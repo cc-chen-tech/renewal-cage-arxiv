@@ -20,6 +20,7 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     fractional_stokes_einstein_exponents,
+    infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
@@ -486,6 +487,47 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 diffusion_coefficient=1e-4,
                 tau_alpha=10.0,
                 renewal_delay=3.0,
+            )
+
+    def test_full_observable_inversion_recovers_renewal_delay_without_external_tau_d(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        plateau = math.exp(-0.5 * wave_number**2 * params.cage_variance)
+        diffusion = long_time_diffusion_coefficient(params)
+        tau_alpha = alpha_relaxation_time(wave_number, params)
+        peak = dimensionless_peak_prediction(params)
+
+        inferred = infer_parameters_from_full_observables(
+            wave_number=wave_number,
+            debye_waller_plateau=plateau,
+            diffusion_coefficient=diffusion,
+            tau_alpha=tau_alpha,
+            peak_time=peak["peak_time"],
+            peak_ngp=peak["peak_ngp"],
+        )
+
+        self.assertAlmostEqual(inferred["cage_variance"], params.cage_variance)
+        self.assertAlmostEqual(inferred["jump_variance"], params.jump_variance)
+        self.assertAlmostEqual(inferred["renewal_rate"], params.renewal_rate)
+        self.assertAlmostEqual(inferred["renewal_delay"], params.renewal_delay, delta=1e-12)
+        self.assertAlmostEqual(inferred["reconstructed_tau_alpha"], tau_alpha, delta=1e-10)
+        self.assertLess(abs(inferred["log_tau_alpha_residual"]), 1e-12)
+
+    def test_full_observable_inversion_rejects_impossible_peak_timing(self):
+        with self.assertRaisesRegex(ValueError, "peak timing"):
+            infer_parameters_from_full_observables(
+                wave_number=1.1,
+                debye_waller_plateau=0.55,
+                diffusion_coefficient=0.02,
+                tau_alpha=10.0,
+                peak_time=1.0,
+                peak_ngp=0.2,
             )
 
     def test_delayed_renewal_shape_is_positive_and_matches_integral(self):

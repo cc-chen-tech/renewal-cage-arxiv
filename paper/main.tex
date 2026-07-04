@@ -198,6 +198,23 @@ peak is no longer adjustable:
 Thus the NGP peak time and height become out-of-sample checks on the parameters
 inferred from $F_s(k,t)$ and long-time diffusion.
 
+One can also invert the observables without supplying $\tau_d$ externally. Use
+$f_k$ to infer $A$, the NGP peak height to infer
+\begin{equation}
+  q=4A\alpha_2(t^\ast),
+\end{equation}
+and diffusion to infer $\lambda=2D/q$. The peak time then fixes the delayed
+onset by solving
+\begin{equation}
+  \lambda\tau_d F(t^\ast/\tau_d)=\frac{A}{q}.
+\end{equation}
+Equivalently, with $s=t^\ast/\tau_d$,
+\begin{equation}
+  \frac{F(s)}{s}=\frac{A/q}{\lambda t^\ast}.
+\end{equation}
+The existence condition is $(A/q)/(\lambda t^\ast)<1$. After this inversion,
+$\tau_\alpha(k)$ is a held-out consistency check rather than an input parameter.
+
 \section{Temperature Dependence and Stokes-Einstein Decoupling}
 
 The fixed-parameter model can be turned into a minimal temperature diagnostic
@@ -430,6 +447,9 @@ The observable inversion gives an existence margin
 $\mathcal{M}_{\rm inv}=1.26$ for the default parameters; reducing $D$ below
 about $0.79$ of its consistent value violates the scattering-transport
 existence criterion.
+The full inversion using $f_k$, $D$, $t^\ast$, and $\alpha_2(t^\ast)$ recovers
+$A=1.00$, $q=0.80$, $\lambda=0.18$, and $\tau_d=3.00$; its held-out
+$\tau_\alpha$ residual is below $10^{-12}$ in logarithmic units.
 
 \begin{figure}[h]
   \centering

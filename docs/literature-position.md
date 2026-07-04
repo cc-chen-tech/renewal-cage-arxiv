@@ -138,6 +138,12 @@ observable inversion:
   existence margin:
     D tau_d F(tau_alpha/tau_d) k^2 / [-log(h)] > 1
   then lambda = 2D/q and the NGP peak is predicted, not fit
+
+full observable inversion without supplied tau_d:
+  q = 4 A alpha_2(t*)
+  lambda = 2D/q
+  solve F(s)/s = (A/q)/(lambda t*) with s=t*/tau_d
+  tau_alpha is then a held-out residual
 ```
 
 Competing mechanisms should be asked to reproduce the same four observables:
@@ -153,6 +159,8 @@ falsifiability test is now the
 scattering-transport inversion: once `F_s` plateau, `D`, `tau_alpha`, and
 `tau_d` are specified, the model either has no positive-`q` solution or predicts
 the NGP peak time and height without another free parameter.
+The stronger inference protocol uses the NGP peak itself to infer `tau_d`, so
+the measured `tau_alpha` becomes an independent consistency check.
 
 ## What Still Needs Strengthening
 

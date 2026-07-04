@@ -267,6 +267,24 @@ R(t*) = A/q
 alpha_2(t*) = q/(4A).
 ```
 
+A second inversion removes the need to supply `tau_d`. Use `f_k` to infer `A`,
+the NGP peak height to infer `q=4A alpha_2(t*)`, and long-time diffusion to
+infer `lambda=2D/q`. The NGP peak time then fixes the delayed onset:
+
+```text
+lambda tau_d F(t*/tau_d) = A/q.
+```
+
+Writing `s=t*/tau_d`,
+
+```text
+F(s)/s = (A/q)/(lambda t*).
+```
+
+This has a positive solution only when `(A/q)/(lambda t*) < 1`. After solving
+for `tau_d`, the measured `tau_alpha` becomes a held-out residual rather than
+an input fit parameter.
+
 ## 4.7. Temperature dependence and Stokes-Einstein decoupling
 
 A minimal temperature extension assigns reduced-temperature dependence to the
@@ -386,6 +404,7 @@ data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_inversion.csv
+data/renewal_cage_full_inference.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_scattering.svg
@@ -412,6 +431,8 @@ the local fractional exponent from `xi_SE=0.725` to `0.568`. The same scan
 raises `E_app` from `2.69` to `3.43` and `m_loc` from `1.17` to `2.41`.
 Increasing the barrier gap `E_d-E_lambda` from `0` to `4.5` raises the cold-end
 normalized `D tau_alpha` from `1.01` to `3.30`.
+The full observable inversion recovers `A=1.00`, `q=0.80`, `lambda=0.18`, and
+`tau_d=3.00`; the held-out `tau_alpha` log residual is below `1e-12`.
 
 The parameter sweeps show:
 

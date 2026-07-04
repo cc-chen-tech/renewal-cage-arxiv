@@ -573,6 +573,55 @@ alpha_2(t*) = q/(4A)
 这就是当前版本最强的证伪点：先用 scattering 和 transport 反演参数，再用 NGP peak
 检查模型是否自洽。
 
+还可以进一步消去外部输入的 `tau_d`。如果同时使用 NGP peak height 和 peak time：
+
+```text
+q = 4 A alpha_2(t*)
+lambda = 2D/q
+```
+
+peak time 满足：
+
+```text
+lambda tau_d F(t*/tau_d) = A/q
+```
+
+令：
+
+```text
+s = t*/tau_d
+```
+
+则：
+
+```text
+F(s)/s = (A/q)/(lambda t*)
+```
+
+只要：
+
+```text
+(A/q)/(lambda t*) < 1
+```
+
+就能唯一解出 `s`，进而得到：
+
+```text
+tau_d = t*/s
+```
+
+这样 `A, q, lambda, tau_d` 都可以从 `F_s` plateau、long-time `D`、NGP peak
+height 和 NGP peak time 反演出来；`tau_alpha` 不再是输入，而是 held-out
+consistency check。默认合成数据中完整反演恢复：
+
+```text
+A = 1.00
+q = 0.80
+lambda = 0.18
+tau_d = 3.00
+log tau_alpha residual < 1e-12
+```
+
 ## 8. 与 Glass Transition 的联系
 
 在 glass transition 语境下：

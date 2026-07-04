@@ -42,6 +42,9 @@ the observed late NGP to lie below the peak bound `beta/4`.
 The scattering-transport inversion uses the measured Debye-Waller plateau,
 `D`, `tau_alpha`, and `tau_d` to infer `A`, `q`, and `lambda`; it requires the
 existence margin `D tau_d F(tau_alpha/tau_d) k^2 / [-log h]` to exceed one.
+A fuller observable inversion uses `f_k`, `D`, NGP peak time, and NGP peak
+height to infer `A`, `q`, `lambda`, and `tau_d`, leaving `tau_alpha` as a
+held-out consistency check.
 
 ## Repository Layout
 
@@ -98,6 +101,7 @@ data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_inversion.csv
+data/renewal_cage_full_inference.csv
 paper/figures/renewal_cage_results.pdf
 paper/figures/renewal_cage_dimensionless.pdf
 paper/figures/renewal_cage_scattering.pdf

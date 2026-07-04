@@ -485,6 +485,94 @@ def infer_parameters_from_scattering_transport(
     }
 
 
+def infer_parameters_from_full_observables(
+    *,
+    wave_number: float,
+    debye_waller_plateau: float,
+    diffusion_coefficient: float,
+    tau_alpha: float,
+    peak_time: float,
+    peak_ngp: float,
+    threshold: float = math.exp(-1.0),
+) -> dict[str, float]:
+    """Infer ``A, q, lambda, tau_d`` without externally supplying ``tau_d``.
+
+    The plateau gives ``A``. The plateau NGP peak height gives ``q/A=4 alpha*``.
+    The long-time diffusion coefficient gives ``lambda=2D/q``. The peak time
+    then fixes ``tau_d`` through ``lambda tau_d F(t*/tau_d)=A/q``. The supplied
+    alpha time is held out as a consistency check rather than used as a fit
+    parameter.
+    """
+
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if not 0.0 < debye_waller_plateau < 1.0:
+        raise ValueError("debye_waller_plateau must lie between zero and one")
+    if diffusion_coefficient <= 0.0:
+        raise ValueError("diffusion_coefficient must be positive")
+    if tau_alpha <= 0.0:
+        raise ValueError("tau_alpha must be positive")
+    if peak_time <= 0.0:
+        raise ValueError("peak_time must be positive")
+    if peak_ngp <= 0.0:
+        raise ValueError("peak_ngp must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must lie between 0 and 1")
+
+    cage_variance = -2.0 * math.log(debye_waller_plateau) / (wave_number**2)
+    jump_variance = 4.0 * peak_ngp * cage_variance
+    target_renewal_count = cage_variance / jump_variance
+    renewal_rate = 2.0 * diffusion_coefficient / jump_variance
+    peak_timing_ratio = target_renewal_count / (renewal_rate * peak_time)
+    if not 0.0 < peak_timing_ratio < 1.0:
+        raise ValueError("peak timing is incompatible with positive delayed-renewal onset")
+
+    low = 0.0
+    high = 1.0
+
+    def shape_ratio(scaled_time: float) -> float:
+        return delayed_renewal_shape(scaled_time) / scaled_time
+
+    while shape_ratio(high) < peak_timing_ratio:
+        high *= 2.0
+    for _ in range(100):
+        mid = 0.5 * (low + high)
+        if shape_ratio(mid) < peak_timing_ratio:
+            low = mid
+        else:
+            high = mid
+    scaled_peak_time = 0.5 * (low + high)
+    renewal_delay = peak_time / scaled_peak_time
+    inferred_params = DelayedRenewalCageParams(
+        cage_variance=cage_variance,
+        cage_tau=1.0,
+        jump_variance=jump_variance,
+        renewal_rate=renewal_rate,
+        renewal_delay=renewal_delay,
+    )
+    reconstructed_tau_alpha = alpha_relaxation_time(wave_number, inferred_params, threshold=threshold)
+    reconstructed_peak = dimensionless_peak_prediction(inferred_params)
+    return {
+        "wave_number": wave_number,
+        "threshold": threshold,
+        "cage_variance": cage_variance,
+        "jump_variance": jump_variance,
+        "jump_to_cage_variance": jump_variance / cage_variance,
+        "renewal_rate": renewal_rate,
+        "renewal_delay": renewal_delay,
+        "lambda_tau_delay": renewal_rate * renewal_delay,
+        "target_renewal_count": target_renewal_count,
+        "scaled_peak_time": scaled_peak_time,
+        "peak_timing_ratio": peak_timing_ratio,
+        "reconstructed_debye_waller_plateau": math.exp(-0.5 * wave_number**2 * cage_variance),
+        "reconstructed_diffusion_coefficient": long_time_diffusion_coefficient(inferred_params),
+        "reconstructed_tau_alpha": reconstructed_tau_alpha,
+        "reconstructed_peak_time": reconstructed_peak["peak_time"],
+        "reconstructed_peak_ngp": reconstructed_peak["peak_ngp"],
+        "log_tau_alpha_residual": math.log(reconstructed_tau_alpha / tau_alpha),
+    }
+
+
 def temperature_scan(
     temperatures: np.ndarray,
     law: TemperatureLawParams,

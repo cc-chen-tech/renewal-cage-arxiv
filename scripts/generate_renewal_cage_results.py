@@ -22,6 +22,7 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
+    infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
     moments_1d,
     ngp_1d,
@@ -281,6 +282,41 @@ def write_inversion_csv(
             )
     write_sweep_csv(path, rows)
     return rows
+
+
+def write_full_inference_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    *,
+    wave_number: float,
+) -> dict[str, float]:
+    plateau = float(np.exp(-0.5 * wave_number**2 * params.cage_variance))
+    diffusion = 0.5 * params.renewal_rate * params.jump_variance
+    observed_tau_alpha = alpha_relaxation_time(wave_number, params)
+    observed_peak = dimensionless_peak_prediction(params)
+    inferred = infer_parameters_from_full_observables(
+        wave_number=wave_number,
+        debye_waller_plateau=plateau,
+        diffusion_coefficient=diffusion,
+        tau_alpha=observed_tau_alpha,
+        peak_time=observed_peak["peak_time"],
+        peak_ngp=observed_peak["peak_ngp"],
+    )
+    row = {
+        "wave_number": wave_number,
+        "observed_debye_waller_plateau": plateau,
+        "observed_diffusion_coefficient": diffusion,
+        "observed_tau_alpha": observed_tau_alpha,
+        "observed_peak_time": observed_peak["peak_time"],
+        "observed_peak_ngp": observed_peak["peak_ngp"],
+        "true_cage_variance": params.cage_variance,
+        "true_jump_variance": params.jump_variance,
+        "true_renewal_rate": params.renewal_rate,
+        "true_renewal_delay": params.renewal_delay,
+        **inferred,
+    }
+    write_sweep_csv(path, [row])
+    return row
 
 
 def write_tail_ratio_csv(
@@ -932,6 +968,7 @@ def main() -> None:
         wave_number=1.1,
         diffusion_scales=[0.6, 0.75, 0.8, 1.0, 1.5, 2.0, 3.0],
     )
+    write_full_inference_csv(DATA_DIR / "renewal_cage_full_inference.csv", params, wave_number=1.1)
     write_inversion_svg(FIGURE_DIR / "renewal_cage_inversion.svg", inversion_rows)
 
 
