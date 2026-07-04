@@ -872,6 +872,190 @@ def infer_gamma_exchange_multik_collapse(
     }
 
 
+def _log_residual(observed: float, predicted: float) -> float:
+    if observed <= 0.0 or predicted <= 0.0:
+        return math.inf
+    return math.log(observed / predicted)
+
+
+def _late_selection_row(
+    *,
+    model: str,
+    predicted_earlier_ngp: float,
+    predicted_later_ngp: float,
+    predicted_alpha_decay_per_renewal: float,
+    earlier_ngp: float,
+    later_ngp: float,
+    observed_alpha_decay_per_renewal: float,
+    score_tolerance: float,
+    extras: dict[str, float] | None = None,
+) -> dict[str, float | str]:
+    residuals = [
+        _log_residual(earlier_ngp, predicted_earlier_ngp),
+        _log_residual(later_ngp, predicted_later_ngp),
+        _log_residual(observed_alpha_decay_per_renewal, predicted_alpha_decay_per_renewal),
+    ]
+    finite_residuals = [value for value in residuals if math.isfinite(value)]
+    score = math.inf if len(finite_residuals) != len(residuals) else math.sqrt(sum(value**2 for value in residuals))
+    row: dict[str, float | str] = {
+        "model": model,
+        "predicted_earlier_ngp": predicted_earlier_ngp,
+        "predicted_later_ngp": predicted_later_ngp,
+        "predicted_alpha_decay_per_renewal": predicted_alpha_decay_per_renewal,
+        "earlier_ngp_log_residual": residuals[0],
+        "later_ngp_log_residual": residuals[1],
+        "alpha_slope_log_residual": residuals[2],
+        "score": score,
+        "score_tolerance": score_tolerance,
+        "passes": 1.0 if score <= score_tolerance else 0.0,
+    }
+    if extras is not None:
+        row.update(extras)
+    return row
+
+
+def late_mechanism_selection(
+    *,
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    earlier_renewal_count: float,
+    earlier_ngp: float,
+    later_renewal_count: float,
+    later_ngp: float,
+    observed_alpha_decay_per_renewal: float,
+    score_tolerance: float = 0.2,
+) -> dict[str, str | dict[str, float | str]]:
+    """Classify late-time NGP recovery and alpha slowing mechanisms.
+
+    The selector compares three asymptotic count mechanisms using two late NGP
+    measurements and one cage-normalized alpha slope per renewal:
+
+    * Poisson delayed renewal: alpha_2 ~= 1/R and alpha slope Gamma_k.
+    * Static gamma disorder: alpha_2 ~= 1/R + 1/kappa and alpha slope tends 0.
+    * Finite exchange: alpha_2 ~= (1+c)/R and alpha slope log(1+Gamma_k c)/c.
+
+    This is intended as a falsification diagnostic, not a full likelihood model.
+    The two NGP points distinguish true long-time recovery from a static plateau.
+    """
+
+    _validate(params)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if earlier_renewal_count <= 0.0 or later_renewal_count <= 0.0:
+        raise ValueError("renewal counts must be positive")
+    if earlier_renewal_count >= later_renewal_count:
+        raise ValueError("earlier_renewal_count must be smaller than later_renewal_count")
+    if earlier_ngp <= 0.0 or later_ngp <= 0.0:
+        raise ValueError("NGP values must be positive")
+    if observed_alpha_decay_per_renewal <= 0.0:
+        raise ValueError("observed_alpha_decay_per_renewal must be positive")
+    if score_tolerance <= 0.0:
+        raise ValueError("score_tolerance must be positive")
+
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    if gamma <= 0.0:
+        raise ValueError("wave_number and jump_variance imply zero alpha decay rate")
+
+    poisson = _late_selection_row(
+        model="poisson",
+        predicted_earlier_ngp=1.0 / earlier_renewal_count,
+        predicted_later_ngp=1.0 / later_renewal_count,
+        predicted_alpha_decay_per_renewal=gamma,
+        earlier_ngp=earlier_ngp,
+        later_ngp=later_ngp,
+        observed_alpha_decay_per_renewal=observed_alpha_decay_per_renewal,
+        score_tolerance=score_tolerance,
+        extras={"gamma_k": gamma},
+    )
+
+    static_plateau = later_ngp - 1.0 / later_renewal_count
+    if static_plateau > 0.0:
+        static_shape = 1.0 / static_plateau
+        static_alpha_slope = static_shape * math.log1p(gamma * later_renewal_count / static_shape) / later_renewal_count
+        static_gamma = _late_selection_row(
+            model="static_gamma",
+            predicted_earlier_ngp=1.0 / earlier_renewal_count + static_plateau,
+            predicted_later_ngp=1.0 / later_renewal_count + static_plateau,
+            predicted_alpha_decay_per_renewal=static_alpha_slope,
+            earlier_ngp=earlier_ngp,
+            later_ngp=later_ngp,
+            observed_alpha_decay_per_renewal=observed_alpha_decay_per_renewal,
+            score_tolerance=score_tolerance,
+            extras={
+                "gamma_k": gamma,
+                "inferred_static_plateau": static_plateau,
+                "inferred_static_shape": static_shape,
+            },
+        )
+    else:
+        static_gamma = _late_selection_row(
+            model="static_gamma",
+            predicted_earlier_ngp=math.nan,
+            predicted_later_ngp=math.nan,
+            predicted_alpha_decay_per_renewal=math.nan,
+            earlier_ngp=earlier_ngp,
+            later_ngp=later_ngp,
+            observed_alpha_decay_per_renewal=observed_alpha_decay_per_renewal,
+            score_tolerance=score_tolerance,
+            extras={
+                "gamma_k": gamma,
+                "inferred_static_plateau": static_plateau,
+                "inferred_static_shape": math.nan,
+            },
+        )
+
+    exchange_ratio = later_renewal_count * later_ngp - 1.0
+    if exchange_ratio >= 0.0:
+        if math.isclose(exchange_ratio, 0.0, rel_tol=1e-14, abs_tol=1e-14):
+            exchange_alpha_slope = gamma
+        else:
+            exchange_alpha_slope = math.log1p(gamma * exchange_ratio) / exchange_ratio
+        finite_exchange = _late_selection_row(
+            model="finite_exchange",
+            predicted_earlier_ngp=(1.0 + exchange_ratio) / earlier_renewal_count,
+            predicted_later_ngp=(1.0 + exchange_ratio) / later_renewal_count,
+            predicted_alpha_decay_per_renewal=exchange_alpha_slope,
+            earlier_ngp=earlier_ngp,
+            later_ngp=later_ngp,
+            observed_alpha_decay_per_renewal=observed_alpha_decay_per_renewal,
+            score_tolerance=score_tolerance,
+            extras={
+                "gamma_k": gamma,
+                "inferred_exchange_ratio": exchange_ratio,
+                "late_ngp_renewal_amplitude": 1.0 + exchange_ratio,
+            },
+        )
+    else:
+        finite_exchange = _late_selection_row(
+            model="finite_exchange",
+            predicted_earlier_ngp=math.nan,
+            predicted_later_ngp=math.nan,
+            predicted_alpha_decay_per_renewal=math.nan,
+            earlier_ngp=earlier_ngp,
+            later_ngp=later_ngp,
+            observed_alpha_decay_per_renewal=observed_alpha_decay_per_renewal,
+            score_tolerance=score_tolerance,
+            extras={
+                "gamma_k": gamma,
+                "inferred_exchange_ratio": exchange_ratio,
+                "late_ngp_renewal_amplitude": later_renewal_count * later_ngp,
+            },
+        )
+
+    rows = {
+        "poisson": poisson,
+        "static_gamma": static_gamma,
+        "finite_exchange": finite_exchange,
+    }
+    best_model = min(rows, key=lambda name: float(rows[name]["score"]))
+    return {
+        "best_model": best_model,
+        "poisson": poisson,
+        "static_gamma": static_gamma,
+        "finite_exchange": finite_exchange,
+    }
+
+
 def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndarray:
     """Local KWW-like exponent ``d log[-log(decay)] / d log(t)``."""
 

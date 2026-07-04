@@ -44,6 +44,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_self_intermediate_scattering,
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
+    late_mechanism_selection,
     observable_consistency_diagnostics,
     radial_van_hove_3d,
     local_cage_variance,
@@ -647,6 +648,97 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertGreater(collapse["collapse_z_score"], 20.0)
         self.assertEqual(collapse["passes_multik_collapse"], 0.0)
+
+    def test_late_mechanism_selection_identifies_finite_exchange_recovery(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+        times = np.array([10000.0, 30000.0])
+        renewal = delayed_poisson_mean(times, params)
+        alpha = gamma_exchange_ngp_1d(times, params, heterogeneity)
+        observed_slope = gamma_exchange_asymptotic_diagnostics(1.1, params, heterogeneity)[
+            "late_alpha_decay_per_renewal"
+        ]
+
+        selection = late_mechanism_selection(
+            wave_number=1.1,
+            params=params,
+            earlier_renewal_count=float(renewal[0]),
+            earlier_ngp=float(alpha[0]),
+            later_renewal_count=float(renewal[1]),
+            later_ngp=float(alpha[1]),
+            observed_alpha_decay_per_renewal=observed_slope,
+        )
+
+        self.assertEqual(selection["best_model"], "finite_exchange")
+        self.assertEqual(selection["finite_exchange"]["passes"], 1.0)
+        self.assertEqual(selection["poisson"]["passes"], 0.0)
+        self.assertEqual(selection["static_gamma"]["passes"], 0.0)
+        self.assertAlmostEqual(selection["finite_exchange"]["inferred_exchange_ratio"], 25.0, delta=0.15)
+
+    def test_late_mechanism_selection_identifies_static_gamma_plateau(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        shape = 0.4
+        times = np.array([10000.0, 30000.0])
+        renewal = delayed_poisson_mean(times, params)
+        alpha = static_gamma_ngp_1d(times, params, shape)
+        decay = static_gamma_normalized_alpha_decay(1.1, np.array([times[1]]), params, shape)[0]
+        observed_slope = -math.log(decay) / renewal[1]
+
+        selection = late_mechanism_selection(
+            wave_number=1.1,
+            params=params,
+            earlier_renewal_count=float(renewal[0]),
+            earlier_ngp=float(alpha[0]),
+            later_renewal_count=float(renewal[1]),
+            later_ngp=float(alpha[1]),
+            observed_alpha_decay_per_renewal=float(observed_slope),
+        )
+
+        self.assertEqual(selection["best_model"], "static_gamma")
+        self.assertEqual(selection["static_gamma"]["passes"], 1.0)
+        self.assertEqual(selection["poisson"]["passes"], 0.0)
+        self.assertEqual(selection["finite_exchange"]["passes"], 0.0)
+        self.assertAlmostEqual(selection["static_gamma"]["inferred_static_shape"], shape, delta=1e-3)
+
+    def test_late_mechanism_selection_identifies_minimal_poisson_renewal(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        times = np.array([10000.0, 30000.0])
+        renewal = delayed_poisson_mean(times, params)
+        alpha = ngp_1d(times, params)
+        gamma = 1.0 - math.exp(-0.5 * 1.1**2 * params.jump_variance)
+
+        selection = late_mechanism_selection(
+            wave_number=1.1,
+            params=params,
+            earlier_renewal_count=float(renewal[0]),
+            earlier_ngp=float(alpha[0]),
+            later_renewal_count=float(renewal[1]),
+            later_ngp=float(alpha[1]),
+            observed_alpha_decay_per_renewal=gamma,
+        )
+
+        self.assertEqual(selection["best_model"], "poisson")
+        self.assertEqual(selection["poisson"]["passes"], 1.0)
+        self.assertEqual(selection["static_gamma"]["passes"], 0.0)
+        self.assertEqual(selection["finite_exchange"]["passes"], 0.0)
 
     def test_static_gamma_null_has_nonzero_long_time_ngp_plateau(self):
         params = DelayedRenewalCageParams(

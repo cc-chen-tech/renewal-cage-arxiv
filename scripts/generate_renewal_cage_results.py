@@ -40,6 +40,7 @@ from renewal_cage import (  # noqa: E402
     infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
     infer_renewal_correlation_size,
+    late_mechanism_selection,
     local_alpha_stretching_exponent,
     moments_1d,
     ngp_1d,
@@ -594,6 +595,72 @@ def write_static_null_csv(
                 ],
             }
         )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_mechanism_selection_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+    *,
+    wave_number: float,
+    earlier_time: float,
+    later_time: float,
+) -> list[dict[str, float | str]]:
+    times = np.array([earlier_time, later_time], dtype=float)
+    renewal = delayed_poisson_mean(times, params)
+    gamma = 1.0 - float(np.exp(-0.5 * wave_number**2 * params.jump_variance))
+    static_decay = static_gamma_normalized_alpha_decay(wave_number, np.array([later_time]), params, heterogeneity.shape)[0]
+    cases = [
+        ("poisson", ngp_1d(times, params), gamma),
+        (
+            "static_gamma",
+            static_gamma_ngp_1d(times, params, heterogeneity.shape),
+            -float(np.log(static_decay)) / float(renewal[1]),
+        ),
+        (
+            "finite_exchange",
+            gamma_exchange_ngp_1d(times, params, heterogeneity),
+            gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)[
+                "late_alpha_decay_per_renewal"
+            ],
+        ),
+    ]
+
+    rows: list[dict[str, float | str]] = []
+    for case_name, alpha, alpha_slope in cases:
+        selection = late_mechanism_selection(
+            wave_number=wave_number,
+            params=params,
+            earlier_renewal_count=float(renewal[0]),
+            earlier_ngp=float(alpha[0]),
+            later_renewal_count=float(renewal[1]),
+            later_ngp=float(alpha[1]),
+            observed_alpha_decay_per_renewal=float(alpha_slope),
+        )
+        for model_name in ["poisson", "static_gamma", "finite_exchange"]:
+            model = selection[model_name]
+            rows.append(
+                {
+                    "case": case_name,
+                    "candidate_model": model_name,
+                    "best_model": selection["best_model"],
+                    "passes": model["passes"],
+                    "score": model["score"],
+                    "earlier_ngp_log_residual": model["earlier_ngp_log_residual"],
+                    "later_ngp_log_residual": model["later_ngp_log_residual"],
+                    "alpha_slope_log_residual": model["alpha_slope_log_residual"],
+                    "observed_earlier_ngp": float(alpha[0]),
+                    "observed_later_ngp": float(alpha[1]),
+                    "observed_alpha_decay_per_renewal": float(alpha_slope),
+                    "predicted_earlier_ngp": model["predicted_earlier_ngp"],
+                    "predicted_later_ngp": model["predicted_later_ngp"],
+                    "predicted_alpha_decay_per_renewal": model["predicted_alpha_decay_per_renewal"],
+                    "earlier_renewal_count": float(renewal[0]),
+                    "later_renewal_count": float(renewal[1]),
+                }
+            )
     write_sweep_csv(path, rows)
     return rows
 
@@ -1393,6 +1460,72 @@ def write_static_null_svg(path: Path, static_rows: list[dict[str, float]]) -> No
     path.write_text(svg)
 
 
+def write_mechanism_selection_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1080, 560
+    top, bottom = 95, 455
+    left, right = 90, 1010
+    cases = ["poisson", "static_gamma", "finite_exchange"]
+    models = ["poisson", "static_gamma", "finite_exchange"]
+    palette = {
+        "poisson": "#2b6cb0",
+        "static_gamma": "#805ad5",
+        "finite_exchange": "#c05621",
+    }
+    row_map = {(row["case"], row["candidate_model"]): row for row in rows}
+    max_score = max(float(row["score"]) for row in rows if np.isfinite(float(row["score"])))
+    y_max = max(1.0, max_score * 1.05)
+
+    def y(value: float) -> float:
+        return bottom - value * (bottom - top) / y_max
+
+    group_width = (right - left) / len(cases)
+    bar_width = 42
+    bars = []
+    labels = []
+    for case_idx, case in enumerate(cases):
+        group_left = left + case_idx * group_width
+        center = group_left + group_width / 2.0
+        labels.append(
+            f'<text x="{center - 40}" y="{bottom + 34}" font-family="Arial, sans-serif" font-size="13">{case}</text>'
+        )
+        for model_idx, model in enumerate(models):
+            row = row_map[(case, model)]
+            raw_score = float(row["score"])
+            score = raw_score if np.isfinite(raw_score) else y_max
+            x = center - 1.5 * bar_width + model_idx * bar_width
+            y_top = y(score)
+            opacity = "1.0" if row["passes"] == 1.0 else "0.45"
+            label = f"{raw_score:.2f}" if np.isfinite(raw_score) else "invalid"
+            bars.append(
+                f'<rect x="{x:.2f}" y="{y_top:.2f}" width="{bar_width - 6}" height="{bottom - y_top:.2f}" fill="{palette[model]}" opacity="{opacity}" />'
+            )
+            bars.append(
+                f'<text x="{x - 2:.2f}" y="{y_top - 7:.2f}" font-family="Arial, sans-serif" font-size="10" fill="{palette[model]}">{label}</text>'
+            )
+    legend = []
+    for idx, model in enumerate(models):
+        legend.append(
+            f'<rect x="{left + idx * 220}" y="505" width="14" height="14" fill="{palette[model]}" />'
+            f'<text x="{left + 20 + idx * 220}" y="517" font-family="Arial, sans-serif" font-size="13">{model}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Late-time mechanism selection</text>
+  <text x="90" y="68" font-family="Arial, sans-serif" font-size="13" fill="#444">Lower score means the candidate matches two late NGP points and the alpha slope.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="34" y="275" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 34 275)">joint log-residual score</text>
+  <line x1="{left}" y1="{y(0.2):.2f}" x2="{right}" y2="{y(0.2):.2f}" stroke="#999" stroke-dasharray="5 4" />
+  <text x="{right - 78}" y="{y(0.2) - 7:.2f}" font-family="Arial, sans-serif" font-size="11" fill="#555">pass threshold</text>
+  {"".join(bars)}
+  {"".join(labels)}
+  {"".join(legend)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -1656,6 +1789,14 @@ def main() -> None:
         heterogeneity,
         wave_number=1.1,
     )
+    mechanism_selection_rows = write_mechanism_selection_csv(
+        DATA_DIR / "renewal_cage_mechanism_selection.csv",
+        params,
+        heterogeneity,
+        wave_number=1.1,
+        earlier_time=10000.0,
+        later_time=30000.0,
+    )
     write_barrier_svg(
         FIGURE_DIR / "renewal_cage_barrier.svg",
         scattering_time,
@@ -1665,6 +1806,7 @@ def main() -> None:
     write_heterogeneity_svg(FIGURE_DIR / "renewal_cage_heterogeneity.svg", heterogeneity_rows)
     write_heterogeneity_map_svg(FIGURE_DIR / "renewal_cage_heterogeneity_map.svg", heterogeneity_map_rows)
     write_static_null_svg(FIGURE_DIR / "renewal_cage_static_null.svg", static_null_rows)
+    write_mechanism_selection_svg(FIGURE_DIR / "renewal_cage_mechanism_selection.svg", mechanism_selection_rows)
     inversion_rows = write_inversion_csv(
         DATA_DIR / "renewal_cage_inversion.csv",
         params,
