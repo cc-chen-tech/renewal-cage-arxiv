@@ -46,6 +46,7 @@ paper/references.bib                       bibliography
 ```bash
 python3 -m unittest discover -s tests -v
 python3 scripts/generate_renewal_cage_results.py
+python3 scripts/build_arxiv_package.py
 ```
 
 Expected outputs include:
@@ -58,6 +59,9 @@ data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
 data/renewal_cage_van_hove.csv
 data/renewal_cage_tail_ratios.csv
+paper/figures/renewal_cage_results.pdf
+paper/figures/renewal_cage_dimensionless.pdf
+dist/renewal-cage-arxiv-source.zip
 ```
 
 ## Current Status

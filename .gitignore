@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .pytest_cache/
+tmp/
 paper/*.aux
 paper/*.bbl
 paper/*.blg
