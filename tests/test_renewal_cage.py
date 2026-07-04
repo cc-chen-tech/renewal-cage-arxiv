@@ -53,6 +53,10 @@ from renewal_cage import (  # noqa: E402
     peak_relaxation_coupling,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
+    static_gamma_asymptotic_diagnostics,
+    static_gamma_count_moments,
+    static_gamma_ngp_1d,
+    static_gamma_normalized_alpha_decay,
     stokes_einstein_product,
     temperature_dependent_params,
     temperature_scan,
@@ -573,6 +577,66 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertGreater(collapse["collapse_z_score"], 20.0)
         self.assertEqual(collapse["passes_multik_collapse"], 0.0)
+
+    def test_static_gamma_null_has_nonzero_long_time_ngp_plateau(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        shape = 0.4
+        times = np.array([30.0, 30000.0])
+
+        count = static_gamma_count_moments(times, params, shape)
+        renewal = delayed_poisson_mean(times, params)
+        alpha = static_gamma_ngp_1d(times, params, shape)
+
+        np.testing.assert_allclose(count["mean"], renewal, rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(count["variance"], renewal + renewal**2 / shape, rtol=1e-12, atol=1e-14)
+        self.assertGreater(alpha[-1], 2.45)
+        self.assertAlmostEqual(alpha[-1], 1.0 / shape, delta=0.01)
+
+    def test_static_gamma_alpha_decay_per_renewal_vanishes_at_long_times(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        shape = 0.4
+        wave_number = 1.1
+        times = np.array([300.0, 30000.0, 60000.0])
+
+        decay = static_gamma_normalized_alpha_decay(wave_number, times, params, shape)
+        renewal = delayed_poisson_mean(times, params)
+        slopes = -np.log(decay) / renewal
+        diagnostics = static_gamma_asymptotic_diagnostics(wave_number, params, shape)
+
+        self.assertLess(slopes[-1], slopes[0] / 20.0)
+        self.assertLess(slopes[-1], 0.002)
+        self.assertEqual(diagnostics["late_alpha_decay_per_renewal"], 0.0)
+        self.assertAlmostEqual(diagnostics["late_ngp_plateau"], 1.0 / shape, delta=1e-12)
+
+    def test_static_gamma_null_contrasts_finite_exchange_gaussian_recovery(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+        late_time = np.array([30000.0])
+
+        static_alpha = static_gamma_ngp_1d(late_time, params, heterogeneity.shape)[0]
+        exchange_alpha = gamma_exchange_ngp_1d(late_time, params, heterogeneity)[0]
+
+        self.assertGreater(static_alpha, 2.45)
+        self.assertLess(exchange_alpha, 0.01)
+        self.assertGreater(static_alpha / exchange_alpha, 500.0)
 
     def test_correlated_domain_susceptibility_scales_renewal_component(self):
         params = DelayedRenewalCageParams(

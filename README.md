@@ -16,8 +16,9 @@ The model combines:
   fractional Stokes-Einstein exponents, apparent alpha-activation/fragility
   diagnostics, renewal-count susceptibility, renewal-domain chi4/cooperative-size
   diagnostics, NGP peak/alpha-relaxation coupling, finite-exchange
-  heterogeneity diagnostics, finite-time consistency diagnostics, and observable
-  inversion/falsifiability criteria.
+  heterogeneity diagnostics, a static-gamma mobility-disorder null model,
+  finite-time consistency diagnostics, and observable inversion/falsifiability
+  criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -54,6 +55,9 @@ observables share one exchange scale. With measurement uncertainties, the same
 closed derivatives propagate this residual into a `z` score. A multi-`k`
 extension requires all `c_alpha(k)` values from `F_s(k,t)` to collapse to the
 same `c_NGP`.
+A static-gamma null model gives `Var N=R+R^2/kappa0`,
+`alpha_2(t)->1/kappa0`, and `-log Phi_alpha/R->0`; it can broaden alpha
+relaxation but fails long-time Gaussian recovery.
 The NGP peak and alpha relaxation are also linked by renewal counts:
 `R_peak=A/q` and
 `R_alpha=-log(h)/[1-exp(-k^2 q/2)]`, so their time ratio is fixed by the same
@@ -104,6 +108,7 @@ figures/renewal_cage_temperature.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
 figures/renewal_cage_heterogeneity_map.svg
+figures/renewal_cage_static_null.svg
 figures/renewal_cage_inversion.svg
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
@@ -123,6 +128,7 @@ data/renewal_cage_heterogeneity_diagnostics.csv
 data/renewal_cage_heterogeneity_map.csv
 data/renewal_cage_heterogeneity_protocol.csv
 data/renewal_cage_heterogeneity_multik.csv
+data/renewal_cage_static_null.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 paper/figures/renewal_cage_results.pdf
@@ -132,6 +138,7 @@ paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf
 paper/figures/renewal_cage_heterogeneity_map.pdf
+paper/figures/renewal_cage_static_null.pdf
 paper/figures/renewal_cage_inversion.pdf
 dist/renewal-cage-arxiv-source.zip
 ```

@@ -46,6 +46,9 @@ from renewal_cage import (  # noqa: E402
     radial_van_hove_3d,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
+    static_gamma_asymptotic_diagnostics,
+    static_gamma_ngp_1d,
+    static_gamma_normalized_alpha_decay,
     temperature_scan,
 )
 
@@ -461,6 +464,62 @@ def write_heterogeneity_multik_csv(
                     "passes_multik_collapse": collapse["passes_multik_collapse"],
                 }
             )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_static_null_csv(
+    path: Path,
+    time: np.ndarray,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float]]:
+    renewal = delayed_poisson_mean(time, params)
+    poisson_decay = normalized_alpha_decay(wave_number, time, params)
+    gamma_decay = gamma_exchange_normalized_alpha_decay(wave_number, time, params, heterogeneity)
+    static_decay = static_gamma_normalized_alpha_decay(wave_number, time, params, heterogeneity.shape)
+    poisson_alpha = ngp_1d(time, params)
+    gamma_alpha = gamma_exchange_ngp_1d(time, params, heterogeneity)
+    static_alpha = static_gamma_ngp_1d(time, params, heterogeneity.shape)
+    gamma_slope = np.divide(
+        -np.log(gamma_decay),
+        renewal,
+        out=np.full_like(renewal, np.nan),
+        where=renewal > 0.0,
+    )
+    static_slope = np.divide(
+        -np.log(static_decay),
+        renewal,
+        out=np.full_like(renewal, np.nan),
+        where=renewal > 0.0,
+    )
+    static_diagnostics = static_gamma_asymptotic_diagnostics(wave_number, params, heterogeneity.shape)
+    gamma_diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+    rows = []
+    for idx, value in enumerate(time):
+        rows.append(
+            {
+                "time": float(value),
+                "log10_time": float(np.log10(value)),
+                "renewal_mean": float(renewal[idx]),
+                "poisson_alpha_decay": float(poisson_decay[idx]),
+                "gamma_exchange_alpha_decay": float(gamma_decay[idx]),
+                "static_gamma_alpha_decay": float(static_decay[idx]),
+                "poisson_ngp": float(poisson_alpha[idx]),
+                "gamma_exchange_ngp": float(gamma_alpha[idx]),
+                "static_gamma_ngp": float(static_alpha[idx]),
+                "gamma_exchange_alpha_slope_per_renewal": float(gamma_slope[idx]),
+                "static_gamma_alpha_slope_per_renewal": float(static_slope[idx]),
+                "static_gamma_late_ngp_plateau": static_diagnostics["late_ngp_plateau"],
+                "static_gamma_late_alpha_decay_per_renewal": static_diagnostics["late_alpha_decay_per_renewal"],
+                "gamma_exchange_late_ngp_renewal_amplitude": gamma_diagnostics["late_ngp_renewal_amplitude"],
+                "gamma_exchange_late_alpha_decay_per_renewal": gamma_diagnostics[
+                    "late_alpha_decay_per_renewal"
+                ],
+            }
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -1108,6 +1167,54 @@ def write_heterogeneity_map_svg(path: Path, map_rows: list[dict[str, float]]) ->
     path.write_text(svg)
 
 
+def write_static_null_svg(path: Path, static_rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    palette = ["#2b6cb0", "#c05621", "#805ad5", "#2f855a"]
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 45}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, x_values: np.ndarray, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, palette[idx % len(palette)]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{palette[idx % len(palette)]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    log_time = np.array([row["log10_time"] for row in static_rows])
+    poisson_decay = np.array([row["poisson_alpha_decay"] for row in static_rows])
+    exchange_decay = np.array([row["gamma_exchange_alpha_decay"] for row in static_rows])
+    static_decay = np.array([row["static_gamma_alpha_decay"] for row in static_rows])
+    exchange_ngp = np.array([row["gamma_exchange_ngp"] for row in static_rows])
+    static_ngp = np.array([row["static_gamma_ngp"] for row in static_rows])
+    static_plateau = np.array([row["static_gamma_late_ngp_plateau"] for row in static_rows])
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Static gamma null versus finite exchange</text>
+  {axes(left_a, right_a, "S. Static disorder broadens alpha decay", "log10 time")}
+  {plot(left_a, right_a, log_time, [("Poisson alpha decay", poisson_decay), ("finite-exchange alpha decay", exchange_decay), ("static-gamma alpha decay", static_decay)])}
+  {axes(left_b, right_b, "T. Static disorder lacks Gaussian recovery", "log10 time")}
+  {plot(left_b, right_b, log_time, [("finite-exchange NGP", exchange_ngp), ("static-gamma NGP", static_ngp), ("static plateau 1/kappa0", static_plateau)])}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -1338,6 +1445,13 @@ def main() -> None:
         late_renewal_count=float(delayed_poisson_mean(late_array, params)[0]),
         late_ngp=float(gamma_exchange_ngp_1d(late_array, params, heterogeneity)[0]),
     )
+    static_null_rows = write_static_null_csv(
+        DATA_DIR / "renewal_cage_static_null.csv",
+        heterogeneity_time,
+        params,
+        heterogeneity,
+        wave_number=1.1,
+    )
     write_barrier_svg(
         FIGURE_DIR / "renewal_cage_barrier.svg",
         scattering_time,
@@ -1346,6 +1460,7 @@ def main() -> None:
     )
     write_heterogeneity_svg(FIGURE_DIR / "renewal_cage_heterogeneity.svg", heterogeneity_rows)
     write_heterogeneity_map_svg(FIGURE_DIR / "renewal_cage_heterogeneity_map.svg", heterogeneity_map_rows)
+    write_static_null_svg(FIGURE_DIR / "renewal_cage_static_null.svg", static_null_rows)
     inversion_rows = write_inversion_csv(
         DATA_DIR / "renewal_cage_inversion.csv",
         params,

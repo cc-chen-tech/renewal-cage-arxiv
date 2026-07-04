@@ -43,7 +43,8 @@ relaxation decouple through the product $\lambda(T)\tau_d(T)$. The delayed
 renewal count regularizes the short-time behavior of jump models while
 preserving analytic tractability and long-time Gaussian recovery. A
 finite-exchange gamma extension then gives a closed criterion for
-stretched-like alpha decay without leaving residual long-time non-Gaussianity.
+stretched-like alpha decay without leaving residual long-time non-Gaussianity,
+and its predictions are contrasted with a static gamma-disorder null model.
 \end{abstract}
 
 \maketitle
@@ -372,10 +373,39 @@ dynamic-heterogeneity amplitude.
 \section{Finite-Exchange Heterogeneity Extension}
 
 The Poisson renewal model is the minimal clock, but glass-forming systems also
-show trajectory-to-trajectory mobility heterogeneity. A static distribution of
-renewal rates can broaden alpha relaxation, but it leaves a nonzero long-time
-NGP and therefore violates Gaussian recovery. A minimal closed correction is to
-let the renewal count be gamma mixed over a finite exchange window. Conditional
+show trajectory-to-trajectory mobility heterogeneity. Before introducing
+exchange, it is useful to state the static mobility-disorder null model. Let a
+trajectory have a fixed dimensionless mobility $M$ drawn from a gamma
+distribution with mean one and shape $\kappa_0$, and let
+$N(t)|M$ be Poisson with mean $MR(t)$. Then
+\begin{equation}
+  G_N^{\rm st}(z;t)=
+  \left[1+\frac{R(t)(1-z)}{\kappa_0}\right]^{-\kappa_0},
+\end{equation}
+\begin{equation}
+  \mathbb{E}N(t)=R(t),\qquad
+  {\rm Var}\,N(t)=R(t)+\frac{R(t)^2}{\kappa_0}.
+\end{equation}
+Consequently,
+\begin{equation}
+  \alpha_2^{\rm st}(t)=
+  \frac{q^2[R(t)+R(t)^2/\kappa_0]}{[L(t)+qR(t)]^2}
+  \longrightarrow \frac{1}{\kappa_0},
+\end{equation}
+and
+\begin{equation}
+  \Phi_\alpha^{\rm st}(k,t)=
+  \left[1+\frac{\Gamma_kR(t)}{\kappa_0}\right]^{-\kappa_0},
+  \qquad
+  -\frac{\log\Phi_\alpha^{\rm st}}{R(t)}\longrightarrow0.
+\end{equation}
+Thus static gamma disorder can broaden alpha relaxation, but it predicts a
+nonzero long-time NGP plateau and an alpha decay that becomes subexponential in
+renewal count. It therefore cannot explain stretched-like alpha relaxation and
+long-time Gaussian recovery simultaneously.
+
+A minimal closed correction is to let the renewal count be gamma mixed over a
+finite exchange window. Conditional
 on a dimensionless mobility $M$, take $N(t)|M$ to be Poisson with mean
 $MR(t)$, and let the gamma shape self-average as
 \begin{equation}
@@ -636,6 +666,13 @@ a weighted mean $c_\alpha=25.00$ and collapse score $z=0.096$. For a mismatch in
 which only the $k=1.1$ alpha slope corresponds to $c=2$, the weighted mean drops
 to $2.23$, the collapse score rises to $61.1$, and the reduced chi-square across
 wave numbers is $756$.
+The static-gamma null with the same $\kappa_0=0.4$ gives an instructive
+contrast: at $t=3.0\times10^4$, it leaves
+$\alpha_2^{\rm st}=2.499$, while finite exchange has already recovered to
+$\alpha_2^{\rm hx}=0.00480$. The static alpha slope per renewal has fallen to
+$6.34\times10^{-4}$, whereas finite exchange remains close to its closed
+late-time value $0.0944$. This separates exchange-controlled stretching from
+permanent mobility disorder.
 
 \begin{figure}[h]
   \centering
@@ -694,6 +731,15 @@ wave numbers is $756$.
   $c=R_x/\kappa_0$ controls the late NGP amplitude and the long-time alpha slope.
   The right panel marks the closed-form window where both enhanced NGP and
   alpha-rate slowing are large enough to be experimentally visible.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_static_null.pdf}
+  \caption{Static gamma mobility disorder as a competing null model. Static
+  disorder broadens the cage-normalized alpha decay, but it leaves a nonzero
+  long-time NGP plateau $1/\kappa_0$ and therefore fails the Gaussian-recovery
+  criterion that finite exchange satisfies.}
 \end{figure}
 
 \begin{figure}[h]

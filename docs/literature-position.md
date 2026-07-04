@@ -138,6 +138,12 @@ renewal-count susceptibility:
     N_corr = chi_4,peak^obs / max_t chi_R(k,t)
 
 finite-exchange heterogeneity extension:
+  static gamma null:
+    Var N = R + R^2/kappa0
+    alpha_2(t) -> 1/kappa0
+    -log Phi_alpha/R -> 0
+    broad alpha relaxation alone is therefore not enough; Gaussian recovery
+    falsifies permanent mobility disorder
   kappa_eff(t) = kappa0 [1 + R(t)/R_x]
   G_N(z;t) = [1 + R(t)(1-z)/kappa_eff(t)]^[-kappa_eff(t)]
   Var N(t) = R(t) + R(t)^2/kappa_eff(t)
@@ -188,6 +194,10 @@ scattering-transport inversion: once `F_s` plateau, `D`, `tau_alpha`, and
 the NGP peak time and height without another free parameter.
 The stronger inference protocol uses the NGP peak itself to infer `tau_d`, so
 the measured `tau_alpha` becomes an independent consistency check.
+A specific nearby null model is now ruled in or out analytically: static
+gamma-distributed renewal rates can mimic stretched alpha decay, but if the same
+sample shows long-time Gaussian recovery, the static null fails because it
+predicts a residual NGP plateau `1/kappa0` instead of `alpha_2 -> 0`.
 
 ## What Still Needs Strengthening
 

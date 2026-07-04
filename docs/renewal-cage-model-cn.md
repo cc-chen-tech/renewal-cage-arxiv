@@ -816,6 +816,59 @@ q/A 的有效对比增强
 NGP 在 Tg 以上温度就出现强变化的观察相容：NGP peak 反映的是 cage-renewal
 heterogeneity 的增强，而不是简单的长时间 diffusion coefficient。
 
+## 8.5 Static Gamma Null Model
+
+为了说明 novelty 不是“random diffusivity 也能产生非 Gaussian”，当前版本加入了
+一个明确的 competing null model：static gamma mobility disorder。
+
+如果每条 trajectory 有一个固定 mobility `M`，且 `M` 服从均值为 1、shape 为
+`kappa0` 的 gamma 分布，那么 renewal count 的 generating function 是：
+
+```text
+G_N^st(z;t) = [1 + R(t)(1-z)/kappa0]^(-kappa0)
+```
+
+所以：
+
+```text
+E N(t) = R(t)
+Var N(t) = R(t) + R(t)^2/kappa0
+```
+
+这给出：
+
+```text
+alpha_2^st(t)
+  = q^2 [R(t)+R(t)^2/kappa0] / [L(t)+qR(t)]^2
+  -> 1/kappa0
+```
+
+同时：
+
+```text
+Phi_alpha^st(k,t)
+  = [1 + Gamma_k R(t)/kappa0]^(-kappa0)
+
+-log Phi_alpha^st(k,t) / R(t) -> 0
+```
+
+结论是：static gamma disorder 可以让 alpha relaxation 变宽，但它必然留下长时间
+NGP plateau，不能解释 Gaussian recovery。finite-exchange 模型的关键改动是让
+`kappa_eff(t) ~ R(t)`，所以既能保留 stretched-like alpha，又能让 NGP 回到 0。
+
+默认例子中 `kappa0=0.4`。在 `t=30000`：
+
+```text
+static gamma NGP       = 2.499
+finite-exchange NGP   = 0.00480
+static alpha slope/R   = 6.34e-4
+finite-exchange slope  = 0.0945
+```
+
+这就是最直接的判据：如果数据同时有 broadened alpha decay 和 long-time Gaussian
+recovery，static mobility disorder 不够，必须有 mobility exchange 或等价的
+self-averaging 机制。
+
 ## 9. 当前结果文件
 
 实现：
@@ -843,9 +896,11 @@ data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
 data/renewal_cage_van_hove.csv
+data/renewal_cage_static_null.csv
 data/renewal_cage_inversion.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
+figures/renewal_cage_static_null.svg
 figures/renewal_cage_inversion.svg
 ```
 

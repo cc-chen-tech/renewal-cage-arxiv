@@ -409,8 +409,27 @@ N_corr = chi_4,peak^obs / max_t chi_R(k,t).
 ## 4.10. Finite-exchange heterogeneity extension
 
 A static distribution of renewal rates can broaden alpha relaxation, but it
-leaves a nonzero long-time NGP. To keep Gaussian recovery, use a finite-exchange
-gamma mixture of the renewal count:
+leaves a nonzero long-time NGP. As a competing null model, take a fixed
+trajectory mobility `M` drawn from a mean-one gamma distribution with shape
+`kappa0`, and then let `N(t)|M` be Poisson with mean `M R(t)`. The static
+renewal-count generating function is
+
+```text
+G_N^st(z;t) = [1 + R(t)(1-z)/kappa0]^(-kappa0)
+```
+
+so
+
+```text
+Var N(t) = R(t) + R(t)^2/kappa0
+alpha_2^st(t) -> 1/kappa0
+Phi_alpha^st(k,t) = [1 + Gamma_k R(t)/kappa0]^(-kappa0)
+-log Phi_alpha^st(k,t) / R(t) -> 0.
+```
+
+Thus static gamma disorder can mimic a broad alpha decay, but it fails the
+long-time Gaussian-recovery criterion. To keep Gaussian recovery, use a
+finite-exchange gamma mixture of the renewal count:
 
 ```text
 N(t) | M ~ Poisson[M R(t)]
@@ -495,6 +514,7 @@ data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_heterogeneity_protocol.csv
 data/renewal_cage_heterogeneity_multik.csv
+data/renewal_cage_static_null.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 figures/renewal_cage_results.svg
@@ -504,6 +524,7 @@ figures/renewal_cage_temperature.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
 figures/renewal_cage_heterogeneity_map.svg
+figures/renewal_cage_static_null.svg
 figures/renewal_cage_inversion.svg
 ```
 
@@ -517,6 +538,20 @@ MSD final      = 26.272
 lambda_*       = 0.180010 from peak diagnostics
 lambda_l       = 0.180000 from finite-time late-NGP inversion
 ```
+
+For the static-gamma null with `kappa0=0.4`, the long-time contrast at
+`t=30000` is:
+
+```text
+static gamma NGP       = 2.499
+finite-exchange NGP   = 0.00480
+static alpha slope/R   = 6.34e-4
+finite-exchange slope  = 0.0945
+```
+
+This is the current sharpest null-model distinction: static mobility disorder
+can broaden `F_s`, but it cannot also recover a Gaussian van Hove/NGP tail at
+long times.
 
 For the illustrative temperature law, cooling from `T=1.00` to `T=0.62`
 decreases `D` by a factor of `3.30`, increases `tau_alpha(k=1.1)` by a factor

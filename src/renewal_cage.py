@@ -302,6 +302,93 @@ def normalized_alpha_decay(
     return np.exp(renewal * (jump_characteristic - 1.0))
 
 
+def _validate_static_gamma_shape(shape: float) -> None:
+    if shape <= 0.0:
+        raise ValueError("shape must be positive")
+
+
+def static_gamma_count_moments(
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    shape: float,
+) -> dict[str, np.ndarray]:
+    """Mean and variance for a static gamma mixture of renewal rates.
+
+    This is the non-exchanging mobility-disorder null model. A fixed
+    trajectory mobility produces negative-binomial count statistics with
+    constant gamma shape, so overdispersion grows as ``R(t)^2`` and does not
+    self-average away.
+    """
+
+    _validate(params)
+    _validate_static_gamma_shape(shape)
+    renewal = delayed_poisson_mean(t, params)
+    return {
+        "mean": renewal,
+        "variance": renewal + renewal**2 / shape,
+        "shape": np.full_like(renewal, shape),
+    }
+
+
+def static_gamma_ngp_1d(
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    shape: float,
+) -> np.ndarray:
+    """One-dimensional NGP for static gamma renewal-rate disorder."""
+
+    _validate(params)
+    _validate_static_gamma_shape(shape)
+    local = local_cage_variance(t, params)
+    count = static_gamma_count_moments(t, params, shape)
+    mean_variance = local + params.jump_variance * count["mean"]
+    variance_variance = params.jump_variance**2 * count["variance"]
+    out = np.zeros_like(mean_variance)
+    mask = mean_variance > 0.0
+    out[mask] = variance_variance[mask] / (mean_variance[mask] ** 2)
+    return out
+
+
+def static_gamma_normalized_alpha_decay(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    shape: float,
+) -> np.ndarray:
+    """Cage-normalized alpha decay for static gamma renewal-rate disorder."""
+
+    _validate(params)
+    _validate_static_gamma_shape(shape)
+    if wave_number < 0.0:
+        raise ValueError("wave_number must be nonnegative")
+    renewal = delayed_poisson_mean(t, params)
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    return (1.0 + gamma * renewal / shape) ** (-shape)
+
+
+def static_gamma_asymptotic_diagnostics(
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    shape: float,
+) -> dict[str, float]:
+    """Late-time predictions of the static gamma mobility-disorder null."""
+
+    _validate(params)
+    _validate_static_gamma_shape(shape)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    return {
+        "wave_number": wave_number,
+        "gamma_k": gamma,
+        "static_shape": shape,
+        "late_ngp_plateau": 1.0 / shape,
+        "late_alpha_decay_per_renewal": 0.0,
+        "late_alpha_rate": 0.0,
+        "alpha_power_law_exponent": shape,
+    }
+
+
 def _gamma_exchange_effective_shape(
     renewal: np.ndarray,
     heterogeneity: GammaExchangeParams,
