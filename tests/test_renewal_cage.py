@@ -15,6 +15,7 @@ from renewal_cage import (  # noqa: E402
     dimensionless_peak_prediction,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
+    observable_consistency_diagnostics,
     radial_van_hove_3d,
     local_cage_variance,
     moments_1d,
@@ -192,6 +193,42 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(diagnostics["jump_to_cage_variance"], params.jump_variance / params.cage_variance)
         self.assertAlmostEqual(diagnostics["target_renewal_count"], params.cage_variance / params.jump_variance)
         self.assertAlmostEqual(diagnostics["renewal_rate"], params.renewal_rate, delta=1e-12)
+
+    def test_observable_consistency_diagnostics_compare_peak_and_late_ngp(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        predicted = dimensionless_peak_prediction(params)
+        late_time = 1200.0
+        late_ngp = float(ngp_1d(np.array([late_time]), params)[0])
+        diagnostics = observable_consistency_diagnostics(
+            peak_ngp=predicted["peak_ngp"],
+            peak_time=predicted["peak_time"],
+            renewal_delay=params.renewal_delay,
+            late_time=late_time,
+            late_ngp=late_ngp,
+        )
+
+        self.assertAlmostEqual(diagnostics["jump_to_cage_variance"], params.jump_variance / params.cage_variance)
+        self.assertAlmostEqual(diagnostics["peak_renewal_rate"], params.renewal_rate, delta=1e-12)
+        self.assertAlmostEqual(diagnostics["late_renewal_rate_exact"], params.renewal_rate, delta=1e-6)
+        self.assertAlmostEqual(diagnostics["late_renewal_rate_asymptotic"], params.renewal_rate, delta=2e-3)
+        self.assertLess(abs(diagnostics["log_exact_rate_residual"]), 1e-5)
+        self.assertLess(abs(diagnostics["log_asymptotic_rate_residual"]), 0.01)
+
+    def test_observable_consistency_diagnostics_validate_inputs(self):
+        with self.assertRaises(ValueError):
+            observable_consistency_diagnostics(
+                peak_ngp=0.2,
+                peak_time=10.0,
+                renewal_delay=3.0,
+                late_time=0.0,
+                late_ngp=0.01,
+            )
 
     def test_delayed_renewal_shape_is_positive_and_matches_integral(self):
         scaled_time = 2.5

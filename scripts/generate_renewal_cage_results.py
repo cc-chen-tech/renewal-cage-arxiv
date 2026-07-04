@@ -19,6 +19,7 @@ from renewal_cage import (  # noqa: E402
     gaussian_radial_3d,
     moments_1d,
     ngp_1d,
+    observable_consistency_diagnostics,
     plateau_peak_diagnostics,
     radial_van_hove_3d,
 )
@@ -146,6 +147,39 @@ def write_diagnostics_csv(
         "diagnostic_renewal_rate": diagnostics["renewal_rate"],
         "target_renewal_count": diagnostics["target_renewal_count"],
         "renewal_rate_times_peak_time": diagnostics["renewal_rate_times_peak_time"],
+    }
+    write_sweep_csv(path, [row])
+
+
+def write_consistency_csv(
+    path: Path,
+    *,
+    peak_time: float,
+    peak_ngp: float,
+    late_time: float,
+    late_ngp: float,
+    params: DelayedRenewalCageParams,
+) -> None:
+    diagnostics = observable_consistency_diagnostics(
+        peak_ngp=peak_ngp,
+        peak_time=peak_time,
+        renewal_delay=params.renewal_delay,
+        late_time=late_time,
+        late_ngp=late_ngp,
+    )
+    row = {
+        "peak_time": peak_time,
+        "peak_ngp": peak_ngp,
+        "late_time": late_time,
+        "late_ngp": late_ngp,
+        "true_renewal_rate": params.renewal_rate,
+        "peak_renewal_rate": diagnostics["peak_renewal_rate"],
+        "late_renewal_rate_exact": diagnostics["late_renewal_rate_exact"],
+        "late_renewal_rate_asymptotic": diagnostics["late_renewal_rate_asymptotic"],
+        "exact_rate_ratio": diagnostics["exact_rate_ratio"],
+        "asymptotic_rate_ratio": diagnostics["asymptotic_rate_ratio"],
+        "log_exact_rate_residual": diagnostics["log_exact_rate_residual"],
+        "log_asymptotic_rate_residual": diagnostics["log_asymptotic_rate_residual"],
     }
     write_sweep_csv(path, [row])
 
@@ -316,6 +350,16 @@ def main() -> None:
         DATA_DIR / "renewal_cage_diagnostics.csv",
         peak_time=default_peak_time,
         peak_ngp=default_peak_value,
+        params=params,
+    )
+    late_time = 180.0
+    late_ngp = float(ngp_1d(np.array([late_time]), params)[0])
+    write_consistency_csv(
+        DATA_DIR / "renewal_cage_consistency.csv",
+        peak_time=default_peak_time,
+        peak_ngp=default_peak_value,
+        late_time=late_time,
+        late_ngp=late_ngp,
         params=params,
     )
 

@@ -295,6 +295,27 @@ alpha_2(t*) = q/(4A)
 2. jump variance q 主要控制 peak height
 ```
 
+还有一个更强的无数据 consistency check。令：
+
+```text
+beta = q/A ~= 4 alpha_2(t*)
+y(t) = beta R(t)
+```
+
+在 late branch 上：
+
+```text
+alpha_2(t_l) = beta y_l/(1 + y_l)^2
+```
+
+因此一个晚时间 NGP 值可以反解出 `y_l`，再给出：
+
+```text
+lambda_l ~= y_l/[beta tau_d F(t_l/tau_d)]
+```
+
+如果 `lambda_l` 和 peak 反推出的 `lambda_*` 不一致，模型就被 falsify。
+
 脚本 `generate_renewal_cage_results.py` 的参数扫描正是验证这两个预测。
 
 ## 8. 与 Glass Transition 的联系

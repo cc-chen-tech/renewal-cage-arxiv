@@ -75,13 +75,19 @@ observable peak diagnostics:
   q/A ~= 4 alpha_2(t*)
   R(t*) ~= 1/[4 alpha_2(t*)]
   lambda ~= 1/[4 alpha_2(t*) tau_d F(t*/tau_d)]
+
+finite-time consistency check:
+  beta = q/A ~= 4 alpha_2(t*)
+  alpha_l = beta y_l/(1+y_l)^2 on the late branch
+  lambda_l ~= y_l/[beta tau_d F(t_l/tau_d)]
+  compare lambda_l with the peak-inferred lambda
 ```
 
 The publishable claim should therefore be:
 
 > A delayed renewal count regularizes the short-time singularity of memoryless jump
 > models while preserving a closed-form NGP peak, simple peak-height diagnostics,
-> and long-time Gaussian recovery.
+> finite-time consistency diagnostics, and long-time Gaussian recovery.
 
 The square-delay choice is now justified as the minimal integer member of a
 generalized delay-exponent class that gives a regular zero-origin NGP.

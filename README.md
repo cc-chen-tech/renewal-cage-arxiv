@@ -11,7 +11,7 @@ The model combines:
 - delayed cage-renewal events,
 - Gaussian cage-center jumps,
 - closed-form MSD, NGP, van Hove distribution, peak asymptotics, and
-  delay-exponent diagnostics.
+  finite-time consistency diagnostics.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -77,6 +77,7 @@ data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
 data/renewal_cage_diagnostics.csv
+data/renewal_cage_consistency.csv
 data/renewal_cage_van_hove.csv
 data/renewal_cage_tail_ratios.csv
 paper/figures/renewal_cage_results.pdf

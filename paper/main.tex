@@ -33,9 +33,10 @@ finite-time maximum, and decays as $1/(\lambda t)$ at long times. In the
 plateau regime the peak condition reduces to $qR(t^\ast)=A$, giving
 $\alpha_2(t^\ast)=q/(4A)$. This also gives observable peak diagnostics,
 including $q/A\simeq 4\alpha_2(t^\ast)$ and
-$R(t^\ast)\simeq 1/[4\alpha_2(t^\ast)]$. The delayed renewal count regularizes
-the short-time behavior of jump models while preserving analytic tractability
-and long-time Gaussian recovery.
+$R(t^\ast)\simeq 1/[4\alpha_2(t^\ast)]$, plus a finite-time consistency check
+that compares the peak-inferred renewal rate with a late-time NGP inversion.
+The delayed renewal count regularizes the short-time behavior of jump models
+while preserving analytic tractability and long-time Gaussian recovery.
 \end{abstract}
 
 \maketitle
@@ -163,8 +164,31 @@ peak time estimates the asymptotic renewal rate,
   \lambda \simeq
   \frac{1}{4\alpha_2(t^\ast)\tau_d F(t^\ast/\tau_d)}.
 \end{equation}
-The independent long-time check is $\lambda\simeq[t\,\alpha_2(t)]^{-1}$ once
-$t$ is beyond the cage plateau and renewal delay.
+The independent asymptotic long-time check is
+$\lambda\simeq[t\,\alpha_2(t)]^{-1}$ once $t$ is beyond the cage plateau and
+renewal delay. A finite-time version is obtained without taking the
+$t\to\infty$ limit. Let
+\begin{equation}
+  \beta=\frac{q}{A}\simeq 4\alpha_2(t^\ast),\qquad y(t)=\beta R(t).
+\end{equation}
+On the late branch of the plateau expression,
+\begin{equation}
+  \alpha_2(t)=\frac{\beta y(t)}{[1+y(t)]^2},
+\end{equation}
+so an observed late-time value $\alpha_\ell=\alpha_2(t_\ell)$ gives
+\begin{equation}
+  y_\ell=
+  \frac{\beta-2\alpha_\ell+\sqrt{\beta^2-4\beta\alpha_\ell}}
+       {2\alpha_\ell},
+\end{equation}
+and therefore
+\begin{equation}
+  \lambda_\ell\simeq
+  \frac{y_\ell}{\beta\tau_d F(t_\ell/\tau_d)}.
+\end{equation}
+Agreement between $\lambda_\ell$ and the peak-inferred rate is a falsifiable
+consistency condition using only the peak height, peak time, delay scale, and a
+late NGP value.
 
 \section{Self Van Hove Distribution}
 
@@ -185,7 +209,11 @@ The accompanying repository generates all figures from closed-form equations.
 For the default parameter set, the NGP peak occurs at $t^\ast=11.306$ with
 $\alpha_2(t^\ast)=0.200$. At $t=180$, the NGP has decayed to $0.0293$. The
 tail probability beyond $r=5$ at peak time is about $2.90$ times the matched
-Gaussian tail, while the long-time ratio returns to about $0.97$.
+Gaussian tail, while the long-time ratio returns to about $0.97$. The
+finite-time consistency inversion at $t=180$ gives
+$\lambda_\ell=0.180000$, while the peak diagnostic gives
+$\lambda_\ast=0.180010$; the simpler asymptotic estimate
+$[t\alpha_2(t)]^{-1}$ gives $0.189664$ at the same finite time.
 
 \begin{figure}[h]
   \centering

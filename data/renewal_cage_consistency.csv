@@ -1,0 +1,2 @@
+peak_time,peak_ngp,late_time,late_ngp,true_renewal_rate,peak_renewal_rate,late_renewal_rate_exact,late_renewal_rate_asymptotic,exact_rate_ratio,asymptotic_rate_ratio,log_exact_rate_residual,log_asymptotic_rate_residual
+11.30637498610339,0.2000000191777156,180.0,0.029291615791917636,0.18,0.18001006293293054,0.1800000014222106,0.18966367697231937,0.9999441058429956,1.053628191013886,-5.589571914095816e-05,0.052239627935868796

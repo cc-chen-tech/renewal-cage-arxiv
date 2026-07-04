@@ -307,3 +307,54 @@ def plateau_peak_diagnostics(
         "renewal_rate": renewal_rate,
         "renewal_rate_times_peak_time": renewal_rate * peak_time,
     }
+
+
+def observable_consistency_diagnostics(
+    *,
+    peak_ngp: float,
+    peak_time: float,
+    renewal_delay: float,
+    late_time: float,
+    late_ngp: float,
+) -> dict[str, float]:
+    """Compare peak-inferred and long-time-inferred renewal rates.
+
+    The plateau peak gives q/A and lambda from alpha_2(t*) and t*. A later NGP
+    value gives two independent checks: the simple asymptotic estimate
+    1/[t alpha_2(t)] and a finite-time correction obtained by inverting the
+    exact plateau NGP formula alpha = beta y/(1+y)^2 with beta=q/A and y=beta R.
+    Their logarithmic ratios are data-level falsification residuals.
+    """
+
+    if late_time <= 0.0:
+        raise ValueError("late_time must be positive")
+    if late_ngp <= 0.0:
+        raise ValueError("late_ngp must be positive")
+    peak = plateau_peak_diagnostics(
+        peak_ngp=peak_ngp,
+        peak_time=peak_time,
+        renewal_delay=renewal_delay,
+    )
+    beta = peak["jump_to_cage_variance"]
+    discriminant = beta * beta - 4.0 * beta * late_ngp
+    if discriminant < 0.0:
+        raise ValueError("late_ngp exceeds the plateau peak bound implied by peak_ngp")
+    late_branch_y = (beta - 2.0 * late_ngp + math.sqrt(discriminant)) / (2.0 * late_ngp)
+    late_renewal_count = late_branch_y / beta
+    late_shape = delayed_renewal_shape(late_time / renewal_delay)
+    late_renewal_rate_exact = late_renewal_count / (renewal_delay * late_shape)
+    late_renewal_rate_asymptotic = 1.0 / (late_time * late_ngp)
+    exact_rate_ratio = late_renewal_rate_exact / peak["renewal_rate"]
+    asymptotic_rate_ratio = late_renewal_rate_asymptotic / peak["renewal_rate"]
+    return {
+        "jump_to_cage_variance": peak["jump_to_cage_variance"],
+        "target_renewal_count": peak["target_renewal_count"],
+        "peak_renewal_rate": peak["renewal_rate"],
+        "late_renewal_count": late_renewal_count,
+        "late_renewal_rate_exact": late_renewal_rate_exact,
+        "late_renewal_rate_asymptotic": late_renewal_rate_asymptotic,
+        "exact_rate_ratio": exact_rate_ratio,
+        "asymptotic_rate_ratio": asymptotic_rate_ratio,
+        "log_exact_rate_residual": math.log(exact_rate_ratio),
+        "log_asymptotic_rate_residual": math.log(asymptotic_rate_ratio),
+    }

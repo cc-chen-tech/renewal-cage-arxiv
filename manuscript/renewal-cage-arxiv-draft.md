@@ -189,6 +189,13 @@ alpha_2(t*) = q/(4A).
 This predicts that the renewal delay primarily shifts the peak time, whereas the
 jump variance primarily controls the peak height.
 
+A finite-time consistency check follows from `beta=q/A≈4 alpha_2(t*)` and
+`y(t)=beta R(t)`. On the late branch, `alpha_l=beta y_l/(1+y_l)^2`, so a late
+NGP value gives `y_l` and therefore
+`lambda_l≈y_l/[beta tau_d F(t_l/tau_d)]`. Agreement between this value and the
+peak-inferred renewal rate is a falsifiable check using only observable
+peak/late-NGP quantities plus `tau_d`.
+
 ## 5. Reproducible Results
 
 The repository contains the exact implementation:
@@ -204,6 +211,7 @@ The script produces:
 ```text
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
+data/renewal_cage_consistency.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 ```
@@ -215,6 +223,8 @@ NGP peak time  = 11.306
 NGP peak value = 0.200
 NGP final      = 0.0293 at t=180
 MSD final      = 26.272
+lambda_*       = 0.180010 from peak diagnostics
+lambda_l       = 0.180000 from finite-time late-NGP inversion
 ```
 
 The parameter sweeps show:
