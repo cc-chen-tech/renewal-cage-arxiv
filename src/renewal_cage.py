@@ -305,6 +305,50 @@ def renewal_scattering_susceptibility(
     return second_moment - mean_square
 
 
+def correlated_domain_susceptibility(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    *,
+    correlation_size: float,
+) -> np.ndarray:
+    """Renewal contribution to chi4 for domains sharing one renewal count.
+
+    If each correlated renewal domain contains ``correlation_size`` particles
+    with the same renewal-count history, the per-particle four-point
+    susceptibility contribution scales as ``N_corr * chi_R``.
+    """
+
+    if correlation_size <= 0.0:
+        raise ValueError("correlation_size must be positive")
+    return correlation_size * renewal_scattering_susceptibility(wave_number, t, params)
+
+
+def infer_renewal_correlation_size(
+    *,
+    observed_chi4_peak: float,
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+) -> dict[str, float]:
+    """Infer correlated renewal-domain size from an observed chi4 peak."""
+
+    if observed_chi4_peak <= 0.0:
+        raise ValueError("observed_chi4_peak must be positive")
+    susceptibility = renewal_scattering_susceptibility(wave_number, t, params)
+    peak_idx = int(np.argmax(susceptibility))
+    model_peak = float(susceptibility[peak_idx])
+    if model_peak <= 0.0:
+        raise ValueError("model renewal susceptibility peak must be positive")
+    t = np.asarray(t, dtype=float)
+    return {
+        "correlation_size": observed_chi4_peak / model_peak,
+        "observed_chi4_peak": observed_chi4_peak,
+        "model_single_particle_peak": model_peak,
+        "peak_time": float(t[peak_idx]),
+    }
+
+
 def alpha_relaxation_time(
     wave_number: float,
     params: DelayedRenewalCageParams,

@@ -10,10 +10,10 @@ cage note as a short arXiv manuscript.
   scattering function, temperature-dependent alpha relaxation, Stokes-Einstein
   decoupling diagnostics, fractional Stokes-Einstein exponents,
   apparent alpha-activation/fragility diagnostics, activated-barrier gap
-  diagnostic, renewal-count susceptibility, peak diagnostics, finite-time
-  peak/late-NGP consistency diagnostics, and scattering-transport observable
-  inversion including a full protocol that infers the renewal delay from NGP
-  peak timing.
+  diagnostic, renewal-count susceptibility, renewal-domain chi4/cooperative-size
+  estimator, peak diagnostics, finite-time peak/late-NGP consistency diagnostics,
+  and scattering-transport observable inversion including a full protocol that
+  infers the renewal delay from NGP peak timing.
 - Generalized delay-exponent argument explaining the square-delay choice.
 - Reproducible CSV outputs, SVG figures, PDF manuscript figures, and arXiv
   source zip.

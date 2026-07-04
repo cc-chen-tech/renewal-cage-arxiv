@@ -382,6 +382,19 @@ chi_R(k,t)/F_s(k,t)^2 = exp[R(t)(a_k-1)^2]-1.
 
 This is not a full spatial `chi_4(t)`; it is the renewal-count contribution that
 can be compared with NGP and `F_s` peak times.
+If a correlated renewal domain contains `N_corr` particles sharing the same
+renewal-count history, then the renewal part of the per-particle four-point
+susceptibility is
+
+```text
+chi_4^R(k,t) = N_corr chi_R(k,t).
+```
+
+Thus a renewal-dominated observed peak estimates the cooperative domain size:
+
+```text
+N_corr = chi_4,peak^obs / max_t chi_R(k,t).
+```
 
 ## 5. Reproducible Results
 
@@ -402,6 +415,7 @@ data/renewal_cage_consistency.csv
 data/renewal_cage_scattering.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
+data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
@@ -433,6 +447,8 @@ Increasing the barrier gap `E_d-E_lambda` from `0` to `4.5` raises the cold-end
 normalized `D tau_alpha` from `1.01` to `3.30`.
 The full observable inversion recovers `A=1.00`, `q=0.80`, `lambda=0.18`, and
 `tau_d=3.00`; the held-out `tau_alpha` log residual is below `1e-12`.
+A synthetic renewal-domain four-point peak with `N_corr=12` is inverted back to
+`N_corr=12.0` from the analytic `chi_R` peak.
 
 The parameter sweeps show:
 

@@ -14,8 +14,9 @@ The model combines:
   scattering function, temperature-dependent alpha relaxation, peak
   asymptotics, Stokes-Einstein decoupling, activated-barrier diagnostics,
   fractional Stokes-Einstein exponents, apparent alpha-activation/fragility
-  diagnostics, renewal-count susceptibility, finite-time consistency
-  diagnostics, and observable inversion/falsifiability criteria.
+  diagnostics, renewal-count susceptibility, renewal-domain chi4/cooperative-size
+  diagnostics, finite-time consistency diagnostics, and observable
+  inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -99,6 +100,7 @@ data/renewal_cage_tail_ratios.csv
 data/renewal_cage_scattering.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
+data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv

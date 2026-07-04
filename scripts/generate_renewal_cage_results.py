@@ -18,12 +18,14 @@ from renewal_cage import (  # noqa: E402
     TemperatureLawParams,
     alpha_relaxation_time,
     activated_barrier_temperature_law,
+    correlated_domain_susceptibility,
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
     infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
+    infer_renewal_correlation_size,
     moments_1d,
     ngp_1d,
     normalized_alpha_decay,
@@ -223,6 +225,48 @@ def write_susceptibility_csv(
             )
     write_sweep_csv(path, rows)
     return curves
+
+
+def write_chi4_bridge_csv(
+    path: Path,
+    time: np.ndarray,
+    params: DelayedRenewalCageParams,
+    *,
+    wave_number: float,
+    correlation_sizes: list[float],
+    synthetic_correlation_size: float,
+) -> dict[str, float]:
+    rows = []
+    single_particle = renewal_scattering_susceptibility(wave_number, time, params)
+    observed_peak = synthetic_correlation_size * float(np.max(single_particle))
+    inferred = infer_renewal_correlation_size(
+        observed_chi4_peak=observed_peak,
+        wave_number=wave_number,
+        t=time,
+        params=params,
+    )
+    for correlation_size in correlation_sizes:
+        chi4 = correlated_domain_susceptibility(
+            wave_number,
+            time,
+            params,
+            correlation_size=correlation_size,
+        )
+        for idx, value in enumerate(time):
+            rows.append(
+                {
+                    "time": float(value),
+                    "wave_number": wave_number,
+                    "correlation_size": correlation_size,
+                    "renewal_chi4": float(chi4[idx]),
+                    "single_particle_chi_R": float(single_particle[idx]),
+                    "synthetic_observed_chi4_peak": observed_peak,
+                    "inferred_correlation_size": inferred["correlation_size"],
+                    "model_peak_time": inferred["peak_time"],
+                }
+            )
+    write_sweep_csv(path, rows)
+    return inferred
 
 
 def write_inversion_csv(
@@ -955,6 +999,14 @@ def main() -> None:
         scattering_time,
         params,
         wave_numbers,
+    )
+    chi4_inference = write_chi4_bridge_csv(
+        DATA_DIR / "renewal_cage_chi4.csv",
+        scattering_time,
+        params,
+        wave_number=1.1,
+        correlation_sizes=[1.0, 4.0, 12.0],
+        synthetic_correlation_size=12.0,
     )
     write_barrier_svg(
         FIGURE_DIR / "renewal_cage_barrier.svg",

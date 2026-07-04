@@ -509,6 +509,23 @@ chi_R(k,t) / F_s(k,t)^2
 但它是 delayed renewal count 对 dynamic heterogeneity 的闭式贡献，可以和 NGP peak
 以及 `F_s` relaxation time 对比。
 
+如果一个 correlated renewal domain 中有 `N_corr` 个粒子共享同一个 renewal count
+history，那么 renewal 部分对 per-particle 四点 susceptibility 的贡献是：
+
+```text
+chi_4^R(k,t) = N_corr chi_R(k,t)
+```
+
+因此如果实验或模拟给出 renewal-dominated 的四点峰值，可以反推 cooperative size：
+
+```text
+N_corr = chi_4,peak^obs / max_t chi_R(k,t)
+```
+
+这不是完整空间相关长度理论，但它给出一个很直接的桥：用闭式 `chi_R` 把观测到的
+`chi_4` 峰值转换成 renewal-domain 粒子数。默认合成例子用 `N_corr=12` 生成四点峰，
+反演会回到 `N_corr=12.0`。
+
 ## 7.8. 从可观测量反演参数和证伪条件
 
 更强的可发表价值在于：模型不只是正向画曲线，也能从常见 glass observable 反推

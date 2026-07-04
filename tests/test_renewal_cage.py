@@ -15,12 +15,14 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_time,
     apparent_alpha_activation_energies,
     activated_barrier_temperature_law,
+    correlated_domain_susceptibility,
     classify_delay_exponent,
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     fractional_stokes_einstein_exponents,
     infer_parameters_from_full_observables,
+    infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
@@ -207,6 +209,67 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(float(np.max(susceptibility)), 0.02)
         self.assertLess(susceptibility[-1], float(np.max(susceptibility)) / 4.0)
         np.testing.assert_allclose(susceptibility, scattering**2 * relative, rtol=1e-12, atol=1e-14)
+
+    def test_correlated_domain_susceptibility_scales_renewal_component(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        times = np.linspace(0.0, 220.0, 900)
+        single_particle = renewal_scattering_susceptibility(wave_number, times, params)
+        correlated = correlated_domain_susceptibility(
+            wave_number,
+            times,
+            params,
+            correlation_size=7.5,
+        )
+
+        np.testing.assert_allclose(correlated, 7.5 * single_particle, rtol=1e-12, atol=1e-14)
+        self.assertGreater(float(np.max(correlated)), float(np.max(single_particle)))
+
+    def test_renewal_correlation_size_inverts_observed_chi4_peak(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        times = np.linspace(0.0, 220.0, 900)
+        single_particle = renewal_scattering_susceptibility(wave_number, times, params)
+        observed_peak = 12.0 * float(np.max(single_particle))
+
+        inferred = infer_renewal_correlation_size(
+            observed_chi4_peak=observed_peak,
+            wave_number=wave_number,
+            t=times,
+            params=params,
+        )
+
+        self.assertAlmostEqual(inferred["correlation_size"], 12.0)
+        self.assertAlmostEqual(inferred["model_single_particle_peak"], float(np.max(single_particle)))
+        self.assertGreater(inferred["peak_time"], 0.0)
+
+    def test_renewal_correlation_size_validates_observed_peak(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        with self.assertRaises(ValueError):
+            infer_renewal_correlation_size(
+                observed_chi4_peak=0.0,
+                wave_number=1.1,
+                t=np.linspace(0.0, 10.0, 20),
+                params=params,
+            )
 
     def test_activated_barrier_gap_controls_delayed_renewal_product(self):
         barrier = ActivatedBarrierParams(

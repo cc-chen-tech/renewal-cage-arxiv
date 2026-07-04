@@ -130,6 +130,9 @@ activated barrier interpretation:
 renewal-count susceptibility:
   chi_R(k,t) = Var_N[exp(-k^2 L(t)/2) exp(-k^2 q N(t)/2)]
   chi_R/F_s^2 = exp[R(t)(exp(-k^2 q/2)-1)^2]-1
+  correlated renewal domain:
+    chi_4^R(k,t) = N_corr chi_R(k,t)
+    N_corr = chi_4,peak^obs / max_t chi_R(k,t)
 
 observable inversion:
   A = -2 log(f_k)/k^2
@@ -154,7 +157,8 @@ comparison can additionally ask whether they reproduce the same growth of
 `lambda tau_d`, whether they predict a fractional exponent `xi_SE<1`, and
 whether they produce growing apparent alpha-activation/fragility without an
 extra fit parameter. They should also explain whether their dynamic-heterogeneity
-measure has the same renewal-count susceptibility peak. The strongest
+measure has the same renewal-count susceptibility peak and whether an observed
+`chi_4` amplitude maps to the same cooperative renewal-domain size. The strongest
 falsifiability test is now the
 scattering-transport inversion: once `F_s` plateau, `D`, `tau_alpha`, and
 `tau_d` are specified, the model either has no positive-`q` solution or predicts
