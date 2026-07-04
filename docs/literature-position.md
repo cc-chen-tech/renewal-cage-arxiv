@@ -117,6 +117,14 @@ alpha time:
 Stokes-Einstein diagnostic:
   D(T) tau_alpha(k,T)
     = lambda(T) q(T) tau_d(T) F^{-1}[1/(Gamma_k lambda(T) tau_d(T))] / 2
+
+activated barrier interpretation:
+  lambda(T) tau_d(T) = lambda0 tau_d0 exp[(E_d-E_lambda)(1/T-1/T0)]
+  E_d > E_lambda makes delayed renewal increasingly control relaxation on cooling
+
+renewal-count susceptibility:
+  chi_R(k,t) = Var_N[exp(-k^2 L(t)/2) exp(-k^2 q N(t)/2)]
+  chi_R/F_s^2 = exp[R(t)(exp(-k^2 q/2)-1)^2]-1
 ```
 
 Competing mechanisms should be asked to reproduce the same four observables:
@@ -124,7 +132,8 @@ the MSD plateau, the early-time NGP exponent, peak/late-time renewal-rate
 consistency, and the long-time `1/t` NGP decay. A stronger glass-transition
 comparison can additionally ask whether they reproduce the same growth of
 `D tau_alpha` when cooling increases the delayed-renewal control parameter
-`lambda tau_d`.
+`lambda tau_d`, and whether their dynamic-heterogeneity measure has the same
+renewal-count susceptibility peak.
 
 ## What Still Needs Strengthening
 

@@ -13,8 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from renewal_cage import (  # noqa: E402
+    ActivatedBarrierParams,
     DelayedRenewalCageParams,
     TemperatureLawParams,
+    activated_barrier_temperature_law,
     delayed_poisson_mean,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
@@ -24,6 +26,7 @@ from renewal_cage import (  # noqa: E402
     observable_consistency_diagnostics,
     plateau_peak_diagnostics,
     radial_van_hove_3d,
+    renewal_scattering_susceptibility,
     self_intermediate_scattering,
     temperature_scan,
 )
@@ -141,6 +144,69 @@ def write_temperature_csv(
     rows = temperature_scan(temperatures, law, wave_number=wave_number)
     write_sweep_csv(path, rows)
     return rows
+
+
+def write_barrier_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    *,
+    base_barrier: ActivatedBarrierParams,
+    wave_number: float,
+    gap_values: list[float],
+) -> list[dict[str, float]]:
+    rows = []
+    reference_gap = gap_values[0]
+    reference_final_product = None
+    for gap in gap_values:
+        barrier = ActivatedBarrierParams(
+            reference_temperature=base_barrier.reference_temperature,
+            cage_variance_ref=base_barrier.cage_variance_ref,
+            cage_tau_ref=base_barrier.cage_tau_ref,
+            jump_to_cage_ref=base_barrier.jump_to_cage_ref,
+            renewal_rate_ref=base_barrier.renewal_rate_ref,
+            renewal_delay_ref=base_barrier.renewal_delay_ref,
+            renewal_rate_barrier=base_barrier.renewal_rate_barrier,
+            delay_onset_barrier=base_barrier.renewal_rate_barrier + gap,
+            cage_stiffening_barrier=base_barrier.cage_stiffening_barrier,
+            jump_to_cage_barrier=base_barrier.jump_to_cage_barrier,
+            cage_tau_barrier=base_barrier.cage_tau_barrier,
+        )
+        law = activated_barrier_temperature_law(barrier)
+        scan = temperature_scan(temperatures, law, wave_number=wave_number)
+        final_product = scan[-1]["normalized_stokes_einstein_product"]
+        if reference_final_product is None:
+            reference_final_product = final_product
+        for row in scan:
+            out = dict(row)
+            out["barrier_gap"] = gap
+            out["relative_gap"] = gap - reference_gap
+            out["cold_product_ratio_vs_reference_gap"] = final_product / reference_final_product
+            rows.append(out)
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_susceptibility_csv(
+    path: Path,
+    time: np.ndarray,
+    params: DelayedRenewalCageParams,
+    wave_numbers: list[float],
+) -> list[tuple[str, np.ndarray]]:
+    curves = []
+    rows = []
+    for wave_number in wave_numbers:
+        susceptibility = renewal_scattering_susceptibility(wave_number, time, params)
+        curves.append((f"k={wave_number:g}", susceptibility))
+        for idx, value in enumerate(time):
+            rows.append(
+                {
+                    "time": float(value),
+                    "wave_number": wave_number,
+                    "renewal_scattering_susceptibility": float(susceptibility[idx]),
+                }
+            )
+    write_sweep_csv(path, rows)
+    return curves
 
 
 def write_tail_ratio_csv(
@@ -481,6 +547,66 @@ def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
     path.write_text(svg)
 
 
+def write_barrier_svg(
+    path: Path,
+    time: np.ndarray,
+    susceptibility_curves: list[tuple[str, np.ndarray]],
+    barrier_rows: list[dict[str, float]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    colors = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 62}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, x_values: np.ndarray, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, colors[idx % len(colors)]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{colors[idx % len(colors)]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    final_by_gap = {}
+    lambda_tau_by_gap = {}
+    for row in barrier_rows:
+        gap = row["barrier_gap"]
+        if row["temperature"] == min(r["temperature"] for r in barrier_rows if r["barrier_gap"] == gap):
+            final_by_gap[gap] = row["normalized_stokes_einstein_product"]
+            lambda_tau_by_gap[gap] = row["lambda_tau_delay"]
+    gaps = np.array(sorted(final_by_gap.keys()))
+    cold_product = np.array([final_by_gap[gap] for gap in gaps])
+    cold_lambda_tau = np.array([lambda_tau_by_gap[gap] for gap in gaps])
+    right_curves = [
+        ("cold D tau_alpha / hot", cold_product),
+        ("cold lambda tau_d", cold_lambda_tau / cold_lambda_tau[0]),
+    ]
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Activated barrier and renewal susceptibility diagnostics</text>
+  {axes(left_a, right_a, "K. Renewal-count scattering susceptibility", "time")}
+  {plot(left_a, right_a, time, susceptibility_curves)}
+  {axes(left_b, right_b, "L. Barrier gap amplifies SE violation", "E_d - E_lambda")}
+  {plot(left_b, right_b, gaps, right_curves)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -638,6 +764,38 @@ def main() -> None:
         wave_number=1.1,
     )
     write_temperature_svg(FIGURE_DIR / "renewal_cage_temperature.svg", temperature_rows)
+
+    barrier = ActivatedBarrierParams(
+        reference_temperature=1.0,
+        cage_variance_ref=params.cage_variance,
+        cage_tau_ref=params.cage_tau,
+        jump_to_cage_ref=params.jump_variance / params.cage_variance,
+        renewal_rate_ref=params.renewal_rate,
+        renewal_delay_ref=params.renewal_delay,
+        renewal_rate_barrier=2.0,
+        delay_onset_barrier=5.0,
+        cage_stiffening_barrier=0.2,
+        jump_to_cage_barrier=0.25,
+    )
+    barrier_rows = write_barrier_csv(
+        DATA_DIR / "renewal_cage_barrier.csv",
+        temperatures,
+        base_barrier=barrier,
+        wave_number=1.1,
+        gap_values=[0.0, 1.5, 3.0, 4.5],
+    )
+    susceptibility_curves = write_susceptibility_csv(
+        DATA_DIR / "renewal_cage_susceptibility.csv",
+        scattering_time,
+        params,
+        wave_numbers,
+    )
+    write_barrier_svg(
+        FIGURE_DIR / "renewal_cage_barrier.svg",
+        scattering_time,
+        susceptibility_curves,
+        barrier_rows,
+    )
 
 
 if __name__ == "__main__":

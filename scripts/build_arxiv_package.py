@@ -373,6 +373,75 @@ def write_temperature_pdf(path: Path) -> None:
     c.save()
 
 
+def write_barrier_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_susceptibility.csv").open() as f:
+        susceptibility_rows = list(csv.DictReader(f))
+    with (DATA_DIR / "renewal_cage_barrier.csv").open() as f:
+        rows = list(csv.DictReader(f))
+
+    grouped_susceptibility: dict[str, list[tuple[float, float]]] = {}
+    for row in susceptibility_rows:
+        grouped_susceptibility.setdefault(row["wave_number"], []).append(
+            (float(row["time"]), float(row["renewal_scattering_susceptibility"]))
+        )
+    labels = sorted(grouped_susceptibility.keys(), key=float)
+    time = np.array([point[0] for point in grouped_susceptibility[labels[0]]])
+    colors_list = [colors.HexColor("#2b6cb0"), colors.HexColor("#c05621"), colors.HexColor("#2f855a")]
+    susceptibility_series = []
+    for idx, label in enumerate(labels):
+        susceptibility_series.append(
+            (
+                f"k={float(label):g}",
+                np.array([point[1] for point in grouped_susceptibility[label]]),
+                colors_list[idx % len(colors_list)],
+            )
+        )
+
+    final_rows = []
+    for gap in sorted({float(row["barrier_gap"]) for row in rows}):
+        gap_rows = [row for row in rows if float(row["barrier_gap"]) == gap]
+        cold = min(gap_rows, key=lambda row: float(row["temperature"]))
+        final_rows.append(cold)
+    gaps = np.array([float(row["barrier_gap"]) for row in final_rows])
+    cold_product = np.array([float(row["normalized_stokes_einstein_product"]) for row in final_rows])
+    cold_lambda_tau = np.array([float(row["lambda_tau_delay"]) for row in final_rows])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Activated barrier and renewal susceptibility diagnostics")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        time,
+        susceptibility_series,
+        "K. Renewal-count scattering susceptibility",
+        y_range=(0.0, float(max(np.nanmax(values) for _, values, _ in susceptibility_series) * 1.15)),
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        gaps,
+        [
+            ("cold D tau_alpha / hot", cold_product, colors.HexColor("#805ad5")),
+            ("cold lambda tau_d / first gap", cold_lambda_tau / cold_lambda_tau[0], colors.HexColor("#2f855a")),
+        ],
+        "L. Barrier gap amplifies SE violation",
+        xlabel="E_d - E_lambda",
+    )
+
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -383,10 +452,12 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     dimensionless_pdf = PAPER_FIGURE_DIR / "renewal_cage_dimensionless.pdf"
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
+    barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
     write_results_pdf(results_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
+    write_barrier_pdf(barrier_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -396,6 +467,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(dimensionless_pdf, "figures/renewal_cage_dimensionless.pdf")
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
+        archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
     return zip_path
 
 

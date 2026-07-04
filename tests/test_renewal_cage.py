@@ -9,9 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from renewal_cage import (  # noqa: E402
+    ActivatedBarrierParams,
     DelayedRenewalCageParams,
     TemperatureLawParams,
     alpha_relaxation_time,
+    activated_barrier_temperature_law,
     classify_delay_exponent,
     delayed_poisson_mean,
     delayed_renewal_shape,
@@ -29,6 +31,7 @@ from renewal_cage import (  # noqa: E402
     normalized_alpha_decay,
     plateau_ngp_branches,
     plateau_peak_diagnostics,
+    renewal_scattering_susceptibility,
     self_intermediate_scattering,
     stokes_einstein_product,
     temperature_dependent_params,
@@ -178,6 +181,55 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(decay, math.exp(-1.0), delta=1e-12)
         gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
         self.assertGreater(tau_alpha, 1.0 / (params.renewal_rate * gamma))
+
+    def test_renewal_scattering_susceptibility_is_closed_form_variance(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        times = np.linspace(0.0, 220.0, 900)
+        susceptibility = renewal_scattering_susceptibility(wave_number, times, params)
+        scattering = self_intermediate_scattering(wave_number, times, params)
+        renewal = delayed_poisson_mean(times, params)
+        jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+        relative = np.exp(renewal * (jump_characteristic - 1.0) ** 2) - 1.0
+
+        self.assertAlmostEqual(susceptibility[0], 0.0)
+        self.assertTrue(np.all(susceptibility >= -1e-14))
+        self.assertGreater(float(np.max(susceptibility)), 0.02)
+        self.assertLess(susceptibility[-1], float(np.max(susceptibility)) / 4.0)
+        np.testing.assert_allclose(susceptibility, scattering**2 * relative, rtol=1e-12, atol=1e-14)
+
+    def test_activated_barrier_gap_controls_delayed_renewal_product(self):
+        barrier = ActivatedBarrierParams(
+            reference_temperature=1.0,
+            cage_variance_ref=1.0,
+            cage_tau_ref=0.7,
+            jump_to_cage_ref=0.8,
+            renewal_rate_ref=0.18,
+            renewal_delay_ref=3.0,
+            renewal_rate_barrier=2.0,
+            delay_onset_barrier=5.0,
+            cage_stiffening_barrier=0.2,
+            jump_to_cage_barrier=0.25,
+        )
+        law = activated_barrier_temperature_law(barrier)
+        hot = temperature_dependent_params(1.0, law)
+        cold_temperature = 0.62
+        cold = temperature_dependent_params(cold_temperature, law)
+        delta = 1.0 / cold_temperature - 1.0 / barrier.reference_temperature
+        expected_ratio = math.exp((barrier.delay_onset_barrier - barrier.renewal_rate_barrier) * delta)
+
+        self.assertAlmostEqual(law.delay_activation - law.rate_activation, 3.0)
+        self.assertAlmostEqual(
+            cold.renewal_rate * cold.renewal_delay / (hot.renewal_rate * hot.renewal_delay),
+            expected_ratio,
+        )
+        self.assertGreater(cold.renewal_rate * cold.renewal_delay, hot.renewal_rate * hot.renewal_delay)
 
     def test_temperature_law_encodes_cooling_trends(self):
         law = TemperatureLawParams(

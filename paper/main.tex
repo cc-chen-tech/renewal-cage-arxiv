@@ -215,6 +215,47 @@ the delayed-onset product $\lambda(T)\tau_d(T)$ and/or the jump-to-cage contrast
 fast enough that structural relaxation is bottlenecked by delayed cage renewal
 more strongly than long-time diffusion.
 
+\section{Activated-Barrier Interpretation and Dynamic Heterogeneity}
+
+The temperature law can be read as a minimal activated-barrier reduction. If
+the long-time renewal rate is controlled by a cage-breaking barrier
+$E_\lambda$ while the delayed onset is controlled by a larger local persistence
+barrier $E_d$, then
+\begin{equation}
+  \lambda(T)\tau_d(T)
+  =\lambda_0\tau_{d0}\exp[(E_d-E_\lambda)\Delta_T].
+\end{equation}
+Thus the barrier gap $E_d-E_\lambda$ is the microscopic parameter that makes
+the delayed-renewal control variable grow on cooling. This gives a direct
+mechanism for the Stokes-Einstein diagnostic above: diffusion is set by the
+asymptotic renewal rate and jump length, while structural relaxation is also
+penalized by the delayed cage-breaking onset.
+
+The same renewal-count fluctuations give a closed single-particle analogue of
+the four-point susceptibility. Define
+\begin{equation}
+  W_k(t|N)=\exp[-k^2L(t)/2]a_k^{N(t)},\qquad
+  a_k=e^{-k^2q/2}.
+\end{equation}
+Then $F_s(k,t)=\mathbb{E}[W_k(t|N)]$ and the renewal contribution to the
+self-scattering variance is
+\begin{equation}
+  \chi_R(k,t)=\mathrm{Var}_N[W_k(t|N)]
+  =e^{-k^2L(t)}
+  \left[
+    e^{R(t)(a_k^2-1)}-e^{2R(t)(a_k-1)}
+  \right].
+\end{equation}
+Equivalently,
+\begin{equation}
+  \frac{\chi_R(k,t)}{F_s(k,t)^2}
+  =\exp[R(t)(a_k-1)^2]-1.
+\end{equation}
+This is not a full spatial $\chi_4(t)$ because spatial correlations between
+different particles have been integrated out. It is the renewal-count component:
+it peaks when the number of cage renewals is most heterogeneous and can be
+compared with the NGP and $F_s$ relaxation times in simulation trajectories.
+
 \section{Asymptotics and Peak Condition}
 
 At short times,
@@ -324,6 +365,9 @@ $[t\alpha_2(t)]^{-1}$ gives $0.189664$ at the same finite time.
 For the illustrative temperature law, cooling from $T=1.00$ to $T=0.62$
 decreases $D$ by a factor of $3.30$, increases $\tau_\alpha(k=1.1)$ by a
 factor of $6.72$, and raises the normalized product $D\tau_\alpha$ to $2.03$.
+Increasing the activated barrier gap $E_d-E_\lambda$ from $0$ to $4.5$ raises
+the cold-end normalized $D\tau_\alpha$ from $1.01$ to $3.30$. The renewal
+susceptibility for $k=1.1$ peaks at $t=12.46$, close to the NGP peak time.
 
 \begin{figure}[h]
   \centering
@@ -355,6 +399,15 @@ factor of $6.72$, and raises the normalized product $D\tau_\alpha$ to $2.03$.
   renewal control parameter $\lambda\tau_d$ grows.}
 \end{figure}
 
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_barrier.pdf}
+  \caption{Activated-barrier and renewal-susceptibility diagnostics. The left
+  panel shows the renewal-count contribution to self-scattering fluctuations.
+  The right panel shows that the cold-end Stokes-Einstein product grows as the
+  onset barrier exceeds the renewal-rate barrier.}
+\end{figure}
+
 \clearpage
 \section{Discussion}
 
@@ -376,6 +429,8 @@ in the NGP consistency check. The temperature extension adds a separate
 criterion for Stokes-Einstein violation: changing $\lambda(T)$ alone mainly
 rescales both diffusion and relaxation, while growth of $\tau_d(T)$ relative to
 $1/\lambda(T)$ produces decoupling through the inverse renewal shape $F^{-1}$.
+The activated-barrier interpretation makes this criterion sharper:
+$E_d>E_\lambda$ is the condition for $\lambda(T)\tau_d(T)$ to grow on cooling.
 
 Several assumptions are deliberately restrictive. Renewal events are taken to
 be Poisson once the delayed intensity is specified; cage-center jumps are

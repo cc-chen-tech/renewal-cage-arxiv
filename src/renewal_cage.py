@@ -50,6 +50,23 @@ class TemperatureLawParams:
     cage_tau_activation: float = 0.0
 
 
+@dataclass(frozen=True)
+class ActivatedBarrierParams:
+    """Activated-barrier interpretation of the temperature law."""
+
+    reference_temperature: float
+    cage_variance_ref: float
+    cage_tau_ref: float
+    jump_to_cage_ref: float
+    renewal_rate_ref: float
+    renewal_delay_ref: float
+    renewal_rate_barrier: float
+    delay_onset_barrier: float
+    cage_stiffening_barrier: float = 0.0
+    jump_to_cage_barrier: float = 0.0
+    cage_tau_barrier: float = 0.0
+
+
 def _validate(params: DelayedRenewalCageParams) -> None:
     for name in ("cage_variance", "cage_tau", "jump_variance", "renewal_rate", "renewal_delay"):
         value = getattr(params, name)
@@ -79,6 +96,31 @@ def _validate_temperature_law(law: TemperatureLawParams) -> None:
         value = getattr(law, name)
         if value < 0.0:
             raise ValueError(f"{name} must be nonnegative")
+
+
+def activated_barrier_temperature_law(barrier: ActivatedBarrierParams) -> TemperatureLawParams:
+    """Convert activated cage-breaking barriers into the temperature law.
+
+    The renewal rate is proportional to exp(-E_lambda/T), while the delayed
+    onset time is proportional to exp(E_d/T). Relative to a reference
+    temperature this gives the same Delta_T law used by TemperatureLawParams.
+    """
+
+    law = TemperatureLawParams(
+        reference_temperature=barrier.reference_temperature,
+        cage_variance_ref=barrier.cage_variance_ref,
+        cage_tau_ref=barrier.cage_tau_ref,
+        jump_to_cage_ref=barrier.jump_to_cage_ref,
+        renewal_rate_ref=barrier.renewal_rate_ref,
+        renewal_delay_ref=barrier.renewal_delay_ref,
+        rate_activation=barrier.renewal_rate_barrier,
+        delay_activation=barrier.delay_onset_barrier,
+        cage_stiffening=barrier.cage_stiffening_barrier,
+        jump_to_cage_growth=barrier.jump_to_cage_barrier,
+        cage_tau_activation=barrier.cage_tau_barrier,
+    )
+    _validate_temperature_law(law)
+    return law
 
 
 def temperature_dependent_params(temperature: float, law: TemperatureLawParams) -> DelayedRenewalCageParams:
@@ -237,6 +279,30 @@ def normalized_alpha_decay(
     renewal = delayed_poisson_mean(t, params)
     jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
     return np.exp(renewal * (jump_characteristic - 1.0))
+
+
+def renewal_scattering_susceptibility(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+) -> np.ndarray:
+    """Renewal-count contribution to the self-scattering variance.
+
+    For W=E[exp(i k Delta x)|N], W=exp[-k^2 L(t)/2] a^N with
+    a=exp(-k^2 q/2). The Poisson average gives Var(W) in closed form. This is
+    the single-particle renewal-count analogue of a four-point susceptibility.
+    """
+
+    _validate(params)
+    if wave_number < 0.0:
+        raise ValueError("wave_number must be nonnegative")
+    t = np.asarray(t, dtype=float)
+    local = local_cage_variance(t, params)
+    renewal = delayed_poisson_mean(t, params)
+    jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    second_moment = np.exp(-wave_number**2 * local + renewal * (jump_characteristic**2 - 1.0))
+    mean_square = self_intermediate_scattering(wave_number, t, params) ** 2
+    return second_moment - mean_square
 
 
 def alpha_relaxation_time(

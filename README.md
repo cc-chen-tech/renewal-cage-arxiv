@@ -12,8 +12,8 @@ The model combines:
 - Gaussian cage-center jumps,
 - closed-form MSD, NGP, self van Hove distribution, self-intermediate
   scattering function, temperature-dependent alpha relaxation, peak
-  asymptotics, Stokes-Einstein decoupling, and finite-time consistency
-  diagnostics.
+  asymptotics, Stokes-Einstein decoupling, activated-barrier diagnostics,
+  renewal-count susceptibility, and finite-time consistency diagnostics.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -79,6 +79,7 @@ Expected outputs include:
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_temperature.svg
+figures/renewal_cage_barrier.svg
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
@@ -88,10 +89,13 @@ data/renewal_cage_van_hove.csv
 data/renewal_cage_tail_ratios.csv
 data/renewal_cage_scattering.csv
 data/renewal_cage_temperature.csv
+data/renewal_cage_susceptibility.csv
+data/renewal_cage_barrier.csv
 paper/figures/renewal_cage_results.pdf
 paper/figures/renewal_cage_dimensionless.pdf
 paper/figures/renewal_cage_scattering.pdf
 paper/figures/renewal_cage_temperature.pdf
+paper/figures/renewal_cage_barrier.pdf
 dist/renewal-cage-arxiv-source.zip
 ```
 

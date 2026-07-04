@@ -412,6 +412,57 @@ D(T) tau_alpha(k,T)
 不一定产生强 SE violation。真正的 decoupling 来自 `tau_d(T)` 相对 `1/lambda(T)`
 增长，也就是 delayed renewal onset 变成 structural relaxation 的额外瓶颈。
 
+## 7.7. Activated barrier 和 renewal susceptibility
+
+上面的温度律可以从一个最小 activated barrier 图像得到。设长时间 renewal rate 的
+barrier 是 `E_lambda`，delayed onset 的 persistence barrier 是 `E_d`，则：
+
+```text
+lambda(T) tau_d(T)
+  = lambda0 tau_d0 exp[(E_d - E_lambda)(1/T - 1/T0)]
+```
+
+所以只要：
+
+```text
+E_d > E_lambda
+```
+
+冷却时 `lambda tau_d` 就会增长，structural relaxation 会比 long-time diffusion
+更强地受到 delayed cage renewal 限制。这是 SE violation 的最小 barrier 判据。
+
+模型还给出一个和四点 susceptibility 有关的 renewal-count 部分。定义：
+
+```text
+W_k(t|N) = exp[-k^2 L(t)/2] a_k^N
+a_k = exp[-k^2 q/2]
+```
+
+则：
+
+```text
+F_s(k,t) = E_N[W_k(t|N)]
+```
+
+renewal count fluctuation 贡献的 susceptibility 是：
+
+```text
+chi_R(k,t)
+  = Var_N[W_k(t|N)]
+  = exp[-k^2 L(t)] {exp[R(t)(a_k^2-1)] - exp[2R(t)(a_k-1)]}
+```
+
+也可以写成更简单的相对形式：
+
+```text
+chi_R(k,t) / F_s(k,t)^2
+  = exp[R(t)(a_k-1)^2] - 1
+```
+
+这不是完整空间四点函数 `chi_4(t)`，因为它没有包含不同粒子之间的空间相关长度。
+但它是 delayed renewal count 对 dynamic heterogeneity 的闭式贡献，可以和 NGP peak
+以及 `F_s` relaxation time 对比。
+
 ## 8. 与 Glass Transition 的联系
 
 在 glass transition 语境下：

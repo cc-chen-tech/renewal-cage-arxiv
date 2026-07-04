@@ -274,6 +274,39 @@ rescales diffusion and relaxation together. Decoupling appears when cooling make
 the delayed-onset product `lambda(T) tau_d(T)` grow, so structural relaxation is
 controlled by delayed cage renewal more strongly than long-time diffusion.
 
+## 4.7. Activated-barrier and susceptibility diagnostics
+
+The temperature law can be interpreted as a minimal activated barrier reduction:
+
+```text
+lambda(T) tau_d(T)
+  = lambda0 tau_d0 exp[(E_d-E_lambda)(1/T-1/T0)].
+```
+
+Thus the barrier gap `E_d-E_lambda` is the microscopic parameter that makes
+delayed renewal increasingly important on cooling.
+
+The renewal-count part of a self-scattering susceptibility is also closed form.
+For
+
+```text
+W_k(t|N) = exp[-k^2 L(t)/2] a_k^N
+a_k = exp[-k^2 q/2],
+```
+
+the model gives
+
+```text
+chi_R(k,t) = Var_N[W_k(t|N)]
+           = exp[-k^2 L(t)]
+             {exp[R(t)(a_k^2-1)] - exp[2R(t)(a_k-1)]}
+
+chi_R(k,t)/F_s(k,t)^2 = exp[R(t)(a_k-1)^2]-1.
+```
+
+This is not a full spatial `chi_4(t)`; it is the renewal-count contribution that
+can be compared with NGP and `F_s` peak times.
+
 ## 5. Reproducible Results
 
 The repository contains the exact implementation:
@@ -292,10 +325,13 @@ data/renewal_cage_sweeps.csv
 data/renewal_cage_consistency.csv
 data/renewal_cage_scattering.csv
 data/renewal_cage_temperature.csv
+data/renewal_cage_susceptibility.csv
+data/renewal_cage_barrier.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
+figures/renewal_cage_barrier.svg
 ```
 
 The current parameter set gives:
@@ -312,6 +348,8 @@ lambda_l       = 0.180000 from finite-time late-NGP inversion
 For the illustrative temperature law, cooling from `T=1.00` to `T=0.62`
 decreases `D` by a factor of `3.30`, increases `tau_alpha(k=1.1)` by a factor
 of `6.72`, and raises the normalized `D tau_alpha` product to `2.03`.
+Increasing the barrier gap `E_d-E_lambda` from `0` to `4.5` raises the cold-end
+normalized `D tau_alpha` from `1.01` to `3.30`.
 
 The parameter sweeps show:
 
