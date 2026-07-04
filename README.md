@@ -49,6 +49,15 @@ python3 scripts/generate_renewal_cage_results.py
 python3 scripts/build_arxiv_package.py
 ```
 
+If a TeX distribution is installed, compile the manuscript with:
+
+```bash
+bash scripts/compile_latex.sh
+```
+
+The GitHub Actions workflow runs the tests, regenerates data and figures, builds the
+arXiv source package, installs TeX Live, and compiles `paper/main.tex`.
+
 Expected outputs include:
 
 ```text

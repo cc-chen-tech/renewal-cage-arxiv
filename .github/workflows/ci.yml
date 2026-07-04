@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Regenerate data and figures
+        run: python scripts/generate_renewal_cage_results.py
+
+      - name: Build arXiv source package
+        run: python scripts/build_arxiv_package.py
+
+      - name: Install TeX Live
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-publishers \
+            texlive-fonts-recommended
+
+      - name: Compile manuscript
+        run: bash scripts/compile_latex.sh
+
+      - name: Upload manuscript PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: renewal-cage-manuscript
+          path: |
+            paper/main.pdf
+            dist/renewal-cage-arxiv-source.zip
