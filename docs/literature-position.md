@@ -45,6 +45,7 @@ local OU-like cage variance:
 
 delayed renewal intensity:
   r(t) = lambda[1-exp(-t/tau_d)]^2
+  generalized check: r_m(t) = lambda[1-exp(-t/tau_d)]^m
 
 Gaussian cage-center jump variance:
   q
@@ -58,6 +59,10 @@ This gives three analytic regimes:
 ```text
 short time:
   alpha_2(t) ~ [q^2 lambda tau_c^2/(3A^2 tau_d^2)] t
+  generalized exponent:
+    alpha_2(t) ~ [q^2 lambda tau_c^2/((m+1)A^2 tau_d^m)] t^(m-1)
+    m<1 singular origin, m=1 finite origin, m>1 regular zero origin
+    m=2 is the minimal integer regular choice
 
 peak condition:
   R'(t)[L(t)-qR(t)] - 2R(t)L'(t) = 0
@@ -77,6 +82,9 @@ The publishable claim should therefore be:
 > A delayed renewal count regularizes the short-time singularity of memoryless jump
 > models while preserving a closed-form NGP peak, simple peak-height diagnostics,
 > and long-time Gaussian recovery.
+
+The square-delay choice is now justified as the minimal integer member of a
+generalized delay-exponent class that gives a regular zero-origin NGP.
 
 This should be stated as a minimal diagnostic model, not as a replacement for
 microscopic glass theory or as a claim that all supercooled-liquid dynamics is

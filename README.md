@@ -10,7 +10,8 @@ The model combines:
 - local Ornstein-Uhlenbeck-like cage variance,
 - delayed cage-renewal events,
 - Gaussian cage-center jumps,
-- closed-form MSD, NGP, van Hove distribution, and peak asymptotics.
+- closed-form MSD, NGP, van Hove distribution, peak asymptotics, and
+  delay-exponent diagnostics.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -28,6 +29,9 @@ L(t) = A[1-exp(-t/tau_c)]
 R(t) = lambda [t - 2 tau_d(1-exp(-t/tau_d))
                + (tau_d/2)(1-exp(-2t/tau_d))]
 ```
+
+The square delay is the minimal integer choice in the generalized family
+`r_m(t)=lambda[1-exp(-t/tau_d)]^m` that gives a regular zero-origin NGP.
 
 ## Repository Layout
 

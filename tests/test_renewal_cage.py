@@ -9,9 +9,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
+    classify_delay_exponent,
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
+    generalized_delay_ngp_short_time,
     gaussian_radial_3d,
     radial_van_hove_3d,
     local_cage_variance,
@@ -198,6 +200,26 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertGreater(shape, 0.0)
         self.assertAlmostEqual(shape, numeric, delta=1e-6)
+
+    def test_generalized_delay_short_time_law_matches_square_delay_model(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.7,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        asymptotic = generalized_delay_ngp_short_time(params, delay_exponent=2.0)
+        t = np.array([1e-5, 2e-5, 4e-5])
+        alpha = ngp_1d(t, params)
+
+        self.assertAlmostEqual(asymptotic["power"], 1.0)
+        np.testing.assert_allclose(alpha / t, asymptotic["prefactor"], rtol=1e-3)
+
+    def test_delay_exponent_classification_explains_square_delay_choice(self):
+        self.assertEqual(classify_delay_exponent(0.5), "singular_origin")
+        self.assertEqual(classify_delay_exponent(1.0), "finite_origin")
+        self.assertEqual(classify_delay_exponent(2.0), "regular_zero_origin")
 
 
 if __name__ == "__main__":

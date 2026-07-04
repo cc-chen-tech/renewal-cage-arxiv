@@ -83,6 +83,13 @@ The corresponding mean renewal count is
   \right].
 \end{equation}
 The delayed onset gives $R(t)\sim \lambda t^3/(3\tau_d^2)$ as $t\to0$.
+The square in Eq.~(4) is not essential for the closed-form moment
+calculation, but it is the minimal integer exponent that makes the NGP start
+continuously from zero. More generally, if
+$r_m(t)=\lambda[1-\exp(-t/\tau_d)]^m$, then
+\begin{equation}
+  R_m(t)\sim \frac{\lambda t^{m+1}}{(m+1)\tau_d^m},\qquad t\to0.
+\end{equation}
 
 \section{Moments and Non-Gaussian Parameter}
 
@@ -116,6 +123,15 @@ At short times,
   \alpha_2(t)\sim
   \frac{q^2\lambda\tau_c^2}{3A^2\tau_d^2}t.
 \end{equation}
+For the generalized delay exponent $m$ introduced above,
+\begin{equation}
+  \alpha_2(t)\sim
+  \frac{q^2\lambda\tau_c^2}{(m+1)A^2\tau_d^m}t^{m-1}.
+\end{equation}
+Thus $m<1$ would give a singular origin, $m=1$ a finite nonzero NGP at the
+origin, and $m>1$ a regular zero-origin NGP. The present $m=2$ choice is the
+smallest integer member of this regular class and yields the linear onset in
+Eq.~(12).
 At long times $L(t)\to A$ and $R(t)\sim \lambda t$, so
 \begin{equation}
   \alpha_2(t)\sim \frac{1}{\lambda t}.
@@ -193,6 +209,11 @@ Gaussian recovery. The delay time $\tau_d$ mainly controls when the peak
 appears; the ratio $q/A$ controls its height in the plateau regime. This
 separation of roles may be useful when interpreting short-time simulations or
 coarse-grained cage-jump statistics near glass transition.
+The generalized exponent argument also makes a falsifiable modeling
+assumption explicit: a measured early-time NGP scaling
+$\alpha_2(t)\propto t^\beta$ corresponds to an effective renewal-delay
+exponent $m=\beta+1$ within this class. The square-delay model therefore
+predicts an initially linear NGP rise, not merely a finite peak.
 
 Table~\ref{tab:comparison} summarizes the distinction from nearby modeling
 languages. The point is not that a renewal model is the only explanation of a

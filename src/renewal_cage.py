@@ -221,6 +221,46 @@ def dimensionless_peak_prediction(params: DelayedRenewalCageParams) -> dict[str,
     }
 
 
+def generalized_delay_ngp_short_time(
+    params: DelayedRenewalCageParams,
+    *,
+    delay_exponent: float,
+) -> dict[str, float]:
+    """Short-time NGP law for r(t)=lambda[1-exp(-t/tau_d)]^m.
+
+    Since L(t) ~ A t/tau_c and R(t) ~ lambda t^(m+1)/[(m+1) tau_d^m],
+    alpha_2(t) ~ C t^(m-1). The default model uses m=2, the smallest integer
+    exponent for which alpha_2 starts continuously from zero.
+    """
+
+    _validate(params)
+    if delay_exponent <= 0.0:
+        raise ValueError("delay_exponent must be positive")
+    prefactor = (
+        params.jump_variance**2
+        * params.renewal_rate
+        * params.cage_tau**2
+        / ((delay_exponent + 1.0) * params.cage_variance**2 * params.renewal_delay**delay_exponent)
+    )
+    return {
+        "delay_exponent": delay_exponent,
+        "power": delay_exponent - 1.0,
+        "prefactor": prefactor,
+    }
+
+
+def classify_delay_exponent(delay_exponent: float) -> str:
+    """Classify the NGP origin behavior implied by a delayed renewal exponent."""
+
+    if delay_exponent <= 0.0:
+        raise ValueError("delay_exponent must be positive")
+    if delay_exponent < 1.0:
+        return "singular_origin"
+    if math.isclose(delay_exponent, 1.0):
+        return "finite_origin"
+    return "regular_zero_origin"
+
+
 def delayed_renewal_shape(scaled_time: float) -> float:
     """Dimensionless delayed-renewal integral F(s) for R(t)=lambda*tau_d*F(t/tau_d)."""
 
