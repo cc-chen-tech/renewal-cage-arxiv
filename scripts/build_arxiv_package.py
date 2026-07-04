@@ -442,6 +442,54 @@ def write_barrier_pdf(path: Path) -> None:
     c.save()
 
 
+def write_inversion_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_inversion.csv")
+    diffusion_scale = data["diffusion_scale"]
+    margin = data["existence_margin"]
+    jump_ratio = data["inferred_jump_to_cage_variance"]
+    time_residual = data["log_peak_time_residual"]
+    height_residual = data["log_peak_height_residual"]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Observable inversion and falsifiability diagnostics")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        diffusion_scale,
+        [
+            ("existence margin", margin, colors.HexColor("#2b6cb0")),
+            ("margin=1 threshold", np.ones_like(margin), colors.grey),
+            ("inferred q/A", jump_ratio, colors.HexColor("#c05621")),
+        ],
+        "M. Scattering-transport existence margin",
+        xlabel="D / D_observed",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        diffusion_scale,
+        [
+            ("log t*_pred / t*_obs", time_residual, colors.HexColor("#2f855a")),
+            ("log alpha*_pred / alpha*_obs", height_residual, colors.HexColor("#805ad5")),
+        ],
+        "N. NGP peak residuals after inversion",
+        xlabel="D / D_observed",
+    )
+
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -453,11 +501,13 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
+    inversion_pdf = PAPER_FIGURE_DIR / "renewal_cage_inversion.pdf"
     write_results_pdf(results_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
     write_barrier_pdf(barrier_pdf)
+    write_inversion_pdf(inversion_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -468,6 +518,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
+        archive.write(inversion_pdf, "figures/renewal_cage_inversion.pdf")
     return zip_path
 
 

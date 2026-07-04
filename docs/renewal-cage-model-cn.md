@@ -463,6 +463,70 @@ chi_R(k,t) / F_s(k,t)^2
 但它是 delayed renewal count 对 dynamic heterogeneity 的闭式贡献，可以和 NGP peak
 以及 `F_s` relaxation time 对比。
 
+## 7.8. 从可观测量反演参数和证伪条件
+
+更强的可发表价值在于：模型不只是正向画曲线，也能从常见 glass observable 反推
+参数并给出无解判据。
+
+如果实验或模拟给出：
+
+```text
+f_k          F_s(k,t) 的 cage Debye-Waller plateau
+D            long-time diffusion coefficient
+tau_alpha    cage-normalized alpha relaxation time
+tau_d        delayed cage-breaking onset time
+h            alpha threshold, 常用 h=e^-1
+```
+
+则 plateau 直接给出：
+
+```text
+A = -2 log(f_k) / k^2
+```
+
+long-time diffusion 给出：
+
+```text
+D = lambda q / 2
+```
+
+而 alpha relaxation 条件是：
+
+```text
+lambda tau_d F(tau_alpha/tau_d) [1 - exp(-k^2 q/2)] = -log(h)
+```
+
+消去 `lambda` 后得到一个只关于 `q` 的方程：
+
+```text
+[1 - exp(-k^2 q/2)] / q
+  = -log(h) / [2 D tau_d F(tau_alpha/tau_d)]
+```
+
+由于左边最大只能趋近于 `k^2/2`，所以模型存在正 jump variance 解的必要条件是：
+
+```text
+M_inv = D tau_d F(tau_alpha/tau_d) k^2 / [-log(h)] > 1
+```
+
+如果 `M_inv <= 1`，那么 delayed renewal cage model 无法同时解释给定的
+`F_s` plateau、`D`、`tau_alpha` 和 `tau_d`。如果 `M_inv > 1`，则 `q` 被唯一确定，
+然后：
+
+```text
+lambda = 2D/q
+```
+
+此时 NGP peak 不再是自由拟合参数，而是 out-of-sample prediction：
+
+```text
+R(t*) = A/q
+alpha_2(t*) = q/(4A)
+```
+
+这就是当前版本最强的证伪点：先用 scattering 和 transport 反演参数，再用 NGP peak
+检查模型是否自洽。
+
 ## 8. 与 Glass Transition 的联系
 
 在 glass transition 语境下：
@@ -514,8 +578,10 @@ data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
 data/renewal_cage_van_hove.csv
+data/renewal_cage_inversion.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
+figures/renewal_cage_inversion.svg
 ```
 
 运行：

@@ -16,10 +16,13 @@ from renewal_cage import (  # noqa: E402
     ActivatedBarrierParams,
     DelayedRenewalCageParams,
     TemperatureLawParams,
+    alpha_relaxation_time,
     activated_barrier_temperature_law,
     delayed_poisson_mean,
+    delayed_renewal_shape,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
+    infer_parameters_from_scattering_transport,
     moments_1d,
     ngp_1d,
     normalized_alpha_decay,
@@ -45,10 +48,22 @@ def scale(values: np.ndarray, low: float, high: float) -> np.ndarray:
 
 
 def polyline(x: np.ndarray, y: np.ndarray, color: str, width: float = 2.2) -> str:
-    coords = " ".join(f"{xi:.2f},{yi:.2f}" for xi, yi in zip(x, y))
-    return (
+    segments: list[str] = []
+    current: list[str] = []
+    for xi, yi in zip(x, y):
+        if np.isfinite(xi) and np.isfinite(yi):
+            current.append(f"{xi:.2f},{yi:.2f}")
+        elif len(current) > 1:
+            segments.append(" ".join(current))
+            current = []
+        else:
+            current = []
+    if len(current) > 1:
+        segments.append(" ".join(current))
+    return "\n".join(
         f'<polyline points="{coords}" fill="none" stroke="{color}" '
         f'stroke-width="{width}" stroke-linejoin="round" stroke-linecap="round" />'
+        for coords in segments
     )
 
 
@@ -207,6 +222,65 @@ def write_susceptibility_csv(
             )
     write_sweep_csv(path, rows)
     return curves
+
+
+def write_inversion_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    *,
+    wave_number: float,
+    diffusion_scales: list[float],
+) -> list[dict[str, float]]:
+    plateau = float(np.exp(-0.5 * wave_number**2 * params.cage_variance))
+    diffusion = 0.5 * params.renewal_rate * params.jump_variance
+    observed_tau_alpha = alpha_relaxation_time(wave_number, params)
+    observed_peak = dimensionless_peak_prediction(params)
+    rows: list[dict[str, float]] = []
+    for scale_value in diffusion_scales:
+        scaled_diffusion = diffusion * scale_value
+        try:
+            inferred = infer_parameters_from_scattering_transport(
+                wave_number=wave_number,
+                debye_waller_plateau=plateau,
+                diffusion_coefficient=scaled_diffusion,
+                tau_alpha=observed_tau_alpha,
+                renewal_delay=params.renewal_delay,
+            )
+            rows.append(
+                {
+                    "diffusion_scale": scale_value,
+                    "valid": 1.0,
+                    "existence_margin": inferred["existence_margin"],
+                    "inferred_jump_to_cage_variance": inferred["jump_to_cage_variance"],
+                    "inferred_renewal_rate": inferred["renewal_rate"],
+                    "predicted_ngp_peak_time": inferred["predicted_ngp_peak_time"],
+                    "predicted_ngp_peak": inferred["predicted_ngp_peak"],
+                    "observed_ngp_peak_time": observed_peak["peak_time"],
+                    "observed_ngp_peak": observed_peak["peak_ngp"],
+                    "log_peak_time_residual": np.log(inferred["predicted_ngp_peak_time"] / observed_peak["peak_time"]),
+                    "log_peak_height_residual": np.log(inferred["predicted_ngp_peak"] / observed_peak["peak_ngp"]),
+                }
+            )
+        except ValueError:
+            shape = delayed_renewal_shape(observed_tau_alpha / params.renewal_delay)
+            margin = scaled_diffusion * params.renewal_delay * shape * wave_number**2
+            rows.append(
+                {
+                    "diffusion_scale": scale_value,
+                    "valid": 0.0,
+                    "existence_margin": margin,
+                    "inferred_jump_to_cage_variance": np.nan,
+                    "inferred_renewal_rate": np.nan,
+                    "predicted_ngp_peak_time": np.nan,
+                    "predicted_ngp_peak": np.nan,
+                    "observed_ngp_peak_time": observed_peak["peak_time"],
+                    "observed_ngp_peak": observed_peak["peak_ngp"],
+                    "log_peak_time_residual": np.nan,
+                    "log_peak_height_residual": np.nan,
+                }
+            )
+    write_sweep_csv(path, rows)
+    return rows
 
 
 def write_tail_ratio_csv(
@@ -607,6 +681,56 @@ def write_barrier_svg(
     path.write_text(svg)
 
 
+def write_inversion_svg(path: Path, inversion_rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    colors = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 68}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, x_values: np.ndarray, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        finite = all_values[np.isfinite(all_values)]
+        y_all = scale(finite, bottom, top)
+        y_min = float(np.min(finite))
+        y_max = float(np.max(finite))
+        out = []
+        for idx, (label, curve) in enumerate(curves):
+            y = np.full_like(curve, np.nan, dtype=float)
+            mask = np.isfinite(curve)
+            y[mask] = bottom + (curve[mask] - y_min) * (top - bottom) / (y_max - y_min)
+            out.append(polyline(x, y, colors[idx % len(colors)]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{colors[idx % len(colors)]}">{label}</text>'
+            )
+        return "\n".join(out)
+
+    diffusion_scale = np.array([row["diffusion_scale"] for row in inversion_rows])
+    margin = np.array([row["existence_margin"] for row in inversion_rows])
+    jump_ratio = np.array([row["inferred_jump_to_cage_variance"] for row in inversion_rows])
+    time_residual = np.array([row["log_peak_time_residual"] for row in inversion_rows])
+    height_residual = np.array([row["log_peak_height_residual"] for row in inversion_rows])
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Observable inversion and falsifiability diagnostics</text>
+  {axes(left_a, right_a, "M. Scattering-transport existence margin", "D / D_observed")}
+  {plot(left_a, right_a, diffusion_scale, [("existence margin", margin), ("margin=1 threshold", np.ones_like(margin)), ("inferred q/A", jump_ratio)])}
+  <text x="{left_a + 18}" y="{bottom - 52}" font-family="Arial, sans-serif" font-size="12" fill="#718096">margin below 1 has no positive-q solution</text>
+  {axes(left_b, right_b, "N. NGP peak residuals after inversion", "D / D_observed")}
+  {plot(left_b, right_b, diffusion_scale, [("log t*_pred / t*_obs", time_residual), ("log alpha*_pred / alpha*_obs", height_residual)])}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -796,6 +920,13 @@ def main() -> None:
         susceptibility_curves,
         barrier_rows,
     )
+    inversion_rows = write_inversion_csv(
+        DATA_DIR / "renewal_cage_inversion.csv",
+        params,
+        wave_number=1.1,
+        diffusion_scales=[0.6, 0.75, 0.8, 1.0, 1.5, 2.0, 3.0],
+    )
+    write_inversion_svg(FIGURE_DIR / "renewal_cage_inversion.svg", inversion_rows)
 
 
 if __name__ == "__main__":

@@ -228,7 +228,46 @@ tau_alpha(k)^-1 ~= lambda [1 - exp(-k^2 q/2)].
 This is the main reason to position the note around delayed cage renewal rather
 than generic random diffusivity.
 
-## 4.6. Temperature dependence and Stokes-Einstein decoupling
+## 4.6. Observable inversion and falsifiability
+
+The scattering result can be inverted. Given an observed Debye-Waller plateau
+`f_k`, diffusion coefficient `D`, alpha time `tau_alpha(k)` at threshold `h`,
+and delayed onset time `tau_d`,
+
+```text
+A = -2 log(f_k) / k^2
+D = lambda q / 2
+```
+
+and
+
+```text
+lambda tau_d F(tau_alpha/tau_d) [1-exp(-k^2 q/2)] = -log(h).
+```
+
+Eliminating `lambda` gives the scalar equation
+
+```text
+[1-exp(-k^2 q/2)]/q
+  = -log(h) / [2D tau_d F(tau_alpha/tau_d)].
+```
+
+Because the left side is bounded above by `k^2/2`, a positive-jump solution
+exists only if
+
+```text
+M_inv = D tau_d F(tau_alpha/tau_d) k^2 / [-log(h)] > 1.
+```
+
+This is a data-level falsification criterion. If it holds, `q` is determined,
+`lambda=2D/q`, and the NGP peak is predicted rather than fit:
+
+```text
+R(t*) = A/q
+alpha_2(t*) = q/(4A).
+```
+
+## 4.7. Temperature dependence and Stokes-Einstein decoupling
 
 A minimal temperature extension assigns reduced-temperature dependence to the
 effective renewal parameters:
@@ -274,7 +313,7 @@ rescales diffusion and relaxation together. Decoupling appears when cooling make
 the delayed-onset product `lambda(T) tau_d(T)` grow, so structural relaxation is
 controlled by delayed cage renewal more strongly than long-time diffusion.
 
-## 4.7. Activated-barrier and susceptibility diagnostics
+## 4.8. Activated-barrier and susceptibility diagnostics
 
 The temperature law can be interpreted as a minimal activated barrier reduction:
 
@@ -327,11 +366,13 @@ data/renewal_cage_scattering.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_barrier.csv
+data/renewal_cage_inversion.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
 figures/renewal_cage_barrier.svg
+figures/renewal_cage_inversion.svg
 ```
 
 The current parameter set gives:

@@ -18,6 +18,7 @@ from renewal_cage import (  # noqa: E402
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
+    infer_parameters_from_scattering_transport,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
     long_time_diffusion_coefficient,
@@ -407,6 +408,48 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 renewal_delay=3.0,
                 late_time=0.0,
                 late_ngp=0.01,
+            )
+
+    def test_scattering_transport_inversion_recovers_minimal_parameters(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        plateau = math.exp(-0.5 * wave_number**2 * params.cage_variance)
+        diffusion = long_time_diffusion_coefficient(params)
+        tau_alpha = alpha_relaxation_time(wave_number, params)
+        peak = dimensionless_peak_prediction(params)
+
+        inferred = infer_parameters_from_scattering_transport(
+            wave_number=wave_number,
+            debye_waller_plateau=plateau,
+            diffusion_coefficient=diffusion,
+            tau_alpha=tau_alpha,
+            renewal_delay=params.renewal_delay,
+        )
+
+        self.assertAlmostEqual(inferred["cage_variance"], params.cage_variance)
+        self.assertAlmostEqual(inferred["jump_variance"], params.jump_variance, delta=1e-11)
+        self.assertAlmostEqual(inferred["renewal_rate"], params.renewal_rate, delta=1e-12)
+        self.assertGreater(inferred["existence_margin"], 1.0)
+        self.assertAlmostEqual(inferred["reconstructed_debye_waller_plateau"], plateau)
+        self.assertAlmostEqual(inferred["reconstructed_diffusion_coefficient"], diffusion)
+        self.assertAlmostEqual(inferred["reconstructed_tau_alpha"], tau_alpha, delta=1e-10)
+        self.assertAlmostEqual(inferred["predicted_ngp_peak"], peak["peak_ngp"], delta=1e-12)
+        self.assertAlmostEqual(inferred["predicted_ngp_peak_time"], peak["peak_time"], delta=1e-10)
+
+    def test_scattering_transport_inversion_rejects_impossible_observables(self):
+        with self.assertRaisesRegex(ValueError, "existence"):
+            infer_parameters_from_scattering_transport(
+                wave_number=1.1,
+                debye_waller_plateau=0.55,
+                diffusion_coefficient=1e-4,
+                tau_alpha=10.0,
+                renewal_delay=3.0,
             )
 
     def test_delayed_renewal_shape_is_positive_and_matches_integral(self):

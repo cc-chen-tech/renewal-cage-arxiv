@@ -338,6 +338,97 @@ def stokes_einstein_product(wave_number: float, params: DelayedRenewalCageParams
     return long_time_diffusion_coefficient(params) * alpha_relaxation_time(wave_number, params)
 
 
+def infer_parameters_from_scattering_transport(
+    *,
+    wave_number: float,
+    debye_waller_plateau: float,
+    diffusion_coefficient: float,
+    tau_alpha: float,
+    renewal_delay: float,
+    threshold: float = math.exp(-1.0),
+) -> dict[str, float]:
+    """Infer minimal renewal-cage parameters from common observables.
+
+    The cage plateau of the self-intermediate scattering function gives
+    ``A=-2 log(f_c)/k^2``. The long-time diffusion coefficient gives
+    ``D=lambda q/2``. The cage-normalized alpha time gives
+
+        lambda tau_d F(tau_alpha/tau_d) [1-exp(-k^2 q/2)] = -log(threshold),
+
+    which determines ``q`` after eliminating ``lambda``. The same equation yields
+    a direct falsifiability condition: the dimensionless existence margin below
+    must exceed unity for any positive jump variance to satisfy the observables.
+    """
+
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if not 0.0 < debye_waller_plateau < 1.0:
+        raise ValueError("debye_waller_plateau must lie between zero and one")
+    if diffusion_coefficient <= 0.0:
+        raise ValueError("diffusion_coefficient must be positive")
+    if tau_alpha <= 0.0:
+        raise ValueError("tau_alpha must be positive")
+    if renewal_delay <= 0.0:
+        raise ValueError("renewal_delay must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must lie between 0 and 1")
+
+    cage_variance = -2.0 * math.log(debye_waller_plateau) / (wave_number**2)
+    shape = delayed_renewal_shape(tau_alpha / renewal_delay)
+    target = -math.log(threshold)
+    half_k_squared = 0.5 * wave_number**2
+    transport_scale = 2.0 * diffusion_coefficient * renewal_delay * shape
+    target_ratio = target / transport_scale
+    existence_margin = transport_scale * half_k_squared / target
+    if existence_margin <= 1.0:
+        raise ValueError(
+            "observables fail the scattering-transport existence criterion: "
+            "D tau_d F(tau_alpha/tau_d) k^2 / [-log(threshold)] must exceed 1"
+        )
+
+    def gamma_over_q(jump_variance: float) -> float:
+        return (1.0 - math.exp(-half_k_squared * jump_variance)) / jump_variance
+
+    high = max(cage_variance, 1.0)
+    while gamma_over_q(high) > target_ratio:
+        high *= 2.0
+    low = 0.0
+    for _ in range(100):
+        mid = 0.5 * (low + high)
+        if gamma_over_q(mid) > target_ratio:
+            low = mid
+        else:
+            high = mid
+    jump_variance = 0.5 * (low + high)
+    renewal_rate = 2.0 * diffusion_coefficient / jump_variance
+    inferred_params = DelayedRenewalCageParams(
+        cage_variance=cage_variance,
+        cage_tau=1.0,
+        jump_variance=jump_variance,
+        renewal_rate=renewal_rate,
+        renewal_delay=renewal_delay,
+    )
+    peak = dimensionless_peak_prediction(inferred_params)
+    reconstructed_tau_alpha = alpha_relaxation_time(wave_number, inferred_params, threshold=threshold)
+    return {
+        "wave_number": wave_number,
+        "threshold": threshold,
+        "cage_variance": cage_variance,
+        "jump_variance": jump_variance,
+        "jump_to_cage_variance": jump_variance / cage_variance,
+        "renewal_rate": renewal_rate,
+        "renewal_delay": renewal_delay,
+        "lambda_tau_delay": renewal_rate * renewal_delay,
+        "delayed_renewal_shape_at_tau_alpha": shape,
+        "existence_margin": existence_margin,
+        "reconstructed_debye_waller_plateau": math.exp(-0.5 * wave_number**2 * cage_variance),
+        "reconstructed_diffusion_coefficient": long_time_diffusion_coefficient(inferred_params),
+        "reconstructed_tau_alpha": reconstructed_tau_alpha,
+        "predicted_ngp_peak_time": peak["peak_time"],
+        "predicted_ngp_peak": peak["peak_ngp"],
+    }
+
+
 def temperature_scan(
     temperatures: np.ndarray,
     law: TemperatureLawParams,

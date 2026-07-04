@@ -125,6 +125,14 @@ activated barrier interpretation:
 renewal-count susceptibility:
   chi_R(k,t) = Var_N[exp(-k^2 L(t)/2) exp(-k^2 q N(t)/2)]
   chi_R/F_s^2 = exp[R(t)(exp(-k^2 q/2)-1)^2]-1
+
+observable inversion:
+  A = -2 log(f_k)/k^2
+  [1-exp(-k^2 q/2)]/q
+    = -log(h) / [2 D tau_d F(tau_alpha/tau_d)]
+  existence margin:
+    D tau_d F(tau_alpha/tau_d) k^2 / [-log(h)] > 1
+  then lambda = 2D/q and the NGP peak is predicted, not fit
 ```
 
 Competing mechanisms should be asked to reproduce the same four observables:
@@ -133,7 +141,10 @@ consistency, and the long-time `1/t` NGP decay. A stronger glass-transition
 comparison can additionally ask whether they reproduce the same growth of
 `D tau_alpha` when cooling increases the delayed-renewal control parameter
 `lambda tau_d`, and whether their dynamic-heterogeneity measure has the same
-renewal-count susceptibility peak.
+renewal-count susceptibility peak. The strongest falsifiability test is now the
+scattering-transport inversion: once `F_s` plateau, `D`, `tau_alpha`, and
+`tau_d` are specified, the model either has no positive-`q` solution or predicts
+the NGP peak time and height without another free parameter.
 
 ## What Still Needs Strengthening
 

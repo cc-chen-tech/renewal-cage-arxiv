@@ -161,6 +161,43 @@ diffusive scaling with $D=\lambda q/2$ in one dimension. For larger $k$, the
 rate saturates at $\lambda$, reflecting the renewal-count bottleneck rather
 than a continuously varying diffusivity.
 
+\section{Observable Inversion and Falsifiability}
+
+The same formulas can be read in the reverse direction. Suppose a simulation or
+experiment supplies the cage plateau $f_k$, long-time diffusion coefficient
+$D$, cage-normalized alpha time $\tau_\alpha(k)$ at threshold $h$, and an
+independent estimate of the delayed onset time $\tau_d$. Then
+\begin{equation}
+  A=-\frac{2\log f_k}{k^2}
+\end{equation}
+and $D=\lambda q/2$. The alpha-time equation gives
+\begin{equation}
+  \lambda\tau_dF(\tau_\alpha/\tau_d)
+  \left(1-e^{-k^2q/2}\right)=-\log h.
+\end{equation}
+Eliminating $\lambda$ yields a scalar equation for $q$,
+\begin{equation}
+  \frac{1-e^{-k^2q/2}}{q}=
+  \frac{-\log h}{2D\tau_dF(\tau_\alpha/\tau_d)}.
+\end{equation}
+Because the left side is bounded above by $k^2/2$, the delayed-renewal model
+has a positive-jump solution only if
+\begin{equation}
+  \mathcal{M}_{\rm inv}\equiv
+  \frac{D\tau_dF(\tau_\alpha/\tau_d)k^2}{-\log h}>1.
+\end{equation}
+This is a direct data-level falsification test: if the measured
+$(D,\tau_\alpha,\tau_d,k)$ fail this inequality, no choice of positive jump
+variance can make the minimal model reproduce both transport and scattering.
+When the inequality holds, the inferred $q$ gives $\lambda=2D/q$, and the NGP
+peak is no longer adjustable:
+\begin{equation}
+  R(t^\ast)=\frac{A}{q},\qquad
+  \alpha_2(t^\ast)=\frac{q}{4A}.
+\end{equation}
+Thus the NGP peak time and height become out-of-sample checks on the parameters
+inferred from $F_s(k,t)$ and long-time diffusion.
+
 \section{Temperature Dependence and Stokes-Einstein Decoupling}
 
 The fixed-parameter model can be turned into a minimal temperature diagnostic
@@ -368,6 +405,10 @@ factor of $6.72$, and raises the normalized product $D\tau_\alpha$ to $2.03$.
 Increasing the activated barrier gap $E_d-E_\lambda$ from $0$ to $4.5$ raises
 the cold-end normalized $D\tau_\alpha$ from $1.01$ to $3.30$. The renewal
 susceptibility for $k=1.1$ peaks at $t=12.46$, close to the NGP peak time.
+The observable inversion gives an existence margin
+$\mathcal{M}_{\rm inv}=1.26$ for the default parameters; reducing $D$ below
+about $0.79$ of its consistent value violates the scattering-transport
+existence criterion.
 
 \begin{figure}[h]
   \centering
@@ -406,6 +447,16 @@ susceptibility for $k=1.1$ peaks at $t=12.46$, close to the NGP peak time.
   panel shows the renewal-count contribution to self-scattering fluctuations.
   The right panel shows that the cold-end Stokes-Einstein product grows as the
   onset barrier exceeds the renewal-rate barrier.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_inversion.pdf}
+  \caption{Observable inversion and falsifiability diagnostics. The left panel
+  shows the scattering-transport existence margin and inferred $q/A$ as the
+  diffusion coefficient is varied while $F_s$ plateau, $\tau_\alpha$, and
+  $\tau_d$ are held fixed. The right panel shows the resulting NGP peak
+  residuals, emphasizing that the peak becomes an out-of-sample check.}
 \end{figure}
 
 \clearpage

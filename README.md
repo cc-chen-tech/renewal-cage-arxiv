@@ -13,7 +13,8 @@ The model combines:
 - closed-form MSD, NGP, self van Hove distribution, self-intermediate
   scattering function, temperature-dependent alpha relaxation, peak
   asymptotics, Stokes-Einstein decoupling, activated-barrier diagnostics,
-  renewal-count susceptibility, and finite-time consistency diagnostics.
+  renewal-count susceptibility, finite-time consistency diagnostics, and
+  observable inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -37,6 +38,9 @@ The square delay is the minimal integer choice in the generalized family
 The finite-time consistency diagnostic inverts the plateau relation
 `alpha=beta*y/(1+y)^2`; the late-time check uses the `y>1` branch and requires
 the observed late NGP to lie below the peak bound `beta/4`.
+The scattering-transport inversion uses the measured Debye-Waller plateau,
+`D`, `tau_alpha`, and `tau_d` to infer `A`, `q`, and `lambda`; it requires the
+existence margin `D tau_d F(tau_alpha/tau_d) k^2 / [-log h]` to exceed one.
 
 ## Repository Layout
 
@@ -80,6 +84,7 @@ figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_temperature.svg
 figures/renewal_cage_barrier.svg
+figures/renewal_cage_inversion.svg
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
@@ -91,11 +96,13 @@ data/renewal_cage_scattering.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_barrier.csv
+data/renewal_cage_inversion.csv
 paper/figures/renewal_cage_results.pdf
 paper/figures/renewal_cage_dimensionless.pdf
 paper/figures/renewal_cage_scattering.pdf
 paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_barrier.pdf
+paper/figures/renewal_cage_inversion.pdf
 dist/renewal-cage-arxiv-source.zip
 ```
 
