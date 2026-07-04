@@ -11,14 +11,16 @@ literature.
 - Chechkin, Seno, Metzler, and Sokolov developed Brownian yet non-Gaussian diffusion
   through superstatistics and subordination of fluctuating diffusivities:
   https://arxiv.org/abs/1611.06202
-- Fickian non-Gaussian diffusion has been studied directly in glass-forming liquids:
+- Fickian non-Gaussian diffusion has been studied directly in glass-forming liquids,
+  with later comment/reply discussion about whether that language captures the
+  relevant supercooled-liquid heterogeneity:
   https://doi.org/10.1103/PhysRevLett.128.168001
-- There is also an explicit critique of treating supercooled liquids as simply Fickian
-  yet non-Gaussian:
-  https://arxiv.org/abs/2210.07119
-- Cage-size and jump-precursor studies support the physical relevance of cage
-  rearrangement events before jumps:
-  https://www.researchgate.net/publication/315328573_Cage_Size_and_Jump_Precursors_in_Glass-Forming_Liquids_Experiment_and_Simulations
+  https://doi.org/10.1103/PhysRevLett.131.119801
+  https://doi.org/10.1103/PhysRevLett.131.119802
+- Cage-rearrangement and cage-size precursor studies support the physical
+  relevance of renewal-like rearrangement events before jumps:
+  https://doi.org/10.1103/PhysRevLett.89.095704
+  https://doi.org/10.1021/acs.jpclett.7b00187
 
 ## What Is Not Novel Enough
 
@@ -76,13 +78,16 @@ The publishable claim should therefore be:
 > models while preserving a closed-form NGP peak, simple peak-height diagnostics,
 > and long-time Gaussian recovery.
 
+This should be stated as a minimal diagnostic model, not as a replacement for
+microscopic glass theory or as a claim that all supercooled-liquid dynamics is
+Fickian non-Gaussian.
+
 ## What Still Needs Strengthening
 
 Before arXiv submission, the work should add:
 
 ```text
 1. Final prose polish and narrower claims.
-2. Reference metadata checks.
-3. Author and affiliation confirmation.
-4. A final rendered-PDF read-through.
+2. Author and affiliation confirmation.
+3. A final rendered-PDF read-through.
 ```

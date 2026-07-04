@@ -83,5 +83,5 @@ dist/renewal-cage-arxiv-source.zip
 
 This is a research draft intended to become a short arXiv note. The model,
 figures, arXiv source package, and LaTeX manuscript build are reproducible in
-CI. Before submission, the paper still needs final prose polishing, reference
-checks, and author/affiliation confirmation.
+CI. Before submission, the paper still needs final prose polishing, a final
+rendered-PDF read-through, and author/affiliation confirmation.
