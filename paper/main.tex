@@ -251,6 +251,14 @@ does not produce a strong violation. A violation appears when cooling increases
 the delayed-onset product $\lambda(T)\tau_d(T)$ and/or the jump-to-cage contrast
 fast enough that structural relaxation is bottlenecked by delayed cage renewal
 more strongly than long-time diffusion.
+The same scan gives the local fractional Stokes-Einstein exponent
+\begin{equation}
+  \xi_{\rm SE}(T)=
+  -\frac{d\log D(T)}{d\log\tau_\alpha(k,T)},
+  \qquad D\propto\tau_\alpha^{-\xi_{\rm SE}}.
+\end{equation}
+Ordinary Stokes-Einstein scaling corresponds to $\xi_{\rm SE}=1$, whereas
+decoupled glassy transport gives $0<\xi_{\rm SE}<1$.
 
 \section{Activated-Barrier Interpretation and Dynamic Heterogeneity}
 
@@ -402,6 +410,8 @@ $[t\alpha_2(t)]^{-1}$ gives $0.189664$ at the same finite time.
 For the illustrative temperature law, cooling from $T=1.00$ to $T=0.62$
 decreases $D$ by a factor of $3.30$, increases $\tau_\alpha(k=1.1)$ by a
 factor of $6.72$, and raises the normalized product $D\tau_\alpha$ to $2.03$.
+The corresponding local fractional Stokes-Einstein exponent decreases from
+$\xi_{\rm SE}=0.725$ at the hot end to $0.568$ at the cold end.
 Increasing the activated barrier gap $E_d-E_\lambda$ from $0$ to $4.5$ raises
 the cold-end normalized $D\tau_\alpha$ from $1.01$ to $3.30$. The renewal
 susceptibility for $k=1.1$ peaks at $t=12.46$, close to the NGP peak time.
@@ -437,7 +447,8 @@ existence criterion.
   \caption{Temperature-dependent renewal diagnostics. Cooling decreases the
   long-time diffusion coefficient while increasing the alpha-relaxation and NGP
   peak times. The normalized product $D\tau_\alpha$ grows when the delayed
-  renewal control parameter $\lambda\tau_d$ grows.}
+  renewal control parameter $\lambda\tau_d$ grows, and the same scan gives a
+  fractional Stokes-Einstein exponent $\xi_{\rm SE}<1$.}
 \end{figure}
 
 \begin{figure}[h]

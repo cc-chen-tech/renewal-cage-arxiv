@@ -599,6 +599,7 @@ def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
     lambda_tau = np.array([row["lambda_tau_delay"] for row in rows])
     peak_time = np.array([row["predicted_ngp_peak_time"] for row in rows])
     peak_height = np.array([row["predicted_ngp_peak"] for row in rows])
+    fractional_exponent = np.array([row["fractional_stokes_einstein_exponent"] for row in rows])
     left_curves = [
         ("D / D_hot", diffusion / diffusion[0]),
         ("tau_alpha / tau_hot", tau_alpha / tau_alpha[0]),
@@ -608,6 +609,7 @@ def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
         ("D tau_alpha / hot", se_product),
         ("lambda tau_d / hot", lambda_tau / lambda_tau[0]),
         ("alpha_peak / hot", peak_height / peak_height[0]),
+        ("xi_SE", fractional_exponent),
     ]
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />

@@ -331,6 +331,7 @@ def write_temperature_pdf(path: Path) -> None:
     se_product = data["normalized_stokes_einstein_product"]
     lambda_tau = data["lambda_tau_delay"]
     peak_height = data["predicted_ngp_peak"]
+    fractional_exponent = data["fractional_stokes_einstein_exponent"]
 
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
@@ -364,6 +365,7 @@ def write_temperature_pdf(path: Path) -> None:
             ("D tau_alpha / hot", se_product, colors.HexColor("#805ad5")),
             ("lambda tau_d / hot", lambda_tau / lambda_tau[0], colors.HexColor("#2f855a")),
             ("alpha_peak / hot", peak_height / peak_height[0], colors.HexColor("#c05621")),
+            ("xi_SE", fractional_exponent, colors.HexColor("#2b6cb0")),
         ],
         "J. Stokes-Einstein product and delayed-renewal control",
         xlabel="inverse-temperature shift",

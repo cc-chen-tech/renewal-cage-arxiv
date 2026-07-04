@@ -412,6 +412,28 @@ D(T) tau_alpha(k,T)
 不一定产生强 SE violation。真正的 decoupling 来自 `tau_d(T)` 相对 `1/lambda(T)`
 增长，也就是 delayed renewal onset 变成 structural relaxation 的额外瓶颈。
 
+玻璃文献里常用 fractional Stokes-Einstein exponent 表示这种 decoupling：
+
+```text
+D ~ tau_alpha^(-xi_SE)
+xi_SE(T) = - d log D(T) / d log tau_alpha(k,T)
+```
+
+普通 Stokes-Einstein scaling 对应：
+
+```text
+xi_SE = 1
+```
+
+fractional SE violation 对应：
+
+```text
+0 < xi_SE < 1
+```
+
+当前默认温度扫描给出的 `xi_SE` 从热端约 `0.725` 降到冷端约 `0.568`，说明模型不只
+让 `D tau_alpha` 变大，也能产生文献常见的 fractional SE slope。
+
 ## 7.7. Activated barrier 和 renewal susceptibility
 
 上面的温度律可以从一个最小 activated barrier 图像得到。设长时间 renewal rate 的

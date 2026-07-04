@@ -18,6 +18,7 @@ from renewal_cage import (  # noqa: E402
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
+    fractional_stokes_einstein_exponents,
     infer_parameters_from_scattering_transport,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
@@ -280,6 +281,22 @@ class DelayedRenewalCageTests(unittest.TestCase):
         first = temperature_dependent_params(float(temperatures[0]), law)
         self.assertAlmostEqual(rows[0]["stokes_einstein_product"], stokes_einstein_product(1.1, first))
         self.assertAlmostEqual(rows[0]["diffusion_coefficient"], long_time_diffusion_coefficient(first))
+        self.assertIn("fractional_stokes_einstein_exponent", rows[-1])
+        self.assertGreater(rows[-1]["fractional_stokes_einstein_exponent"], 0.0)
+        self.assertLess(rows[-1]["fractional_stokes_einstein_exponent"], 1.0)
+
+    def test_fractional_stokes_einstein_exponents_recover_power_law_slope(self):
+        tau_alpha = np.array([2.0, 4.0, 8.0, 16.0, 32.0])
+        diffusion = 3.0 * tau_alpha ** (-0.72)
+        exponents = fractional_stokes_einstein_exponents(diffusion, tau_alpha)
+
+        np.testing.assert_allclose(exponents, 0.72, rtol=1e-12, atol=1e-12)
+
+    def test_fractional_stokes_einstein_exponents_validate_inputs(self):
+        with self.assertRaises(ValueError):
+            fractional_stokes_einstein_exponents(np.array([1.0]), np.array([2.0]))
+        with self.assertRaises(ValueError):
+            fractional_stokes_einstein_exponents(np.array([1.0, -1.0]), np.array([2.0, 3.0]))
 
     def test_radial_van_hove_distribution_normalizes(self):
         params = DelayedRenewalCageParams(

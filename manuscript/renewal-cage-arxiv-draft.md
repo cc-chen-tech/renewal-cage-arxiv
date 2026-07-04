@@ -312,6 +312,15 @@ This is the model's Stokes-Einstein diagnostic. Changing `lambda(T)` alone mostl
 rescales diffusion and relaxation together. Decoupling appears when cooling makes
 the delayed-onset product `lambda(T) tau_d(T)` grow, so structural relaxation is
 controlled by delayed cage renewal more strongly than long-time diffusion.
+The same scan gives the local fractional Stokes-Einstein exponent
+
+```text
+xi_SE(T) = -d log D(T) / d log tau_alpha(k,T)
+D ~ tau_alpha^(-xi_SE).
+```
+
+Ordinary Stokes-Einstein scaling has `xi_SE=1`; fractional decoupling has
+`0<xi_SE<1`.
 
 ## 4.8. Activated-barrier and susceptibility diagnostics
 
@@ -388,7 +397,8 @@ lambda_l       = 0.180000 from finite-time late-NGP inversion
 
 For the illustrative temperature law, cooling from `T=1.00` to `T=0.62`
 decreases `D` by a factor of `3.30`, increases `tau_alpha(k=1.1)` by a factor
-of `6.72`, and raises the normalized `D tau_alpha` product to `2.03`.
+of `6.72`, raises the normalized `D tau_alpha` product to `2.03`, and lowers
+the local fractional exponent from `xi_SE=0.725` to `0.568`.
 Increasing the barrier gap `E_d-E_lambda` from `0` to `4.5` raises the cold-end
 normalized `D tau_alpha` from `1.01` to `3.30`.
 

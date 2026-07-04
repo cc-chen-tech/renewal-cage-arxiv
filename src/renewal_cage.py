@@ -338,6 +338,34 @@ def stokes_einstein_product(wave_number: float, params: DelayedRenewalCageParams
     return long_time_diffusion_coefficient(params) * alpha_relaxation_time(wave_number, params)
 
 
+def fractional_stokes_einstein_exponents(
+    diffusion: np.ndarray,
+    tau_alpha: np.ndarray,
+) -> np.ndarray:
+    """Return local exponents in ``D ~ tau_alpha^{-xi}``.
+
+    The returned value is ``xi=-d log(D)/d log(tau_alpha)`` evaluated by finite
+    differences on the supplied scan. Ordinary Stokes-Einstein scaling gives
+    ``xi=1``; fractional Stokes-Einstein decoupling gives ``0<xi<1``.
+    """
+
+    diffusion = np.asarray(diffusion, dtype=float)
+    tau_alpha = np.asarray(tau_alpha, dtype=float)
+    if diffusion.ndim != 1 or tau_alpha.ndim != 1:
+        raise ValueError("diffusion and tau_alpha must be one-dimensional")
+    if diffusion.size != tau_alpha.size:
+        raise ValueError("diffusion and tau_alpha must have the same length")
+    if diffusion.size < 2:
+        raise ValueError("at least two scan points are required")
+    if np.any(diffusion <= 0.0) or np.any(tau_alpha <= 0.0):
+        raise ValueError("diffusion and tau_alpha values must be positive")
+
+    log_tau = np.log(tau_alpha)
+    if np.any(np.isclose(np.diff(log_tau), 0.0)):
+        raise ValueError("tau_alpha values must be distinct")
+    return -np.gradient(np.log(diffusion), log_tau)
+
+
 def infer_parameters_from_scattering_transport(
     *,
     wave_number: float,
@@ -470,6 +498,12 @@ def temperature_scan(
                 "predicted_ngp_peak": peak["peak_ngp"],
             }
         )
+    exponents = fractional_stokes_einstein_exponents(
+        np.array([row["diffusion_coefficient"] for row in rows]),
+        np.array([row["tau_alpha"] for row in rows]),
+    )
+    for row, exponent in zip(rows, exponents):
+        row["fractional_stokes_einstein_exponent"] = float(exponent)
     return rows
 
 
