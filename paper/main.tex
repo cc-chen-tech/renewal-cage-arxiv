@@ -200,6 +200,7 @@ Gaussian tail, while the long-time ratio returns to about $0.97$.
   with matched Gaussian baselines.}
 \end{figure}
 
+\clearpage
 \section{Discussion}
 
 The model is not intended to replace molecular simulations or microscopic cage
@@ -215,12 +216,22 @@ $\alpha_2(t)\propto t^\beta$ corresponds to an effective renewal-delay
 exponent $m=\beta+1$ within this class. The square-delay model therefore
 predicts an initially linear NGP rise, not merely a finite peak.
 
+Several assumptions are deliberately restrictive. Renewal events are taken to
+be Poisson once the delayed intensity is specified; cage-center jumps are
+Gaussian and uncorrelated; and the local cage variance is reduced to a single
+relaxation scale. These choices are what make the moment hierarchy and van Hove
+mixture analytic. Their role is diagnostic rather than microscopic: correlated
+jumps, broad waiting-time distributions, or non-Gaussian local cage motion would
+modify the peak shape, but they would have to reproduce the same three
+observables--the MSD plateau, the early-time NGP exponent, and the long-time
+$1/t$ decay--to fall in the same renewal-cage universality class.
+
 Table~\ref{tab:comparison} summarizes the distinction from nearby modeling
 languages. The point is not that a renewal model is the only explanation of a
 non-Gaussian peak. Rather, the delayed renewal construction supplies an
 explicit bridge between a cage plateau, a finite-time NGP maximum, a radial van
-Hove tail, and two simple peak diagnostics that can be checked against
-simulation trajectories.
+Hove tail, the early-time exponent, and peak diagnostics that can be checked
+against simulation trajectories.
 
 \begin{table}[h]
   \caption{Relation to nearby mechanisms for non-Gaussian transport.}

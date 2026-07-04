@@ -44,6 +44,7 @@ scripts/compile_latex.sh                    LaTeX compile helper
 data/                                      generated CSV outputs
 figures/                                   generated SVG figures
 docs/                                      derivation and literature positioning notes
+docs/arxiv-readiness-checklist.md          submission-readiness checklist
 manuscript/renewal-cage-arxiv-draft.md      prose draft
 paper/main.tex                             arXiv-style LaTeX manuscript
 paper/references.bib                       bibliography
@@ -87,5 +88,5 @@ dist/renewal-cage-arxiv-source.zip
 
 This is a research draft intended to become a short arXiv note. The model,
 figures, arXiv source package, and LaTeX manuscript build are reproducible in
-CI. Before submission, the paper still needs final prose polishing, a final
-rendered-PDF read-through, and author/affiliation confirmation.
+CI. The remaining submission-level checks are tracked in
+`docs/arxiv-readiness-checklist.md`.
