@@ -1,0 +1,175 @@
+import sys
+import unittest
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from renewal_cage import (  # noqa: E402
+    DelayedRenewalCageParams,
+    delayed_poisson_mean,
+    dimensionless_peak_prediction,
+    gaussian_radial_3d,
+    radial_van_hove_3d,
+    local_cage_variance,
+    moments_1d,
+    moments_3d,
+    ngp_1d,
+    ngp_3d,
+)
+
+
+class DelayedRenewalCageTests(unittest.TestCase):
+    def test_delayed_poisson_mean_has_cubic_short_time_onset(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=1.0,
+            jump_variance=0.5,
+            renewal_rate=2.0,
+            renewal_delay=4.0,
+        )
+        t = np.array([1e-4, 2e-4, 4e-4])
+        mean = delayed_poisson_mean(t, params)
+        expected = params.renewal_rate * t**3 / (3.0 * params.renewal_delay**2)
+
+        np.testing.assert_allclose(mean, expected, rtol=2e-4, atol=1e-16)
+
+    def test_local_cage_variance_has_plateau(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.7,
+            cage_tau=0.8,
+            jump_variance=0.5,
+            renewal_rate=0.2,
+            renewal_delay=2.0,
+        )
+        t = np.array([0.0, 10.0])
+        variance = local_cage_variance(t, params)
+
+        self.assertAlmostEqual(variance[0], 0.0)
+        self.assertAlmostEqual(variance[-1], params.cage_variance, delta=1e-5)
+
+    def test_moments_generate_plateau_then_long_time_growth(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.8,
+            jump_variance=0.4,
+            renewal_rate=0.25,
+            renewal_delay=2.5,
+        )
+        early = moments_1d(np.array([1.0]), params)["m2"][0]
+        middle = moments_1d(np.array([8.0]), params)["m2"][0]
+        late = moments_1d(np.array([80.0]), params)["m2"][0]
+
+        self.assertGreater(middle, early)
+        self.assertLess(abs(middle - params.cage_variance), 0.5)
+        self.assertGreater(late, middle + 5.0)
+
+    def test_ngp_starts_near_zero_has_peak_and_decays(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.7,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        t = np.linspace(1e-4, 220.0, 2600)
+        alpha = ngp_1d(t, params)
+        peak_idx = int(np.argmax(alpha))
+
+        self.assertLess(alpha[0], 1e-3)
+        self.assertGreater(alpha[peak_idx], 0.1)
+        self.assertGreater(peak_idx, 10)
+        self.assertLess(alpha[-1], alpha[peak_idx] / 5.0)
+
+    def test_long_time_ngp_matches_inverse_renewal_count(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.7,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        t = np.array([500.0])
+        renewal_count = delayed_poisson_mean(t, params)[0]
+        alpha = ngp_1d(t, params)[0]
+
+        self.assertAlmostEqual(alpha * renewal_count, 1.0, delta=0.03)
+
+    def test_three_dimensional_ngp_matches_variance_mixture_ngp(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.7,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        t = np.linspace(0.1, 40.0, 200)
+
+        np.testing.assert_allclose(ngp_3d(t, params), ngp_1d(t, params), rtol=1e-12, atol=1e-12)
+
+        moments = moments_3d(t, params)
+        self.assertTrue(np.all(moments["r2"] > 0.0))
+        self.assertTrue(np.all(moments["r4"] > 0.0))
+
+    def test_radial_van_hove_distribution_normalizes(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.7,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        radius = np.linspace(0.0, 12.0, 4000)
+        density = radial_van_hove_3d(radius, time=12.0, params=params, max_count=80)
+        integral = np.trapezoid(density, radius)
+
+        self.assertAlmostEqual(integral, 1.0, delta=2e-4)
+        self.assertGreater(density[1], 0.0)
+
+    def test_gaussian_radial_baseline_normalizes(self):
+        radius = np.linspace(0.0, 12.0, 4000)
+        density = gaussian_radial_3d(radius, coordinate_variance=2.5)
+        integral = np.trapezoid(density, radius)
+
+        self.assertAlmostEqual(integral, 1.0, delta=2e-4)
+
+    def test_renewal_van_hove_has_heavier_peak_time_tail_than_gaussian_baseline(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.7,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        radius = np.linspace(0.0, 18.0, 5000)
+        peak_time = 11.30637498610339
+        renewal_density = radial_van_hove_3d(radius, time=peak_time, params=params, max_count=120)
+        coordinate_variance = moments_1d(np.array([peak_time]), params)["m2"][0]
+        gaussian_density = gaussian_radial_3d(radius, coordinate_variance=coordinate_variance)
+        tail_mask = radius > 5.0
+        renewal_tail = np.trapezoid(renewal_density[tail_mask], radius[tail_mask])
+        gaussian_tail = np.trapezoid(gaussian_density[tail_mask], radius[tail_mask])
+
+        self.assertGreater(renewal_tail / gaussian_tail, 1.5)
+
+    def test_dimensionless_peak_prediction_matches_numeric_peak_in_plateau_regime(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        t = np.linspace(0.01, 180.0, 5000)
+        alpha = ngp_1d(t, params)
+        peak_time = float(t[int(np.argmax(alpha))])
+        predicted = dimensionless_peak_prediction(params)
+
+        self.assertAlmostEqual(peak_time, predicted["peak_time"], delta=0.2)
+        self.assertAlmostEqual(float(np.max(alpha)), predicted["peak_ngp"], delta=0.005)
+
+
+if __name__ == "__main__":
+    unittest.main()

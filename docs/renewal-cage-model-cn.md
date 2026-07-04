@@ -1,0 +1,360 @@
+# Delayed Renewal Cage Model 中文推导
+
+这份笔记给出当前最有发表潜力的理论进展：一个闭式可解的 delayed renewal cage
+model。它比前面的 static mixture 和 switching harmonic cage 更进一步，因为它同时给出：
+
+```text
+1. local cage plateau
+2. cage renewal 后的 long-time diffusion
+3. NGP 从 0 起步
+4. NGP 出现有限时间 peak
+5. NGP 长时间按 1/t 衰减
+```
+
+## 1. 物理图像
+
+粒子在短时间内被邻居形成的 cage 限制，做近似 harmonic Ornstein-Uhlenbeck motion。
+经过一段延迟后，cage rearrangement 发生，cage center 跳到新位置。多次 cage
+renewal 后，粒子恢复长时间扩散。
+
+把位移写成：
+
+```text
+Delta x(t) = local cage displacement + sum of cage-center jumps
+```
+
+其中 local cage displacement 是 Gaussian，cage-center jumps 也是 Gaussian，但 jump
+的个数是随机的。因此整体分布是 Gaussian variance mixture，会产生 NGP。
+
+## 2. Local Cage Variance
+
+local cage 部分取一维 Gaussian，方差为：
+
+```text
+L(t) = A [1 - exp(-t/tau_c)]
+```
+
+其中：
+
+```text
+A     = cage plateau variance
+tau_c = local cage relaxation time
+```
+
+极限：
+
+```text
+t << tau_c:  L(t) ~ (A/tau_c)t
+t >> tau_c:  L(t) -> A
+```
+
+这给出 MSD plateau。
+
+## 3. Delayed Cage Renewal
+
+如果 cage renewal 是普通 Poisson process，短时间就有非零跳跃概率，会导致 NGP 在
+`t -> 0` 时出现不物理的奇异行为。为避免这个问题，引入 delayed renewal intensity：
+
+```text
+r(t) = lambda [1 - exp(-t/tau_d)]^2
+```
+
+其中：
+
+```text
+lambda = long-time renewal rate
+tau_d  = renewal onset delay time
+```
+
+短时：
+
+```text
+r(t) ~ lambda t^2/tau_d^2
+```
+
+所以 cage renewal 在短时间被抑制。
+
+renewal count `N(t)` 服从 inhomogeneous Poisson process，平均 renewal count 为：
+
+```text
+R(t) = integral_0^t r(u) du
+```
+
+积分可得闭式：
+
+```text
+R(t)
+  = lambda [t - 2 tau_d(1 - exp(-t/tau_d))
+            + (tau_d/2)(1 - exp(-2t/tau_d))]
+```
+
+短时展开：
+
+```text
+R(t) ~ lambda t^3/(3 tau_d^2)
+```
+
+长时：
+
+```text
+R(t) ~ lambda t
+```
+
+## 4. Conditional Gaussian Variance
+
+设每次 cage-center jump 的一维方差为：
+
+```text
+q
+```
+
+给定 renewal count `N(t)=n`，总位移仍然是 Gaussian，其方差为：
+
+```text
+V(t | n) = L(t) + n q
+```
+
+因为 `N(t)` 是 Poisson variable，满足：
+
+```text
+E[N] = R(t)
+Var[N] = R(t)
+```
+
+所以：
+
+```text
+E[V] = L(t) + q R(t)
+Var[V] = q^2 R(t)
+```
+
+## 5. MSD 和 NGP 的闭式表达
+
+二阶矩：
+
+```text
+M2(t) = <Delta x^2> = L(t) + q R(t)
+```
+
+四阶矩：
+
+给定 `V` 时：
+
+```text
+<Delta x^4 | V> = 3V^2
+```
+
+所以：
+
+```text
+M4(t)
+  = 3 E[V^2]
+  = 3(E[V]^2 + Var[V])
+  = 3[(L(t)+qR(t))^2 + q^2 R(t)]
+```
+
+一维 NGP：
+
+```text
+alpha_2(t)
+  = M4(t)/(3M2(t)^2) - 1
+```
+
+代入得：
+
+```text
+alpha_2(t)
+  = q^2 R(t) / [L(t) + qR(t)]^2
+```
+
+这是模型的核心结果。
+
+## 5.1 三维 NGP
+
+如果位移是三维 isotropic Gaussian variance mixture，那么给定 scalar variance `V`
+时：
+
+```text
+<r^2 | V> = 3V
+<r^4 | V> = 15V^2
+```
+
+论文中常用的三维 NGP 是：
+
+```text
+alpha_2^3D(t)
+  = 3<r^4> / [5<r^2>^2] - 1
+```
+
+代入可得：
+
+```text
+alpha_2^3D(t)
+  = E[V^2]/E[V]^2 - 1
+  = Var[V]/E[V]^2
+  = q^2 R(t) / [L(t) + qR(t)]^2
+```
+
+所以一维 NGP 和三维标准 NGP 在这个模型中有同一个核心表达式。
+
+## 5.2 Van Hove Distribution
+
+三维 radial van Hove distribution 可以写成 Poisson 加权的 Maxwell 分布混合：
+
+```text
+G_s(r,t)
+  = sum_n P[N(t)=n] sqrt(2/pi) r^2 / V_n(t)^(3/2)
+      exp[-r^2/(2V_n(t))]
+```
+
+其中：
+
+```text
+V_n(t) = L(t) + nq
+```
+
+这给出一个可直接画图的预测：在 NGP peak 附近，`G_s(r,t)` 会有比单一 Gaussian
+更宽的尾部；长时间 renewal count 变大以后，相对方差下降，分布重新接近 Gaussian。
+
+## 6. 短时和长时极限
+
+短时：
+
+```text
+L(t) ~ (A/tau_c)t
+R(t) ~ lambda t^3/(3 tau_d^2)
+```
+
+所以：
+
+```text
+alpha_2(t)
+  ~ [q^2 lambda tau_c^2 / (3 A^2 tau_d^2)] t
+```
+
+因此：
+
+```text
+alpha_2(0) = 0
+```
+
+并且 NGP 从 0 线性起步。
+
+长时：
+
+```text
+L(t) -> A
+R(t) ~ lambda t
+```
+
+当 `q lambda t >> A` 时：
+
+```text
+alpha_2(t) ~ 1/(lambda t)
+```
+
+因此模型自动恢复 Gaussian long-time limit。
+
+## 7. Peak 条件
+
+核心公式：
+
+```text
+alpha_2(t) = q^2 R(t) / [L(t) + qR(t)]^2
+```
+
+求导可得 peak 条件：
+
+```text
+R'(t)[L(t) - qR(t)] - 2R(t)L'(t) = 0
+```
+
+如果 local cage 已经接近 plateau，即：
+
+```text
+L'(t) ~ 0
+L(t) ~ A
+```
+
+则 peak 条件简化为：
+
+```text
+qR(t*) = A
+```
+
+此时：
+
+```text
+alpha_2(t*) = q/(4A)
+```
+
+这给出两个可检验预测：
+
+```text
+1. renewal delay tau_d 主要移动 peak time
+2. jump variance q 主要控制 peak height
+```
+
+脚本 `generate_renewal_cage_results.py` 的参数扫描正是验证这两个预测。
+
+## 8. 与 Glass Transition 的联系
+
+在 glass transition 语境下：
+
+```text
+A       cage size / plateau amplitude
+tau_c   local rattling relaxation time
+tau_d   cage-breaking onset time
+lambda  long-time cage renewal rate
+q       cage jump length variance
+```
+
+冷却时，通常可以预期：
+
+```text
+tau_d 增大
+lambda 减小
+q/A 的有效对比增强
+```
+
+因此 NGP peak 会移动到更长时间，并且动态异质性变得更明显。这和 thesis 中
+NGP 在 Tg 以上温度就出现强变化的观察相容：NGP peak 反映的是 cage-renewal
+heterogeneity 的增强，而不是简单的长时间 diffusion coefficient。
+
+## 9. 当前结果文件
+
+实现：
+
+```text
+src/renewal_cage.py
+```
+
+测试：
+
+```text
+tests/test_renewal_cage.py
+```
+
+主结果脚本：
+
+```text
+scripts/generate_renewal_cage_results.py
+```
+
+输出：
+
+```text
+data/renewal_cage_main.csv
+data/renewal_cage_sweeps.csv
+data/renewal_cage_dimensionless.csv
+data/renewal_cage_van_hove.csv
+figures/renewal_cage_results.svg
+figures/renewal_cage_dimensionless.svg
+```
+
+运行：
+
+```bash
+python3 -m unittest tests/test_renewal_cage.py -v
+python3 scripts/generate_renewal_cage_results.py
+```
