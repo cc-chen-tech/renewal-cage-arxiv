@@ -437,6 +437,15 @@ beta_loc(t) = d log[-log Phi_alpha^hx(k,t)] / d log t.
 Because `kappa_eff ~ R(t)` at long times, the relative count variance still
 decays and the NGP returns to zero. This adds a closed stretched-like alpha
 decay mechanism without giving up long-time Gaussian recovery.
+The same ratio `c=R_x/kappa0` controls two late-time tests:
+
+```text
+R(t) alpha_2^hx(t) -> 1 + c
+-log Phi_alpha^hx(k,t) / R(t) -> log(1 + Gamma_k c) / c.
+```
+
+Thus late NGP and the long-time alpha slope independently infer the same
+heterogeneity ratio.
 
 ## 5. Reproducible Results
 
@@ -496,6 +505,9 @@ A synthetic renewal-domain four-point peak with `N_corr=12` is inverted back to
 For the finite-exchange heterogeneity example with `kappa0=0.4,R_x=10`, the
 NGP peak is `1.195` at `t=32.07`, the alpha-window median local exponent is
 `beta_loc=0.805`, and the NGP recovers to `0.00480` by `t=3.0e4`.
+The same parameters give `c=25`, predict `R alpha_2 -> 26.0`, and reduce the
+alpha decay per renewal from `0.384` to `0.0944`; alpha-rate inversion recovers
+`c=25.0`.
 
 The parameter sweeps show:
 

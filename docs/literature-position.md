@@ -144,6 +144,10 @@ finite-exchange heterogeneity extension:
   Phi_alpha^hx(k,t) = G_N(exp[-k^2 q/2];t)
   beta_loc(t) = d log[-log Phi_alpha^hx] / d log t
   kappa_eff ~ R(t) restores long-time Gaussian recovery
+  with c=R_x/kappa0:
+    R(t) alpha_2^hx(t) -> 1+c
+    -log Phi_alpha^hx(k,t)/R(t) -> log(1+Gamma_k c)/c
+    late NGP and alpha slope independently infer the same c
 
 observable inversion:
   A = -2 log(f_k)/k^2

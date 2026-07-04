@@ -24,7 +24,9 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
+    gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_count_moments,
+    infer_gamma_exchange_ratio_from_alpha_rate,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
@@ -324,6 +326,28 @@ def write_heterogeneity_csv(
         )
     write_sweep_csv(path, rows)
     return rows
+
+
+def write_heterogeneity_diagnostics_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+    *,
+    wave_number: float,
+) -> dict[str, float]:
+    diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+    inferred_ratio_from_alpha_rate = infer_gamma_exchange_ratio_from_alpha_rate(
+        gamma_k=diagnostics["gamma_k"],
+        observed_decay_per_renewal=diagnostics["late_alpha_decay_per_renewal"],
+    )
+    row = {
+        **diagnostics,
+        "inferred_ratio_from_late_ngp_amplitude": diagnostics["late_ngp_renewal_amplitude"] - 1.0,
+        "inferred_ratio_from_alpha_rate": inferred_ratio_from_alpha_rate,
+        "log_ratio_residual": float(np.log(inferred_ratio_from_alpha_rate / diagnostics["heterogeneity_ratio"])),
+    }
+    write_sweep_csv(path, [row])
+    return row
 
 
 def write_inversion_csv(
@@ -1118,6 +1142,12 @@ def main() -> None:
     heterogeneity_rows = write_heterogeneity_csv(
         DATA_DIR / "renewal_cage_heterogeneity.csv",
         heterogeneity_time,
+        params,
+        heterogeneity,
+        wave_number=1.1,
+    )
+    write_heterogeneity_diagnostics_csv(
+        DATA_DIR / "renewal_cage_heterogeneity_diagnostics.csv",
         params,
         heterogeneity,
         wave_number=1.1,

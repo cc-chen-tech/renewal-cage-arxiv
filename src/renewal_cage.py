@@ -410,6 +410,66 @@ def gamma_exchange_scattering_susceptibility(
     return second_moment - mean_square
 
 
+def infer_gamma_exchange_ratio_from_alpha_rate(
+    *,
+    gamma_k: float,
+    observed_decay_per_renewal: float,
+) -> float:
+    """Infer ``R_x/kappa_0`` from the late alpha-decay rate per renewal."""
+
+    if gamma_k <= 0.0:
+        raise ValueError("gamma_k must be positive")
+    if observed_decay_per_renewal <= 0.0:
+        raise ValueError("observed_decay_per_renewal must be positive")
+    if observed_decay_per_renewal > gamma_k:
+        raise ValueError("observed_decay_per_renewal cannot exceed the Poisson limit gamma_k")
+    if math.isclose(observed_decay_per_renewal, gamma_k, rel_tol=1e-14, abs_tol=1e-14):
+        return 0.0
+
+    def rate_for_ratio(ratio: float) -> float:
+        return math.log1p(gamma_k * ratio) / ratio
+
+    low = 0.0
+    high = 1.0
+    while rate_for_ratio(high) > observed_decay_per_renewal:
+        high *= 2.0
+    for _ in range(100):
+        mid = 0.5 * (low + high)
+        if rate_for_ratio(mid) > observed_decay_per_renewal:
+            low = mid
+        else:
+            high = mid
+    return 0.5 * (low + high)
+
+
+def gamma_exchange_asymptotic_diagnostics(
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+) -> dict[str, float]:
+    """Late-time consistency predictions for finite-exchange heterogeneity."""
+
+    _validate(params)
+    _validate_gamma_exchange(heterogeneity)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    heterogeneity_ratio = heterogeneity.exchange_renewal_count / heterogeneity.shape
+    late_alpha_per_renewal = math.log1p(gamma * heterogeneity_ratio) / heterogeneity_ratio
+    return {
+        "wave_number": wave_number,
+        "gamma_k": gamma,
+        "heterogeneity_ratio": heterogeneity_ratio,
+        "late_ngp_renewal_amplitude": 1.0 + heterogeneity_ratio,
+        "late_alpha_decay_per_renewal": late_alpha_per_renewal,
+        "late_alpha_rate": params.renewal_rate * late_alpha_per_renewal,
+        "poisson_alpha_decay_per_renewal": gamma,
+        "poisson_alpha_rate": params.renewal_rate * gamma,
+        "alpha_rate_renormalization": late_alpha_per_renewal / gamma,
+        "static_gamma_late_ngp_plateau": 1.0 / heterogeneity.shape,
+    }
+
+
 def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndarray:
     """Local KWW-like exponent ``d log[-log(decay)] / d log(t)``."""
 

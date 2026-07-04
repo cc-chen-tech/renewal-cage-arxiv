@@ -111,6 +111,7 @@ data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_heterogeneity.csv
+data/renewal_cage_heterogeneity_diagnostics.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 paper/figures/renewal_cage_results.pdf

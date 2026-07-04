@@ -28,6 +28,8 @@ from renewal_cage import (  # noqa: E402
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
     gamma_exchange_count_moments,
+    gamma_exchange_asymptotic_diagnostics,
+    infer_gamma_exchange_ratio_from_alpha_rate,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
@@ -327,6 +329,58 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertTrue(np.all(susceptibility >= -1e-14))
         np.testing.assert_allclose(susceptibility, second_moment - scattering**2, rtol=1e-12, atol=1e-14)
         self.assertGreater(float(np.max(susceptibility)), float(np.max(renewal_scattering_susceptibility(wave_number, times, params))))
+
+    def test_gamma_exchange_asymptotics_link_late_ngp_and_alpha_rate(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+        wave_number = 1.1
+        late_time = np.array([30000.0])
+
+        diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+        gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+        heterogeneity_ratio = heterogeneity.exchange_renewal_count / heterogeneity.shape
+        expected_rate_per_renewal = math.log1p(gamma * heterogeneity_ratio) / heterogeneity_ratio
+        renewal = delayed_poisson_mean(late_time, params)[0]
+        ngp = gamma_exchange_ngp_1d(late_time, params, heterogeneity)[0]
+        decay = gamma_exchange_normalized_alpha_decay(wave_number, late_time, params, heterogeneity)[0]
+
+        self.assertAlmostEqual(diagnostics["heterogeneity_ratio"], heterogeneity_ratio, delta=1e-12)
+        self.assertAlmostEqual(diagnostics["late_ngp_renewal_amplitude"], 1.0 + heterogeneity_ratio, delta=1e-12)
+        self.assertAlmostEqual(diagnostics["late_alpha_decay_per_renewal"], expected_rate_per_renewal, delta=1e-12)
+        self.assertAlmostEqual(
+            diagnostics["late_alpha_rate"],
+            params.renewal_rate * expected_rate_per_renewal,
+            delta=1e-12,
+        )
+        self.assertAlmostEqual(renewal * ngp, diagnostics["late_ngp_renewal_amplitude"], delta=0.08)
+        self.assertAlmostEqual(-math.log(decay) / renewal, expected_rate_per_renewal, delta=2e-4)
+        self.assertLess(diagnostics["alpha_rate_renormalization"], 1.0)
+
+    def test_gamma_exchange_alpha_rate_inverts_heterogeneity_ratio(self):
+        gamma = 0.38368679808771045
+        heterogeneity_ratio = 25.0
+        observed_rate_per_renewal = math.log1p(gamma * heterogeneity_ratio) / heterogeneity_ratio
+
+        inferred = infer_gamma_exchange_ratio_from_alpha_rate(
+            gamma_k=gamma,
+            observed_decay_per_renewal=observed_rate_per_renewal,
+        )
+
+        self.assertAlmostEqual(inferred, heterogeneity_ratio, delta=1e-10)
+        self.assertAlmostEqual(
+            infer_gamma_exchange_ratio_from_alpha_rate(
+                gamma_k=gamma,
+                observed_decay_per_renewal=gamma,
+            ),
+            0.0,
+            delta=1e-12,
+        )
 
     def test_correlated_domain_susceptibility_scales_renewal_component(self):
         params = DelayedRenewalCageParams(

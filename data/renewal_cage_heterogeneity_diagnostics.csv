@@ -1,0 +1,2 @@
+wave_number,gamma_k,heterogeneity_ratio,late_ngp_renewal_amplitude,late_alpha_decay_per_renewal,late_alpha_rate,poisson_alpha_decay_per_renewal,poisson_alpha_rate,alpha_rate_renormalization,static_gamma_late_ngp_plateau,inferred_ratio_from_late_ngp_amplitude,inferred_ratio_from_alpha_rate,log_ratio_residual
+1.1,0.38368679808771045,25.0,26.0,0.09440460177605386,0.016992828319689696,0.38368679808771045,0.06906362365578787,0.24604599961886897,2.5,25.0,25.0,0.0

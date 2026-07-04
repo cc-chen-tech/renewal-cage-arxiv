@@ -13,9 +13,10 @@ cage note as a short arXiv manuscript.
   diagnostic, renewal-count susceptibility, renewal-domain chi4/cooperative-size
   estimator, peak diagnostics, NGP peak/alpha-relaxation coupling,
   finite-exchange heterogeneity diagnostics with stretched-like alpha decay and
-  Gaussian recovery, finite-time peak/late-NGP consistency diagnostics, and
-  scattering-transport observable inversion including a full protocol that
-  infers the renewal delay from NGP peak timing.
+  Gaussian recovery, finite-time peak/late-NGP consistency diagnostics,
+  late-time heterogeneity consistency diagnostics linking NGP amplitude and
+  alpha slope, and scattering-transport observable inversion including a full
+  protocol that infers the renewal delay from NGP peak timing.
 - Generalized delay-exponent argument explaining the square-delay choice.
 - Reproducible CSV outputs, SVG figures, PDF manuscript figures, and arXiv
   source zip.
