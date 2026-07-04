@@ -96,6 +96,10 @@ This should be stated as a minimal diagnostic model, not as a replacement for
 microscopic glass theory or as a claim that all supercooled-liquid dynamics is
 Fickian non-Gaussian.
 
+Competing mechanisms should be asked to reproduce the same four observables:
+the MSD plateau, the early-time NGP exponent, peak/late-time renewal-rate
+consistency, and the long-time `1/t` NGP decay.
+
 ## What Still Needs Strengthening
 
 Before arXiv submission, the work should add:

@@ -196,6 +196,10 @@ NGP value gives `y_l` and therefore
 peak-inferred renewal rate is a falsifiable check using only observable
 peak/late-NGP quantities plus `tau_d`.
 
+Alternative mechanisms can still be viable, but to fall into the same diagnostic
+class they must reproduce the MSD plateau, the early-time NGP exponent, the
+peak/late-time rate consistency, and the long-time `1/t` NGP decay.
+
 ## 5. Reproducible Results
 
 The repository contains the exact implementation:

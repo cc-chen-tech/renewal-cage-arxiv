@@ -250,16 +250,17 @@ Gaussian and uncorrelated; and the local cage variance is reduced to a single
 relaxation scale. These choices are what make the moment hierarchy and van Hove
 mixture analytic. Their role is diagnostic rather than microscopic: correlated
 jumps, broad waiting-time distributions, or non-Gaussian local cage motion would
-modify the peak shape, but they would have to reproduce the same three
-observables--the MSD plateau, the early-time NGP exponent, and the long-time
-$1/t$ decay--to fall in the same renewal-cage universality class.
+modify the peak shape, but they would have to reproduce the same four
+observables--the MSD plateau, the early-time NGP exponent, the peak/late-time
+renewal-rate consistency, and the long-time $1/t$ decay--to fall in the same
+renewal-cage universality class.
 
 Table~\ref{tab:comparison} summarizes the distinction from nearby modeling
 languages. The point is not that a renewal model is the only explanation of a
 non-Gaussian peak. Rather, the delayed renewal construction supplies an
 explicit bridge between a cage plateau, a finite-time NGP maximum, a radial van
-Hove tail, the early-time exponent, and peak diagnostics that can be checked
-against simulation trajectories.
+Hove tail, the early-time exponent, and peak/late-time diagnostics that can be
+checked against simulation trajectories.
 
 \begin{table}[h]
   \caption{Relation to nearby mechanisms for non-Gaussian transport.}
@@ -271,7 +272,7 @@ against simulation trajectories.
   Harmonic cage & Local displacement & None; Gaussian at all times & Baseline MSD plateau \\
   Diffusing diffusivity & Mobility or diffusivity & Mobility heterogeneity & Long-time $1/(\lambda t)$ recovery \\
   Cage-jump picture & Rearrangement events & Jump intermittency & Delayed renewal count $R(t)$ \\
-  Delayed renewal cage & Cage-center renewal count & $qR(t^\ast)\simeq A$ & $q/A\simeq4\alpha_2(t^\ast)$ \\
+  Delayed renewal cage & Cage-center renewal count & $qR(t^\ast)\simeq A$ & $\lambda_\ell\simeq\lambda_\ast$ \\
   \end{tabular}
   \end{ruledtabular}
 \end{table}
