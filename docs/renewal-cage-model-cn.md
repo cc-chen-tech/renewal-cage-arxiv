@@ -353,6 +353,65 @@ tau_alpha(k)^-1 ~= lambda [1 - exp(-k^2 q/2)]
 这比 random diffusivity 的说法更具体：alpha relaxation 受离散 cage-center
 renewal count 控制。
 
+## 7.6. 温度依赖和 Stokes-Einstein violation
+
+最小温度扩展不是完整 microscopic glass theory，而是一个可检验的 phenomenological
+law。令：
+
+```text
+Delta_T = 1/T - 1/T0
+```
+
+取：
+
+```text
+lambda(T) = lambda0 exp[-E_lambda Delta_T]
+tau_d(T)  = tau_d0 exp[ E_d Delta_T]
+A(T)      = A0 exp[-E_A Delta_T]
+q(T)/A(T) = beta0 exp[E_beta Delta_T]
+```
+
+冷却时 `lambda` 下降，`tau_d` 增长，cage 变硬，`q/A` 可以增强。
+
+长时间 diffusion coefficient 是：
+
+```text
+D(T) = lambda(T) q(T) / 2
+```
+
+而 cage-normalized alpha relaxation 满足：
+
+```text
+Phi_alpha(k,t) = exp[-Gamma_k(T) R(t;T)]
+Gamma_k(T) = 1 - exp[-k^2 q(T)/2]
+Gamma_k(T) R(tau_alpha;T) = 1
+```
+
+因为：
+
+```text
+R(t;T) = lambda(T) tau_d(T) F[t/tau_d(T)]
+```
+
+所以：
+
+```text
+tau_alpha(k,T)
+  = tau_d(T) F^{-1}[1/(Gamma_k lambda(T) tau_d(T))]
+```
+
+于是 Stokes-Einstein product 的闭式判据是：
+
+```text
+D(T) tau_alpha(k,T)
+  = lambda(T) q(T) tau_d(T)
+    F^{-1}[1/(Gamma_k lambda(T) tau_d(T))] / 2
+```
+
+关键结论：只让 `lambda(T)` 下降，通常只是同时放慢 diffusion 和 alpha relaxation，
+不一定产生强 SE violation。真正的 decoupling 来自 `tau_d(T)` 相对 `1/lambda(T)`
+增长，也就是 delayed renewal onset 变成 structural relaxation 的额外瓶颈。
+
 ## 8. 与 Glass Transition 的联系
 
 在 glass transition 语境下：

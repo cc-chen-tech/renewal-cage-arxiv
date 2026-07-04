@@ -26,6 +26,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_results.pdf", names)
             self.assertIn("figures/renewal_cage_dimensionless.pdf", names)
             self.assertIn("figures/renewal_cage_scattering.pdf", names)
+            self.assertIn("figures/renewal_cage_temperature.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
@@ -33,6 +34,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_results.pdf", main_tex)
         self.assertIn("figures/renewal_cage_dimensionless.pdf", main_tex)
         self.assertIn("figures/renewal_cage_scattering.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_temperature.pdf", main_tex)
         self.assertNotIn(".svg", main_tex)
 
     def test_build_arxiv_package_generates_deterministic_pdf_figures(self):
@@ -41,16 +43,19 @@ class ArxivPackageTests(unittest.TestCase):
             first_results = (ROOT / "paper" / "figures" / "renewal_cage_results.pdf").read_bytes()
             first_dimensionless = (ROOT / "paper" / "figures" / "renewal_cage_dimensionless.pdf").read_bytes()
             first_scattering = (ROOT / "paper" / "figures" / "renewal_cage_scattering.pdf").read_bytes()
+            first_temperature = (ROOT / "paper" / "figures" / "renewal_cage_temperature.pdf").read_bytes()
 
             time.sleep(1.1)
             build_arxiv_package(output_dir=Path(second))
             second_results = (ROOT / "paper" / "figures" / "renewal_cage_results.pdf").read_bytes()
             second_dimensionless = (ROOT / "paper" / "figures" / "renewal_cage_dimensionless.pdf").read_bytes()
             second_scattering = (ROOT / "paper" / "figures" / "renewal_cage_scattering.pdf").read_bytes()
+            second_temperature = (ROOT / "paper" / "figures" / "renewal_cage_temperature.pdf").read_bytes()
 
         self.assertEqual(first_results, second_results)
         self.assertEqual(first_dimensionless, second_dimensionless)
         self.assertEqual(first_scattering, second_scattering)
+        self.assertEqual(first_temperature, second_temperature)
 
 
 if __name__ == "__main__":

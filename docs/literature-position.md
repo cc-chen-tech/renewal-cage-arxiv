@@ -98,17 +98,33 @@ Fickian non-Gaussian.
 
 The novelty should be positioned around delayed discrete cage-center renewal,
 not around random diffusivity. The model's added glass-literature observable is
-the closed-form self-intermediate scattering function:
+the closed-form self-intermediate scattering function and its temperature
+extension:
 
 ```text
 F_s(k,t) = exp[-k^2 L(t)/2 + R(t)(exp(-k^2 q/2)-1)]
 Phi_alpha(k,t) = exp[-(1-exp(-k^2 q/2)) R(t)]
 tau_alpha(k)^-1 ~= lambda[1-exp(-k^2 q/2)]
+
+temperature law:
+  lambda(T) = lambda0 exp[-E_lambda(1/T-1/T0)]
+  tau_d(T) = tau_d0 exp[E_d(1/T-1/T0)]
+  q(T)/A(T) = beta0 exp[E_beta(1/T-1/T0)]
+
+alpha time:
+  tau_alpha(k,T) = tau_d(T) F^{-1}[1/(Gamma_k lambda(T) tau_d(T))]
+
+Stokes-Einstein diagnostic:
+  D(T) tau_alpha(k,T)
+    = lambda(T) q(T) tau_d(T) F^{-1}[1/(Gamma_k lambda(T) tau_d(T))] / 2
 ```
 
 Competing mechanisms should be asked to reproduce the same four observables:
 the MSD plateau, the early-time NGP exponent, peak/late-time renewal-rate
-consistency, and the long-time `1/t` NGP decay.
+consistency, and the long-time `1/t` NGP decay. A stronger glass-transition
+comparison can additionally ask whether they reproduce the same growth of
+`D tau_alpha` when cooling increases the delayed-renewal control parameter
+`lambda tau_d`.
 
 ## What Still Needs Strengthening
 

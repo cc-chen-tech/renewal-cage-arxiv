@@ -228,6 +228,52 @@ tau_alpha(k)^-1 ~= lambda [1 - exp(-k^2 q/2)].
 This is the main reason to position the note around delayed cage renewal rather
 than generic random diffusivity.
 
+## 4.6. Temperature dependence and Stokes-Einstein decoupling
+
+A minimal temperature extension assigns reduced-temperature dependence to the
+effective renewal parameters:
+
+```text
+Delta_T = 1/T - 1/T0
+lambda(T) = lambda0 exp[-E_lambda Delta_T]
+tau_d(T)  = tau_d0 exp[ E_d Delta_T]
+A(T)      = A0 exp[-E_A Delta_T]
+q(T)/A(T) = beta0 exp[E_beta Delta_T]
+```
+
+The long-time diffusion coefficient is
+
+```text
+D(T) = lambda(T) q(T) / 2.
+```
+
+The cage-normalized alpha time is defined by
+
+```text
+Gamma_k(T) R(tau_alpha;T) = 1
+Gamma_k(T) = 1 - exp[-k^2 q(T)/2].
+```
+
+Since `R(t;T)=lambda(T) tau_d(T) F[t/tau_d(T)]`,
+
+```text
+tau_alpha(k,T)
+  = tau_d(T) F^{-1}[1/(Gamma_k lambda(T) tau_d(T))]
+```
+
+and therefore
+
+```text
+D(T) tau_alpha(k,T)
+  = lambda(T) q(T) tau_d(T)
+    F^{-1}[1/(Gamma_k lambda(T) tau_d(T))] / 2.
+```
+
+This is the model's Stokes-Einstein diagnostic. Changing `lambda(T)` alone mostly
+rescales diffusion and relaxation together. Decoupling appears when cooling makes
+the delayed-onset product `lambda(T) tau_d(T)` grow, so structural relaxation is
+controlled by delayed cage renewal more strongly than long-time diffusion.
+
 ## 5. Reproducible Results
 
 The repository contains the exact implementation:
@@ -245,9 +291,11 @@ data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_consistency.csv
 data/renewal_cage_scattering.csv
+data/renewal_cage_temperature.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_scattering.svg
+figures/renewal_cage_temperature.svg
 ```
 
 The current parameter set gives:
@@ -260,6 +308,10 @@ MSD final      = 26.272
 lambda_*       = 0.180010 from peak diagnostics
 lambda_l       = 0.180000 from finite-time late-NGP inversion
 ```
+
+For the illustrative temperature law, cooling from `T=1.00` to `T=0.62`
+decreases `D` by a factor of `3.30`, increases `tau_alpha(k=1.1)` by a factor
+of `6.72`, and raises the normalized `D tau_alpha` product to `2.03`.
 
 The parameter sweeps show:
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="560" viewBox="0 0 1180 560">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Temperature-dependent renewal diagnostics</text>
+  <line x1="75" y1="460" x2="525" y2="460" stroke="#222" />
+  <line x1="75" y1="460" x2="75" y2="85" stroke="#222" />
+  <text x="75" y="61" font-family="Arial, sans-serif" font-size="17" font-weight="700">I. Transport and relaxation decouple on cooling</text>
+  <text x="222.0" y="498" font-family="Arial, sans-serif" font-size="13">inverse-temperature shift</text>
+
+  <polyline points="75.00,423.53 91.79,425.81 109.36,428.10 127.77,430.37 147.09,432.65 167.38,434.91 188.72,437.17 211.19,439.41 234.89,441.63 259.90,443.83 286.36,446.00 314.39,448.14 344.13,450.24 375.75,452.30 409.42,454.31 445.35,456.27 483.79,458.17 525.00,460.00" fill="none" stroke="#2b6cb0" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+<text x="93" y="110" font-family="Arial, sans-serif" font-size="12" fill="#2b6cb0">D / D_hot</text>
+<polyline points="75.00,423.53 91.79,420.22 109.36,416.47 127.77,412.21 147.09,407.33 167.38,401.73 188.72,395.23 211.19,387.65 234.89,378.73 259.90,368.15 286.36,355.50 314.39,340.20 344.13,321.52 375.75,298.45 409.42,269.60 445.35,233.01 483.79,185.92 525.00,124.31" fill="none" stroke="#c05621" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+<text x="93" y="128" font-family="Arial, sans-serif" font-size="12" fill="#c05621">tau_alpha / tau_hot</text>
+<polyline points="75.00,423.53 91.79,419.92 109.36,415.80 127.77,411.11 147.09,405.72 167.38,399.49 188.72,392.25 211.19,383.77 234.89,373.77 259.90,361.88 286.36,347.61 314.39,330.34 344.13,309.20 375.75,283.05 409.42,250.30 445.35,208.72 483.79,155.15 525.00,85.00" fill="none" stroke="#2f855a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+<text x="93" y="146" font-family="Arial, sans-serif" font-size="12" fill="#2f855a">t_NGP / t_NGP,hot</text>
+  <line x1="660" y1="460" x2="1110" y2="460" stroke="#222" />
+  <line x1="660" y1="460" x2="660" y2="85" stroke="#222" />
+  <text x="660" y="61" font-family="Arial, sans-serif" font-size="17" font-weight="700">J. Stokes-Einstein product and delayed-renewal control</text>
+  <text x="807.0" y="498" font-family="Arial, sans-serif" font-size="13">inverse-temperature shift</text>
+
+  <polyline points="660.00,460.00 676.79,458.79 694.36,457.44 712.77,455.92 732.09,454.22 752.38,452.29 773.72,450.11 796.19,447.63 819.89,444.80 844.90,441.56 871.36,437.83 899.39,433.53 929.13,428.53 960.75,422.70 994.42,415.86 1030.35,407.78 1068.79,398.17 1110.00,386.64" fill="none" stroke="#2b6cb0" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+<text x="678" y="110" font-family="Arial, sans-serif" font-size="12" fill="#2b6cb0">D tau_alpha / hot</text>
+<polyline points="660.00,460.00 676.79,454.97 694.36,449.31 712.77,442.94 732.09,435.71 752.38,427.48 773.72,418.06 796.19,407.21 819.89,394.63 844.90,379.96 871.36,362.73 899.39,342.32 929.13,317.95 960.75,288.59 994.42,252.85 1030.35,208.87 1068.79,154.10 1110.00,85.00" fill="none" stroke="#c05621" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+<text x="678" y="128" font-family="Arial, sans-serif" font-size="12" fill="#c05621">lambda tau_d / hot</text>
+<polyline points="660.00,460.00 676.79,459.59 694.36,459.17 712.77,458.71 732.09,458.24 752.38,457.73 773.72,457.20 796.19,456.63 819.89,456.03 844.90,455.39 871.36,454.71 899.39,453.98 929.13,453.19 960.75,452.35 994.42,451.45 1030.35,450.47 1068.79,449.41 1110.00,448.26" fill="none" stroke="#2f855a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+<text x="678" y="146" font-family="Arial, sans-serif" font-size="12" fill="#2f855a">alpha_peak / hot</text>
+</svg>

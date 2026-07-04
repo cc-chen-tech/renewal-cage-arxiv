@@ -27,11 +27,76 @@ class DelayedRenewalCageParams:
     renewal_delay: float
 
 
+@dataclass(frozen=True)
+class TemperatureLawParams:
+    """Dimensionless Arrhenius-like temperature law for the renewal cage model.
+
+    Temperatures are reduced units. Cooling below ``reference_temperature`` makes
+    ``delta = 1/T - 1/T_ref`` positive. The law keeps the model phenomenological:
+    renewal events slow down, the delayed onset grows, cages stiffen, and q/A can
+    increase with cooling.
+    """
+
+    reference_temperature: float
+    cage_variance_ref: float
+    cage_tau_ref: float
+    jump_to_cage_ref: float
+    renewal_rate_ref: float
+    renewal_delay_ref: float
+    rate_activation: float
+    delay_activation: float
+    cage_stiffening: float = 0.0
+    jump_to_cage_growth: float = 0.0
+    cage_tau_activation: float = 0.0
+
+
 def _validate(params: DelayedRenewalCageParams) -> None:
     for name in ("cage_variance", "cage_tau", "jump_variance", "renewal_rate", "renewal_delay"):
         value = getattr(params, name)
         if value <= 0.0:
             raise ValueError(f"{name} must be positive")
+
+
+def _validate_temperature_law(law: TemperatureLawParams) -> None:
+    for name in (
+        "reference_temperature",
+        "cage_variance_ref",
+        "cage_tau_ref",
+        "jump_to_cage_ref",
+        "renewal_rate_ref",
+        "renewal_delay_ref",
+    ):
+        value = getattr(law, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    for name in (
+        "rate_activation",
+        "delay_activation",
+        "cage_stiffening",
+        "jump_to_cage_growth",
+        "cage_tau_activation",
+    ):
+        value = getattr(law, name)
+        if value < 0.0:
+            raise ValueError(f"{name} must be nonnegative")
+
+
+def temperature_dependent_params(temperature: float, law: TemperatureLawParams) -> DelayedRenewalCageParams:
+    """Map reduced temperature to delayed-renewal cage parameters."""
+
+    _validate_temperature_law(law)
+    if temperature <= 0.0:
+        raise ValueError("temperature must be positive")
+    inverse_temperature_shift = 1.0 / temperature - 1.0 / law.reference_temperature
+    cage_variance = law.cage_variance_ref * math.exp(-law.cage_stiffening * inverse_temperature_shift)
+    jump_to_cage = law.jump_to_cage_ref * math.exp(law.jump_to_cage_growth * inverse_temperature_shift)
+    return DelayedRenewalCageParams(
+        cage_variance=cage_variance,
+        cage_tau=law.cage_tau_ref * math.exp(law.cage_tau_activation * inverse_temperature_shift),
+        jump_variance=cage_variance * jump_to_cage,
+        renewal_rate=law.renewal_rate_ref * math.exp(-law.rate_activation * inverse_temperature_shift),
+        renewal_delay=law.renewal_delay_ref * math.exp(law.delay_activation * inverse_temperature_shift),
+    )
 
 
 def local_cage_variance(t: np.ndarray, params: DelayedRenewalCageParams) -> np.ndarray:
@@ -172,6 +237,83 @@ def normalized_alpha_decay(
     renewal = delayed_poisson_mean(t, params)
     jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
     return np.exp(renewal * (jump_characteristic - 1.0))
+
+
+def alpha_relaxation_time(
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    *,
+    threshold: float = math.exp(-1.0),
+) -> float:
+    """Time at which the cage-normalized alpha decay reaches ``threshold``."""
+
+    _validate(params)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must lie between 0 and 1")
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    if gamma <= 0.0:
+        raise ValueError("wave_number and jump_variance imply zero alpha decay rate")
+    target_renewal_count = -math.log(threshold) / gamma
+    return _find_time_for_renewal_count(target_renewal_count, params)
+
+
+def long_time_diffusion_coefficient(params: DelayedRenewalCageParams) -> float:
+    """Long-time self-diffusion coefficient per coordinate."""
+
+    _validate(params)
+    return 0.5 * params.renewal_rate * params.jump_variance
+
+
+def stokes_einstein_product(wave_number: float, params: DelayedRenewalCageParams) -> float:
+    """Return D times the cage-normalized alpha-relaxation time."""
+
+    return long_time_diffusion_coefficient(params) * alpha_relaxation_time(wave_number, params)
+
+
+def temperature_scan(
+    temperatures: np.ndarray,
+    law: TemperatureLawParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float]]:
+    """Evaluate temperature-dependent transport and relaxation diagnostics."""
+
+    temperatures = np.asarray(temperatures, dtype=float)
+    if temperatures.ndim != 1 or temperatures.size == 0:
+        raise ValueError("temperatures must be a nonempty one-dimensional array")
+    if np.any(temperatures <= 0.0):
+        raise ValueError("temperatures must be positive")
+
+    rows: list[dict[str, float]] = []
+    baseline_product = None
+    for temperature in temperatures:
+        params = temperature_dependent_params(float(temperature), law)
+        diffusion = long_time_diffusion_coefficient(params)
+        tau_alpha = alpha_relaxation_time(wave_number, params)
+        se_product = diffusion * tau_alpha
+        if baseline_product is None:
+            baseline_product = se_product
+        peak = dimensionless_peak_prediction(params)
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "cage_variance": params.cage_variance,
+                "jump_variance": params.jump_variance,
+                "jump_to_cage_variance": params.jump_variance / params.cage_variance,
+                "renewal_rate": params.renewal_rate,
+                "renewal_delay": params.renewal_delay,
+                "lambda_tau_delay": params.renewal_rate * params.renewal_delay,
+                "diffusion_coefficient": diffusion,
+                "tau_alpha": tau_alpha,
+                "stokes_einstein_product": se_product,
+                "normalized_stokes_einstein_product": se_product / baseline_product,
+                "predicted_ngp_peak_time": peak["peak_time"],
+                "predicted_ngp_peak": peak["peak_ngp"],
+            }
+        )
+    return rows
 
 
 def poisson_weights(mean: float, *, max_count: int) -> np.ndarray:

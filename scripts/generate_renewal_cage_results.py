@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
+    TemperatureLawParams,
     delayed_poisson_mean,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
@@ -24,6 +25,7 @@ from renewal_cage import (  # noqa: E402
     plateau_peak_diagnostics,
     radial_van_hove_3d,
     self_intermediate_scattering,
+    temperature_scan,
 )
 
 
@@ -127,6 +129,18 @@ def write_scattering_csv(
                 }
             )
     write_sweep_csv(path, rows)
+
+
+def write_temperature_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    law: TemperatureLawParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float]]:
+    rows = temperature_scan(temperatures, law, wave_number=wave_number)
+    write_sweep_csv(path, rows)
+    return rows
 
 
 def write_tail_ratio_csv(
@@ -409,6 +423,64 @@ def write_scattering_svg(
     path.write_text(svg)
 
 
+def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    colors = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+    inverse_shift = np.array([1.0 / row["temperature"] - 1.0 for row in rows])
+
+    def axes(left: int, right: int, title: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 78}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">inverse-temperature shift</text>
+"""
+
+    def plot(left: int, right: int, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(inverse_shift, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, colors[idx]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{colors[idx]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    diffusion = np.array([row["diffusion_coefficient"] for row in rows])
+    tau_alpha = np.array([row["tau_alpha"] for row in rows])
+    se_product = np.array([row["normalized_stokes_einstein_product"] for row in rows])
+    lambda_tau = np.array([row["lambda_tau_delay"] for row in rows])
+    peak_time = np.array([row["predicted_ngp_peak_time"] for row in rows])
+    peak_height = np.array([row["predicted_ngp_peak"] for row in rows])
+    left_curves = [
+        ("D / D_hot", diffusion / diffusion[0]),
+        ("tau_alpha / tau_hot", tau_alpha / tau_alpha[0]),
+        ("t_NGP / t_NGP,hot", peak_time / peak_time[0]),
+    ]
+    right_curves = [
+        ("D tau_alpha / hot", se_product),
+        ("lambda tau_d / hot", lambda_tau / lambda_tau[0]),
+        ("alpha_peak / hot", peak_height / peak_height[0]),
+    ]
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Temperature-dependent renewal diagnostics</text>
+  {axes(left_a, right_a, "I. Transport and relaxation decouple on cooling")}
+  {plot(left_a, right_a, left_curves)}
+  {axes(left_b, right_b, "J. Stokes-Einstein product and delayed-renewal control")}
+  {plot(left_b, right_b, right_curves)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -545,6 +617,27 @@ def main() -> None:
         scattering_curves,
         alpha_curves,
     )
+
+    temperature_law = TemperatureLawParams(
+        reference_temperature=1.0,
+        cage_variance_ref=params.cage_variance,
+        cage_tau_ref=params.cage_tau,
+        jump_to_cage_ref=params.jump_variance / params.cage_variance,
+        renewal_rate_ref=params.renewal_rate,
+        renewal_delay_ref=params.renewal_delay,
+        rate_activation=2.0,
+        delay_activation=5.0,
+        cage_stiffening=0.2,
+        jump_to_cage_growth=0.25,
+    )
+    temperatures = np.linspace(1.0, 0.62, 18)
+    temperature_rows = write_temperature_csv(
+        DATA_DIR / "renewal_cage_temperature.csv",
+        temperatures,
+        temperature_law,
+        wave_number=1.1,
+    )
+    write_temperature_svg(FIGURE_DIR / "renewal_cage_temperature.svg", temperature_rows)
 
 
 if __name__ == "__main__":

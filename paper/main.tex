@@ -37,9 +37,11 @@ including $q/A\simeq 4\alpha_2(t^\ast)$ and
 $R(t^\ast)\simeq 1/[4\alpha_2(t^\ast)]$, plus a finite-time consistency check
 that compares the peak-inferred renewal rate with a late-time NGP inversion.
 The same renewal generator gives a closed-form self-intermediate scattering
-function with a cage plateau and an alpha-relaxation rate. The delayed renewal
-count regularizes the short-time behavior of jump models while preserving
-analytic tractability and long-time Gaussian recovery.
+function with a cage plateau and an alpha-relaxation rate. A minimal
+temperature-dependent extension predicts when diffusion and structural
+relaxation decouple through the product $\lambda(T)\tau_d(T)$. The delayed
+renewal count regularizes the short-time behavior of jump models while
+preserving analytic tractability and long-time Gaussian recovery.
 \end{abstract}
 
 \maketitle
@@ -159,6 +161,60 @@ diffusive scaling with $D=\lambda q/2$ in one dimension. For larger $k$, the
 rate saturates at $\lambda$, reflecting the renewal-count bottleneck rather
 than a continuously varying diffusivity.
 
+\section{Temperature Dependence and Stokes-Einstein Decoupling}
+
+The fixed-parameter model can be turned into a minimal temperature diagnostic
+by assigning reduced-temperature dependence to its effective parameters. Let
+\begin{equation}
+  \Delta_T=\frac{1}{T}-\frac{1}{T_0}.
+\end{equation}
+We use the phenomenological laws
+\begin{align}
+  \lambda(T)&=\lambda_0 e^{-E_\lambda\Delta_T},&
+  \tau_d(T)&=\tau_{d0} e^{E_d\Delta_T},\\
+  A(T)&=A_0 e^{-E_A\Delta_T},&
+  \frac{q(T)}{A(T)}&=\beta_0 e^{E_\beta\Delta_T}.
+\end{align}
+They encode four standard cooling trends without claiming a microscopic
+derivation: renewal events become rarer, the delayed cage-breaking onset grows,
+the local cage stiffens, and the jump-to-cage contrast may increase.
+
+The long-time diffusion coefficient per coordinate is
+\begin{equation}
+  D(T)=\frac{\lambda(T)q(T)}{2}.
+\end{equation}
+The cage-normalized self-intermediate scattering function is
+\begin{equation}
+  \Phi_\alpha(k,t;T)=\exp[-\Gamma_k(T)R(t;T)].
+\end{equation}
+The $1/e$ alpha time is defined by
+\begin{equation}
+  \Gamma_k(T)R(\tau_\alpha;T)=1,\qquad
+  \Gamma_k(T)=1-e^{-k^2q(T)/2}.
+\end{equation}
+Using $R(t;T)=\lambda(T)\tau_d(T)F[t/\tau_d(T)]$ gives the closed diagnostic
+\begin{equation}
+  \tau_\alpha(k,T)=
+  \tau_d(T)\,
+  F^{-1}\left(
+    \frac{1}{\Gamma_k(T)\lambda(T)\tau_d(T)}
+  \right).
+\end{equation}
+Therefore
+\begin{equation}
+  D(T)\tau_\alpha(k,T)=
+  \frac{\lambda(T)q(T)\tau_d(T)}{2}\,
+  F^{-1}\left(
+    \frac{1}{\Gamma_k(T)\lambda(T)\tau_d(T)}
+  \right).
+\end{equation}
+This expression is the model's Stokes-Einstein diagnostic. In the late-renewal
+limit it reduces approximately to $q/(2\Gamma_k)$, so changing $\lambda$ alone
+does not produce a strong violation. A violation appears when cooling increases
+the delayed-onset product $\lambda(T)\tau_d(T)$ and/or the jump-to-cage contrast
+fast enough that structural relaxation is bottlenecked by delayed cage renewal
+more strongly than long-time diffusion.
+
 \section{Asymptotics and Peak Condition}
 
 At short times,
@@ -265,6 +321,9 @@ finite-time consistency inversion at $t=180$ gives
 $\lambda_\ell=0.180000$, while the peak diagnostic gives
 $\lambda_\ast=0.180010$; the simpler asymptotic estimate
 $[t\alpha_2(t)]^{-1}$ gives $0.189664$ at the same finite time.
+For the illustrative temperature law, cooling from $T=1.00$ to $T=0.62$
+decreases $D$ by a factor of $3.30$, increases $\tau_\alpha(k=1.1)$ by a
+factor of $6.72$, and raises the normalized product $D\tau_\alpha$ to $2.03$.
 
 \begin{figure}[h]
   \centering
@@ -287,6 +346,15 @@ $[t\alpha_2(t)]^{-1}$ gives $0.189664$ at the same finite time.
   the local cage Debye-Waller factor and isolates the renewal-controlled decay.}
 \end{figure}
 
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_temperature.pdf}
+  \caption{Temperature-dependent renewal diagnostics. Cooling decreases the
+  long-time diffusion coefficient while increasing the alpha-relaxation and NGP
+  peak times. The normalized product $D\tau_\alpha$ grows when the delayed
+  renewal control parameter $\lambda\tau_d$ grows.}
+\end{figure}
+
 \clearpage
 \section{Discussion}
 
@@ -304,7 +372,10 @@ exponent $m=\beta+1$ within this class. The square-delay model therefore
 predicts an initially linear NGP rise, not merely a finite peak. The
 self-intermediate scattering result adds an independent glass-literature
 observable: $\tau_\alpha(k)$ is controlled by the same renewal rate that appears
-in the NGP consistency check.
+in the NGP consistency check. The temperature extension adds a separate
+criterion for Stokes-Einstein violation: changing $\lambda(T)$ alone mainly
+rescales both diffusion and relaxation, while growth of $\tau_d(T)$ relative to
+$1/\lambda(T)$ produces decoupling through the inverse renewal shape $F^{-1}$.
 
 Several assumptions are deliberately restrictive. Renewal events are taken to
 be Poisson once the delayed intensity is specified; cage-center jumps are

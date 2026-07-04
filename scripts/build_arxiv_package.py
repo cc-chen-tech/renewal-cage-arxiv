@@ -322,6 +322,57 @@ def write_scattering_pdf(path: Path) -> None:
     c.save()
 
 
+def write_temperature_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_temperature.csv")
+    inverse_shift = 1.0 / data["temperature"] - 1.0 / data["temperature"][0]
+    diffusion = data["diffusion_coefficient"]
+    tau_alpha = data["tau_alpha"]
+    peak_time = data["predicted_ngp_peak_time"]
+    se_product = data["normalized_stokes_einstein_product"]
+    lambda_tau = data["lambda_tau_delay"]
+    peak_height = data["predicted_ngp_peak"]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Temperature-dependent renewal diagnostics")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("D / D_hot", diffusion / diffusion[0], colors.HexColor("#2b6cb0")),
+            ("tau_alpha / tau_hot", tau_alpha / tau_alpha[0], colors.HexColor("#c05621")),
+            ("t_NGP / t_NGP,hot", peak_time / peak_time[0], colors.HexColor("#2f855a")),
+        ],
+        "I. Transport and relaxation decouple on cooling",
+        xlabel="inverse-temperature shift",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("D tau_alpha / hot", se_product, colors.HexColor("#805ad5")),
+            ("lambda tau_d / hot", lambda_tau / lambda_tau[0], colors.HexColor("#2f855a")),
+            ("alpha_peak / hot", peak_height / peak_height[0], colors.HexColor("#c05621")),
+        ],
+        "J. Stokes-Einstein product and delayed-renewal control",
+        xlabel="inverse-temperature shift",
+    )
+
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -331,9 +382,11 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     results_pdf = PAPER_FIGURE_DIR / "renewal_cage_results.pdf"
     dimensionless_pdf = PAPER_FIGURE_DIR / "renewal_cage_dimensionless.pdf"
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
+    temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
     write_results_pdf(results_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
+    write_temperature_pdf(temperature_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -342,6 +395,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(results_pdf, "figures/renewal_cage_results.pdf")
         archive.write(dimensionless_pdf, "figures/renewal_cage_dimensionless.pdf")
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
+        archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
     return zip_path
 
 

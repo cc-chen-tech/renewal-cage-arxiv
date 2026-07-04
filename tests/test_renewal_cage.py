@@ -10,12 +10,15 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
+    TemperatureLawParams,
+    alpha_relaxation_time,
     classify_delay_exponent,
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
+    long_time_diffusion_coefficient,
     observable_consistency_diagnostics,
     radial_van_hove_3d,
     local_cage_variance,
@@ -27,6 +30,9 @@ from renewal_cage import (  # noqa: E402
     plateau_ngp_branches,
     plateau_peak_diagnostics,
     self_intermediate_scattering,
+    stokes_einstein_product,
+    temperature_dependent_params,
+    temperature_scan,
 )
 
 
@@ -156,6 +162,71 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(decay[0], 1.0)
         self.assertLess(decay[1], decay[0])
         self.assertAlmostEqual(-math.log(decay[-1]) / times[-1], alpha_rate, delta=0.003)
+
+    def test_alpha_relaxation_time_solves_cage_normalized_decay_threshold(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        tau_alpha = alpha_relaxation_time(wave_number, params)
+        decay = normalized_alpha_decay(wave_number, np.array([tau_alpha]), params)[0]
+
+        self.assertAlmostEqual(decay, math.exp(-1.0), delta=1e-12)
+        gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+        self.assertGreater(tau_alpha, 1.0 / (params.renewal_rate * gamma))
+
+    def test_temperature_law_encodes_cooling_trends(self):
+        law = TemperatureLawParams(
+            reference_temperature=1.0,
+            cage_variance_ref=1.0,
+            cage_tau_ref=0.7,
+            jump_to_cage_ref=0.8,
+            renewal_rate_ref=0.18,
+            renewal_delay_ref=3.0,
+            rate_activation=2.0,
+            delay_activation=3.0,
+            cage_stiffening=0.25,
+            jump_to_cage_growth=0.35,
+        )
+        hot = temperature_dependent_params(1.0, law)
+        cold = temperature_dependent_params(0.62, law)
+
+        self.assertLess(cold.renewal_rate, hot.renewal_rate)
+        self.assertGreater(cold.renewal_delay, hot.renewal_delay)
+        self.assertLess(cold.cage_variance, hot.cage_variance)
+        self.assertGreater(cold.jump_variance / cold.cage_variance, hot.jump_variance / hot.cage_variance)
+
+    def test_temperature_scan_produces_stokes_einstein_decoupling(self):
+        law = TemperatureLawParams(
+            reference_temperature=1.0,
+            cage_variance_ref=1.0,
+            cage_tau_ref=0.7,
+            jump_to_cage_ref=0.8,
+            renewal_rate_ref=0.18,
+            renewal_delay_ref=3.0,
+            rate_activation=2.0,
+            delay_activation=5.0,
+            cage_stiffening=0.2,
+            jump_to_cage_growth=0.25,
+        )
+        temperatures = np.array([1.0, 0.85, 0.72, 0.62])
+        rows = temperature_scan(temperatures, law, wave_number=1.1)
+
+        diffusion = np.array([row["diffusion_coefficient"] for row in rows])
+        tau_alpha = np.array([row["tau_alpha"] for row in rows])
+        se_ratio = np.array([row["normalized_stokes_einstein_product"] for row in rows])
+
+        self.assertTrue(np.all(np.diff(diffusion) < 0.0))
+        self.assertTrue(np.all(np.diff(tau_alpha) > 0.0))
+        self.assertGreater(se_ratio[-1], 2.0)
+        self.assertAlmostEqual(se_ratio[0], 1.0)
+        first = temperature_dependent_params(float(temperatures[0]), law)
+        self.assertAlmostEqual(rows[0]["stokes_einstein_product"], stokes_einstein_product(1.1, first))
+        self.assertAlmostEqual(rows[0]["diffusion_coefficient"], long_time_diffusion_coefficient(first))
 
     def test_radial_van_hove_distribution_normalizes(self):
         params = DelayedRenewalCageParams(

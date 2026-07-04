@@ -7,7 +7,8 @@ cage note as a short arXiv manuscript.
 
 - Standalone repository separate from the liquid-crystal theory work.
 - Closed-form MSD, NGP, radial van Hove distribution, self-intermediate
-  scattering function, peak diagnostics, and finite-time peak/late-NGP
+  scattering function, temperature-dependent alpha relaxation, Stokes-Einstein
+  decoupling diagnostics, peak diagnostics, and finite-time peak/late-NGP
   consistency diagnostics.
 - Generalized delay-exponent argument explaining the square-delay choice.
 - Reproducible CSV outputs, SVG figures, PDF manuscript figures, and arXiv
