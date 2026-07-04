@@ -219,3 +219,51 @@ def dimensionless_peak_prediction(params: DelayedRenewalCageParams) -> dict[str,
         "peak_time": _find_time_for_renewal_count(target_renewal, params),
         "peak_ngp": params.jump_variance / (4.0 * params.cage_variance),
     }
+
+
+def delayed_renewal_shape(scaled_time: float) -> float:
+    """Dimensionless delayed-renewal integral F(s) for R(t)=lambda*tau_d*F(t/tau_d)."""
+
+    if scaled_time <= 0.0:
+        raise ValueError("scaled_time must be positive")
+    return (
+        scaled_time
+        - 2.0 * (1.0 - math.exp(-scaled_time))
+        + 0.5 * (1.0 - math.exp(-2.0 * scaled_time))
+    )
+
+
+def plateau_peak_diagnostics(
+    *,
+    peak_ngp: float,
+    peak_time: float,
+    renewal_delay: float,
+) -> dict[str, float]:
+    """Infer plateau-regime parameters from the observed NGP peak.
+
+    The approximation q R(t*) = A and alpha*(t*) = q/(4A) gives
+    q/A = 4 alpha* and R(t*) = 1/(4 alpha*). If the delayed renewal shape is
+    assumed and tau_d is known or fit independently, the same peak time estimates
+    the asymptotic renewal rate.
+    """
+
+    if peak_ngp <= 0.0:
+        raise ValueError("peak_ngp must be positive")
+    if peak_time <= 0.0:
+        raise ValueError("peak_time must be positive")
+    if renewal_delay <= 0.0:
+        raise ValueError("renewal_delay must be positive")
+
+    jump_to_cage_variance = 4.0 * peak_ngp
+    target_renewal_count = 1.0 / jump_to_cage_variance
+    scaled_peak_time = peak_time / renewal_delay
+    shape = delayed_renewal_shape(scaled_peak_time)
+    renewal_rate = target_renewal_count / (renewal_delay * shape)
+    return {
+        "jump_to_cage_variance": jump_to_cage_variance,
+        "target_renewal_count": target_renewal_count,
+        "scaled_peak_time": scaled_peak_time,
+        "renewal_shape": shape,
+        "renewal_rate": renewal_rate,
+        "renewal_rate_times_peak_time": renewal_rate * peak_time,
+    }

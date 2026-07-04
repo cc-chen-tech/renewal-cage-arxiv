@@ -30,9 +30,11 @@ event, and $R(t)$ is the mean delayed renewal count. With renewal intensity
 $r(t)=\lambda[1-\exp(-t/\tau_d)]^2$, the NGP starts from zero, develops a
 finite-time maximum, and decays as $1/(\lambda t)$ at long times. In the
 plateau regime the peak condition reduces to $qR(t^\ast)=A$, giving
-$\alpha_2(t^\ast)=q/(4A)$. The delayed renewal count regularizes the
-short-time behavior of jump models while preserving analytic tractability and
-long-time Gaussian recovery.
+$\alpha_2(t^\ast)=q/(4A)$. This also gives observable peak diagnostics,
+including $q/A\simeq 4\alpha_2(t^\ast)$ and
+$R(t^\ast)\simeq 1/[4\alpha_2(t^\ast)]$. The delayed renewal count regularizes
+the short-time behavior of jump models while preserving analytic tractability
+and long-time Gaussian recovery.
 \end{abstract}
 
 \maketitle
@@ -119,6 +121,27 @@ In the plateau regime this reduces to
 \begin{equation}
   qR(t^\ast)=A,\qquad \alpha_2(t^\ast)=\frac{q}{4A}.
 \end{equation}
+Equivalently, a measured peak height gives the plateau-regime estimates
+\begin{equation}
+  \frac{q}{A}\simeq 4\alpha_2(t^\ast),\qquad
+  R(t^\ast)\simeq \frac{1}{4\alpha_2(t^\ast)}.
+\end{equation}
+For the delayed intensity used above, write
+\begin{equation}
+  R(t)=\lambda\tau_d F(t/\tau_d),
+\end{equation}
+where
+\begin{equation}
+  F(s)=s-2(1-e^{-s})+\frac{1}{2}(1-e^{-2s}).
+\end{equation}
+If $\tau_d$ is obtained independently or fitted from the rise of the peak, the
+peak time estimates the asymptotic renewal rate,
+\begin{equation}
+  \lambda \simeq
+  \frac{1}{4\alpha_2(t^\ast)\tau_d F(t^\ast/\tau_d)}.
+\end{equation}
+The independent long-time check is $\lambda\simeq[t\,\alpha_2(t)]^{-1}$ once
+$t$ is beyond the cage plateau and renewal delay.
 
 \section{Self Van Hove Distribution}
 
@@ -163,6 +186,28 @@ Gaussian recovery. The delay time $\tau_d$ mainly controls when the peak
 appears; the ratio $q/A$ controls its height in the plateau regime. This
 separation of roles may be useful when interpreting short-time simulations or
 coarse-grained cage-jump statistics near glass transition.
+
+Table~\ref{tab:comparison} summarizes the distinction from nearby modeling
+languages. The point is not that a renewal model is the only explanation of a
+non-Gaussian peak. Rather, the delayed renewal construction supplies an
+explicit bridge between a cage plateau, a finite-time NGP maximum, a radial van
+Hove tail, and two simple peak diagnostics that can be checked against
+simulation trajectories.
+
+\begin{table}[h]
+  \caption{Relation to nearby mechanisms for non-Gaussian transport.}
+  \label{tab:comparison}
+  \begin{ruledtabular}
+  \begin{tabular}{llll}
+  Model class & Main fluctuating quantity & NGP peak mechanism & Diagnostic here \\
+  \hline
+  Harmonic cage & Local displacement & None; Gaussian at all times & Baseline MSD plateau \\
+  Diffusing diffusivity & Mobility or diffusivity & Mobility heterogeneity & Long-time $1/(\lambda t)$ recovery \\
+  Cage-jump picture & Rearrangement events & Jump intermittency & Delayed renewal count $R(t)$ \\
+  Delayed renewal cage & Cage-center renewal count & $qR(t^\ast)\simeq A$ & $q/A\simeq4\alpha_2(t^\ast)$ \\
+  \end{tabular}
+  \end{ruledtabular}
+\end{table}
 
 \bibliographystyle{apsrev4-2}
 \bibliography{references}

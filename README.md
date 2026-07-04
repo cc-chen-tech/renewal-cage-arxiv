@@ -71,6 +71,7 @@ figures/renewal_cage_dimensionless.svg
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
+data/renewal_cage_diagnostics.csv
 data/renewal_cage_van_hove.csv
 data/renewal_cage_tail_ratios.csv
 paper/figures/renewal_cage_results.pdf

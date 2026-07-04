@@ -19,6 +19,7 @@ from renewal_cage import (  # noqa: E402
     gaussian_radial_3d,
     moments_1d,
     ngp_1d,
+    plateau_peak_diagnostics,
     radial_van_hove_3d,
 )
 
@@ -122,6 +123,31 @@ def write_tail_ratio_csv(
             }
         )
     write_sweep_csv(path, rows)
+
+
+def write_diagnostics_csv(
+    path: Path,
+    *,
+    peak_time: float,
+    peak_ngp: float,
+    params: DelayedRenewalCageParams,
+) -> None:
+    diagnostics = plateau_peak_diagnostics(
+        peak_ngp=peak_ngp,
+        peak_time=peak_time,
+        renewal_delay=params.renewal_delay,
+    )
+    row = {
+        "peak_time": peak_time,
+        "peak_ngp": peak_ngp,
+        "true_jump_to_cage_variance": params.jump_variance / params.cage_variance,
+        "diagnostic_jump_to_cage_variance": diagnostics["jump_to_cage_variance"],
+        "true_renewal_rate": params.renewal_rate,
+        "diagnostic_renewal_rate": diagnostics["renewal_rate"],
+        "target_renewal_count": diagnostics["target_renewal_count"],
+        "renewal_rate_times_peak_time": diagnostics["renewal_rate_times_peak_time"],
+    }
+    write_sweep_csv(path, [row])
 
 
 def write_svg(
@@ -284,6 +310,14 @@ def main() -> None:
     )
     time = np.linspace(1e-4, 180.0, 1800)
     write_main_csv(DATA_DIR / "renewal_cage_main.csv", time, params)
+    default_alpha = ngp_1d(time, params)
+    default_peak_time, default_peak_value = peak_summary(time, default_alpha)
+    write_diagnostics_csv(
+        DATA_DIR / "renewal_cage_diagnostics.csv",
+        peak_time=default_peak_time,
+        peak_ngp=default_peak_value,
+        params=params,
+    )
 
     delay_values = [1.2, 2.0, 3.0, 5.0]
     jump_values = [0.3, 0.6, 0.9, 1.3]

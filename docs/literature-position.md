@@ -63,21 +63,26 @@ peak condition:
 
 long time:
   alpha_2(t) ~ 1/(lambda t)
+
+observable peak diagnostics:
+  q/A ~= 4 alpha_2(t*)
+  R(t*) ~= 1/[4 alpha_2(t*)]
+  lambda ~= 1/[4 alpha_2(t*) tau_d F(t*/tau_d)]
 ```
 
 The publishable claim should therefore be:
 
 > A delayed renewal count regularizes the short-time singularity of memoryless jump
-> models while preserving a closed-form NGP peak and long-time Gaussian recovery.
+> models while preserving a closed-form NGP peak, simple peak-height diagnostics,
+> and long-time Gaussian recovery.
 
 ## What Still Needs Strengthening
 
 Before arXiv submission, the work should add:
 
 ```text
-1. A dimensionless parameterization using q/A, lambda tau_c, tau_d/tau_c.
-2. A three-dimensional NGP derivation.
-3. A van Hove distribution plot showing Gaussian core plus transient tails.
-4. A comparison table versus diffusing diffusivity, CTRW, and cage-jump models.
-5. A LaTeX manuscript with references.
+1. Final prose polish and narrower claims.
+2. Reference metadata checks.
+3. Author and affiliation confirmation.
+4. A final rendered-PDF read-through.
 ```

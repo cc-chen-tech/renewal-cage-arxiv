@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
     delayed_poisson_mean,
+    delayed_renewal_shape,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
     radial_van_hove_3d,
@@ -18,6 +19,7 @@ from renewal_cage import (  # noqa: E402
     moments_3d,
     ngp_1d,
     ngp_3d,
+    plateau_peak_diagnostics,
 )
 
 
@@ -169,6 +171,33 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertAlmostEqual(peak_time, predicted["peak_time"], delta=0.2)
         self.assertAlmostEqual(float(np.max(alpha)), predicted["peak_ngp"], delta=0.005)
+
+    def test_plateau_peak_diagnostics_recover_peak_scale_parameters(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        predicted = dimensionless_peak_prediction(params)
+        diagnostics = plateau_peak_diagnostics(
+            peak_ngp=predicted["peak_ngp"],
+            peak_time=predicted["peak_time"],
+            renewal_delay=params.renewal_delay,
+        )
+
+        self.assertAlmostEqual(diagnostics["jump_to_cage_variance"], params.jump_variance / params.cage_variance)
+        self.assertAlmostEqual(diagnostics["target_renewal_count"], params.cage_variance / params.jump_variance)
+        self.assertAlmostEqual(diagnostics["renewal_rate"], params.renewal_rate, delta=1e-12)
+
+    def test_delayed_renewal_shape_is_positive_and_matches_integral(self):
+        scaled_time = 2.5
+        shape = delayed_renewal_shape(scaled_time)
+        numeric = np.trapezoid((1.0 - np.exp(-np.linspace(0.0, scaled_time, 2000))) ** 2, np.linspace(0.0, scaled_time, 2000))
+
+        self.assertGreater(shape, 0.0)
+        self.assertAlmostEqual(shape, numeric, delta=1e-6)
 
 
 if __name__ == "__main__":
