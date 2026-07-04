@@ -666,6 +666,19 @@ z_c = |Delta_c| / sigma_Delta
 一致案例 `z_c=0.062`，错配案例 `z_c=76.4`。这使判据从“看起来一致”
 变成了统计意义上的 falsification protocol。
 
+如果有多个 wave number 的 `F_s(k,t)`，还可以做更强的 collapse test：
+每个 `k` 都通过
+
+```text
+log(1 + Gamma_k c_alpha(k)) / c_alpha(k) = s_alpha(k)
+```
+
+独立反推出一个 `c_alpha(k)`。finite-exchange renewal 预言所有
+`c_alpha(k)` 必须 collapse 到同一个 `c_NGP`。默认 `k=0.6,1.1,1.8`
+的相容例子给出 weighted `c_alpha=25.00`、`z=0.096`；如果只把 `k=1.1`
+的 alpha slope 换成对应 `c=2` 的值，则 weighted `c_alpha=2.23`、
+`z=61.1`，跨 wave number reduced chi-square 为 `756`，强烈失败。
+
 ## 7.9. 从可观测量反演参数和证伪条件
 
 更强的可发表价值在于：模型不只是正向画曲线，也能从常见 glass observable 反推

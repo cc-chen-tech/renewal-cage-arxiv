@@ -31,6 +31,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_diagnostic_map,
     infer_gamma_exchange_from_late_observables,
+    infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_uncertainty_from_late_observables,
     infer_gamma_exchange_ratio_from_alpha_rate,
     gamma_exchange_ngp_1d,
@@ -511,6 +512,67 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertGreater(mismatched["log_ratio_z_score"], 20.0)
         self.assertEqual(mismatched["passes_statistical_consistency"], 0.0)
+
+    def test_gamma_exchange_multik_collapse_accepts_shared_exchange_ratio(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_numbers = [0.6, 1.1, 1.8]
+        shared_ratio = 25.0
+        rates = []
+        for wave_number in wave_numbers:
+            gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+            rates.append(math.log1p(gamma * shared_ratio) / shared_ratio)
+
+        collapse = infer_gamma_exchange_multik_collapse(
+            wave_numbers=wave_numbers,
+            params=params,
+            late_renewal_count=5400.0,
+            late_ngp=26.0 / 5400.0,
+            observed_alpha_decay_per_renewal=rates,
+            alpha_decay_per_renewal_std=[0.002, 0.002, 0.002],
+            late_renewal_count_std=54.0,
+            late_ngp_std=0.01 * 26.0 / 5400.0,
+        )
+
+        self.assertEqual(len(collapse["per_wave_number"]), 3)
+        self.assertAlmostEqual(collapse["ratio_from_late_ngp"], 25.0, delta=1e-12)
+        self.assertAlmostEqual(collapse["weighted_mean_ratio_from_alpha"], 25.0, delta=1e-8)
+        self.assertLess(collapse["collapse_z_score"], 1.0)
+        self.assertEqual(collapse["passes_multik_collapse"], 1.0)
+
+    def test_gamma_exchange_multik_collapse_rejects_wave_number_mismatch(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_numbers = [0.6, 1.1, 1.8]
+        rates = []
+        for idx, wave_number in enumerate(wave_numbers):
+            target_ratio = 2.0 if idx == 1 else 25.0
+            gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+            rates.append(math.log1p(gamma * target_ratio) / target_ratio)
+
+        collapse = infer_gamma_exchange_multik_collapse(
+            wave_numbers=wave_numbers,
+            params=params,
+            late_renewal_count=5400.0,
+            late_ngp=26.0 / 5400.0,
+            observed_alpha_decay_per_renewal=rates,
+            alpha_decay_per_renewal_std=[0.002, 0.002, 0.002],
+            late_renewal_count_std=54.0,
+            late_ngp_std=0.01 * 26.0 / 5400.0,
+        )
+
+        self.assertGreater(collapse["collapse_z_score"], 20.0)
+        self.assertEqual(collapse["passes_multik_collapse"], 0.0)
 
     def test_correlated_domain_susceptibility_scales_renewal_component(self):
         params = DelayedRenewalCageParams(

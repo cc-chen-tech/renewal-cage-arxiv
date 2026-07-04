@@ -27,6 +27,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
+    infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
     gamma_exchange_ngp_1d,
@@ -410,6 +411,56 @@ def write_heterogeneity_protocol_csv(
     rows: list[dict[str, float | str]] = []
     for label, row in [("consistent", consistent), ("inconsistent_alpha_slope", inconsistent)]:
         rows.append({"case": label, **row})
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_heterogeneity_multik_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    *,
+    wave_numbers: list[float],
+    exchange_ratio: float,
+    late_renewal_count: float,
+    late_ngp: float,
+) -> list[dict[str, float | str]]:
+    def rate_for(wave_number: float, ratio: float) -> float:
+        gamma = 1.0 - float(np.exp(-0.5 * wave_number**2 * params.jump_variance))
+        return float(np.log1p(gamma * ratio) / ratio)
+
+    consistent_rates = [rate_for(wave_number, exchange_ratio) for wave_number in wave_numbers]
+    mismatched_rates = [
+        rate_for(wave_number, 2.0 if np.isclose(wave_number, 1.1) else exchange_ratio)
+        for wave_number in wave_numbers
+    ]
+    rows: list[dict[str, float | str]] = []
+    for label, rates in [("consistent_multik", consistent_rates), ("mismatch_k_1.1", mismatched_rates)]:
+        collapse = infer_gamma_exchange_multik_collapse(
+            wave_numbers=wave_numbers,
+            params=params,
+            late_renewal_count=late_renewal_count,
+            late_ngp=late_ngp,
+            observed_alpha_decay_per_renewal=rates,
+            alpha_decay_per_renewal_std=[0.002 for _ in wave_numbers],
+            late_renewal_count_std=0.01 * late_renewal_count,
+            late_ngp_std=0.01 * late_ngp,
+        )
+        for row in collapse["per_wave_number"]:
+            rows.append(
+                {
+                    "case": label,
+                    "wave_number": row["wave_number"],
+                    "observed_alpha_decay_per_renewal": row["observed_alpha_decay_per_renewal"],
+                    "ratio_from_late_ngp": collapse["ratio_from_late_ngp"],
+                    "ratio_from_alpha_rate": row["ratio_from_alpha_rate"],
+                    "ratio_from_alpha_rate_std": row["ratio_from_alpha_rate_std"],
+                    "weighted_mean_ratio_from_alpha": collapse["weighted_mean_ratio_from_alpha"],
+                    "weighted_mean_ratio_from_alpha_std": collapse["weighted_mean_ratio_from_alpha_std"],
+                    "collapse_z_score": collapse["collapse_z_score"],
+                    "alpha_ratio_reduced_chi_square": collapse["alpha_ratio_reduced_chi_square"],
+                    "passes_multik_collapse": collapse["passes_multik_collapse"],
+                }
+            )
     write_sweep_csv(path, rows)
     return rows
 
@@ -1277,6 +1328,15 @@ def main() -> None:
         heterogeneity,
         wave_number=1.1,
         late_time=30000.0,
+    )
+    late_array = np.array([30000.0])
+    write_heterogeneity_multik_csv(
+        DATA_DIR / "renewal_cage_heterogeneity_multik.csv",
+        params,
+        wave_numbers=[0.6, 1.1, 1.8],
+        exchange_ratio=heterogeneity.exchange_renewal_count / heterogeneity.shape,
+        late_renewal_count=float(delayed_poisson_mean(late_array, params)[0]),
+        late_ngp=float(gamma_exchange_ngp_1d(late_array, params, heterogeneity)[0]),
     )
     write_barrier_svg(
         FIGURE_DIR / "renewal_cage_barrier.svg",

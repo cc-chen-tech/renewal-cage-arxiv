@@ -468,6 +468,9 @@ f'(c) = [Gamma_k c/(1+Gamma_k c) - log(1+Gamma_k c)] / c^2
 sigma_calpha = sigma_salpha / |f'(c_alpha)|
 z_c = |Delta_c| / sigma_Delta.
 ```
+With multiple wave numbers, each `k` gives an independent `c_alpha(k)`. The
+finite-exchange picture is then overdetermined: all `c_alpha(k)` values must
+collapse to the same `c_NGP` within propagated errors.
 
 ## 5. Reproducible Results
 
@@ -491,6 +494,7 @@ data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_heterogeneity_protocol.csv
+data/renewal_cage_heterogeneity_multik.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 figures/renewal_cage_results.svg
@@ -540,6 +544,10 @@ At `t_l=3.0e4`, the protocol gives `c_NGP=24.94`, `c_alpha=25.00`, and
 corresponding to `c_alpha=2` gives `Delta_c=-2.52` and fails.
 With `1%` uncertainty in `R_l` and `alpha_2(t_l)` and
 `sigma_salpha=0.002`, the two cases give `z_c=0.062` and `z_c=76.4`.
+For `k=0.6,1.1,1.8`, consistent slopes collapse to weighted
+`c_alpha=25.00` with `z=0.096`; changing only the `k=1.1` slope to the value
+corresponding to `c=2` gives weighted `c_alpha=2.23`, `z=61.1`, and reduced
+chi-square `756`.
 
 The parameter sweeps show:
 

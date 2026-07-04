@@ -665,6 +665,81 @@ def infer_gamma_exchange_uncertainty_from_late_observables(
     return inferred
 
 
+def infer_gamma_exchange_multik_collapse(
+    *,
+    wave_numbers: list[float],
+    params: DelayedRenewalCageParams,
+    late_renewal_count: float,
+    late_ngp: float,
+    observed_alpha_decay_per_renewal: list[float],
+    alpha_decay_per_renewal_std: list[float],
+    late_renewal_count_std: float,
+    late_ngp_std: float,
+    z_threshold: float = 2.0,
+) -> dict[str, float | list[dict[str, float]]]:
+    """Test whether alpha slopes at multiple wave numbers share one exchange ratio."""
+
+    if not wave_numbers:
+        raise ValueError("wave_numbers must not be empty")
+    if len(wave_numbers) != len(observed_alpha_decay_per_renewal):
+        raise ValueError("wave_numbers and observed_alpha_decay_per_renewal must have the same length")
+    if len(wave_numbers) != len(alpha_decay_per_renewal_std):
+        raise ValueError("wave_numbers and alpha_decay_per_renewal_std must have the same length")
+
+    per_wave_number = []
+    for wave_number, rate, rate_std in zip(
+        wave_numbers,
+        observed_alpha_decay_per_renewal,
+        alpha_decay_per_renewal_std,
+    ):
+        per_wave_number.append(
+            infer_gamma_exchange_uncertainty_from_late_observables(
+                wave_number=wave_number,
+                params=params,
+                late_renewal_count=late_renewal_count,
+                late_ngp=late_ngp,
+                observed_alpha_decay_per_renewal=rate,
+                late_renewal_count_std=late_renewal_count_std,
+                late_ngp_std=late_ngp_std,
+                alpha_decay_per_renewal_std=rate_std,
+                z_threshold=z_threshold,
+            )
+        )
+
+    ratio_from_late_ngp = per_wave_number[0]["ratio_from_late_ngp"]
+    ratio_from_late_ngp_std = per_wave_number[0]["ratio_from_late_ngp_std"]
+    weights = []
+    ratios = []
+    for row in per_wave_number:
+        sigma = row["ratio_from_alpha_rate_std"]
+        if sigma <= 0.0:
+            raise ValueError("alpha-rate ratio standard deviations must be positive")
+        weights.append(1.0 / sigma**2)
+        ratios.append(row["ratio_from_alpha_rate"])
+    weight_sum = sum(weights)
+    weighted_mean = sum(weight * ratio for weight, ratio in zip(weights, ratios)) / weight_sum
+    weighted_mean_std = math.sqrt(1.0 / weight_sum)
+    collapse_std = math.hypot(weighted_mean_std, ratio_from_late_ngp_std)
+    collapse_z_score = abs(weighted_mean - ratio_from_late_ngp) / collapse_std if collapse_std > 0.0 else math.inf
+    chi_square = sum(weight * (ratio - weighted_mean) ** 2 for weight, ratio in zip(weights, ratios))
+    degrees_of_freedom = max(0.0, float(len(ratios) - 1))
+    reduced_chi_square = chi_square / degrees_of_freedom if degrees_of_freedom > 0.0 else 0.0
+    passes = collapse_z_score <= z_threshold and reduced_chi_square <= z_threshold**2
+    return {
+        "ratio_from_late_ngp": ratio_from_late_ngp,
+        "ratio_from_late_ngp_std": ratio_from_late_ngp_std,
+        "weighted_mean_ratio_from_alpha": weighted_mean,
+        "weighted_mean_ratio_from_alpha_std": weighted_mean_std,
+        "collapse_z_score": collapse_z_score,
+        "alpha_ratio_chi_square": chi_square,
+        "alpha_ratio_degrees_of_freedom": degrees_of_freedom,
+        "alpha_ratio_reduced_chi_square": reduced_chi_square,
+        "z_threshold": z_threshold,
+        "passes_multik_collapse": 1.0 if passes else 0.0,
+        "per_wave_number": per_wave_number,
+    }
+
+
 def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndarray:
     """Local KWW-like exponent ``d log[-log(decay)] / d log(t)``."""
 
