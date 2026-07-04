@@ -15,8 +15,8 @@ The model combines:
   asymptotics, Stokes-Einstein decoupling, activated-barrier diagnostics,
   fractional Stokes-Einstein exponents, apparent alpha-activation/fragility
   diagnostics, renewal-count susceptibility, renewal-domain chi4/cooperative-size
-  diagnostics, finite-time consistency diagnostics, and observable
-  inversion/falsifiability criteria.
+  diagnostics, NGP peak/alpha-relaxation coupling, finite-time consistency
+  diagnostics, and observable inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -46,6 +46,10 @@ existence margin `D tau_d F(tau_alpha/tau_d) k^2 / [-log h]` to exceed one.
 A fuller observable inversion uses `f_k`, `D`, NGP peak time, and NGP peak
 height to infer `A`, `q`, `lambda`, and `tau_d`, leaving `tau_alpha` as a
 held-out consistency check.
+The NGP peak and alpha relaxation are also linked by renewal counts:
+`R_peak=A/q` and
+`R_alpha=-log(h)/[1-exp(-k^2 q/2)]`, so their time ratio is fixed by the same
+delayed-renewal inverse.
 
 ## Repository Layout
 
@@ -98,6 +102,7 @@ data/renewal_cage_consistency.csv
 data/renewal_cage_van_hove.csv
 data/renewal_cage_tail_ratios.csv
 data/renewal_cage_scattering.csv
+data/renewal_cage_peak_relaxation.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv

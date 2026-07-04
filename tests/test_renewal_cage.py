@@ -37,6 +37,7 @@ from renewal_cage import (  # noqa: E402
     normalized_alpha_decay,
     plateau_ngp_branches,
     plateau_peak_diagnostics,
+    peak_relaxation_coupling,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     stokes_einstein_product,
@@ -187,6 +188,42 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(decay, math.exp(-1.0), delta=1e-12)
         gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
         self.assertGreater(tau_alpha, 1.0 / (params.renewal_rate * gamma))
+
+    def test_peak_relaxation_coupling_links_ngp_peak_to_alpha_time(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        threshold = math.exp(-1.0)
+
+        coupling = peak_relaxation_coupling(wave_number, params, threshold=threshold)
+        peak = dimensionless_peak_prediction(params)
+        tau_alpha = alpha_relaxation_time(wave_number, params, threshold=threshold)
+        gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+        alpha_count = -math.log(threshold) / gamma
+        peak_count = params.cage_variance / params.jump_variance
+
+        self.assertAlmostEqual(coupling["peak_time"], peak["peak_time"], delta=1e-12)
+        self.assertAlmostEqual(coupling["tau_alpha"], tau_alpha, delta=1e-12)
+        self.assertAlmostEqual(coupling["peak_ngp"], peak["peak_ngp"], delta=1e-12)
+        self.assertAlmostEqual(coupling["gamma_k"], gamma, delta=1e-12)
+        self.assertAlmostEqual(coupling["peak_renewal_count"], peak_count, delta=1e-12)
+        self.assertAlmostEqual(coupling["alpha_renewal_count"], alpha_count, delta=1e-12)
+        self.assertAlmostEqual(
+            coupling["alpha_to_peak_renewal_count_ratio"],
+            alpha_count / peak_count,
+            delta=1e-12,
+        )
+        self.assertAlmostEqual(
+            coupling["tau_alpha_over_peak_time"],
+            tau_alpha / peak["peak_time"],
+            delta=1e-12,
+        )
+        self.assertGreater(coupling["tau_alpha_over_peak_time"], 1.0)
 
     def test_renewal_scattering_susceptibility_is_closed_form_variance(self):
         params = DelayedRenewalCageParams(

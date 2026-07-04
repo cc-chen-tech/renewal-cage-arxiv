@@ -105,6 +105,9 @@ extension:
 F_s(k,t) = exp[-k^2 L(t)/2 + R(t)(exp(-k^2 q/2)-1)]
 Phi_alpha(k,t) = exp[-(1-exp(-k^2 q/2)) R(t)]
 tau_alpha(k)^-1 ~= lambda[1-exp(-k^2 q/2)]
+R_alpha(k,h) = -log(h) / [1-exp(-k^2 q/2)]
+R_peak = A/q
+tau_alpha/t_peak = R^{-1}(R_alpha) / R^{-1}(R_peak)
 
 temperature law:
   lambda(T) = lambda0 exp[-E_lambda(1/T-1/T0)]

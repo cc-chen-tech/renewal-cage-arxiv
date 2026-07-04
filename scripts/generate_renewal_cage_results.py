@@ -31,6 +31,7 @@ from renewal_cage import (  # noqa: E402
     normalized_alpha_decay,
     observable_consistency_diagnostics,
     plateau_peak_diagnostics,
+    peak_relaxation_coupling,
     radial_van_hove_3d,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
@@ -150,6 +151,18 @@ def write_scattering_csv(
                 }
             )
     write_sweep_csv(path, rows)
+
+
+def write_peak_relaxation_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    wave_numbers: list[float],
+) -> list[dict[str, float]]:
+    rows = []
+    for wave_number in wave_numbers:
+        rows.append(peak_relaxation_coupling(wave_number, params))
+    write_sweep_csv(path, rows)
+    return rows
 
 
 def write_temperature_csv(
@@ -912,6 +925,7 @@ def main() -> None:
     scattering_time = np.linspace(0.0, 180.0, 1200)
     wave_numbers = [0.6, 1.1, 1.8]
     write_scattering_csv(DATA_DIR / "renewal_cage_scattering.csv", scattering_time, params, wave_numbers)
+    write_peak_relaxation_csv(DATA_DIR / "renewal_cage_peak_relaxation.csv", params, wave_numbers)
     scattering_curves = []
     alpha_curves = []
     for wave_number in wave_numbers:

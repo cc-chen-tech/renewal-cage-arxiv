@@ -369,6 +369,43 @@ def alpha_relaxation_time(
     return _find_time_for_renewal_count(target_renewal_count, params)
 
 
+def peak_relaxation_coupling(
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    *,
+    threshold: float = math.exp(-1.0),
+) -> dict[str, float]:
+    """Closed relation between the NGP peak time and alpha relaxation time."""
+
+    _validate(params)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must lie between 0 and 1")
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    if gamma <= 0.0:
+        raise ValueError("wave_number and jump_variance imply zero alpha decay rate")
+
+    peak = dimensionless_peak_prediction(params)
+    peak_time = peak["peak_time"]
+    tau_alpha = alpha_relaxation_time(wave_number, params, threshold=threshold)
+    alpha_renewal_count = -math.log(threshold) / gamma
+    peak_renewal_count = peak["target_renewal_count"]
+
+    return {
+        "wave_number": wave_number,
+        "threshold": threshold,
+        "gamma_k": gamma,
+        "peak_time": peak_time,
+        "tau_alpha": tau_alpha,
+        "tau_alpha_over_peak_time": tau_alpha / peak_time,
+        "peak_renewal_count": peak_renewal_count,
+        "alpha_renewal_count": alpha_renewal_count,
+        "alpha_to_peak_renewal_count_ratio": alpha_renewal_count / peak_renewal_count,
+        "peak_ngp": peak["peak_ngp"],
+    }
+
+
 def long_time_diffusion_coefficient(params: DelayedRenewalCageParams) -> float:
     """Long-time self-diffusion coefficient per coordinate."""
 

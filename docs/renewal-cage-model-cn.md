@@ -353,6 +353,25 @@ tau_alpha(k)^-1 ~= lambda [1 - exp(-k^2 q/2)]
 这比 random diffusivity 的说法更具体：alpha relaxation 受离散 cage-center
 renewal count 控制。
 
+更强的一点是，NGP peak time 和 alpha relaxation time 被同一个 renewal
+clock 连接。如果 `Phi_alpha(k,tau_alpha)=h`，则：
+
+```text
+R_alpha(k,h) = -log(h) / Gamma_k
+R_peak       = A/q
+
+R_alpha / R_peak
+  = -q log(h) / [A(1 - exp(-k^2 q/2))]
+
+tau_alpha / t_peak
+  = R^{-1}(R_alpha) / R^{-1}(R_peak)
+```
+
+因此只要知道 `A,q,lambda,tau_d`，`tau_alpha/t_peak` 不是自由拟合量。默认参数
+和 `k=1.1,h=e^-1` 下，`R_alpha=2.606`，`R_peak=1.250`，所以
+`tau_alpha/t_peak=1.678`。这给出一个很直接的 glass-literature 判据：NGP peak
+早于 structural relaxation，但二者是否由同一个 renewal process 控制可以被检验。
+
 ## 7.6. 温度依赖和 Stokes-Einstein violation
 
 最小温度扩展不是完整 microscopic glass theory，而是一个可检验的 phenomenological

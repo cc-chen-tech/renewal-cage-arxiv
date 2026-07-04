@@ -227,6 +227,16 @@ tau_alpha(k)^-1 ~= lambda [1 - exp(-k^2 q/2)].
 
 This is the main reason to position the note around delayed cage renewal rather
 than generic random diffusivity.
+The NGP peak and alpha time are also tied by the same renewal count:
+
+```text
+R_peak = A/q
+R_alpha(k,h) = -log(h) / [1-exp(-k^2 q/2)]
+tau_alpha/t_peak = R^{-1}(R_alpha) / R^{-1}(R_peak).
+```
+
+For the default parameters at `k=1.1,h=e^-1`, the model predicts
+`tau_alpha/t_peak = 1.678`.
 
 ## 4.6. Observable inversion and falsifiability
 
@@ -447,6 +457,8 @@ Increasing the barrier gap `E_d-E_lambda` from `0` to `4.5` raises the cold-end
 normalized `D tau_alpha` from `1.01` to `3.30`.
 The full observable inversion recovers `A=1.00`, `q=0.80`, `lambda=0.18`, and
 `tau_d=3.00`; the held-out `tau_alpha` log residual is below `1e-12`.
+At `k=1.1,h=e^-1`, `R_alpha=2.606` and `R_peak=1.250`, giving
+`tau_alpha/t_peak=1.678`.
 A synthetic renewal-domain four-point peak with `N_corr=12` is inverted back to
 `N_corr=12.0` from the analytic `chi_R` peak.
 

@@ -160,6 +160,29 @@ For small $k$, $\tau_\alpha(k)^{-1}\simeq \lambda k^2q/2$, matching ordinary
 diffusive scaling with $D=\lambda q/2$ in one dimension. For larger $k$, the
 rate saturates at $\lambda$, reflecting the renewal-count bottleneck rather
 than a continuously varying diffusivity.
+The same expression links the alpha time to the NGP peak without adding a
+parameter. If the alpha time is defined by
+$\Phi_\alpha(k,\tau_\alpha)=h$, then
+\begin{equation}
+  R_\alpha(k,h)
+  =\frac{-\log h}{\Gamma_k},
+  \qquad
+  R_\ast=\frac{A}{q}.
+\end{equation}
+Therefore
+\begin{equation}
+  \frac{R_\alpha}{R_\ast}
+  =
+  \frac{-q\log h}
+       {A\left(1-e^{-k^2q/2}\right)},
+  \qquad
+  \frac{\tau_\alpha}{t^\ast}
+  =
+  \frac{R^{-1}(R_\alpha)}{R^{-1}(R_\ast)} ,
+\end{equation}
+where the inverse is taken with the same delayed-renewal clock $R(t)$. This
+gives a direct test of whether the NGP peak and structural relaxation are
+controlled by one renewal process.
 
 \section{Observable Inversion and Falsifiability}
 
@@ -467,6 +490,9 @@ existence criterion.
 The full inversion using $f_k$, $D$, $t^\ast$, and $\alpha_2(t^\ast)$ recovers
 $A=1.00$, $q=0.80$, $\lambda=0.18$, and $\tau_d=3.00$; its held-out
 $\tau_\alpha$ residual is below $10^{-12}$ in logarithmic units.
+For $k=1.1$ and $h=e^{-1}$, the alpha target is $R_\alpha=2.606$ renewals,
+whereas the NGP peak requires $R_\ast=1.250$ renewals; the resulting
+$\tau_\alpha/t^\ast$ is $1.678$.
 A synthetic four-point peak generated with $N_{\rm corr}=12$ is inverted back to
 $N_{\rm corr}=12.0$ using the renewal $\chi_R$ peak, illustrating how the model
 can translate a measured $\chi_4$ amplitude into a renewal-domain size.
