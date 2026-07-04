@@ -28,6 +28,20 @@ class DelayedRenewalCageParams:
 
 
 @dataclass(frozen=True)
+class GammaExchangeParams:
+    """Finite-exchange gamma heterogeneity for the renewal count.
+
+    ``shape`` controls the instantaneous mobility dispersion. Smaller values
+    mean broader dynamic heterogeneity. ``exchange_renewal_count`` is the
+    renewal-count scale over which independent mobility environments are sampled,
+    so the effective gamma shape grows as the trajectory self-averages.
+    """
+
+    shape: float
+    exchange_renewal_count: float
+
+
+@dataclass(frozen=True)
 class TemperatureLawParams:
     """Dimensionless Arrhenius-like temperature law for the renewal cage model.
 
@@ -70,6 +84,13 @@ class ActivatedBarrierParams:
 def _validate(params: DelayedRenewalCageParams) -> None:
     for name in ("cage_variance", "cage_tau", "jump_variance", "renewal_rate", "renewal_delay"):
         value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+
+
+def _validate_gamma_exchange(heterogeneity: GammaExchangeParams) -> None:
+    for name in ("shape", "exchange_renewal_count"):
+        value = getattr(heterogeneity, name)
         if value <= 0.0:
             raise ValueError(f"{name} must be positive")
 
@@ -279,6 +300,135 @@ def normalized_alpha_decay(
     renewal = delayed_poisson_mean(t, params)
     jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
     return np.exp(renewal * (jump_characteristic - 1.0))
+
+
+def _gamma_exchange_effective_shape(
+    renewal: np.ndarray,
+    heterogeneity: GammaExchangeParams,
+) -> np.ndarray:
+    _validate_gamma_exchange(heterogeneity)
+    return heterogeneity.shape * (1.0 + renewal / heterogeneity.exchange_renewal_count)
+
+
+def gamma_exchange_count_moments(
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+) -> dict[str, np.ndarray]:
+    """Mean and variance of a finite-exchange gamma-mixed renewal count.
+
+    A gamma mixture of Poisson renewal counts has negative-binomial
+    overdispersion. The effective shape grows with the renewal count, modeling
+    exchange between independent mobility environments and restoring
+    self-averaging at long times.
+    """
+
+    _validate(params)
+    _validate_gamma_exchange(heterogeneity)
+    renewal = delayed_poisson_mean(t, params)
+    effective_shape = _gamma_exchange_effective_shape(renewal, heterogeneity)
+    return {
+        "mean": renewal,
+        "variance": renewal + renewal**2 / effective_shape,
+        "effective_shape": effective_shape,
+    }
+
+
+def gamma_exchange_ngp_1d(
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+) -> np.ndarray:
+    """One-dimensional NGP with finite-exchange renewal heterogeneity."""
+
+    _validate(params)
+    local = local_cage_variance(t, params)
+    count = gamma_exchange_count_moments(t, params, heterogeneity)
+    mean_variance = local + params.jump_variance * count["mean"]
+    variance_variance = params.jump_variance**2 * count["variance"]
+    out = np.zeros_like(mean_variance)
+    mask = mean_variance > 0.0
+    out[mask] = variance_variance[mask] / (mean_variance[mask] ** 2)
+    return out
+
+
+def gamma_exchange_normalized_alpha_decay(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+) -> np.ndarray:
+    """Cage-normalized alpha decay for finite-exchange gamma heterogeneity."""
+
+    _validate(params)
+    _validate_gamma_exchange(heterogeneity)
+    if wave_number < 0.0:
+        raise ValueError("wave_number must be nonnegative")
+    renewal = delayed_poisson_mean(t, params)
+    effective_shape = _gamma_exchange_effective_shape(renewal, heterogeneity)
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    return (1.0 + gamma * renewal / effective_shape) ** (-effective_shape)
+
+
+def gamma_exchange_self_intermediate_scattering(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+) -> np.ndarray:
+    """Self-intermediate scattering with gamma-exchange renewal counts."""
+
+    _validate(params)
+    if wave_number < 0.0:
+        raise ValueError("wave_number must be nonnegative")
+    local = local_cage_variance(t, params)
+    alpha_decay = gamma_exchange_normalized_alpha_decay(wave_number, t, params, heterogeneity)
+    return np.exp(-0.5 * wave_number**2 * local) * alpha_decay
+
+
+def gamma_exchange_scattering_susceptibility(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+) -> np.ndarray:
+    """Renewal-count scattering variance for gamma-exchange heterogeneity."""
+
+    _validate(params)
+    _validate_gamma_exchange(heterogeneity)
+    if wave_number < 0.0:
+        raise ValueError("wave_number must be nonnegative")
+    t = np.asarray(t, dtype=float)
+    local = local_cage_variance(t, params)
+    renewal = delayed_poisson_mean(t, params)
+    effective_shape = _gamma_exchange_effective_shape(renewal, heterogeneity)
+    jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    second_moment = np.exp(-wave_number**2 * local) * (
+        1.0 + renewal * (1.0 - jump_characteristic**2) / effective_shape
+    ) ** (-effective_shape)
+    mean_square = gamma_exchange_self_intermediate_scattering(wave_number, t, params, heterogeneity) ** 2
+    return second_moment - mean_square
+
+
+def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndarray:
+    """Local KWW-like exponent ``d log[-log(decay)] / d log(t)``."""
+
+    t = np.asarray(t, dtype=float)
+    decay = np.asarray(decay, dtype=float)
+    if t.ndim != 1 or decay.ndim != 1:
+        raise ValueError("t and decay must be one-dimensional")
+    if t.size != decay.size:
+        raise ValueError("t and decay must have the same length")
+    if np.any(t <= 0.0):
+        raise ValueError("t values must be positive")
+    if np.any((decay <= 0.0) | (decay > 1.0)):
+        raise ValueError("decay values must lie in (0, 1]")
+    log_decay = -np.log(decay)
+    exponent = np.full_like(log_decay, np.nan)
+    mask = log_decay > 0.0
+    if np.count_nonzero(mask) >= 2:
+        exponent[mask] = np.gradient(np.log(log_decay[mask]), np.log(t[mask]))
+    return exponent
 
 
 def renewal_scattering_susceptibility(

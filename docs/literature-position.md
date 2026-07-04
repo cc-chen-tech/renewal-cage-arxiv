@@ -137,6 +137,14 @@ renewal-count susceptibility:
     chi_4^R(k,t) = N_corr chi_R(k,t)
     N_corr = chi_4,peak^obs / max_t chi_R(k,t)
 
+finite-exchange heterogeneity extension:
+  kappa_eff(t) = kappa0 [1 + R(t)/R_x]
+  G_N(z;t) = [1 + R(t)(1-z)/kappa_eff(t)]^[-kappa_eff(t)]
+  Var N(t) = R(t) + R(t)^2/kappa_eff(t)
+  Phi_alpha^hx(k,t) = G_N(exp[-k^2 q/2];t)
+  beta_loc(t) = d log[-log Phi_alpha^hx] / d log t
+  kappa_eff ~ R(t) restores long-time Gaussian recovery
+
 observable inversion:
   A = -2 log(f_k)/k^2
   [1-exp(-k^2 q/2)]/q

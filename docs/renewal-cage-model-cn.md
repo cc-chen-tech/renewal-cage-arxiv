@@ -545,7 +545,61 @@ N_corr = chi_4,peak^obs / max_t chi_R(k,t)
 `chi_4` 峰值转换成 renewal-domain 粒子数。默认合成例子用 `N_corr=12` 生成四点峰，
 反演会回到 `N_corr=12.0`。
 
-## 7.8. 从可观测量反演参数和证伪条件
+## 7.8. Finite-exchange heterogeneity extension
+
+单一 Poisson renewal clock 是最小模型，但真实 glassy dynamics 还有 trajectory-to-trajectory
+mobility heterogeneity。一个静态 renewal rate 分布确实能拉宽 alpha decay，但会留下
+非零长时间 NGP，破坏 Gaussian recovery。更合理的最小闭式扩展是让 renewal count 做
+finite-exchange gamma mixing。
+
+条件在 mobility `M` 下：
+
+```text
+N(t) | M ~ Poisson[M R(t)]
+```
+
+令有效 gamma shape 随着采样过的 renewal count 增大：
+
+```text
+kappa_eff(t) = kappa0 [1 + R(t)/R_x]
+```
+
+则 renewal-count PGF 是负二项式形式：
+
+```text
+G_N(z;t) = [1 + R(t)(1-z)/kappa_eff(t)]^[-kappa_eff(t)]
+```
+
+它保持平均 renewal count 不变，但增加有限时间 overdispersion：
+
+```text
+E N(t)   = R(t)
+Var N(t) = R(t) + R(t)^2/kappa_eff(t)
+```
+
+因此：
+
+```text
+alpha_2^hx(t) = q^2 Var N(t) / [L(t)+qR(t)]^2
+
+Phi_alpha^hx(k,t)
+  = G_N(exp[-k^2 q/2];t)
+  = [1 + Gamma_k R(t)/kappa_eff(t)]^[-kappa_eff(t)]
+```
+
+局部拉伸指数可以定义为：
+
+```text
+beta_loc(t) = d log[-log Phi_alpha^hx(k,t)] / d log t
+```
+
+默认例子 `kappa0=0.4, R_x=10` 下，NGP peak 增强到 `1.195`，出现在
+`t=32.07`；alpha window 中 `beta_loc` 的中位数为 `0.805`，说明出现
+stretched-like alpha decay；同时到 `t=3.0e4` 时 NGP 已恢复到 `0.00480`。
+这比静态 heterogeneity 更适合 glass transition：它允许强 dynamic heterogeneity，
+但仍保留长时间 Gaussian recovery。
+
+## 7.9. 从可观测量反演参数和证伪条件
 
 更强的可发表价值在于：模型不只是正向画曲线，也能从常见 glass observable 反推
 参数并给出无解判据。

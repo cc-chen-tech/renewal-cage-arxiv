@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from renewal_cage import (  # noqa: E402
     ActivatedBarrierParams,
     DelayedRenewalCageParams,
+    GammaExchangeParams,
     TemperatureLawParams,
     alpha_relaxation_time,
     apparent_alpha_activation_energies,
@@ -26,7 +27,13 @@ from renewal_cage import (  # noqa: E402
     infer_parameters_from_scattering_transport,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
+    gamma_exchange_count_moments,
+    gamma_exchange_ngp_1d,
+    gamma_exchange_normalized_alpha_decay,
+    gamma_exchange_scattering_susceptibility,
+    gamma_exchange_self_intermediate_scattering,
     long_time_diffusion_coefficient,
+    local_alpha_stretching_exponent,
     observable_consistency_diagnostics,
     radial_van_hove_3d,
     local_cage_variance,
@@ -246,6 +253,80 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(float(np.max(susceptibility)), 0.02)
         self.assertLess(susceptibility[-1], float(np.max(susceptibility)) / 4.0)
         np.testing.assert_allclose(susceptibility, scattering**2 * relative, rtol=1e-12, atol=1e-14)
+
+    def test_gamma_exchange_count_moments_add_recovering_overdispersion(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+        times = np.array([20.0, 120.0, 30000.0])
+
+        count = gamma_exchange_count_moments(times, params, heterogeneity)
+        renewal = delayed_poisson_mean(times, params)
+        kappa_eff = heterogeneity.shape * (1.0 + renewal / heterogeneity.exchange_renewal_count)
+
+        np.testing.assert_allclose(count["mean"], renewal, rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(count["variance"], renewal + renewal**2 / kappa_eff, rtol=1e-12, atol=1e-14)
+        self.assertGreater(count["variance"][1] / count["mean"][1], 2.0)
+
+        alpha = gamma_exchange_ngp_1d(times, params, heterogeneity)
+        self.assertGreater(alpha[1], ngp_1d(np.array([times[1]]), params)[0])
+        self.assertLess(alpha[-1], alpha[1] / 20.0)
+
+    def test_gamma_exchange_alpha_decay_has_stretched_like_window_and_recovery(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+        wave_number = 1.1
+        times = np.linspace(0.02, 400.0, 2400)
+
+        decay = gamma_exchange_normalized_alpha_decay(wave_number, times, params, heterogeneity)
+        renewal = delayed_poisson_mean(times, params)
+        gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+        kappa_eff = heterogeneity.shape * (1.0 + renewal / heterogeneity.exchange_renewal_count)
+        expected = (1.0 + gamma * renewal / kappa_eff) ** (-kappa_eff)
+        exponent = local_alpha_stretching_exponent(times, decay)
+        alpha_window = (-np.log(decay) > 0.5) & (-np.log(decay) < 2.0)
+
+        np.testing.assert_allclose(decay, expected, rtol=1e-12, atol=1e-14)
+        self.assertLess(float(np.nanmedian(exponent[alpha_window])), 0.9)
+        self.assertLess(decay[-1], 0.01)
+
+    def test_gamma_exchange_scattering_susceptibility_matches_negative_binomial_variance(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.6, exchange_renewal_count=8.0)
+        wave_number = 1.1
+        times = np.linspace(0.0, 220.0, 900)
+
+        susceptibility = gamma_exchange_scattering_susceptibility(wave_number, times, params, heterogeneity)
+        scattering = gamma_exchange_self_intermediate_scattering(wave_number, times, params, heterogeneity)
+        renewal = delayed_poisson_mean(times, params)
+        local = local_cage_variance(times, params)
+        kappa_eff = heterogeneity.shape * (1.0 + renewal / heterogeneity.exchange_renewal_count)
+        jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+        second_moment = np.exp(-wave_number**2 * local) * (
+            1.0 + renewal * (1.0 - jump_characteristic**2) / kappa_eff
+        ) ** (-kappa_eff)
+
+        self.assertAlmostEqual(susceptibility[0], 0.0)
+        self.assertTrue(np.all(susceptibility >= -1e-14))
+        np.testing.assert_allclose(susceptibility, second_moment - scattering**2, rtol=1e-12, atol=1e-14)
+        self.assertGreater(float(np.max(susceptibility)), float(np.max(renewal_scattering_susceptibility(wave_number, times, params))))
 
     def test_correlated_domain_susceptibility_scales_renewal_component(self):
         params = DelayedRenewalCageParams(

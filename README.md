@@ -15,8 +15,9 @@ The model combines:
   asymptotics, Stokes-Einstein decoupling, activated-barrier diagnostics,
   fractional Stokes-Einstein exponents, apparent alpha-activation/fragility
   diagnostics, renewal-count susceptibility, renewal-domain chi4/cooperative-size
-  diagnostics, NGP peak/alpha-relaxation coupling, finite-time consistency
-  diagnostics, and observable inversion/falsifiability criteria.
+  diagnostics, NGP peak/alpha-relaxation coupling, finite-exchange
+  heterogeneity diagnostics, finite-time consistency diagnostics, and observable
+  inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -91,8 +92,10 @@ Expected outputs include:
 ```text
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
+figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
 figures/renewal_cage_barrier.svg
+figures/renewal_cage_heterogeneity.svg
 figures/renewal_cage_inversion.svg
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
@@ -107,6 +110,7 @@ data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
+data/renewal_cage_heterogeneity.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 paper/figures/renewal_cage_results.pdf
@@ -114,6 +118,7 @@ paper/figures/renewal_cage_dimensionless.pdf
 paper/figures/renewal_cage_scattering.pdf
 paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_barrier.pdf
+paper/figures/renewal_cage_heterogeneity.pdf
 paper/figures/renewal_cage_inversion.pdf
 dist/renewal-cage-arxiv-source.zip
 ```

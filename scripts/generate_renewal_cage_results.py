@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from renewal_cage import (  # noqa: E402
     ActivatedBarrierParams,
     DelayedRenewalCageParams,
+    GammaExchangeParams,
     TemperatureLawParams,
     alpha_relaxation_time,
     activated_barrier_temperature_law,
@@ -23,9 +24,14 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
+    gamma_exchange_count_moments,
+    gamma_exchange_ngp_1d,
+    gamma_exchange_normalized_alpha_decay,
+    gamma_exchange_scattering_susceptibility,
     infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
     infer_renewal_correlation_size,
+    local_alpha_stretching_exponent,
     moments_1d,
     ngp_1d,
     normalized_alpha_decay,
@@ -280,6 +286,44 @@ def write_chi4_bridge_csv(
             )
     write_sweep_csv(path, rows)
     return inferred
+
+
+def write_heterogeneity_csv(
+    path: Path,
+    time: np.ndarray,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float]]:
+    renewal = delayed_poisson_mean(time, params)
+    count = gamma_exchange_count_moments(time, params, heterogeneity)
+    poisson_decay = normalized_alpha_decay(wave_number, time, params)
+    gamma_decay = gamma_exchange_normalized_alpha_decay(wave_number, time, params, heterogeneity)
+    poisson_alpha = ngp_1d(time, params)
+    gamma_alpha = gamma_exchange_ngp_1d(time, params, heterogeneity)
+    poisson_chi = renewal_scattering_susceptibility(wave_number, time, params)
+    gamma_chi = gamma_exchange_scattering_susceptibility(wave_number, time, params, heterogeneity)
+    stretching = local_alpha_stretching_exponent(time, gamma_decay)
+    rows = []
+    for idx, value in enumerate(time):
+        rows.append(
+            {
+                "time": float(value),
+                "log10_time": float(np.log10(value)),
+                "renewal_mean": float(renewal[idx]),
+                "effective_shape": float(count["effective_shape"][idx]),
+                "poisson_alpha_decay": float(poisson_decay[idx]),
+                "gamma_exchange_alpha_decay": float(gamma_decay[idx]),
+                "poisson_ngp": float(poisson_alpha[idx]),
+                "gamma_exchange_ngp": float(gamma_alpha[idx]),
+                "gamma_exchange_local_beta": float(stretching[idx]),
+                "poisson_scattering_susceptibility": float(poisson_chi[idx]),
+                "gamma_exchange_scattering_susceptibility": float(gamma_chi[idx]),
+            }
+        )
+    write_sweep_csv(path, rows)
+    return rows
 
 
 def write_inversion_csv(
@@ -830,6 +874,53 @@ def write_inversion_svg(path: Path, inversion_rows: list[dict[str, float]]) -> N
     path.write_text(svg)
 
 
+def write_heterogeneity_svg(path: Path, heterogeneity_rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    palette = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 45}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, x_values: np.ndarray, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, palette[idx % len(palette)]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{palette[idx % len(palette)]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    log_time = np.array([row["log10_time"] for row in heterogeneity_rows])
+    poisson_decay = np.array([row["poisson_alpha_decay"] for row in heterogeneity_rows])
+    gamma_decay = np.array([row["gamma_exchange_alpha_decay"] for row in heterogeneity_rows])
+    poisson_ngp = np.array([row["poisson_ngp"] for row in heterogeneity_rows])
+    gamma_ngp = np.array([row["gamma_exchange_ngp"] for row in heterogeneity_rows])
+    local_beta = np.array([row["gamma_exchange_local_beta"] for row in heterogeneity_rows])
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Finite-exchange heterogeneity extension</text>
+  {axes(left_a, right_a, "O. Alpha relaxation from renewal heterogeneity", "log10 time")}
+  {plot(left_a, right_a, log_time, [("Poisson alpha decay", poisson_decay), ("gamma-exchange alpha decay", gamma_decay)])}
+  {axes(left_b, right_b, "P. Enhanced NGP with long-time recovery", "log10 time")}
+  {plot(left_b, right_b, log_time, [("Poisson NGP", poisson_ngp), ("gamma-exchange NGP", gamma_ngp), ("local beta", local_beta)])}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -1022,12 +1113,22 @@ def main() -> None:
         correlation_sizes=[1.0, 4.0, 12.0],
         synthetic_correlation_size=12.0,
     )
+    heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+    heterogeneity_time = np.geomspace(0.02, 30000.0, 1400)
+    heterogeneity_rows = write_heterogeneity_csv(
+        DATA_DIR / "renewal_cage_heterogeneity.csv",
+        heterogeneity_time,
+        params,
+        heterogeneity,
+        wave_number=1.1,
+    )
     write_barrier_svg(
         FIGURE_DIR / "renewal_cage_barrier.svg",
         scattering_time,
         susceptibility_curves,
         barrier_rows,
     )
+    write_heterogeneity_svg(FIGURE_DIR / "renewal_cage_heterogeneity.svg", heterogeneity_rows)
     inversion_rows = write_inversion_csv(
         DATA_DIR / "renewal_cage_inversion.csv",
         params,

@@ -406,6 +406,38 @@ Thus a renewal-dominated observed peak estimates the cooperative domain size:
 N_corr = chi_4,peak^obs / max_t chi_R(k,t).
 ```
 
+## 4.10. Finite-exchange heterogeneity extension
+
+A static distribution of renewal rates can broaden alpha relaxation, but it
+leaves a nonzero long-time NGP. To keep Gaussian recovery, use a finite-exchange
+gamma mixture of the renewal count:
+
+```text
+N(t) | M ~ Poisson[M R(t)]
+kappa_eff(t) = kappa0 [1 + R(t)/R_x]
+G_N(z;t) = [1 + R(t)(1-z)/kappa_eff(t)]^[-kappa_eff(t)].
+```
+
+Then
+
+```text
+E N(t) = R(t)
+Var N(t) = R(t) + R(t)^2/kappa_eff(t)
+
+alpha_2^hx(t) = q^2 Var N(t) / [L(t)+qR(t)]^2
+Phi_alpha^hx(k,t) = G_N(exp[-k^2 q/2];t).
+```
+
+The local stretching diagnostic is
+
+```text
+beta_loc(t) = d log[-log Phi_alpha^hx(k,t)] / d log t.
+```
+
+Because `kappa_eff ~ R(t)` at long times, the relative count variance still
+decays and the NGP returns to zero. This adds a closed stretched-like alpha
+decay mechanism without giving up long-time Gaussian recovery.
+
 ## 5. Reproducible Results
 
 The repository contains the exact implementation:
@@ -461,6 +493,9 @@ At `k=1.1,h=e^-1`, `R_alpha=2.606` and `R_peak=1.250`, giving
 `tau_alpha/t_peak=1.678`.
 A synthetic renewal-domain four-point peak with `N_corr=12` is inverted back to
 `N_corr=12.0` from the analytic `chi_R` peak.
+For the finite-exchange heterogeneity example with `kappa0=0.4,R_x=10`, the
+NGP peak is `1.195` at `t=32.07`, the alpha-window median local exponent is
+`beta_loc=0.805`, and the NGP recovers to `0.00480` by `t=3.0e4`.
 
 The parameter sweeps show:
 

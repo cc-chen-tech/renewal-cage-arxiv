@@ -3,7 +3,7 @@
 
 The repository stores SVG figures for easy browser viewing. arXiv source uploads are
 more robust when figures are PDF files referenced from LaTeX, so this script
-recreates the two manuscript figures directly from CSV outputs using reportlab.
+recreates manuscript figures directly from CSV outputs using reportlab.
 """
 
 from __future__ import annotations
@@ -446,6 +446,50 @@ def write_barrier_pdf(path: Path) -> None:
     c.save()
 
 
+def write_heterogeneity_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_heterogeneity.csv")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Finite-exchange heterogeneity extension")
+
+    log_time = data["log10_time"]
+    draw_panel(
+        c,
+        52,
+        78,
+        320,
+        280,
+        log_time,
+        [
+            ("Poisson alpha decay", data["poisson_alpha_decay"], colors.HexColor("#2b6cb0")),
+            ("gamma-exchange alpha decay", data["gamma_exchange_alpha_decay"], colors.HexColor("#c05621")),
+        ],
+        "O. Alpha relaxation from renewal heterogeneity",
+        xlabel="log10 time",
+        y_range=(0.0, 1.0),
+    )
+    draw_panel(
+        c,
+        430,
+        78,
+        320,
+        280,
+        log_time,
+        [
+            ("Poisson NGP", data["poisson_ngp"], colors.HexColor("#2b6cb0")),
+            ("gamma-exchange NGP", data["gamma_exchange_ngp"], colors.HexColor("#c05621")),
+            ("local beta", data["gamma_exchange_local_beta"], colors.HexColor("#2f855a")),
+        ],
+        "P. Enhanced NGP with recovery",
+        xlabel="log10 time",
+    )
+
+    c.showPage()
+    c.save()
+
+
 def write_inversion_pdf(path: Path) -> None:
     data = read_csv_columns(DATA_DIR / "renewal_cage_inversion.csv")
     diffusion_scale = data["diffusion_scale"]
@@ -505,12 +549,14 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
+    heterogeneity_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity.pdf"
     inversion_pdf = PAPER_FIGURE_DIR / "renewal_cage_inversion.pdf"
     write_results_pdf(results_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
     write_barrier_pdf(barrier_pdf)
+    write_heterogeneity_pdf(heterogeneity_pdf)
     write_inversion_pdf(inversion_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
@@ -522,6 +568,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
+        archive.write(heterogeneity_pdf, "figures/renewal_cage_heterogeneity.pdf")
         archive.write(inversion_pdf, "figures/renewal_cage_inversion.pdf")
     return zip_path
 

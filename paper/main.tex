@@ -41,7 +41,9 @@ function with a cage plateau and an alpha-relaxation rate. A minimal
 temperature-dependent extension predicts when diffusion and structural
 relaxation decouple through the product $\lambda(T)\tau_d(T)$. The delayed
 renewal count regularizes the short-time behavior of jump models while
-preserving analytic tractability and long-time Gaussian recovery.
+preserving analytic tractability and long-time Gaussian recovery. A
+finite-exchange gamma extension then gives a closed criterion for
+stretched-like alpha decay without leaving residual long-time non-Gaussianity.
 \end{abstract}
 
 \maketitle
@@ -367,6 +369,58 @@ This does not replace a spatial four-point calculation, but it gives a closed
 conversion between the analytically predicted renewal fluctuation and a measured
 dynamic-heterogeneity amplitude.
 
+\section{Finite-Exchange Heterogeneity Extension}
+
+The Poisson renewal model is the minimal clock, but glass-forming systems also
+show trajectory-to-trajectory mobility heterogeneity. A static distribution of
+renewal rates can broaden alpha relaxation, but it leaves a nonzero long-time
+NGP and therefore violates Gaussian recovery. A minimal closed correction is to
+let the renewal count be gamma mixed over a finite exchange window. Conditional
+on a dimensionless mobility $M$, take $N(t)|M$ to be Poisson with mean
+$MR(t)$, and let the gamma shape self-average as
+\begin{equation}
+  \kappa_{\rm eff}(t)=
+  \kappa_0\left[1+\frac{R(t)}{R_x}\right].
+\end{equation}
+The renewal-count probability-generating function is then the negative-binomial
+form
+\begin{equation}
+  G_N(z;t)=
+  \left[
+    1+\frac{R(t)(1-z)}{\kappa_{\rm eff}(t)}
+  \right]^{-\kappa_{\rm eff}(t)} .
+\end{equation}
+It preserves the mean renewal count but adds finite-time overdispersion,
+\begin{equation}
+  \mathbb{E}N(t)=R(t),\qquad
+  {\rm Var}\,N(t)=R(t)+\frac{R(t)^2}{\kappa_{\rm eff}(t)}.
+\end{equation}
+Since $\kappa_{\rm eff}(t)\sim \kappa_0R(t)/R_x$ at long times, the relative
+count variance still decays as $1/R(t)$ and Gaussian recovery is retained.
+The NGP and cage-normalized alpha decay become
+\begin{equation}
+  \alpha_2^{\rm hx}(t)=
+  \frac{q^2{\rm Var}\,N(t)}
+       {[L(t)+qR(t)]^2},
+\end{equation}
+and
+\begin{equation}
+  \Phi_\alpha^{\rm hx}(k,t)=
+  G_N(e^{-k^2q/2};t)
+  =
+  \left[
+    1+\frac{\Gamma_kR(t)}{\kappa_{\rm eff}(t)}
+  \right]^{-\kappa_{\rm eff}(t)} .
+\end{equation}
+The local stretching diagnostic is
+\begin{equation}
+  \beta_{\rm loc}(t)=
+  \frac{d\log[-\log\Phi_\alpha^{\rm hx}(k,t)]}{d\log t}.
+\end{equation}
+Values $\beta_{\rm loc}<1$ in the alpha window are therefore produced by finite
+exchange of renewal mobility, while the same construction predicts the
+long-time return of $\alpha_2(t)$ toward zero.
+
 \section{Asymptotics and Peak Condition}
 
 At short times,
@@ -496,6 +550,10 @@ $\tau_\alpha/t^\ast$ is $1.678$.
 A synthetic four-point peak generated with $N_{\rm corr}=12$ is inverted back to
 $N_{\rm corr}=12.0$ using the renewal $\chi_R$ peak, illustrating how the model
 can translate a measured $\chi_4$ amplitude into a renewal-domain size.
+For the finite-exchange heterogeneity example with
+$\kappa_0=0.4$ and $R_x=10$, the NGP peak rises to $1.195$ at $t=32.07$, the
+alpha-window median local stretching exponent is $\beta_{\rm loc}=0.805$, and
+the NGP recovers to $0.00480$ by $t=3.0\times10^4$.
 
 \begin{figure}[h]
   \centering
@@ -536,6 +594,15 @@ can translate a measured $\chi_4$ amplitude into a renewal-domain size.
   panel shows the renewal-count contribution to self-scattering fluctuations.
   The right panel shows that the cold-end Stokes-Einstein product grows as the
   onset barrier exceeds the renewal-rate barrier.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_heterogeneity.pdf}
+  \caption{Finite-exchange heterogeneity extension. Gamma-mixed renewal counts
+  broaden the alpha decay and produce a stretched-like local exponent in the
+  alpha window while preserving long-time NGP recovery through exchange-driven
+  self-averaging of the renewal count.}
 \end{figure}
 
 \begin{figure}[h]
