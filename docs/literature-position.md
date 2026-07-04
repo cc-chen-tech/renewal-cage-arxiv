@@ -154,6 +154,7 @@ finite-exchange heterogeneity extension:
       c_NGP = R_l alpha_2(t_l)-1
       log(1+Gamma_k c_alpha)/c_alpha = -log Phi_alpha(k,t_l)/R_l
       Delta_c = log(c_alpha/c_NGP)
+      z_c = |Delta_c|/sigma_Delta from propagated measurement errors
 
 observable inversion:
   A = -2 log(f_k)/k^2

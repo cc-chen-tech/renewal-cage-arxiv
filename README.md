@@ -50,7 +50,8 @@ held-out consistency check.
 The finite-exchange protocol adds a second data-level residual: late NGP gives
 `c_NGP=R_l alpha_2(t_l)-1`, the alpha slope gives `c_alpha` through
 `log(1+Gamma_k c_alpha)/c_alpha`, and `log(c_alpha/c_NGP)` tests whether both
-observables share one exchange scale.
+observables share one exchange scale. With measurement uncertainties, the same
+closed derivatives propagate this residual into a `z` score.
 The NGP peak and alpha relaxation are also linked by renewal counts:
 `R_peak=A/q` and
 `R_alpha=-log(h)/[1-exp(-k^2 q/2)]`, so their time ratio is fixed by the same

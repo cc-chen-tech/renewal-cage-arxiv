@@ -31,6 +31,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_diagnostic_map,
     infer_gamma_exchange_from_late_observables,
+    infer_gamma_exchange_uncertainty_from_late_observables,
     infer_gamma_exchange_ratio_from_alpha_rate,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
@@ -462,6 +463,54 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(inferred["ratio_from_alpha_rate"], 2.0, delta=1e-10)
         self.assertGreater(abs(inferred["log_ratio_residual"]), 2.0)
         self.assertEqual(inferred["passes_consistency"], 0.0)
+
+    def test_gamma_exchange_late_observable_uncertainty_scores_residuals(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+        wave_number = 1.1
+        late_time = np.array([30000.0])
+        renewal = delayed_poisson_mean(late_time, params)[0]
+        late_ngp = gamma_exchange_ngp_1d(late_time, params, heterogeneity)[0]
+        diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+
+        scored = infer_gamma_exchange_uncertainty_from_late_observables(
+            wave_number=wave_number,
+            params=params,
+            late_renewal_count=renewal,
+            late_ngp=late_ngp,
+            observed_alpha_decay_per_renewal=diagnostics["late_alpha_decay_per_renewal"],
+            late_renewal_count_std=0.01 * renewal,
+            late_ngp_std=0.01 * late_ngp,
+            alpha_decay_per_renewal_std=0.002,
+        )
+
+        self.assertGreater(scored["ratio_from_late_ngp_std"], 0.0)
+        self.assertGreater(scored["ratio_from_alpha_rate_std"], 0.0)
+        self.assertGreater(scored["log_ratio_residual_std"], 0.0)
+        self.assertLess(scored["log_ratio_z_score"], 1.0)
+        self.assertEqual(scored["passes_statistical_consistency"], 1.0)
+
+        gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+        alpha_rate_for_c2 = math.log1p(gamma * 2.0) / 2.0
+        mismatched = infer_gamma_exchange_uncertainty_from_late_observables(
+            wave_number=wave_number,
+            params=params,
+            late_renewal_count=renewal,
+            late_ngp=late_ngp,
+            observed_alpha_decay_per_renewal=alpha_rate_for_c2,
+            late_renewal_count_std=0.01 * renewal,
+            late_ngp_std=0.01 * late_ngp,
+            alpha_decay_per_renewal_std=0.002,
+        )
+
+        self.assertGreater(mismatched["log_ratio_z_score"], 20.0)
+        self.assertEqual(mismatched["passes_statistical_consistency"], 0.0)
 
     def test_correlated_domain_susceptibility_scales_renewal_component(self):
         params = DelayedRenewalCageParams(

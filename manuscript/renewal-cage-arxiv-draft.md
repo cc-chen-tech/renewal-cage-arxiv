@@ -459,6 +459,15 @@ Delta_c = log(c_alpha / c_NGP).
 ```
 
 `Delta_c` is a scalar data-level residual for the finite-exchange mechanism.
+Independent uncertainties in `R_l`, `alpha_2(t_l)`, and
+`s_alpha=-log Phi_alpha/R_l` propagate through the closed derivatives
+
+```text
+sigma_cNGP^2 = alpha_2^2 sigma_R^2 + R_l^2 sigma_alpha2^2
+f'(c) = [Gamma_k c/(1+Gamma_k c) - log(1+Gamma_k c)] / c^2
+sigma_calpha = sigma_salpha / |f'(c_alpha)|
+z_c = |Delta_c| / sigma_Delta.
+```
 
 ## 5. Reproducible Results
 
@@ -529,6 +538,8 @@ default thresholds `R alpha_2 >= 3` and alpha-rate renormalization below `0.75`.
 At `t_l=3.0e4`, the protocol gives `c_NGP=24.94`, `c_alpha=25.00`, and
 `Delta_c=0.0023` for the consistent example. A mismatched alpha slope
 corresponding to `c_alpha=2` gives `Delta_c=-2.52` and fails.
+With `1%` uncertainty in `R_l` and `alpha_2(t_l)` and
+`sigma_salpha=0.002`, the two cases give `z_c=0.062` and `z_c=76.4`.
 
 The parameter sweeps show:
 

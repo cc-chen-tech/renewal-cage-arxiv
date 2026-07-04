@@ -594,6 +594,77 @@ def infer_gamma_exchange_from_late_observables(
     }
 
 
+def infer_gamma_exchange_uncertainty_from_late_observables(
+    *,
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    late_renewal_count: float,
+    late_ngp: float,
+    observed_alpha_decay_per_renewal: float,
+    late_renewal_count_std: float,
+    late_ngp_std: float,
+    alpha_decay_per_renewal_std: float,
+    z_threshold: float = 2.0,
+) -> dict[str, float]:
+    """Propagate late-observable errors into the finite-exchange residual."""
+
+    if late_renewal_count_std < 0.0:
+        raise ValueError("late_renewal_count_std must be nonnegative")
+    if late_ngp_std < 0.0:
+        raise ValueError("late_ngp_std must be nonnegative")
+    if alpha_decay_per_renewal_std < 0.0:
+        raise ValueError("alpha_decay_per_renewal_std must be nonnegative")
+    if z_threshold <= 0.0:
+        raise ValueError("z_threshold must be positive")
+
+    inferred = infer_gamma_exchange_from_late_observables(
+        wave_number=wave_number,
+        params=params,
+        late_renewal_count=late_renewal_count,
+        late_ngp=late_ngp,
+        observed_alpha_decay_per_renewal=observed_alpha_decay_per_renewal,
+    )
+    ratio_from_late_ngp = inferred["ratio_from_late_ngp"]
+    ratio_from_alpha_rate = inferred["ratio_from_alpha_rate"]
+    if ratio_from_late_ngp <= 0.0 or ratio_from_alpha_rate <= 0.0:
+        raise ValueError("uncertainty propagation requires positive inferred ratios")
+
+    ratio_from_late_ngp_std = math.hypot(
+        late_ngp * late_renewal_count_std,
+        late_renewal_count * late_ngp_std,
+    )
+    gamma = inferred["gamma_k"]
+    derivative = (
+        gamma * ratio_from_alpha_rate / (1.0 + gamma * ratio_from_alpha_rate)
+        - math.log1p(gamma * ratio_from_alpha_rate)
+    ) / ratio_from_alpha_rate**2
+    if derivative == 0.0:
+        raise ValueError("alpha-rate derivative vanished")
+    ratio_from_alpha_rate_std = alpha_decay_per_renewal_std / abs(derivative)
+    log_ratio_residual_std = math.hypot(
+        ratio_from_late_ngp_std / ratio_from_late_ngp,
+        ratio_from_alpha_rate_std / ratio_from_alpha_rate,
+    )
+    if log_ratio_residual_std == 0.0:
+        z_score = math.inf if inferred["log_ratio_residual"] != 0.0 else 0.0
+    else:
+        z_score = abs(inferred["log_ratio_residual"]) / log_ratio_residual_std
+    inferred.update(
+        {
+            "late_renewal_count_std": late_renewal_count_std,
+            "late_ngp_std": late_ngp_std,
+            "alpha_decay_per_renewal_std": alpha_decay_per_renewal_std,
+            "ratio_from_late_ngp_std": ratio_from_late_ngp_std,
+            "ratio_from_alpha_rate_std": ratio_from_alpha_rate_std,
+            "log_ratio_residual_std": log_ratio_residual_std,
+            "log_ratio_z_score": z_score,
+            "z_threshold": z_threshold,
+            "passes_statistical_consistency": 1.0 if z_score <= z_threshold else 0.0,
+        }
+    )
+    return inferred
+
+
 def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndarray:
     """Local KWW-like exponent ``d log[-log(decay)] / d log(t)``."""
 

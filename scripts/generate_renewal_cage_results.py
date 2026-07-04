@@ -28,7 +28,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
     infer_gamma_exchange_ratio_from_alpha_rate,
-    infer_gamma_exchange_from_late_observables,
+    infer_gamma_exchange_uncertainty_from_late_observables,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
@@ -382,21 +382,30 @@ def write_heterogeneity_protocol_csv(
     renewal = float(delayed_poisson_mean(late_array, params)[0])
     late_ngp = float(gamma_exchange_ngp_1d(late_array, params, heterogeneity)[0])
     diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
-    consistent = infer_gamma_exchange_from_late_observables(
+    renewal_std = 0.01 * renewal
+    late_ngp_std = 0.01 * late_ngp
+    alpha_slope_std = 0.002
+    consistent = infer_gamma_exchange_uncertainty_from_late_observables(
         wave_number=wave_number,
         params=params,
         late_renewal_count=renewal,
         late_ngp=late_ngp,
         observed_alpha_decay_per_renewal=diagnostics["late_alpha_decay_per_renewal"],
+        late_renewal_count_std=renewal_std,
+        late_ngp_std=late_ngp_std,
+        alpha_decay_per_renewal_std=alpha_slope_std,
     )
     gamma_k = consistent["gamma_k"]
     mismatched_alpha_rate = float(np.log1p(gamma_k * 2.0) / 2.0)
-    inconsistent = infer_gamma_exchange_from_late_observables(
+    inconsistent = infer_gamma_exchange_uncertainty_from_late_observables(
         wave_number=wave_number,
         params=params,
         late_renewal_count=renewal,
         late_ngp=late_ngp,
         observed_alpha_decay_per_renewal=mismatched_alpha_rate,
+        late_renewal_count_std=renewal_std,
+        late_ngp_std=late_ngp_std,
+        alpha_decay_per_renewal_std=alpha_slope_std,
     )
     rows: list[dict[str, float | str]] = []
     for label, row in [("consistent", consistent), ("inconsistent_alpha_slope", inconsistent)]:

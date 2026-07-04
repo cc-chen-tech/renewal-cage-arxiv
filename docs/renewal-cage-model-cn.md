@@ -650,6 +650,22 @@ scale 控制；如果它很大，就 falsify 这个一参数 finite-exchange ren
 `Delta_c=0.0023`，通过；如果只把 alpha slope 换成对应 `c_alpha=2` 的值，
 则 `Delta_c=-2.52`，失败。
 
+如果有测量误差，还可以直接给出统计显著性：
+
+```text
+sigma_cNGP^2 = alpha_2^2 sigma_R^2 + R_l^2 sigma_alpha2^2
+
+f'(c) = [Gamma_k c/(1+Gamma_k c) - log(1+Gamma_k c)] / c^2
+
+sigma_calpha = sigma_salpha / |f'(c_alpha)|
+
+z_c = |Delta_c| / sigma_Delta
+```
+
+在 `R_l` 和 `alpha_2(t_l)` 各有 `1%` 误差、`sigma_salpha=0.002` 的示例中，
+一致案例 `z_c=0.062`，错配案例 `z_c=76.4`。这使判据从“看起来一致”
+变成了统计意义上的 falsification protocol。
+
 ## 7.9. 从可观测量反演参数和证伪条件
 
 更强的可发表价值在于：模型不只是正向画曲线，也能从常见 glass observable 反推
