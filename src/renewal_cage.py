@@ -136,6 +136,44 @@ def ngp_3d(t: np.ndarray, params: DelayedRenewalCageParams) -> np.ndarray:
     return out
 
 
+def self_intermediate_scattering(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+) -> np.ndarray:
+    """Self-intermediate scattering function for the renewal cage model.
+
+    For an isotropic Gaussian displacement with per-coordinate variance V,
+    F_s(k|V)=exp(-k^2 V/2). Averaging exp(-k^2[L(t)+qN(t)]/2) over the Poisson
+    renewal count gives the closed form below.
+    """
+
+    _validate(params)
+    if wave_number < 0.0:
+        raise ValueError("wave_number must be nonnegative")
+    t = np.asarray(t, dtype=float)
+    local = local_cage_variance(t, params)
+    renewal = delayed_poisson_mean(t, params)
+    jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    return np.exp(-0.5 * wave_number**2 * local + renewal * (jump_characteristic - 1.0))
+
+
+def normalized_alpha_decay(
+    wave_number: float,
+    t: np.ndarray,
+    params: DelayedRenewalCageParams,
+) -> np.ndarray:
+    """Alpha-relaxation part of F_s after removing the local cage factor."""
+
+    _validate(params)
+    if wave_number < 0.0:
+        raise ValueError("wave_number must be nonnegative")
+    t = np.asarray(t, dtype=float)
+    renewal = delayed_poisson_mean(t, params)
+    jump_characteristic = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    return np.exp(renewal * (jump_characteristic - 1.0))
+
+
 def poisson_weights(mean: float, *, max_count: int) -> np.ndarray:
     """Stable Poisson weights from n=0 to max_count with tail folded into max_count."""
 
@@ -309,6 +347,39 @@ def plateau_peak_diagnostics(
     }
 
 
+def plateau_ngp_branches(
+    *,
+    jump_to_cage_variance: float,
+    observed_ngp: float,
+) -> dict[str, float]:
+    """Invert alpha = beta y/(1+y)^2 into its early and late branches.
+
+    Here beta=q/A and y=beta R in the plateau approximation. The admissible
+    range is 0 < alpha <= beta/4. Values below the maximum have two roots:
+    an early branch y<1 before the NGP peak and a late branch y>1 after it.
+    """
+
+    if jump_to_cage_variance <= 0.0:
+        raise ValueError("jump_to_cage_variance must be positive")
+    if observed_ngp <= 0.0:
+        raise ValueError("observed_ngp must be positive")
+    beta = jump_to_cage_variance
+    discriminant = beta * beta - 4.0 * beta * observed_ngp
+    tolerance = 1e-14 * beta * beta
+    if discriminant < -tolerance:
+        raise ValueError("observed_ngp exceeds the plateau peak bound")
+    discriminant = max(0.0, discriminant)
+    root = math.sqrt(discriminant)
+    early_y = (beta - 2.0 * observed_ngp - root) / (2.0 * observed_ngp)
+    late_y = (beta - 2.0 * observed_ngp + root) / (2.0 * observed_ngp)
+    return {
+        "early_y": early_y,
+        "late_y": late_y,
+        "peak_y": 1.0,
+        "peak_ngp_bound": beta / 4.0,
+    }
+
+
 def observable_consistency_diagnostics(
     *,
     peak_ngp: float,
@@ -336,10 +407,8 @@ def observable_consistency_diagnostics(
         renewal_delay=renewal_delay,
     )
     beta = peak["jump_to_cage_variance"]
-    discriminant = beta * beta - 4.0 * beta * late_ngp
-    if discriminant < 0.0:
-        raise ValueError("late_ngp exceeds the plateau peak bound implied by peak_ngp")
-    late_branch_y = (beta - 2.0 * late_ngp + math.sqrt(discriminant)) / (2.0 * late_ngp)
+    branches = plateau_ngp_branches(jump_to_cage_variance=beta, observed_ngp=late_ngp)
+    late_branch_y = branches["late_y"]
     late_renewal_count = late_branch_y / beta
     late_shape = delayed_renewal_shape(late_time / renewal_delay)
     late_renewal_rate_exact = late_renewal_count / (renewal_delay * late_shape)

@@ -195,10 +195,38 @@ NGP value gives `y_l` and therefore
 `lambda_l≈y_l/[beta tau_d F(t_l/tau_d)]`. Agreement between this value and the
 peak-inferred renewal rate is a falsifiable check using only observable
 peak/late-NGP quantities plus `tau_d`.
+The inverse is admissible only for `alpha_l<=beta/4`; its two roots obey
+`y_- y_+=1`, and the late-time branch is the `y_+>1` root.
 
 Alternative mechanisms can still be viable, but to fall into the same diagnostic
 class they must reproduce the MSD plateau, the early-time NGP exponent, the
 peak/late-time rate consistency, and the long-time `1/t` NGP decay.
+
+## 4.5. Self-intermediate scattering function
+
+The same delayed renewal count gives a closed-form glass-literature observable:
+
+```text
+F_s(k,t) = exp[-k^2 L(t)/2 + R(t)(exp(-k^2 q/2)-1)].
+```
+
+Equivalently,
+
+```text
+F_s(k,t) = exp[-k^2 L(t)/2] Phi_alpha(k,t)
+Phi_alpha(k,t) = exp[-Gamma_k R(t)]
+Gamma_k = 1 - exp(-k^2 q/2).
+```
+
+This gives a cage Debye-Waller plateau `f_k=exp(-k^2 A/2)` and a renewal
+controlled long-time alpha rate:
+
+```text
+tau_alpha(k)^-1 ~= lambda [1 - exp(-k^2 q/2)].
+```
+
+This is the main reason to position the note around delayed cage renewal rather
+than generic random diffusivity.
 
 ## 5. Reproducible Results
 
@@ -216,8 +244,10 @@ The script produces:
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_consistency.csv
+data/renewal_cage_scattering.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
+figures/renewal_cage_scattering.svg
 ```
 
 The current parameter set gives:

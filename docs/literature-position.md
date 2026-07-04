@@ -96,6 +96,16 @@ This should be stated as a minimal diagnostic model, not as a replacement for
 microscopic glass theory or as a claim that all supercooled-liquid dynamics is
 Fickian non-Gaussian.
 
+The novelty should be positioned around delayed discrete cage-center renewal,
+not around random diffusivity. The model's added glass-literature observable is
+the closed-form self-intermediate scattering function:
+
+```text
+F_s(k,t) = exp[-k^2 L(t)/2 + R(t)(exp(-k^2 q/2)-1)]
+Phi_alpha(k,t) = exp[-(1-exp(-k^2 q/2)) R(t)]
+tau_alpha(k)^-1 ~= lambda[1-exp(-k^2 q/2)]
+```
+
 Competing mechanisms should be asked to reproduce the same four observables:
 the MSD plateau, the early-time NGP exponent, peak/late-time renewal-rate
 consistency, and the long-time `1/t` NGP decay.

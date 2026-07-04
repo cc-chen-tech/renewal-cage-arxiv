@@ -10,8 +10,9 @@ The model combines:
 - local Ornstein-Uhlenbeck-like cage variance,
 - delayed cage-renewal events,
 - Gaussian cage-center jumps,
-- closed-form MSD, NGP, van Hove distribution, peak asymptotics, and
-  finite-time consistency diagnostics.
+- closed-form MSD, NGP, self van Hove distribution, self-intermediate
+  scattering function, peak asymptotics, and finite-time consistency
+  diagnostics.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -32,6 +33,9 @@ R(t) = lambda [t - 2 tau_d(1-exp(-t/tau_d))
 
 The square delay is the minimal integer choice in the generalized family
 `r_m(t)=lambda[1-exp(-t/tau_d)]^m` that gives a regular zero-origin NGP.
+The finite-time consistency diagnostic inverts the plateau relation
+`alpha=beta*y/(1+y)^2`; the late-time check uses the `y>1` branch and requires
+the observed late NGP to lie below the peak bound `beta/4`.
 
 ## Repository Layout
 
@@ -80,8 +84,10 @@ data/renewal_cage_diagnostics.csv
 data/renewal_cage_consistency.csv
 data/renewal_cage_van_hove.csv
 data/renewal_cage_tail_ratios.csv
+data/renewal_cage_scattering.csv
 paper/figures/renewal_cage_results.pdf
 paper/figures/renewal_cage_dimensionless.pdf
+paper/figures/renewal_cage_scattering.pdf
 dist/renewal-cage-arxiv-source.zip
 ```
 

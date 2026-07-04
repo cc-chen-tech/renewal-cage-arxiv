@@ -261,6 +261,67 @@ def write_dimensionless_pdf(path: Path) -> None:
     c.save()
 
 
+def write_scattering_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_scattering.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    grouped: dict[str, list[dict[str, float]]] = {}
+    for row in rows:
+        grouped.setdefault(row["wave_number"], []).append(
+            {
+                "time": float(row["time"]),
+                "self_intermediate_scattering": float(row["self_intermediate_scattering"]),
+                "normalized_alpha_decay": float(row["normalized_alpha_decay"]),
+            }
+        )
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Self-intermediate scattering predictions")
+
+    colors_list = [colors.HexColor("#2b6cb0"), colors.HexColor("#c05621"), colors.HexColor("#2f855a")]
+    labels = sorted(grouped.keys(), key=float)
+    time = np.array([point["time"] for point in grouped[labels[0]]])
+    scattering_series = []
+    alpha_series = []
+    for idx, label in enumerate(labels):
+        points = grouped[label]
+        color = colors_list[idx % len(colors_list)]
+        scattering_series.append(
+            (f"k={float(label):g}", np.array([point["self_intermediate_scattering"] for point in points]), color)
+        )
+        alpha_series.append(
+            (f"k={float(label):g}", np.array([point["normalized_alpha_decay"] for point in points]), color)
+        )
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        time,
+        scattering_series,
+        "G. F_s(k,t): cage plateau and alpha relaxation",
+        y_range=(0.0, 1.0),
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        time,
+        alpha_series,
+        "H. Cage-normalized alpha decay",
+        y_range=(0.0, 1.0),
+    )
+
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -269,8 +330,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
 
     results_pdf = PAPER_FIGURE_DIR / "renewal_cage_results.pdf"
     dimensionless_pdf = PAPER_FIGURE_DIR / "renewal_cage_dimensionless.pdf"
+    scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     write_results_pdf(results_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
+    write_scattering_pdf(scattering_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -278,6 +341,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(PAPER_DIR / "references.bib", "references.bib")
         archive.write(results_pdf, "figures/renewal_cage_results.pdf")
         archive.write(dimensionless_pdf, "figures/renewal_cage_dimensionless.pdf")
+        archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
     return zip_path
 
 

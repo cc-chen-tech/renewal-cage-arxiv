@@ -308,6 +308,10 @@ y(t) = beta R(t)
 alpha_2(t_l) = beta y_l/(1 + y_l)^2
 ```
 
+这个反演有两个分支。只有当 `0 < alpha_l <= beta/4` 时才可行；`y<1`
+对应 peak 前，`y>1` 对应 peak 后。因此 late-time consistency check 必须选
+`y>1` 分支。
+
 因此一个晚时间 NGP 值可以反解出 `y_l`，再给出：
 
 ```text
@@ -317,6 +321,37 @@ lambda_l ~= y_l/[beta tau_d F(t_l/tau_d)]
 如果 `lambda_l` 和 peak 反推出的 `lambda_*` 不一致，模型就被 falsify。
 
 脚本 `generate_renewal_cage_results.py` 的参数扫描正是验证这两个预测。
+
+## 7.5. Self-intermediate scattering function
+
+更贴近 glass literature 的量是：
+
+```text
+F_s(k,t) = <exp[i k · Delta r(t)]>
+```
+
+在本模型中，条件在 renewal count `N(t)=n` 下位移仍然是 Gaussian，因此：
+
+```text
+F_s(k,t) = exp[-k^2 L(t)/2 + R(t)(exp(-k^2 q/2)-1)]
+```
+
+这可以拆成 cage Debye-Waller plateau 和 alpha relaxation：
+
+```text
+F_s(k,t) = exp[-k^2 L(t)/2] Phi_alpha(k,t)
+Phi_alpha(k,t) = exp[-Gamma_k R(t)]
+Gamma_k = 1 - exp(-k^2 q/2)
+```
+
+长时间 `R(t) ~ lambda t`，所以：
+
+```text
+tau_alpha(k)^-1 ~= lambda [1 - exp(-k^2 q/2)]
+```
+
+这比 random diffusivity 的说法更具体：alpha relaxation 受离散 cage-center
+renewal count 控制。
 
 ## 8. 与 Glass Transition 的联系
 

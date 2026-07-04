@@ -10,6 +10,7 @@ paper/*.blg
 paper/*.fdb_latexmk
 paper/*.fls
 paper/*.log
+paper/*Notes.bib
 paper/*.out
 paper/*.synctex.gz
 paper/*.pdf

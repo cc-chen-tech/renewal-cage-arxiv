@@ -1,3 +1,4 @@
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -22,7 +23,10 @@ from renewal_cage import (  # noqa: E402
     moments_3d,
     ngp_1d,
     ngp_3d,
+    normalized_alpha_decay,
+    plateau_ngp_branches,
     plateau_peak_diagnostics,
+    self_intermediate_scattering,
 )
 
 
@@ -118,6 +122,41 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertTrue(np.all(moments["r2"] > 0.0))
         self.assertTrue(np.all(moments["r4"] > 0.0))
 
+    def test_self_intermediate_scattering_has_cage_plateau_and_alpha_decay(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        times = np.array([0.0, 1.0, 600.0])
+        scattering = self_intermediate_scattering(wave_number, times, params)
+        plateau = math.exp(-0.5 * wave_number**2 * params.cage_variance)
+        alpha_rate = params.renewal_rate * (1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance))
+
+        self.assertAlmostEqual(scattering[0], 1.0)
+        self.assertAlmostEqual(scattering[1], plateau, delta=0.02)
+        self.assertAlmostEqual(-math.log(scattering[-1] / plateau) / times[-1], alpha_rate, delta=0.003)
+
+    def test_normalized_alpha_decay_removes_cage_debye_waller_factor(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        wave_number = 1.1
+        times = np.array([0.0, 8.0, 600.0])
+        decay = normalized_alpha_decay(wave_number, times, params)
+        alpha_rate = params.renewal_rate * (1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance))
+
+        self.assertAlmostEqual(decay[0], 1.0)
+        self.assertLess(decay[1], decay[0])
+        self.assertAlmostEqual(-math.log(decay[-1]) / times[-1], alpha_rate, delta=0.003)
+
     def test_radial_van_hove_distribution_normalizes(self):
         params = DelayedRenewalCageParams(
             cage_variance=1.0,
@@ -193,6 +232,23 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(diagnostics["jump_to_cage_variance"], params.jump_variance / params.cage_variance)
         self.assertAlmostEqual(diagnostics["target_renewal_count"], params.cage_variance / params.jump_variance)
         self.assertAlmostEqual(diagnostics["renewal_rate"], params.renewal_rate, delta=1e-12)
+
+    def test_plateau_ngp_branches_invert_same_observed_value(self):
+        beta = 0.8
+        observed_ngp = 0.05
+        branches = plateau_ngp_branches(jump_to_cage_variance=beta, observed_ngp=observed_ngp)
+
+        self.assertLess(branches["early_y"], 1.0)
+        self.assertGreater(branches["late_y"], 1.0)
+        self.assertAlmostEqual(branches["early_y"] * branches["late_y"], 1.0)
+        for branch in ("early_y", "late_y"):
+            y = branches[branch]
+            reconstructed = beta * y / (1.0 + y) ** 2
+            self.assertAlmostEqual(reconstructed, observed_ngp, delta=1e-14)
+
+    def test_plateau_ngp_branches_reject_values_above_peak_bound(self):
+        with self.assertRaises(ValueError):
+            plateau_ngp_branches(jump_to_cage_variance=0.8, observed_ngp=0.21)
 
     def test_observable_consistency_diagnostics_compare_peak_and_late_ngp(self):
         params = DelayedRenewalCageParams(

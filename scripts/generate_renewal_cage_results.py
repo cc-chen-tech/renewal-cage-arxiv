@@ -19,9 +19,11 @@ from renewal_cage import (  # noqa: E402
     gaussian_radial_3d,
     moments_1d,
     ngp_1d,
+    normalized_alpha_decay,
     observable_consistency_diagnostics,
     plateau_peak_diagnostics,
     radial_van_hove_3d,
+    self_intermediate_scattering,
 )
 
 
@@ -51,7 +53,7 @@ def write_main_csv(path: Path, time: np.ndarray, params: DelayedRenewalCageParam
     alpha = ngp_1d(time, params)
     with path.open("w", newline="") as f:
         fieldnames = ["time", "local_variance", "renewal_mean", "msd", "m4", "ngp_1d"]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for idx, t in enumerate(time):
             writer.writerow(
@@ -74,7 +76,7 @@ def peak_summary(time: np.ndarray, alpha: np.ndarray) -> tuple[float, float]:
 def write_sweep_csv(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -91,13 +93,40 @@ def write_van_hove_csv(
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
         fieldnames = ["radius"] + [label for label, _ in curves]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for idx, r in enumerate(radius):
             row: dict[str, float] = {"radius": float(r)}
             for label, density in curves:
                 row[label] = float(density[idx])
             writer.writerow(row)
+
+
+def write_scattering_csv(
+    path: Path,
+    time: np.ndarray,
+    params: DelayedRenewalCageParams,
+    wave_numbers: list[float],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for wave_number in wave_numbers:
+        scattering = self_intermediate_scattering(wave_number, time, params)
+        alpha_decay = normalized_alpha_decay(wave_number, time, params)
+        plateau = float(np.exp(-0.5 * wave_number**2 * params.cage_variance))
+        alpha_rate = params.renewal_rate * (1.0 - float(np.exp(-0.5 * wave_number**2 * params.jump_variance)))
+        for idx, value in enumerate(time):
+            rows.append(
+                {
+                    "time": float(value),
+                    "wave_number": wave_number,
+                    "self_intermediate_scattering": float(scattering[idx]),
+                    "normalized_alpha_decay": float(alpha_decay[idx]),
+                    "debye_waller_plateau": plateau,
+                    "long_time_alpha_rate": alpha_rate,
+                }
+            )
+    write_sweep_csv(path, rows)
 
 
 def write_tail_ratio_csv(
@@ -334,6 +363,52 @@ def write_dimensionless_svg(
     path.write_text(svg)
 
 
+def write_scattering_svg(
+    path: Path,
+    time: np.ndarray,
+    scattering_curves: list[tuple[str, np.ndarray]],
+    alpha_curves: list[tuple[str, np.ndarray]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    colors = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+
+    def axes(left: int, right: int, title: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 32}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">time</text>
+"""
+
+    def plot(left: int, right: int, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(time, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, colors[idx]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{colors[idx]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Self-intermediate scattering predictions</text>
+  {axes(left_a, right_a, "G. F_s(k,t): cage plateau and alpha relaxation")}
+  {plot(left_a, right_a, scattering_curves)}
+  {axes(left_b, right_b, "H. Cage-normalized alpha decay")}
+  {plot(left_b, right_b, alpha_curves)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -426,6 +501,19 @@ def main() -> None:
             )
     write_dimensionless_csv(DATA_DIR / "renewal_cage_dimensionless.csv", collapse_rows)
 
+    scattering_time = np.linspace(0.0, 180.0, 1200)
+    wave_numbers = [0.6, 1.1, 1.8]
+    write_scattering_csv(DATA_DIR / "renewal_cage_scattering.csv", scattering_time, params, wave_numbers)
+    scattering_curves = []
+    alpha_curves = []
+    for wave_number in wave_numbers:
+        scattering_curves.append(
+            (f"k={wave_number:g}", self_intermediate_scattering(wave_number, scattering_time, params))
+        )
+        alpha_curves.append(
+            (f"k={wave_number:g}", normalized_alpha_decay(wave_number, scattering_time, params))
+        )
+
     radius = np.linspace(0.0, 24.0, 1400)
     van_hove_times = [2.0, 11.30637498610339, 80.0]
     van_hove_curves = []
@@ -450,6 +538,12 @@ def main() -> None:
         radius,
         van_hove_curves,
         gaussian_curves,
+    )
+    write_scattering_svg(
+        FIGURE_DIR / "renewal_cage_scattering.svg",
+        scattering_time,
+        scattering_curves,
+        alpha_curves,
     )
 
 
