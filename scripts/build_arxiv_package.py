@@ -490,6 +490,50 @@ def write_heterogeneity_pdf(path: Path) -> None:
     c.save()
 
 
+def write_heterogeneity_map_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_heterogeneity_map.csv")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Finite-exchange diagnostic map")
+
+    log_ratio = data["log10_one_plus_ratio"]
+    inferred_error = np.abs(data["inferred_ratio_from_alpha_rate"] - data["heterogeneity_ratio"])
+    draw_panel(
+        c,
+        52,
+        78,
+        320,
+        280,
+        log_ratio,
+        [
+            ("R alpha_2 -> 1+c", data["late_ngp_renewal_amplitude"], colors.HexColor("#2b6cb0")),
+            ("alpha-rate inferred c error", inferred_error, colors.HexColor("#c05621")),
+        ],
+        "Q. Late NGP amplitude versus exchange ratio",
+        xlabel="log10(1+c)",
+    )
+    draw_panel(
+        c,
+        430,
+        78,
+        320,
+        280,
+        log_ratio,
+        [
+            ("alpha-rate renormalization", data["alpha_rate_renormalization"], colors.HexColor("#805ad5")),
+            ("passes joint criterion", data["passes_joint_criterion"], colors.HexColor("#2f855a")),
+        ],
+        "R. Alpha slowing and observable window",
+        xlabel="log10(1+c)",
+        y_range=(0.0, 1.05),
+    )
+
+    c.showPage()
+    c.save()
+
+
 def write_inversion_pdf(path: Path) -> None:
     data = read_csv_columns(DATA_DIR / "renewal_cage_inversion.csv")
     diffusion_scale = data["diffusion_scale"]
@@ -550,6 +594,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
     heterogeneity_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity.pdf"
+    heterogeneity_map_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity_map.pdf"
     inversion_pdf = PAPER_FIGURE_DIR / "renewal_cage_inversion.pdf"
     write_results_pdf(results_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
@@ -557,6 +602,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_temperature_pdf(temperature_pdf)
     write_barrier_pdf(barrier_pdf)
     write_heterogeneity_pdf(heterogeneity_pdf)
+    write_heterogeneity_map_pdf(heterogeneity_map_pdf)
     write_inversion_pdf(inversion_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
@@ -569,6 +615,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
         archive.write(heterogeneity_pdf, "figures/renewal_cage_heterogeneity.pdf")
+        archive.write(heterogeneity_map_pdf, "figures/renewal_cage_heterogeneity_map.pdf")
         archive.write(inversion_pdf, "figures/renewal_cage_inversion.pdf")
     return zip_path
 

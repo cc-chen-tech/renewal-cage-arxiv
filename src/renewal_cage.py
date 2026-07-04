@@ -470,6 +470,77 @@ def gamma_exchange_asymptotic_diagnostics(
     }
 
 
+def gamma_exchange_diagnostic_map(
+    *,
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    shape: float,
+    heterogeneity_ratios: list[float],
+    minimum_late_ngp_amplitude: float = 3.0,
+    maximum_alpha_rate_renormalization: float = 0.75,
+) -> list[dict[str, float]]:
+    """Closed map of finite-exchange observability as ``c=R_x/kappa_0`` varies."""
+
+    _validate(params)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if shape <= 0.0:
+        raise ValueError("shape must be positive")
+    if minimum_late_ngp_amplitude <= 1.0:
+        raise ValueError("minimum_late_ngp_amplitude must exceed the Poisson value")
+    if not 0.0 < maximum_alpha_rate_renormalization < 1.0:
+        raise ValueError("maximum_alpha_rate_renormalization must lie between 0 and 1")
+
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    rows: list[dict[str, float]] = []
+    for ratio in heterogeneity_ratios:
+        if ratio < 0.0:
+            raise ValueError("heterogeneity ratios must be nonnegative")
+        if ratio == 0.0:
+            late_alpha_per_renewal = gamma
+            inferred_ratio_from_alpha_rate = 0.0
+            static_plateau = 1.0 / shape
+        else:
+            heterogeneity = GammaExchangeParams(shape=shape, exchange_renewal_count=shape * ratio)
+            diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+            late_alpha_per_renewal = diagnostics["late_alpha_decay_per_renewal"]
+            inferred_ratio_from_alpha_rate = infer_gamma_exchange_ratio_from_alpha_rate(
+                gamma_k=gamma,
+                observed_decay_per_renewal=late_alpha_per_renewal,
+            )
+            static_plateau = diagnostics["static_gamma_late_ngp_plateau"]
+        late_ngp_amplitude = 1.0 + ratio
+        alpha_rate_renormalization = late_alpha_per_renewal / gamma
+        inferred_ratio_from_late_ngp = late_ngp_amplitude - 1.0
+        if ratio == 0.0:
+            log_ratio_residual = 0.0
+        else:
+            log_ratio_residual = math.log(inferred_ratio_from_alpha_rate / ratio)
+        passes_joint = (
+            late_ngp_amplitude >= minimum_late_ngp_amplitude
+            and alpha_rate_renormalization <= maximum_alpha_rate_renormalization
+        )
+        rows.append(
+            {
+                "heterogeneity_ratio": ratio,
+                "log10_one_plus_ratio": math.log10(1.0 + ratio),
+                "gamma_k": gamma,
+                "late_ngp_renewal_amplitude": late_ngp_amplitude,
+                "late_alpha_decay_per_renewal": late_alpha_per_renewal,
+                "late_alpha_rate": params.renewal_rate * late_alpha_per_renewal,
+                "poisson_alpha_decay_per_renewal": gamma,
+                "poisson_alpha_rate": params.renewal_rate * gamma,
+                "alpha_rate_renormalization": alpha_rate_renormalization,
+                "static_gamma_late_ngp_plateau": static_plateau,
+                "inferred_ratio_from_late_ngp_amplitude": inferred_ratio_from_late_ngp,
+                "inferred_ratio_from_alpha_rate": inferred_ratio_from_alpha_rate,
+                "log_ratio_residual": log_ratio_residual,
+                "passes_joint_criterion": 1.0 if passes_joint else 0.0,
+            }
+        )
+    return rows
+
+
 def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndarray:
     """Local KWW-like exponent ``d log[-log(decay)] / d log(t)``."""
 

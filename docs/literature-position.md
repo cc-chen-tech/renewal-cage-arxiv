@@ -148,6 +148,8 @@ finite-exchange heterogeneity extension:
     R(t) alpha_2^hx(t) -> 1+c
     -log Phi_alpha^hx(k,t)/R(t) -> log(1+Gamma_k c)/c
     late NGP and alpha slope independently infer the same c
+    diagnostic map: joint visibility requires enhanced R alpha_2 and reduced
+    alpha decay per renewal on the same c curve
 
 observable inversion:
   A = -2 log(f_k)/k^2

@@ -26,6 +26,7 @@ from renewal_cage import (  # noqa: E402
     gaussian_radial_3d,
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_count_moments,
+    gamma_exchange_diagnostic_map,
     infer_gamma_exchange_ratio_from_alpha_rate,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
@@ -348,6 +349,24 @@ def write_heterogeneity_diagnostics_csv(
     }
     write_sweep_csv(path, [row])
     return row
+
+
+def write_heterogeneity_map_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    *,
+    shape: float,
+    heterogeneity_ratios: list[float],
+    wave_number: float,
+) -> list[dict[str, float]]:
+    rows = gamma_exchange_diagnostic_map(
+        wave_number=wave_number,
+        params=params,
+        shape=shape,
+        heterogeneity_ratios=heterogeneity_ratios,
+    )
+    write_sweep_csv(path, rows)
+    return rows
 
 
 def write_inversion_csv(
@@ -945,6 +964,54 @@ def write_heterogeneity_svg(path: Path, heterogeneity_rows: list[dict[str, float
     path.write_text(svg)
 
 
+def write_heterogeneity_map_svg(path: Path, map_rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    palette = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 65}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, x_values: np.ndarray, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, palette[idx % len(palette)]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{palette[idx % len(palette)]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    log_ratio = np.array([row["log10_one_plus_ratio"] for row in map_rows])
+    amplitude = np.array([row["late_ngp_renewal_amplitude"] for row in map_rows])
+    alpha_slope = np.array([row["alpha_rate_renormalization"] for row in map_rows])
+    criterion = np.array([row["passes_joint_criterion"] for row in map_rows])
+    inferred = np.array([row["inferred_ratio_from_alpha_rate"] for row in map_rows])
+    ratio = np.array([row["heterogeneity_ratio"] for row in map_rows])
+    inferred_error = np.abs(inferred - ratio)
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Finite-exchange diagnostic map</text>
+  {axes(left_a, right_a, "Q. Late NGP amplitude versus exchange ratio", "log10(1+c)")}
+  {plot(left_a, right_a, log_ratio, [("R alpha2 -> 1+c", amplitude), ("alpha-rate inferred c error", inferred_error)])}
+  {axes(left_b, right_b, "R. Alpha slowing and joint observable window", "log10(1+c)")}
+  {plot(left_b, right_b, log_ratio, [("alpha-rate renormalization", alpha_slope), ("passes joint criterion", criterion)])}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
@@ -1152,6 +1219,13 @@ def main() -> None:
         heterogeneity,
         wave_number=1.1,
     )
+    heterogeneity_map_rows = write_heterogeneity_map_csv(
+        DATA_DIR / "renewal_cage_heterogeneity_map.csv",
+        params,
+        shape=heterogeneity.shape,
+        heterogeneity_ratios=[0.0, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 25.0, 40.0],
+        wave_number=1.1,
+    )
     write_barrier_svg(
         FIGURE_DIR / "renewal_cage_barrier.svg",
         scattering_time,
@@ -1159,6 +1233,7 @@ def main() -> None:
         barrier_rows,
     )
     write_heterogeneity_svg(FIGURE_DIR / "renewal_cage_heterogeneity.svg", heterogeneity_rows)
+    write_heterogeneity_map_svg(FIGURE_DIR / "renewal_cage_heterogeneity_map.svg", heterogeneity_map_rows)
     inversion_rows = write_inversion_csv(
         DATA_DIR / "renewal_cage_inversion.csv",
         params,

@@ -29,6 +29,7 @@ from renewal_cage import (  # noqa: E402
     gaussian_radial_3d,
     gamma_exchange_count_moments,
     gamma_exchange_asymptotic_diagnostics,
+    gamma_exchange_diagnostic_map,
     infer_gamma_exchange_ratio_from_alpha_rate,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
@@ -381,6 +382,33 @@ class DelayedRenewalCageTests(unittest.TestCase):
             0.0,
             delta=1e-12,
         )
+
+    def test_gamma_exchange_diagnostic_map_classifies_observable_window(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+
+        rows = gamma_exchange_diagnostic_map(
+            wave_number=1.1,
+            params=params,
+            shape=0.4,
+            heterogeneity_ratios=[0.0, 2.0, 25.0],
+        )
+
+        self.assertEqual([row["heterogeneity_ratio"] for row in rows], [0.0, 2.0, 25.0])
+        self.assertAlmostEqual(rows[0]["late_ngp_renewal_amplitude"], 1.0, delta=1e-12)
+        self.assertAlmostEqual(rows[0]["alpha_rate_renormalization"], 1.0, delta=1e-12)
+        self.assertEqual(rows[0]["passes_joint_criterion"], 0.0)
+        self.assertEqual(rows[1]["passes_joint_criterion"], 1.0)
+        self.assertEqual(rows[2]["passes_joint_criterion"], 1.0)
+        self.assertGreater(rows[2]["late_ngp_renewal_amplitude"], rows[1]["late_ngp_renewal_amplitude"])
+        self.assertLess(rows[2]["alpha_rate_renormalization"], rows[1]["alpha_rate_renormalization"])
+        self.assertAlmostEqual(rows[2]["inferred_ratio_from_alpha_rate"], 25.0, delta=1e-10)
+        self.assertAlmostEqual(rows[2]["log_ratio_residual"], 0.0, delta=1e-12)
 
     def test_correlated_domain_susceptibility_scales_renewal_component(self):
         params = DelayedRenewalCageParams(

@@ -626,6 +626,13 @@ c = R alpha_2 - 1
 `c=25.0`。这把 stretched-like alpha decay、enhanced NGP 和 Gaussian recovery
 连成一个可证伪三联判据。
 
+这一步还能做成 diagnostic map：固定 `k` 后，实验或模拟测到的
+`(R alpha_2, -log Phi_alpha/R)` 必须落在同一条由 `c` 参数化的曲线上。
+如果 late NGP 反推出的 `c` 和 alpha slope 反推出的 `c` 不一致，就说明
+finite-exchange renewal 不是充分解释。默认阈值
+`R alpha_2 >= 3` 且 alpha-rate renormalization `< 0.75` 时，联合可观测窗口
+从大约 `c=2` 开始。
+
 ## 7.9. 从可观测量反演参数和证伪条件
 
 更强的可发表价值在于：模型不只是正向画曲线，也能从常见 glass observable 反推

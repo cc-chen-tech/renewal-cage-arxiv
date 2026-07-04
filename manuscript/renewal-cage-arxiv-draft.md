@@ -446,6 +446,10 @@ R(t) alpha_2^hx(t) -> 1 + c
 
 Thus late NGP and the long-time alpha slope independently infer the same
 heterogeneity ratio.
+This gives a diagnostic map: for fixed `k`, the pair
+`(R alpha_2, -log Phi_alpha/R)` must fall on a one-parameter curve indexed by
+`c`. Disagreement between the `c` inferred from late NGP and the `c` inferred
+from alpha slope falsifies the finite-exchange renewal explanation.
 
 ## 5. Reproducible Results
 
@@ -508,6 +512,8 @@ NGP peak is `1.195` at `t=32.07`, the alpha-window median local exponent is
 The same parameters give `c=25`, predict `R alpha_2 -> 26.0`, and reduce the
 alpha decay per renewal from `0.384` to `0.0944`; alpha-rate inversion recovers
 `c=25.0`.
+Scanning `c` places the onset of the joint observable window near `c=2` for the
+default thresholds `R alpha_2 >= 3` and alpha-rate renormalization below `0.75`.
 
 The parameter sweeps show:
 

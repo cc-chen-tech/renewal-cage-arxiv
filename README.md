@@ -96,6 +96,7 @@ figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
+figures/renewal_cage_heterogeneity_map.svg
 figures/renewal_cage_inversion.svg
 data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
@@ -112,6 +113,7 @@ data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
 data/renewal_cage_heterogeneity.csv
 data/renewal_cage_heterogeneity_diagnostics.csv
+data/renewal_cage_heterogeneity_map.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 paper/figures/renewal_cage_results.pdf
@@ -120,6 +122,7 @@ paper/figures/renewal_cage_scattering.pdf
 paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf
+paper/figures/renewal_cage_heterogeneity_map.pdf
 paper/figures/renewal_cage_inversion.pdf
 dist/renewal-cage-arxiv-source.zip
 ```
