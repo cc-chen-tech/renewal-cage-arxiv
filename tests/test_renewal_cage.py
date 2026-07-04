@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from renewal_cage import (  # noqa: E402
     ActivatedBarrierParams,
     DelayedRenewalCageParams,
+    FacilitatedExchangeLawParams,
     GammaExchangeParams,
     TemperatureLawParams,
     alpha_relaxation_time,
@@ -24,6 +25,7 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     fractional_stokes_einstein_exponents,
+    gamma_exchange_temperature_scan,
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
@@ -61,6 +63,7 @@ from renewal_cage import (  # noqa: E402
     static_gamma_normalized_alpha_decay,
     stokes_einstein_product,
     temperature_dependent_params,
+    temperature_dependent_gamma_exchange,
     temperature_scan,
 )
 
@@ -848,6 +851,72 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertIn("local_fragility_index", rows[-1])
         self.assertGreater(rows[-1]["apparent_alpha_activation_energy"], rows[0]["apparent_alpha_activation_energy"])
         self.assertGreater(rows[-1]["local_fragility_index"], rows[0]["local_fragility_index"])
+
+    def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
+        law = FacilitatedExchangeLawParams(
+            reference_temperature=1.0,
+            shape_ref=0.4,
+            exchange_renewal_count_ref=10.0,
+            shape_broadening_barrier=1.5,
+            exchange_slowing_barrier=2.5,
+        )
+
+        hot = temperature_dependent_gamma_exchange(1.0, law)
+        cold_temperature = 0.62
+        cold = temperature_dependent_gamma_exchange(cold_temperature, law)
+        delta = 1.0 / cold_temperature - 1.0 / law.reference_temperature
+        expected_ratio_growth = math.exp(
+            (law.shape_broadening_barrier + law.exchange_slowing_barrier) * delta
+        )
+
+        self.assertAlmostEqual(hot.shape, 0.4)
+        self.assertAlmostEqual(hot.exchange_renewal_count, 10.0)
+        self.assertLess(cold.shape, hot.shape)
+        self.assertGreater(cold.exchange_renewal_count, hot.exchange_renewal_count)
+        self.assertAlmostEqual(
+            (cold.exchange_renewal_count / cold.shape) / (hot.exchange_renewal_count / hot.shape),
+            expected_ratio_growth,
+            delta=1e-12,
+        )
+
+    def test_gamma_exchange_temperature_scan_links_cooling_to_alpha_slowing(self):
+        cage_law = TemperatureLawParams(
+            reference_temperature=1.0,
+            cage_variance_ref=1.0,
+            cage_tau_ref=0.7,
+            jump_to_cage_ref=0.8,
+            renewal_rate_ref=0.18,
+            renewal_delay_ref=3.0,
+            rate_activation=2.0,
+            delay_activation=5.0,
+            cage_stiffening=0.2,
+            jump_to_cage_growth=0.25,
+        )
+        exchange_law = FacilitatedExchangeLawParams(
+            reference_temperature=1.0,
+            shape_ref=0.4,
+            exchange_renewal_count_ref=10.0,
+            shape_broadening_barrier=1.5,
+            exchange_slowing_barrier=2.5,
+        )
+        temperatures = np.array([1.0, 0.78, 0.62])
+
+        rows = gamma_exchange_temperature_scan(
+            temperatures,
+            cage_law,
+            exchange_law,
+            wave_number=1.1,
+        )
+
+        ratios = np.array([row["heterogeneity_ratio"] for row in rows])
+        amplitudes = np.array([row["late_ngp_renewal_amplitude"] for row in rows])
+        alpha_renormalization = np.array([row["alpha_rate_renormalization"] for row in rows])
+
+        self.assertTrue(np.all(np.diff(ratios) > 0.0))
+        self.assertTrue(np.all(np.diff(amplitudes) > 0.0))
+        self.assertTrue(np.all(np.diff(alpha_renormalization) < 0.0))
+        self.assertGreater(rows[-1]["late_ngp_renewal_amplitude"], 50.0)
+        self.assertLess(rows[-1]["alpha_rate_renormalization"], rows[0]["alpha_rate_renormalization"] / 2.0)
 
     def test_fractional_stokes_einstein_exponents_recover_power_law_slope(self):
         tau_alpha = np.array([2.0, 4.0, 8.0, 16.0, 32.0])

@@ -436,6 +436,57 @@ def write_alpha_shape_pdf(path: Path) -> None:
     c.save()
 
 
+def write_facilitated_exchange_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_facilitated_exchange.csv")
+    inverse_shift = data["inverse_temperature_shift"]
+    ratio = data["heterogeneity_ratio"]
+    amplitude = data["late_ngp_renewal_amplitude"]
+    shape = data["shape"]
+    exchange_count = data["exchange_renewal_count"]
+    renormalization = data["alpha_rate_renormalization"]
+    alpha_slope = data["late_alpha_decay_per_renewal"]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Facilitated finite-exchange heterogeneity law")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("c=R_x/kappa0", ratio, colors.HexColor("#2b6cb0")),
+            ("R alpha_2 late", amplitude, colors.HexColor("#c05621")),
+            ("R_x / hot", exchange_count / exchange_count[0], colors.HexColor("#2f855a")),
+            ("kappa0 / hot", shape / shape[0], colors.HexColor("#805ad5")),
+        ],
+        "W. Cooling grows exchange heterogeneity",
+        xlabel="inverse-temperature shift",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("alpha-rate renormalization", renormalization, colors.HexColor("#805ad5")),
+            ("late alpha slope / hot", alpha_slope / alpha_slope[0], colors.HexColor("#2b6cb0")),
+        ],
+        "X. Alpha decay per renewal slows",
+        xlabel="inverse-temperature shift",
+    )
+
+    c.showPage()
+    c.save()
+
+
 def write_barrier_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_susceptibility.csv").open() as f:
         susceptibility_rows = list(csv.DictReader(f))
@@ -697,6 +748,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
     alpha_shape_pdf = PAPER_FIGURE_DIR / "renewal_cage_alpha_shape.pdf"
+    facilitated_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_facilitated_exchange.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
     heterogeneity_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity.pdf"
     heterogeneity_map_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity_map.pdf"
@@ -707,6 +759,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
     write_alpha_shape_pdf(alpha_shape_pdf)
+    write_facilitated_exchange_pdf(facilitated_exchange_pdf)
     write_barrier_pdf(barrier_pdf)
     write_heterogeneity_pdf(heterogeneity_pdf)
     write_heterogeneity_map_pdf(heterogeneity_map_pdf)
@@ -722,6 +775,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
         archive.write(alpha_shape_pdf, "figures/renewal_cage_alpha_shape.pdf")
+        archive.write(facilitated_exchange_pdf, "figures/renewal_cage_facilitated_exchange.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
         archive.write(heterogeneity_pdf, "figures/renewal_cage_heterogeneity.pdf")
         archive.write(heterogeneity_map_pdf, "figures/renewal_cage_heterogeneity_map.pdf")

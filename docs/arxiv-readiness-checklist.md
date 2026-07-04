@@ -14,8 +14,9 @@ cage note as a short arXiv manuscript.
   renewal-count susceptibility, renewal-domain chi4/cooperative-size
   estimator, peak diagnostics, NGP peak/alpha-relaxation coupling,
   finite-exchange heterogeneity diagnostics with stretched-like alpha decay and
-  Gaussian recovery, a static-gamma mobility-disorder null model proving that
-  non-exchanging disorder leaves a residual NGP plateau, finite-time
+  Gaussian recovery, a temperature-dependent facilitated-exchange law linking
+  cooling to stronger exchange heterogeneity, a static-gamma mobility-disorder
+  null model proving that non-exchanging disorder leaves a residual NGP plateau, finite-time
   peak/late-NGP consistency diagnostics,
   late-time heterogeneity consistency diagnostics linking NGP amplitude and
   alpha slope, a finite-exchange diagnostic map for the jointly observable

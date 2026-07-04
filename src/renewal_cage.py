@@ -81,6 +81,23 @@ class ActivatedBarrierParams:
     cage_tau_barrier: float = 0.0
 
 
+@dataclass(frozen=True)
+class FacilitatedExchangeLawParams:
+    """Activated facilitation law for finite-exchange heterogeneity.
+
+    Cooling can broaden the instantaneous mobility distribution and slow the
+    exchange between mobility environments. The former decreases ``shape``;
+    the latter increases ``exchange_renewal_count``. Their sum controls the
+    growth of the finite-exchange ratio ``c=R_x/kappa_0``.
+    """
+
+    reference_temperature: float
+    shape_ref: float
+    exchange_renewal_count_ref: float
+    shape_broadening_barrier: float
+    exchange_slowing_barrier: float
+
+
 def _validate(params: DelayedRenewalCageParams) -> None:
     for name in ("cage_variance", "cage_tau", "jump_variance", "renewal_rate", "renewal_delay"):
         value = getattr(params, name)
@@ -114,6 +131,17 @@ def _validate_temperature_law(law: TemperatureLawParams) -> None:
         "jump_to_cage_growth",
         "cage_tau_activation",
     ):
+        value = getattr(law, name)
+        if value < 0.0:
+            raise ValueError(f"{name} must be nonnegative")
+
+
+def _validate_facilitated_exchange_law(law: FacilitatedExchangeLawParams) -> None:
+    for name in ("reference_temperature", "shape_ref", "exchange_renewal_count_ref"):
+        value = getattr(law, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    for name in ("shape_broadening_barrier", "exchange_slowing_barrier"):
         value = getattr(law, name)
         if value < 0.0:
             raise ValueError(f"{name} must be nonnegative")
@@ -159,6 +187,23 @@ def temperature_dependent_params(temperature: float, law: TemperatureLawParams) 
         jump_variance=cage_variance * jump_to_cage,
         renewal_rate=law.renewal_rate_ref * math.exp(-law.rate_activation * inverse_temperature_shift),
         renewal_delay=law.renewal_delay_ref * math.exp(law.delay_activation * inverse_temperature_shift),
+    )
+
+
+def temperature_dependent_gamma_exchange(
+    temperature: float,
+    law: FacilitatedExchangeLawParams,
+) -> GammaExchangeParams:
+    """Map reduced temperature to finite-exchange heterogeneity parameters."""
+
+    _validate_facilitated_exchange_law(law)
+    if temperature <= 0.0:
+        raise ValueError("temperature must be positive")
+    inverse_temperature_shift = 1.0 / temperature - 1.0 / law.reference_temperature
+    return GammaExchangeParams(
+        shape=law.shape_ref * math.exp(-law.shape_broadening_barrier * inverse_temperature_shift),
+        exchange_renewal_count=law.exchange_renewal_count_ref
+        * math.exp(law.exchange_slowing_barrier * inverse_temperature_shift),
     )
 
 
@@ -1350,6 +1395,51 @@ def temperature_scan(
     for row, activation_energy in zip(rows, activation_energies):
         row["apparent_alpha_activation_energy"] = float(activation_energy)
         row["local_fragility_index"] = float(activation_energy / (row["temperature"] * math.log(10.0)))
+    return rows
+
+
+def gamma_exchange_temperature_scan(
+    temperatures: np.ndarray,
+    cage_law: TemperatureLawParams,
+    exchange_law: FacilitatedExchangeLawParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float]]:
+    """Evaluate temperature-dependent finite-exchange heterogeneity diagnostics."""
+
+    temperatures = np.asarray(temperatures, dtype=float)
+    if temperatures.ndim != 1 or temperatures.size == 0:
+        raise ValueError("temperatures must be a nonempty one-dimensional array")
+    if np.any(temperatures <= 0.0):
+        raise ValueError("temperatures must be positive")
+    _validate_temperature_law(cage_law)
+    _validate_facilitated_exchange_law(exchange_law)
+    if not math.isclose(cage_law.reference_temperature, exchange_law.reference_temperature):
+        raise ValueError("cage and exchange laws must share a reference temperature")
+
+    rows = []
+    for temperature in temperatures:
+        params = temperature_dependent_params(float(temperature), cage_law)
+        heterogeneity = temperature_dependent_gamma_exchange(float(temperature), exchange_law)
+        diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "shape": heterogeneity.shape,
+                "exchange_renewal_count": heterogeneity.exchange_renewal_count,
+                "heterogeneity_ratio": diagnostics["heterogeneity_ratio"],
+                "late_ngp_renewal_amplitude": diagnostics["late_ngp_renewal_amplitude"],
+                "late_alpha_decay_per_renewal": diagnostics["late_alpha_decay_per_renewal"],
+                "poisson_alpha_decay_per_renewal": diagnostics["poisson_alpha_decay_per_renewal"],
+                "alpha_rate_renormalization": diagnostics["alpha_rate_renormalization"],
+                "late_alpha_rate": diagnostics["late_alpha_rate"],
+                "poisson_alpha_rate": diagnostics["poisson_alpha_rate"],
+                "renewal_rate": params.renewal_rate,
+                "renewal_delay": params.renewal_delay,
+                "lambda_tau_delay": params.renewal_rate * params.renewal_delay,
+                "jump_to_cage_variance": params.jump_variance / params.cage_variance,
+            }
+        )
     return rows
 
 

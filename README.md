@@ -17,9 +17,9 @@ The model combines:
   diagnostics, alpha-shape time-temperature-superposition collapse residuals,
   renewal-count susceptibility, renewal-domain chi4/cooperative-size
   diagnostics, NGP peak/alpha-relaxation coupling, finite-exchange
-  heterogeneity diagnostics, a static-gamma mobility-disorder null model,
-  finite-time consistency diagnostics, and observable inversion/falsifiability
-  criteria.
+  heterogeneity diagnostics, a temperature-dependent facilitated-exchange law,
+  a static-gamma mobility-disorder null model, finite-time consistency
+  diagnostics, and observable inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -117,6 +117,7 @@ figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
 figures/renewal_cage_alpha_shape.svg
+figures/renewal_cage_facilitated_exchange.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
 figures/renewal_cage_heterogeneity_map.svg
@@ -133,6 +134,7 @@ data/renewal_cage_scattering.csv
 data/renewal_cage_peak_relaxation.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_alpha_shape.csv
+data/renewal_cage_facilitated_exchange.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
@@ -149,6 +151,7 @@ paper/figures/renewal_cage_dimensionless.pdf
 paper/figures/renewal_cage_scattering.pdf
 paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_alpha_shape.pdf
+paper/figures/renewal_cage_facilitated_exchange.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf
 paper/figures/renewal_cage_heterogeneity_map.pdf

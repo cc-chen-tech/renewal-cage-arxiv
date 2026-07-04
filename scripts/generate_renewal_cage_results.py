@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from renewal_cage import (  # noqa: E402
     ActivatedBarrierParams,
     DelayedRenewalCageParams,
+    FacilitatedExchangeLawParams,
     GammaExchangeParams,
     TemperatureLawParams,
     alpha_relaxation_shape_curve,
@@ -29,6 +30,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
+    gamma_exchange_temperature_scan,
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
@@ -233,6 +235,32 @@ def write_alpha_shape_csv(
                     "max_abs_log_shape_residual": residual["max_abs_log_shape_residual"],
                 }
             )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_facilitated_exchange_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    cage_law: TemperatureLawParams,
+    exchange_law: FacilitatedExchangeLawParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float]]:
+    rows = gamma_exchange_temperature_scan(
+        temperatures,
+        cage_law,
+        exchange_law,
+        wave_number=wave_number,
+    )
+    reference_ratio = rows[0]["heterogeneity_ratio"]
+    reference_late_alpha = rows[0]["late_alpha_decay_per_renewal"]
+    for row in rows:
+        row["inverse_temperature_shift"] = 1.0 / row["temperature"] - 1.0 / cage_law.reference_temperature
+        row["heterogeneity_ratio_over_hot"] = row["heterogeneity_ratio"] / reference_ratio
+        row["late_alpha_decay_per_renewal_over_hot"] = (
+            row["late_alpha_decay_per_renewal"] / reference_late_alpha
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -1064,6 +1092,54 @@ def write_alpha_shape_svg(path: Path, rows: list[dict[str, float | str]]) -> Non
     path.write_text(svg)
 
 
+def write_facilitated_exchange_svg(path: Path, rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    palette = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 78}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, x_values: np.ndarray, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, palette[idx % len(palette)]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{palette[idx % len(palette)]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    inverse_shift = np.array([row["inverse_temperature_shift"] for row in rows])
+    ratio = np.array([row["heterogeneity_ratio"] for row in rows])
+    amplitude = np.array([row["late_ngp_renewal_amplitude"] for row in rows])
+    shape = np.array([row["shape"] for row in rows])
+    exchange_count = np.array([row["exchange_renewal_count"] for row in rows])
+    renormalization = np.array([row["alpha_rate_renormalization"] for row in rows])
+    alpha_slope = np.array([row["late_alpha_decay_per_renewal"] for row in rows])
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Facilitated finite-exchange heterogeneity law</text>
+  {axes(left_a, right_a, "W. Cooling grows exchange heterogeneity", "inverse-temperature shift")}
+  {plot(left_a, right_a, inverse_shift, [("c=R_x/kappa0", ratio), ("R alpha2 late", amplitude), ("R_x/R_x hot", exchange_count / exchange_count[0]), ("kappa0/kappa hot", shape / shape[0])])}
+  {axes(left_b, right_b, "X. Alpha decay per renewal slows", "inverse-temperature shift")}
+  {plot(left_b, right_b, inverse_shift, [("alpha-rate renormalization", renormalization), ("late alpha slope / hot", alpha_slope / alpha_slope[0])])}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -1483,6 +1559,24 @@ def main() -> None:
         wave_number=1.1,
     )
     write_alpha_shape_svg(FIGURE_DIR / "renewal_cage_alpha_shape.svg", alpha_shape_rows)
+    exchange_law = FacilitatedExchangeLawParams(
+        reference_temperature=1.0,
+        shape_ref=0.4,
+        exchange_renewal_count_ref=10.0,
+        shape_broadening_barrier=1.5,
+        exchange_slowing_barrier=2.5,
+    )
+    facilitated_exchange_rows = write_facilitated_exchange_csv(
+        DATA_DIR / "renewal_cage_facilitated_exchange.csv",
+        temperatures,
+        temperature_law,
+        exchange_law,
+        wave_number=1.1,
+    )
+    write_facilitated_exchange_svg(
+        FIGURE_DIR / "renewal_cage_facilitated_exchange.svg",
+        facilitated_exchange_rows,
+    )
 
     barrier = ActivatedBarrierParams(
         reference_temperature=1.0,
