@@ -1,5 +1,6 @@
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -31,6 +32,20 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_results.pdf", main_tex)
         self.assertIn("figures/renewal_cage_dimensionless.pdf", main_tex)
         self.assertNotIn(".svg", main_tex)
+
+    def test_build_arxiv_package_generates_deterministic_pdf_figures(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            build_arxiv_package(output_dir=Path(first))
+            first_results = (ROOT / "paper" / "figures" / "renewal_cage_results.pdf").read_bytes()
+            first_dimensionless = (ROOT / "paper" / "figures" / "renewal_cage_dimensionless.pdf").read_bytes()
+
+            time.sleep(1.1)
+            build_arxiv_package(output_dir=Path(second))
+            second_results = (ROOT / "paper" / "figures" / "renewal_cage_results.pdf").read_bytes()
+            second_dimensionless = (ROOT / "paper" / "figures" / "renewal_cage_dimensionless.pdf").read_bytes()
+
+        self.assertEqual(first_results, second_results)
+        self.assertEqual(first_dimensionless, second_dimensionless)
 
 
 if __name__ == "__main__":

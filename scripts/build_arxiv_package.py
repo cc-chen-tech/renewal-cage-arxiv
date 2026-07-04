@@ -14,10 +14,12 @@ import zipfile
 from pathlib import Path
 
 import numpy as np
+from reportlab import rl_config
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
 
+rl_config.invariant = 1
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
