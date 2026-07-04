@@ -36,15 +36,41 @@ def read_csv_columns(path: Path) -> dict[str, np.ndarray]:
     return {key: np.array(value, dtype=float) for key, value in columns.items()}
 
 
-def scale(values: np.ndarray, low: float, high: float) -> np.ndarray:
-    vmin = float(np.nanmin(values))
-    vmax = float(np.nanmax(values))
+def scale(values: np.ndarray, low: float, high: float, data_range: tuple[float, float] | None = None) -> np.ndarray:
+    if data_range is None:
+        vmin = float(np.nanmin(values))
+        vmax = float(np.nanmax(values))
+    else:
+        vmin, vmax = data_range
     if math.isclose(vmin, vmax):
         return np.full_like(values, (low + high) / 2.0)
     return low + (values - vmin) * (high - low) / (vmax - vmin)
 
 
-def draw_axes(c: canvas.Canvas, left: float, bottom: float, width: float, height: float, title: str, xlabel: str) -> None:
+def format_tick(value: float) -> str:
+    if abs(value) >= 100:
+        return f"{value:.0f}"
+    if abs(value) >= 10:
+        return f"{value:.1f}".rstrip("0").rstrip(".")
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def tick_values(data_min: float, data_max: float) -> list[float]:
+    mid = 0.5 * (data_min + data_max)
+    return [data_min, mid, data_max]
+
+
+def draw_axes(
+    c: canvas.Canvas,
+    left: float,
+    bottom: float,
+    width: float,
+    height: float,
+    title: str,
+    xlabel: str,
+    x_range: tuple[float, float],
+    y_range: tuple[float, float],
+) -> None:
     c.setStrokeColor(colors.black)
     c.setLineWidth(0.8)
     c.line(left, bottom, left + width, bottom)
@@ -53,13 +79,31 @@ def draw_axes(c: canvas.Canvas, left: float, bottom: float, width: float, height
     c.drawString(left, bottom + height + 12, title)
     c.setFont("Helvetica", 8)
     c.drawCentredString(left + width / 2.0, bottom - 18, xlabel)
+    c.setFont("Helvetica", 6)
+    c.setStrokeColor(colors.grey)
+    for value in tick_values(*x_range):
+        x = float(scale(np.array([value]), left, left + width, x_range)[0])
+        c.line(x, bottom, x, bottom - 3)
+        c.drawCentredString(x, bottom - 10, format_tick(value))
+    for value in tick_values(*y_range):
+        y = float(scale(np.array([value]), bottom, bottom + height, y_range)[0])
+        c.line(left - 3, y, left, y)
+        c.drawRightString(left - 5, y - 2, format_tick(value))
+    c.setStrokeColor(colors.black)
 
 
 def draw_polyline(c: canvas.Canvas, x: np.ndarray, y: np.ndarray, color: colors.Color, line_width: float = 1.2) -> None:
     path = c.beginPath()
-    path.moveTo(float(x[0]), float(y[0]))
-    for xi, yi in zip(x[1:], y[1:]):
-        path.lineTo(float(xi), float(yi))
+    started = False
+    for xi, yi in zip(x, y):
+        if not np.isfinite(yi):
+            started = False
+            continue
+        if not started:
+            path.moveTo(float(xi), float(yi))
+            started = True
+        else:
+            path.lineTo(float(xi), float(yi))
     c.setStrokeColor(color)
     c.setLineWidth(line_width)
     c.drawPath(path)
@@ -75,11 +119,15 @@ def draw_panel(
     series: list[tuple[str, np.ndarray, colors.Color]],
     title: str,
     xlabel: str = "time",
+    y_range: tuple[float, float] | None = None,
 ) -> None:
-    draw_axes(c, left, bottom, width, height, title, xlabel)
-    x = scale(x_values, left, left + width)
+    x_range = (float(np.nanmin(x_values)), float(np.nanmax(x_values)))
     all_y = np.concatenate([values for _, values, _ in series])
-    y_scaled = scale(all_y, bottom, bottom + height)
+    if y_range is None:
+        y_range = (float(np.nanmin(all_y)), float(np.nanmax(all_y)))
+    draw_axes(c, left, bottom, width, height, title, xlabel, x_range, y_range)
+    x = scale(x_values, left, left + width, x_range)
+    y_scaled = scale(all_y, bottom, bottom + height, y_range)
     start = 0
     for label, values, color in series:
         y = y_scaled[start : start + len(values)]
@@ -128,6 +176,9 @@ def write_results_pdf(path: Path) -> None:
         "A. MSD: cage plateau followed by renewal diffusion",
     )
     renewal = np.maximum(main["renewal_mean"], 1e-12)
+    ngp_ymax = float(np.nanmax(main["ngp_1d"]) * 1.15)
+    inverse_renewal = 1.0 / renewal
+    inverse_renewal[inverse_renewal > ngp_ymax] = np.nan
     draw_panel(
         c,
         430,
@@ -137,9 +188,10 @@ def write_results_pdf(path: Path) -> None:
         time,
         [
             ("NGP", main["ngp_1d"], colors.HexColor("#c05621")),
-            ("1 / renewal count", 1.0 / renewal, colors.lightgrey),
+            ("1 / renewal count", inverse_renewal, colors.lightgrey),
         ],
         "B. NGP peak and long-time decay",
+        y_range=(0.0, ngp_ymax),
     )
     # Peak summary panels use point-connected summaries from the sweep CSV.
     delay_arr = np.array(delay_curves)
@@ -190,7 +242,7 @@ def write_dimensionless_pdf(path: Path) -> None:
         arr = np.array(points)
         collapse_series.append((f"q/A={label}", arr[:, 1], colors_list[idx % len(colors_list)]))
     x_values = np.array(grouped[sorted(grouped.keys())[0]])[:, 0]
-    draw_panel(c, 45, 160, 320, 280, x_values, collapse_series, "E. Peak collapse", xlabel="t / t*")
+    draw_panel(c, 45, 160, 320, 280, x_values, collapse_series, "E. Peak collapse", xlabel="t / t*", y_range=(0.0, 1.05))
 
     radius = van_hove["radius"]
     van_series = []

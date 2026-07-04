@@ -1,5 +1,7 @@
 # Delayed Renewal Cage Model
 
+[![CI](https://github.com/cc-chen-tech/renewal-cage-arxiv/actions/workflows/ci.yml/badge.svg)](https://github.com/cc-chen-tech/renewal-cage-arxiv/actions/workflows/ci.yml)
+
 This repository contains a reproducible theoretical note on a minimal delayed
 renewal cage model for non-Gaussian dynamics near glass transition.
 
@@ -33,12 +35,15 @@ R(t) = lambda [t - 2 tau_d(1-exp(-t/tau_d))
 src/renewal_cage.py                         closed-form model functions
 tests/test_renewal_cage.py                  unit tests
 scripts/generate_renewal_cage_results.py    reproducible data/figure generator
+scripts/build_arxiv_package.py              arXiv PDF figure and source builder
+scripts/compile_latex.sh                    LaTeX compile helper
 data/                                      generated CSV outputs
 figures/                                   generated SVG figures
 docs/                                      derivation and literature positioning notes
 manuscript/renewal-cage-arxiv-draft.md      prose draft
 paper/main.tex                             arXiv-style LaTeX manuscript
 paper/references.bib                       bibliography
+dist/renewal-cage-arxiv-source.zip          arXiv source package
 ```
 
 ## Reproduce
@@ -75,6 +80,7 @@ dist/renewal-cage-arxiv-source.zip
 
 ## Current Status
 
-This is a research draft intended to become a short arXiv note. The model and
-figures are reproducible; the LaTeX paper still needs final polishing, reference
-checks, and a final discussion section before submission.
+This is a research draft intended to become a short arXiv note. The model,
+figures, arXiv source package, and LaTeX manuscript build are reproducible in
+CI. Before submission, the paper still needs final prose polishing, reference
+checks, and author/affiliation confirmation.
