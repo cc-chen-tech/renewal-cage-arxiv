@@ -126,6 +126,12 @@ Stokes-Einstein diagnostic:
   E_app(T) = d log tau_alpha(k,T) / d(1/T)
   local fragility proxy: m_loc(T) = E_app(T)/(T log 10)
 
+alpha-shape TTS diagnostic:
+  Y_k(u;T) = -log Phi_alpha(k,u tau_alpha;T)/[-log h]
+  C_k(T) = Gamma_k(T) lambda(T) tau_d(T)
+  scaled alpha shapes are controlled by C_k
+  epsilon_TTS = RMS_i[log Y_k(u_i;T)-log Y_k(u_i;T_ref)]
+
 activated barrier interpretation:
   lambda(T) tau_d(T) = lambda0 tau_d0 exp[(E_d-E_lambda)(1/T-1/T0)]
   E_d > E_lambda makes delayed renewal increasingly control relaxation on cooling
@@ -185,7 +191,10 @@ comparison can additionally ask whether they reproduce the same growth of
 `D tau_alpha` when cooling increases the delayed-renewal control parameter
 `lambda tau_d`, whether they predict a fractional exponent `xi_SE<1`, and
 whether they produce growing apparent alpha-activation/fragility without an
-extra fit parameter. They should also explain whether their dynamic-heterogeneity
+extra fit parameter. They should also reproduce or intentionally fail the
+alpha-shape TTS residual controlled by `Gamma_k lambda tau_d`, because this
+tests the scaled relaxation shape rather than only its time scale. They should
+also explain whether their dynamic-heterogeneity
 measure has the same renewal-count susceptibility peak and whether an observed
 `chi_4` amplitude maps to the same cooperative renewal-domain size. The strongest
 falsifiability test is now the

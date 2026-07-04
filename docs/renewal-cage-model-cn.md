@@ -477,6 +477,66 @@ m_loc: 1.17 -> 2.41
 所以这个模型已经能同时给出三类温度可检验量：`D tau_alpha` 增长、`xi_SE<1`、
 以及 `E_app/m_loc` 随冷却增强。
 
+### 7.6.1 Alpha-shape time-temperature superposition
+
+glass literature 里除了 `tau_alpha(T)` 的增长，还常看 alpha relaxation 的形状在
+`t/tau_alpha` 缩放后是否 collapse，也就是 time-temperature superposition (TTS)。
+当前模型给出一个闭式判据。
+
+定义：
+
+```text
+Y_k(u;T)
+  = -log Phi_alpha(k, u tau_alpha; T) / [-log h]
+```
+
+其中 `u=t/tau_alpha`。因为：
+
+```text
+Phi_alpha(k,t;T) = exp[-Gamma_k(T) R(t;T)]
+R(t;T) = lambda(T) tau_d(T) F[t/tau_d(T)]
+```
+
+所以：
+
+```text
+Y_k(u;T)
+  = Gamma_k(T) lambda(T) tau_d(T)
+    F[u tau_alpha(T)/tau_d(T)] / [-log h]
+```
+
+而：
+
+```text
+tau_alpha(T)/tau_d(T)
+  = F^{-1}{[-log h] / [Gamma_k(T) lambda(T) tau_d(T)]}
+```
+
+因此缩放后的 alpha shape 只由一个无量纲控制量决定：
+
+```text
+C_k(T) = Gamma_k(T) lambda(T) tau_d(T)
+```
+
+如果 `C_k(T)` 不随温度变，模型预测严格 TTS collapse；如果 `C_k(T)` 随冷却变化，
+则 `t/tau_alpha` 缩放后仍然会有可测的 shape residual：
+
+```text
+epsilon_TTS(T)
+  = RMS_i [log Y_k(u_i;T) - log Y_k(u_i;T_ref)]
+```
+
+默认温度扫描中：
+
+```text
+C_k:              0.207 -> 1.334
+tau_alpha/tau_d:  6.323 -> 1.984
+epsilon_TTS:      0     -> 0.611
+```
+
+这说明 delayed-renewal model 不只预测 relaxation time 变长，还预测 alpha
+relaxation 的 scaled shape 什么时候会破坏 TTS。
+
 ## 7.7. Activated barrier 和 renewal susceptibility
 
 上面的温度律可以从一个最小 activated barrier 图像得到。设长时间 renewal rate 的
@@ -896,10 +956,12 @@ data/renewal_cage_main.csv
 data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
 data/renewal_cage_van_hove.csv
+data/renewal_cage_alpha_shape.csv
 data/renewal_cage_static_null.csv
 data/renewal_cage_inversion.csv
 figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
+figures/renewal_cage_alpha_shape.svg
 figures/renewal_cage_static_null.svg
 figures/renewal_cage_inversion.svg
 ```

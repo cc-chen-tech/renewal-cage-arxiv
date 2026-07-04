@@ -973,6 +973,81 @@ def peak_relaxation_coupling(
     }
 
 
+def _alpha_shape_control(wave_number: float, params: DelayedRenewalCageParams) -> float:
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    return gamma * params.renewal_rate * params.renewal_delay
+
+
+def alpha_relaxation_shape_curve(
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    scaled_time: np.ndarray,
+    *,
+    threshold: float = math.exp(-1.0),
+) -> np.ndarray:
+    """Alpha-relaxation shape after scaling time by ``tau_alpha``.
+
+    The returned curve is ``-log Phi_alpha(k, u tau_alpha) / [-log(threshold)]``.
+    It equals one at ``u=1`` and is independent of the cage Debye-Waller factor.
+    For the minimal Poisson renewal model its shape is controlled by the single
+    dimensionless number ``Gamma_k lambda tau_d``.
+    """
+
+    _validate(params)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must lie between 0 and 1")
+    scaled_time = np.asarray(scaled_time, dtype=float)
+    if np.any(scaled_time <= 0.0):
+        raise ValueError("scaled_time values must be positive")
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    tau_alpha = alpha_relaxation_time(wave_number, params, threshold=threshold)
+    return gamma * delayed_poisson_mean(scaled_time * tau_alpha, params) / (-math.log(threshold))
+
+
+def alpha_shape_superposition_residual(
+    wave_number: float,
+    reference_params: DelayedRenewalCageParams,
+    candidate_params: DelayedRenewalCageParams,
+    scaled_time: np.ndarray,
+    *,
+    threshold: float = math.exp(-1.0),
+) -> dict[str, float]:
+    """RMS log-shape residual for time-temperature superposition tests."""
+
+    scaled_time = np.asarray(scaled_time, dtype=float)
+    reference_curve = alpha_relaxation_shape_curve(
+        wave_number,
+        reference_params,
+        scaled_time,
+        threshold=threshold,
+    )
+    candidate_curve = alpha_relaxation_shape_curve(
+        wave_number,
+        candidate_params,
+        scaled_time,
+        threshold=threshold,
+    )
+    if np.any(reference_curve <= 0.0) or np.any(candidate_curve <= 0.0):
+        raise ValueError("alpha shape curves must be positive")
+    reference_tau_alpha = alpha_relaxation_time(wave_number, reference_params, threshold=threshold)
+    candidate_tau_alpha = alpha_relaxation_time(wave_number, candidate_params, threshold=threshold)
+    residual = np.log(candidate_curve) - np.log(reference_curve)
+    return {
+        "wave_number": wave_number,
+        "threshold": threshold,
+        "reference_control": _alpha_shape_control(wave_number, reference_params),
+        "candidate_control": _alpha_shape_control(wave_number, candidate_params),
+        "reference_tau_alpha": reference_tau_alpha,
+        "candidate_tau_alpha": candidate_tau_alpha,
+        "reference_tau_alpha_over_delay": reference_tau_alpha / reference_params.renewal_delay,
+        "candidate_tau_alpha_over_delay": candidate_tau_alpha / candidate_params.renewal_delay,
+        "rms_log_shape_residual": float(math.sqrt(float(np.mean(residual**2)))),
+        "max_abs_log_shape_residual": float(np.max(np.abs(residual))),
+    }
+
+
 def long_time_diffusion_coefficient(params: DelayedRenewalCageParams) -> float:
     """Long-time self-diffusion coefficient per coordinate."""
 

@@ -377,6 +377,65 @@ def write_temperature_pdf(path: Path) -> None:
     c.save()
 
 
+def write_alpha_shape_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_alpha_shape.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    labels = list(dict.fromkeys(row["temperature_label"] for row in rows))
+    grouped = {label: [row for row in rows if row["temperature_label"] == label] for label in labels}
+    scaled_time = np.array([float(row["scaled_time"]) for row in grouped[labels[0]]])
+    shape_series = []
+    colors_list = [colors.HexColor("#2b6cb0"), colors.HexColor("#c05621"), colors.HexColor("#2f855a")]
+    for idx, label in enumerate(labels):
+        shape_series.append(
+            (
+                label,
+                np.array([float(row["alpha_shape"]) for row in grouped[label]]),
+                colors_list[idx % len(colors_list)],
+            )
+        )
+    summary = [grouped[label][0] for label in labels]
+    inverse_shift = np.array([float(row["inverse_temperature_shift"]) for row in summary])
+    rms = np.array([float(row["rms_log_shape_residual"]) for row in summary])
+    control = np.array([float(row["shape_control"]) for row in summary])
+    tau_over_delay = np.array([float(row["tau_alpha_over_delay"]) for row in summary])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Alpha-shape time-temperature superposition diagnostic")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        scaled_time,
+        shape_series,
+        "U. Alpha shape after tau_alpha scaling",
+        xlabel="t / tau_alpha",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("RMS log-shape residual", rms, colors.HexColor("#805ad5")),
+            ("Gamma lambda tau_d / hot", control / control[0], colors.HexColor("#2f855a")),
+            ("tau_alpha/tau_d / hot", tau_over_delay / tau_over_delay[0], colors.HexColor("#c05621")),
+        ],
+        "V. Collapse residual and control variable",
+        xlabel="inverse-temperature shift",
+    )
+
+    c.showPage()
+    c.save()
+
+
 def write_barrier_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_susceptibility.csv").open() as f:
         susceptibility_rows = list(csv.DictReader(f))
@@ -637,6 +696,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     dimensionless_pdf = PAPER_FIGURE_DIR / "renewal_cage_dimensionless.pdf"
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
+    alpha_shape_pdf = PAPER_FIGURE_DIR / "renewal_cage_alpha_shape.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
     heterogeneity_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity.pdf"
     heterogeneity_map_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity_map.pdf"
@@ -646,6 +706,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
+    write_alpha_shape_pdf(alpha_shape_pdf)
     write_barrier_pdf(barrier_pdf)
     write_heterogeneity_pdf(heterogeneity_pdf)
     write_heterogeneity_map_pdf(heterogeneity_map_pdf)
@@ -660,6 +721,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(dimensionless_pdf, "figures/renewal_cage_dimensionless.pdf")
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
+        archive.write(alpha_shape_pdf, "figures/renewal_cage_alpha_shape.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
         archive.write(heterogeneity_pdf, "figures/renewal_cage_heterogeneity.pdf")
         archive.write(heterogeneity_map_pdf, "figures/renewal_cage_heterogeneity_map.pdf")

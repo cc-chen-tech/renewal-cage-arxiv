@@ -39,7 +39,8 @@ that compares the peak-inferred renewal rate with a late-time NGP inversion.
 The same renewal generator gives a closed-form self-intermediate scattering
 function with a cage plateau and an alpha-relaxation rate. A minimal
 temperature-dependent extension predicts when diffusion and structural
-relaxation decouple through the product $\lambda(T)\tau_d(T)$. The delayed
+relaxation decouple through the product $\lambda(T)\tau_d(T)$ and gives a
+closed time-temperature-superposition residual for the alpha shape. The delayed
 renewal count regularizes the short-time behavior of jump models while
 preserving analytic tractability and long-time Gaussian recovery. A
 finite-exchange gamma extension then gives a closed criterion for
@@ -311,6 +312,46 @@ For Arrhenius relaxation this is constant; growth of $E_{\rm app}$ on cooling
 is the minimal fragility signal produced by the temperature-dependent delayed
 renewal law. A local Angell-style fragility proxy is
 $m_{\rm loc}(T)=E_{\rm app}(T)/(T\log 10)$.
+
+The same equations give a closed diagnostic for time-temperature
+superposition of the alpha relaxation. Define the scaled alpha-shape function
+\begin{equation}
+  Y_k(u;T)=
+  \frac{-\log\Phi_\alpha(k,u\tau_\alpha;T)}{-\log h}.
+\end{equation}
+Using the delayed-renewal form gives
+\begin{equation}
+  Y_k(u;T)=
+  \frac{\Gamma_k(T)\lambda(T)\tau_d(T)}
+       {-\log h}
+  F\left[u\,s_\alpha(T)\right],
+  \qquad
+  s_\alpha(T)=\frac{\tau_\alpha(k,T)}{\tau_d(T)}
+  =
+  F^{-1}\left[
+    \frac{-\log h}{\Gamma_k(T)\lambda(T)\tau_d(T)}
+  \right].
+\end{equation}
+Thus the alpha shape after scaling time by $\tau_\alpha$ is controlled by the
+single variable
+\begin{equation}
+  C_k(T)=\Gamma_k(T)\lambda(T)\tau_d(T).
+\end{equation}
+Exact time-temperature superposition within this minimal model requires
+$C_k(T)$ to be temperature independent. A data-level residual can be defined on
+a chosen scaled-time grid $\{u_i\}$ as
+\begin{equation}
+  \epsilon_{\rm TTS}(T)=
+  \left[
+    \frac{1}{n}\sum_i
+    \left(
+      \log Y_k(u_i;T)-\log Y_k(u_i;T_{\rm ref})
+    \right)^2
+  \right]^{1/2}.
+\end{equation}
+This criterion is complementary to the Stokes-Einstein diagnostic: it tests the
+shape of the alpha relaxation after removing its time scale, not only the
+growth of $\tau_\alpha$.
 
 \section{Activated-Barrier Interpretation and Dynamic Heterogeneity}
 
@@ -629,6 +670,12 @@ The corresponding local fractional Stokes-Einstein exponent decreases from
 $\xi_{\rm SE}=0.725$ at the hot end to $0.568$ at the cold end, while the
 apparent alpha-relaxation activation energy grows from $E_{\rm app}=2.69$ to
 $3.43$ and the local fragility proxy grows from $1.17$ to $2.41$.
+For the same scan, the alpha-shape control $C_k=\Gamma_k\lambda\tau_d$ rises
+from $0.207$ at $T=1.00$ to $1.334$ at $T=0.62$; the scaled alpha-shape
+residual relative to the hot curve rises from $0$ to $0.611$. Thus the model
+predicts not only a growing $\tau_\alpha$ but a quantifiable breakdown of
+time-temperature superposition when the delayed-renewal control variable
+changes on cooling.
 Increasing the activated barrier gap $E_d-E_\lambda$ from $0$ to $4.5$ raises
 the cold-end normalized $D\tau_\alpha$ from $1.01$ to $3.30$. The renewal
 susceptibility for $k=1.1$ peaks at $t=12.46$, close to the NGP peak time.
@@ -704,6 +751,17 @@ permanent mobility disorder.
   renewal control parameter $\lambda\tau_d$ grows, and the same scan gives a
   fractional Stokes-Einstein exponent $\xi_{\rm SE}<1$ plus a growing apparent
   alpha-relaxation activation energy.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_alpha_shape.pdf}
+  \caption{Alpha-relaxation time-temperature-superposition diagnostic. The left
+  panel plots the cage-normalized alpha shape after scaling time by
+  $\tau_\alpha$. The right panel shows the collapse residual together with the
+  control variable $C_k=\Gamma_k\lambda\tau_d$, demonstrating that the delayed
+  renewal clock predicts a specific, measurable source of alpha-shape
+  superposition breakdown.}
 \end{figure}
 
 \begin{figure}[h]

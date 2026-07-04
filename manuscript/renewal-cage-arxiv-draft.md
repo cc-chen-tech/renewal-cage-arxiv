@@ -360,6 +360,38 @@ m_loc(T) = E_app(T) / [T log(10)].
 For Arrhenius relaxation `E_app` is constant; growth of `E_app` on cooling is
 the minimal fragility signal in the present effective theory.
 
+The same equations give an alpha-shape time-temperature-superposition
+diagnostic. Define
+
+```text
+Y_k(u;T) = -log Phi_alpha(k,u tau_alpha;T) / [-log h].
+```
+
+Then
+
+```text
+Y_k(u;T)
+  = Gamma_k(T) lambda(T) tau_d(T)
+    F[u tau_alpha(T)/tau_d(T)] / [-log h]
+
+tau_alpha(T)/tau_d(T)
+  = F^{-1}{[-log h] / [Gamma_k(T) lambda(T) tau_d(T)]}.
+```
+
+So the scaled alpha shape is controlled by
+
+```text
+C_k(T) = Gamma_k(T) lambda(T) tau_d(T).
+```
+
+Exact TTS within this minimal model requires `C_k(T)` to be temperature
+independent. A direct residual is
+
+```text
+epsilon_TTS(T)
+  = RMS_i [log Y_k(u_i;T) - log Y_k(u_i;T_ref)].
+```
+
 ## 4.8. Activated-barrier and susceptibility diagnostics
 
 The temperature law can be interpreted as a minimal activated barrier reduction:
@@ -509,6 +541,7 @@ data/renewal_cage_sweeps.csv
 data/renewal_cage_consistency.csv
 data/renewal_cage_scattering.csv
 data/renewal_cage_temperature.csv
+data/renewal_cage_alpha_shape.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
@@ -521,6 +554,7 @@ figures/renewal_cage_results.svg
 figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
+figures/renewal_cage_alpha_shape.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
 figures/renewal_cage_heterogeneity_map.svg
@@ -558,6 +592,9 @@ decreases `D` by a factor of `3.30`, increases `tau_alpha(k=1.1)` by a factor
 of `6.72`, raises the normalized `D tau_alpha` product to `2.03`, and lowers
 the local fractional exponent from `xi_SE=0.725` to `0.568`. The same scan
 raises `E_app` from `2.69` to `3.43` and `m_loc` from `1.17` to `2.41`.
+The alpha-shape control `C_k=Gamma_k lambda tau_d` rises from `0.207` to
+`1.334`, while the TTS residual relative to the hot curve rises from `0` to
+`0.611`.
 Increasing the barrier gap `E_d-E_lambda` from `0` to `4.5` raises the cold-end
 normalized `D tau_alpha` from `1.01` to `3.30`.
 The full observable inversion recovers `A=1.00`, `q=0.80`, `lambda=0.18`, and

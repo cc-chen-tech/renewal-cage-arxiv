@@ -17,7 +17,9 @@ from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
     GammaExchangeParams,
     TemperatureLawParams,
+    alpha_relaxation_shape_curve,
     alpha_relaxation_time,
+    alpha_shape_superposition_residual,
     activated_barrier_temperature_law,
     correlated_domain_susceptibility,
     delayed_poisson_mean,
@@ -49,6 +51,7 @@ from renewal_cage import (  # noqa: E402
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
+    temperature_dependent_params,
     temperature_scan,
 )
 
@@ -187,6 +190,49 @@ def write_temperature_csv(
     wave_number: float,
 ) -> list[dict[str, float]]:
     rows = temperature_scan(temperatures, law, wave_number=wave_number)
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_alpha_shape_csv(
+    path: Path,
+    scaled_time: np.ndarray,
+    temperatures: list[float],
+    law: TemperatureLawParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float | str]]:
+    reference_temperature = temperatures[0]
+    reference_params = temperature_dependent_params(reference_temperature, law)
+    reference_curve = alpha_relaxation_shape_curve(wave_number, reference_params, scaled_time)
+    rows: list[dict[str, float | str]] = []
+    for temperature in temperatures:
+        params = temperature_dependent_params(temperature, law)
+        curve = alpha_relaxation_shape_curve(wave_number, params, scaled_time)
+        residual = alpha_shape_superposition_residual(
+            wave_number,
+            reference_params,
+            params,
+            scaled_time,
+        )
+        inverse_shift = 1.0 / temperature - 1.0 / reference_temperature
+        for idx, value in enumerate(scaled_time):
+            rows.append(
+                {
+                    "temperature_label": f"T={temperature:.2f}",
+                    "temperature": temperature,
+                    "inverse_temperature_shift": inverse_shift,
+                    "scaled_time": float(value),
+                    "alpha_shape": float(curve[idx]),
+                    "reference_alpha_shape": float(reference_curve[idx]),
+                    "log_shape_residual": float(np.log(curve[idx]) - np.log(reference_curve[idx])),
+                    "shape_control": residual["candidate_control"],
+                    "reference_control": residual["reference_control"],
+                    "tau_alpha_over_delay": residual["candidate_tau_alpha_over_delay"],
+                    "rms_log_shape_residual": residual["rms_log_shape_residual"],
+                    "max_abs_log_shape_residual": residual["max_abs_log_shape_residual"],
+                }
+            )
     write_sweep_csv(path, rows)
     return rows
 
@@ -962,6 +1008,62 @@ def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
     path.write_text(svg)
 
 
+def write_alpha_shape_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 560
+    left_a, top, right_a, bottom = 75, 85, 525, 460
+    left_b, right_b = 660, 1110
+    palette = ["#2b6cb0", "#c05621", "#2f855a", "#805ad5"]
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 55}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, x_values: np.ndarray, curves: list[tuple[str, np.ndarray]]) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, palette[idx % len(palette)]))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{palette[idx % len(palette)]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    labels = list(dict.fromkeys(str(row["temperature_label"]) for row in rows))
+    shape_curves = []
+    scaled_time = None
+    summary_rows = []
+    for label in labels:
+        label_rows = [row for row in rows if row["temperature_label"] == label]
+        if scaled_time is None:
+            scaled_time = np.array([float(row["scaled_time"]) for row in label_rows])
+        shape_curves.append((label, np.array([float(row["alpha_shape"]) for row in label_rows])))
+        summary_rows.append(label_rows[0])
+
+    inverse_shift = np.array([float(row["inverse_temperature_shift"]) for row in summary_rows])
+    rms = np.array([float(row["rms_log_shape_residual"]) for row in summary_rows])
+    control = np.array([float(row["shape_control"]) for row in summary_rows])
+    tau_over_delay = np.array([float(row["tau_alpha_over_delay"]) for row in summary_rows])
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Alpha-shape time-temperature superposition diagnostic</text>
+  {axes(left_a, right_a, "U. Alpha shape after tau_alpha scaling", "t / tau_alpha")}
+  {plot(left_a, right_a, scaled_time, shape_curves)}
+  {axes(left_b, right_b, "V. Collapse residual and control variable", "inverse-temperature shift")}
+  {plot(left_b, right_b, inverse_shift, [("RMS log-shape residual", rms), ("Gamma lambda tau_d / hot", control / control[0]), ("tau_alpha/tau_d", tau_over_delay / tau_over_delay[0])])}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -1373,6 +1475,14 @@ def main() -> None:
         wave_number=1.1,
     )
     write_temperature_svg(FIGURE_DIR / "renewal_cage_temperature.svg", temperature_rows)
+    alpha_shape_rows = write_alpha_shape_csv(
+        DATA_DIR / "renewal_cage_alpha_shape.csv",
+        np.geomspace(0.15, 4.0, 180),
+        [1.0, 0.78, 0.62],
+        temperature_law,
+        wave_number=1.1,
+    )
+    write_alpha_shape_svg(FIGURE_DIR / "renewal_cage_alpha_shape.svg", alpha_shape_rows)
 
     barrier = ActivatedBarrierParams(
         reference_temperature=1.0,

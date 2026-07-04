@@ -10,7 +10,8 @@ cage note as a short arXiv manuscript.
   scattering function, temperature-dependent alpha relaxation, Stokes-Einstein
   decoupling diagnostics, fractional Stokes-Einstein exponents,
   apparent alpha-activation/fragility diagnostics, activated-barrier gap
-  diagnostic, renewal-count susceptibility, renewal-domain chi4/cooperative-size
+  diagnostic, alpha-shape time-temperature-superposition residuals,
+  renewal-count susceptibility, renewal-domain chi4/cooperative-size
   estimator, peak diagnostics, NGP peak/alpha-relaxation coupling,
   finite-exchange heterogeneity diagnostics with stretched-like alpha decay and
   Gaussian recovery, a static-gamma mobility-disorder null model proving that

@@ -16,6 +16,8 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_time,
     apparent_alpha_activation_energies,
     activated_barrier_temperature_law,
+    alpha_relaxation_shape_curve,
+    alpha_shape_superposition_residual,
     correlated_domain_susceptibility,
     classify_delay_exponent,
     delayed_poisson_mean,
@@ -241,6 +243,71 @@ class DelayedRenewalCageTests(unittest.TestCase):
             delta=1e-12,
         )
         self.assertGreater(coupling["tau_alpha_over_peak_time"], 1.0)
+
+    def test_alpha_shape_curve_depends_only_on_delay_control(self):
+        params_a = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        params_b = DelayedRenewalCageParams(
+            cage_variance=1.8,
+            cage_tau=0.9,
+            jump_variance=0.8,
+            renewal_rate=0.09,
+            renewal_delay=6.0,
+        )
+        scaled_times = np.geomspace(0.15, 4.0, 120)
+
+        curve_a = alpha_relaxation_shape_curve(1.1, params_a, scaled_times)
+        curve_b = alpha_relaxation_shape_curve(1.1, params_b, scaled_times)
+
+        np.testing.assert_allclose(curve_a, curve_b, rtol=1e-12, atol=1e-12)
+        self.assertAlmostEqual(alpha_relaxation_shape_curve(1.1, params_a, np.array([1.0]))[0], 1.0)
+
+    def test_alpha_shape_superposition_residual_detects_control_change(self):
+        reference = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        same_shape = DelayedRenewalCageParams(
+            cage_variance=0.7,
+            cage_tau=0.4,
+            jump_variance=0.8,
+            renewal_rate=0.09,
+            renewal_delay=6.0,
+        )
+        different_shape = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=12.0,
+        )
+        scaled_times = np.geomspace(0.15, 4.0, 120)
+
+        collapsed = alpha_shape_superposition_residual(
+            1.1,
+            reference,
+            same_shape,
+            scaled_times,
+        )
+        broken = alpha_shape_superposition_residual(
+            1.1,
+            reference,
+            different_shape,
+            scaled_times,
+        )
+
+        self.assertLess(collapsed["rms_log_shape_residual"], 1e-12)
+        self.assertGreater(broken["rms_log_shape_residual"], 0.2)
+        self.assertAlmostEqual(collapsed["reference_control"], collapsed["candidate_control"], delta=1e-12)
+        self.assertGreater(broken["candidate_control"], broken["reference_control"])
 
     def test_renewal_scattering_susceptibility_is_closed_form_variance(self):
         params = DelayedRenewalCageParams(

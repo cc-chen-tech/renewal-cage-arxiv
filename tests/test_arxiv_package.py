@@ -30,6 +30,8 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_barrier.pdf", names)
             self.assertIn("figures/renewal_cage_heterogeneity.pdf", names)
             self.assertIn("figures/renewal_cage_heterogeneity_map.pdf", names)
+            self.assertIn("figures/renewal_cage_static_null.pdf", names)
+            self.assertIn("figures/renewal_cage_alpha_shape.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -42,6 +44,8 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_barrier.pdf", main_tex)
         self.assertIn("figures/renewal_cage_heterogeneity.pdf", main_tex)
         self.assertIn("figures/renewal_cage_heterogeneity_map.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_static_null.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_alpha_shape.pdf", main_tex)
         self.assertIn("figures/renewal_cage_inversion.pdf", main_tex)
         self.assertNotIn(".svg", main_tex)
 
@@ -55,6 +59,8 @@ class ArxivPackageTests(unittest.TestCase):
             first_barrier = (ROOT / "paper" / "figures" / "renewal_cage_barrier.pdf").read_bytes()
             first_heterogeneity = (ROOT / "paper" / "figures" / "renewal_cage_heterogeneity.pdf").read_bytes()
             first_heterogeneity_map = (ROOT / "paper" / "figures" / "renewal_cage_heterogeneity_map.pdf").read_bytes()
+            first_static_null = (ROOT / "paper" / "figures" / "renewal_cage_static_null.pdf").read_bytes()
+            first_alpha_shape = (ROOT / "paper" / "figures" / "renewal_cage_alpha_shape.pdf").read_bytes()
             first_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
             time.sleep(1.1)
@@ -66,6 +72,8 @@ class ArxivPackageTests(unittest.TestCase):
             second_barrier = (ROOT / "paper" / "figures" / "renewal_cage_barrier.pdf").read_bytes()
             second_heterogeneity = (ROOT / "paper" / "figures" / "renewal_cage_heterogeneity.pdf").read_bytes()
             second_heterogeneity_map = (ROOT / "paper" / "figures" / "renewal_cage_heterogeneity_map.pdf").read_bytes()
+            second_static_null = (ROOT / "paper" / "figures" / "renewal_cage_static_null.pdf").read_bytes()
+            second_alpha_shape = (ROOT / "paper" / "figures" / "renewal_cage_alpha_shape.pdf").read_bytes()
             second_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
         self.assertEqual(first_results, second_results)
@@ -75,6 +83,8 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_barrier, second_barrier)
         self.assertEqual(first_heterogeneity, second_heterogeneity)
         self.assertEqual(first_heterogeneity_map, second_heterogeneity_map)
+        self.assertEqual(first_static_null, second_static_null)
+        self.assertEqual(first_alpha_shape, second_alpha_shape)
         self.assertEqual(first_inversion, second_inversion)
 
 
