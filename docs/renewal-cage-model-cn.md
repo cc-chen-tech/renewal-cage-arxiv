@@ -633,6 +633,23 @@ finite-exchange renewal 不是充分解释。默认阈值
 `R alpha_2 >= 3` 且 alpha-rate renormalization `< 0.75` 时，联合可观测窗口
 从大约 `c=2` 开始。
 
+实际使用时，可以把它压缩成一个 residual：
+
+```text
+c_NGP = R_l alpha_2(t_l) - 1
+
+log(1 + Gamma_k c_alpha) / c_alpha
+  = -log Phi_alpha(k,t_l) / R_l
+
+Delta_c = log(c_alpha / c_NGP)
+```
+
+如果 `|Delta_c|` 小，late NGP recovery 和 alpha slowing 由同一个 exchange
+scale 控制；如果它很大，就 falsify 这个一参数 finite-exchange renewal 图像。
+默认例子在 `t_l=3.0e4` 给出 `c_NGP=24.94`、`c_alpha=25.00`、
+`Delta_c=0.0023`，通过；如果只把 alpha slope 换成对应 `c_alpha=2` 的值，
+则 `Delta_c=-2.52`，失败。
+
 ## 7.9. 从可观测量反演参数和证伪条件
 
 更强的可发表价值在于：模型不只是正向画曲线，也能从常见 glass observable 反推

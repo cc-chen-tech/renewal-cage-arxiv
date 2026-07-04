@@ -541,6 +541,59 @@ def gamma_exchange_diagnostic_map(
     return rows
 
 
+def infer_gamma_exchange_from_late_observables(
+    *,
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    late_renewal_count: float,
+    late_ngp: float,
+    observed_alpha_decay_per_renewal: float,
+    residual_tolerance: float = 0.15,
+) -> dict[str, float]:
+    """Infer finite-exchange consistency from late NGP and alpha-slope data."""
+
+    _validate(params)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if late_renewal_count <= 0.0:
+        raise ValueError("late_renewal_count must be positive")
+    if late_ngp <= 0.0:
+        raise ValueError("late_ngp must be positive")
+    if residual_tolerance <= 0.0:
+        raise ValueError("residual_tolerance must be positive")
+
+    gamma = 1.0 - math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    ratio_from_late_ngp = late_renewal_count * late_ngp - 1.0
+    if ratio_from_late_ngp < 0.0:
+        raise ValueError("late_renewal_count * late_ngp must be at least 1")
+    ratio_from_alpha_rate = infer_gamma_exchange_ratio_from_alpha_rate(
+        gamma_k=gamma,
+        observed_decay_per_renewal=observed_alpha_decay_per_renewal,
+    )
+    if ratio_from_late_ngp == 0.0 and ratio_from_alpha_rate == 0.0:
+        log_ratio_residual = 0.0
+    elif ratio_from_late_ngp <= 0.0 or ratio_from_alpha_rate <= 0.0:
+        log_ratio_residual = math.inf
+    else:
+        log_ratio_residual = math.log(ratio_from_alpha_rate / ratio_from_late_ngp)
+    passes = math.isfinite(log_ratio_residual) and abs(log_ratio_residual) <= residual_tolerance
+    return {
+        "wave_number": wave_number,
+        "gamma_k": gamma,
+        "late_renewal_count": late_renewal_count,
+        "late_ngp": late_ngp,
+        "late_ngp_renewal_amplitude": late_renewal_count * late_ngp,
+        "observed_alpha_decay_per_renewal": observed_alpha_decay_per_renewal,
+        "poisson_alpha_decay_per_renewal": gamma,
+        "alpha_rate_renormalization": observed_alpha_decay_per_renewal / gamma,
+        "ratio_from_late_ngp": ratio_from_late_ngp,
+        "ratio_from_alpha_rate": ratio_from_alpha_rate,
+        "log_ratio_residual": log_ratio_residual,
+        "passes_consistency": 1.0 if passes else 0.0,
+        "residual_tolerance": residual_tolerance,
+    }
+
+
 def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndarray:
     """Local KWW-like exponent ``d log[-log(decay)] / d log(t)``."""
 

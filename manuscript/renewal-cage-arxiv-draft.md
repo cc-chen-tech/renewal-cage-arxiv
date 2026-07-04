@@ -450,6 +450,15 @@ This gives a diagnostic map: for fixed `k`, the pair
 `(R alpha_2, -log Phi_alpha/R)` must fall on a one-parameter curve indexed by
 `c`. Disagreement between the `c` inferred from late NGP and the `c` inferred
 from alpha slope falsifies the finite-exchange renewal explanation.
+Operationally,
+
+```text
+c_NGP = R_l alpha_2(t_l) - 1
+log(1 + Gamma_k c_alpha) / c_alpha = -log Phi_alpha(k,t_l) / R_l
+Delta_c = log(c_alpha / c_NGP).
+```
+
+`Delta_c` is a scalar data-level residual for the finite-exchange mechanism.
 
 ## 5. Reproducible Results
 
@@ -472,6 +481,7 @@ data/renewal_cage_temperature.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
+data/renewal_cage_heterogeneity_protocol.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 figures/renewal_cage_results.svg
@@ -479,6 +489,8 @@ figures/renewal_cage_dimensionless.svg
 figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
 figures/renewal_cage_barrier.svg
+figures/renewal_cage_heterogeneity.svg
+figures/renewal_cage_heterogeneity_map.svg
 figures/renewal_cage_inversion.svg
 ```
 
@@ -514,6 +526,9 @@ alpha decay per renewal from `0.384` to `0.0944`; alpha-rate inversion recovers
 `c=25.0`.
 Scanning `c` places the onset of the joint observable window near `c=2` for the
 default thresholds `R alpha_2 >= 3` and alpha-rate renormalization below `0.75`.
+At `t_l=3.0e4`, the protocol gives `c_NGP=24.94`, `c_alpha=25.00`, and
+`Delta_c=0.0023` for the consistent example. A mismatched alpha slope
+corresponding to `c_alpha=2` gives `Delta_c=-2.52` and fails.
 
 The parameter sweeps show:
 

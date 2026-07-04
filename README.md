@@ -47,6 +47,10 @@ existence margin `D tau_d F(tau_alpha/tau_d) k^2 / [-log h]` to exceed one.
 A fuller observable inversion uses `f_k`, `D`, NGP peak time, and NGP peak
 height to infer `A`, `q`, `lambda`, and `tau_d`, leaving `tau_alpha` as a
 held-out consistency check.
+The finite-exchange protocol adds a second data-level residual: late NGP gives
+`c_NGP=R_l alpha_2(t_l)-1`, the alpha slope gives `c_alpha` through
+`log(1+Gamma_k c_alpha)/c_alpha`, and `log(c_alpha/c_NGP)` tests whether both
+observables share one exchange scale.
 The NGP peak and alpha relaxation are also linked by renewal counts:
 `R_peak=A/q` and
 `R_alpha=-log(h)/[1-exp(-k^2 q/2)]`, so their time ratio is fixed by the same
@@ -114,6 +118,7 @@ data/renewal_cage_barrier.csv
 data/renewal_cage_heterogeneity.csv
 data/renewal_cage_heterogeneity_diagnostics.csv
 data/renewal_cage_heterogeneity_map.csv
+data/renewal_cage_heterogeneity_protocol.csv
 data/renewal_cage_inversion.csv
 data/renewal_cage_full_inference.csv
 paper/figures/renewal_cage_results.pdf

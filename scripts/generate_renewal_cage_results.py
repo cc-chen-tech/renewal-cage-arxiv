@@ -28,6 +28,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
     infer_gamma_exchange_ratio_from_alpha_rate,
+    infer_gamma_exchange_from_late_observables,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
@@ -365,6 +366,41 @@ def write_heterogeneity_map_csv(
         shape=shape,
         heterogeneity_ratios=heterogeneity_ratios,
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_heterogeneity_protocol_csv(
+    path: Path,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+    *,
+    wave_number: float,
+    late_time: float,
+) -> list[dict[str, float | str]]:
+    late_array = np.array([late_time])
+    renewal = float(delayed_poisson_mean(late_array, params)[0])
+    late_ngp = float(gamma_exchange_ngp_1d(late_array, params, heterogeneity)[0])
+    diagnostics = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+    consistent = infer_gamma_exchange_from_late_observables(
+        wave_number=wave_number,
+        params=params,
+        late_renewal_count=renewal,
+        late_ngp=late_ngp,
+        observed_alpha_decay_per_renewal=diagnostics["late_alpha_decay_per_renewal"],
+    )
+    gamma_k = consistent["gamma_k"]
+    mismatched_alpha_rate = float(np.log1p(gamma_k * 2.0) / 2.0)
+    inconsistent = infer_gamma_exchange_from_late_observables(
+        wave_number=wave_number,
+        params=params,
+        late_renewal_count=renewal,
+        late_ngp=late_ngp,
+        observed_alpha_decay_per_renewal=mismatched_alpha_rate,
+    )
+    rows: list[dict[str, float | str]] = []
+    for label, row in [("consistent", consistent), ("inconsistent_alpha_slope", inconsistent)]:
+        rows.append({"case": label, **row})
     write_sweep_csv(path, rows)
     return rows
 
@@ -1225,6 +1261,13 @@ def main() -> None:
         shape=heterogeneity.shape,
         heterogeneity_ratios=[0.0, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 25.0, 40.0],
         wave_number=1.1,
+    )
+    write_heterogeneity_protocol_csv(
+        DATA_DIR / "renewal_cage_heterogeneity_protocol.csv",
+        params,
+        heterogeneity,
+        wave_number=1.1,
+        late_time=30000.0,
     )
     write_barrier_svg(
         FIGURE_DIR / "renewal_cage_barrier.svg",
