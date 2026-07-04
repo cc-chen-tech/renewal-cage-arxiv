@@ -321,6 +321,16 @@ D ~ tau_alpha^(-xi_SE).
 
 Ordinary Stokes-Einstein scaling has `xi_SE=1`; fractional decoupling has
 `0<xi_SE<1`.
+The same temperature scan gives an apparent activation energy and a local
+Angell-style fragility proxy:
+
+```text
+E_app(T) = d log tau_alpha(k,T) / d(1/T)
+m_loc(T) = E_app(T) / [T log(10)].
+```
+
+For Arrhenius relaxation `E_app` is constant; growth of `E_app` on cooling is
+the minimal fragility signal in the present effective theory.
 
 ## 4.8. Activated-barrier and susceptibility diagnostics
 
@@ -398,7 +408,8 @@ lambda_l       = 0.180000 from finite-time late-NGP inversion
 For the illustrative temperature law, cooling from `T=1.00` to `T=0.62`
 decreases `D` by a factor of `3.30`, increases `tau_alpha(k=1.1)` by a factor
 of `6.72`, raises the normalized `D tau_alpha` product to `2.03`, and lowers
-the local fractional exponent from `xi_SE=0.725` to `0.568`.
+the local fractional exponent from `xi_SE=0.725` to `0.568`. The same scan
+raises `E_app` from `2.69` to `3.43` and `m_loc` from `1.17` to `2.41`.
 Increasing the barrier gap `E_d-E_lambda` from `0` to `4.5` raises the cold-end
 normalized `D tau_alpha` from `1.01` to `3.30`.
 

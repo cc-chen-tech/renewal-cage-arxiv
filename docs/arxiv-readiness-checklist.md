@@ -9,9 +9,10 @@ cage note as a short arXiv manuscript.
 - Closed-form MSD, NGP, radial van Hove distribution, self-intermediate
   scattering function, temperature-dependent alpha relaxation, Stokes-Einstein
   decoupling diagnostics, fractional Stokes-Einstein exponents,
-  activated-barrier gap diagnostic, renewal-count susceptibility, peak
-  diagnostics, finite-time peak/late-NGP consistency diagnostics, and
-  scattering-transport observable inversion.
+  apparent alpha-activation/fragility diagnostics, activated-barrier gap
+  diagnostic, renewal-count susceptibility, peak diagnostics, finite-time
+  peak/late-NGP consistency diagnostics, and scattering-transport observable
+  inversion.
 - Generalized delay-exponent argument explaining the square-delay choice.
 - Reproducible CSV outputs, SVG figures, PDF manuscript figures, and arXiv
   source zip.

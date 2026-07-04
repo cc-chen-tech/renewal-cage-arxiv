@@ -25,4 +25,6 @@
 <text x="678" y="146" font-family="Arial, sans-serif" font-size="12" fill="#2f855a">alpha_peak / hot</text>
 <polyline points="660.00,449.70 676.79,450.01 694.36,450.65 712.77,451.31 732.09,451.99 752.38,452.67 773.72,453.36 796.19,454.05 819.89,454.74 844.90,455.43 871.36,456.10 899.39,456.76 929.13,457.40 960.75,458.02 994.42,458.62 1030.35,459.18 1068.79,459.73 1110.00,460.00" fill="none" stroke="#805ad5" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
 <text x="678" y="164" font-family="Arial, sans-serif" font-size="12" fill="#805ad5">xi_SE</text>
+<polyline points="660.00,431.68 676.79,431.24 694.36,430.33 712.77,429.37 732.09,428.36 752.38,427.30 773.72,426.20 796.19,425.06 819.89,423.89 844.90,422.69 871.36,421.46 899.39,420.23 929.13,418.99 960.75,417.76 994.42,416.54 1030.35,415.33 1068.79,414.15 1110.00,413.54" fill="none" stroke="#2b6cb0" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+<text x="678" y="182" font-family="Arial, sans-serif" font-size="12" fill="#2b6cb0">E_app / hot</text>
 </svg>

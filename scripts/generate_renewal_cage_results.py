@@ -544,9 +544,10 @@ def write_scattering_svg(
         start = 0
         for idx, (label, curve) in enumerate(curves):
             segment = y_all[start : start + len(curve)]
-            out.append(polyline(x, segment, colors[idx]))
+            color = colors[idx % len(colors)]
+            out.append(polyline(x, segment, color))
             out.append(
-                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{colors[idx]}">{label}</text>'
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
             )
             start += len(curve)
         return "\n".join(out)
@@ -586,9 +587,10 @@ def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
         start = 0
         for idx, (label, curve) in enumerate(curves):
             segment = y_all[start : start + len(curve)]
-            out.append(polyline(x, segment, colors[idx]))
+            color = colors[idx % len(colors)]
+            out.append(polyline(x, segment, color))
             out.append(
-                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{colors[idx]}">{label}</text>'
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
             )
             start += len(curve)
         return "\n".join(out)
@@ -600,6 +602,7 @@ def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
     peak_time = np.array([row["predicted_ngp_peak_time"] for row in rows])
     peak_height = np.array([row["predicted_ngp_peak"] for row in rows])
     fractional_exponent = np.array([row["fractional_stokes_einstein_exponent"] for row in rows])
+    activation_energy = np.array([row["apparent_alpha_activation_energy"] for row in rows])
     left_curves = [
         ("D / D_hot", diffusion / diffusion[0]),
         ("tau_alpha / tau_hot", tau_alpha / tau_alpha[0]),
@@ -610,6 +613,7 @@ def write_temperature_svg(path: Path, rows: list[dict[str, float]]) -> None:
         ("lambda tau_d / hot", lambda_tau / lambda_tau[0]),
         ("alpha_peak / hot", peak_height / peak_height[0]),
         ("xi_SE", fractional_exponent),
+        ("E_app / hot", activation_energy / activation_energy[0]),
     ]
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />

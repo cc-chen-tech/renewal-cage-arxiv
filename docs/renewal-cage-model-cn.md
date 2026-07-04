@@ -434,6 +434,30 @@ fractional SE violation 对应：
 当前默认温度扫描给出的 `xi_SE` 从热端约 `0.725` 降到冷端约 `0.568`，说明模型不只
 让 `D tau_alpha` 变大，也能产生文献常见的 fractional SE slope。
 
+另一个直接对应 glass transition 的温度诊断是 alpha relaxation 的 apparent activation
+energy：
+
+```text
+E_app(T) = d log tau_alpha(k,T) / d(1/T)
+```
+
+如果 relaxation 是 Arrhenius 的，`E_app` 是常数；如果冷却时 `E_app` 增长，就表示
+有效 relaxation barrier 正在升高。可以定义一个局部 Angell-style fragility proxy：
+
+```text
+m_loc(T) = E_app(T) / [T log(10)]
+```
+
+当前默认温度扫描中：
+
+```text
+E_app: 2.69 -> 3.43
+m_loc: 1.17 -> 2.41
+```
+
+所以这个模型已经能同时给出三类温度可检验量：`D tau_alpha` 增长、`xi_SE<1`、
+以及 `E_app/m_loc` 随冷却增强。
+
 ## 7.7. Activated barrier 和 renewal susceptibility
 
 上面的温度律可以从一个最小 activated barrier 图像得到。设长时间 renewal rate 的

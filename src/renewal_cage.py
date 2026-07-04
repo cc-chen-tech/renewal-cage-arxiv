@@ -366,6 +366,34 @@ def fractional_stokes_einstein_exponents(
     return -np.gradient(np.log(diffusion), log_tau)
 
 
+def apparent_alpha_activation_energies(
+    temperatures: np.ndarray,
+    tau_alpha: np.ndarray,
+) -> np.ndarray:
+    """Return local slopes ``d ln(tau_alpha) / d(1/T)``.
+
+    For Arrhenius relaxation ``tau_alpha=tau_0 exp(E/T)``, this diagnostic
+    returns the constant barrier ``E``. Growth of this slope on cooling is the
+    minimal fragility signal captured by the temperature-dependent model.
+    """
+
+    temperatures = np.asarray(temperatures, dtype=float)
+    tau_alpha = np.asarray(tau_alpha, dtype=float)
+    if temperatures.ndim != 1 or tau_alpha.ndim != 1:
+        raise ValueError("temperatures and tau_alpha must be one-dimensional")
+    if temperatures.size != tau_alpha.size:
+        raise ValueError("temperatures and tau_alpha must have the same length")
+    if temperatures.size < 2:
+        raise ValueError("at least two scan points are required")
+    if np.any(temperatures <= 0.0) or np.any(tau_alpha <= 0.0):
+        raise ValueError("temperatures and tau_alpha values must be positive")
+
+    inverse_temperature = 1.0 / temperatures
+    if np.any(np.isclose(np.diff(inverse_temperature), 0.0)):
+        raise ValueError("temperature values must be distinct")
+    return np.gradient(np.log(tau_alpha), inverse_temperature)
+
+
 def infer_parameters_from_scattering_transport(
     *,
     wave_number: float,
@@ -504,6 +532,13 @@ def temperature_scan(
     )
     for row, exponent in zip(rows, exponents):
         row["fractional_stokes_einstein_exponent"] = float(exponent)
+    activation_energies = apparent_alpha_activation_energies(
+        temperatures,
+        np.array([row["tau_alpha"] for row in rows]),
+    )
+    for row, activation_energy in zip(rows, activation_energies):
+        row["apparent_alpha_activation_energy"] = float(activation_energy)
+        row["local_fragility_index"] = float(activation_energy / (row["temperature"] * math.log(10.0)))
     return rows
 
 

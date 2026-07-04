@@ -13,6 +13,7 @@ from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
     TemperatureLawParams,
     alpha_relaxation_time,
+    apparent_alpha_activation_energies,
     activated_barrier_temperature_law,
     classify_delay_exponent,
     delayed_poisson_mean,
@@ -284,6 +285,10 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertIn("fractional_stokes_einstein_exponent", rows[-1])
         self.assertGreater(rows[-1]["fractional_stokes_einstein_exponent"], 0.0)
         self.assertLess(rows[-1]["fractional_stokes_einstein_exponent"], 1.0)
+        self.assertIn("apparent_alpha_activation_energy", rows[-1])
+        self.assertIn("local_fragility_index", rows[-1])
+        self.assertGreater(rows[-1]["apparent_alpha_activation_energy"], rows[0]["apparent_alpha_activation_energy"])
+        self.assertGreater(rows[-1]["local_fragility_index"], rows[0]["local_fragility_index"])
 
     def test_fractional_stokes_einstein_exponents_recover_power_law_slope(self):
         tau_alpha = np.array([2.0, 4.0, 8.0, 16.0, 32.0])
@@ -297,6 +302,20 @@ class DelayedRenewalCageTests(unittest.TestCase):
             fractional_stokes_einstein_exponents(np.array([1.0]), np.array([2.0]))
         with self.assertRaises(ValueError):
             fractional_stokes_einstein_exponents(np.array([1.0, -1.0]), np.array([2.0, 3.0]))
+
+    def test_apparent_alpha_activation_energies_recover_arrhenius_barrier(self):
+        temperatures = np.array([1.0, 0.9, 0.8, 0.7, 0.62])
+        barrier = 4.2
+        tau_alpha = 0.3 * np.exp(barrier / temperatures)
+        energies = apparent_alpha_activation_energies(temperatures, tau_alpha)
+
+        np.testing.assert_allclose(energies, barrier, rtol=1e-12, atol=1e-12)
+
+    def test_apparent_alpha_activation_energies_validate_inputs(self):
+        with self.assertRaises(ValueError):
+            apparent_alpha_activation_energies(np.array([1.0]), np.array([2.0]))
+        with self.assertRaises(ValueError):
+            apparent_alpha_activation_energies(np.array([1.0, 0.0]), np.array([2.0, 3.0]))
 
     def test_radial_van_hove_distribution_normalizes(self):
         params = DelayedRenewalCageParams(

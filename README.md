@@ -13,9 +13,9 @@ The model combines:
 - closed-form MSD, NGP, self van Hove distribution, self-intermediate
   scattering function, temperature-dependent alpha relaxation, peak
   asymptotics, Stokes-Einstein decoupling, activated-barrier diagnostics,
-  fractional Stokes-Einstein exponents, renewal-count susceptibility,
-  finite-time consistency diagnostics, and observable inversion/falsifiability
-  criteria.
+  fractional Stokes-Einstein exponents, apparent alpha-activation/fragility
+  diagnostics, renewal-count susceptibility, finite-time consistency
+  diagnostics, and observable inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 

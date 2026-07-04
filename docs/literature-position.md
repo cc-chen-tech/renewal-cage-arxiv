@@ -120,6 +120,8 @@ Stokes-Einstein diagnostic:
   xi_SE(T) = -d log D(T) / d log tau_alpha(k,T)
   ordinary SE: xi_SE = 1
   fractional SE: 0 < xi_SE < 1
+  E_app(T) = d log tau_alpha(k,T) / d(1/T)
+  local fragility proxy: m_loc(T) = E_app(T)/(T log 10)
 
 activated barrier interpretation:
   lambda(T) tau_d(T) = lambda0 tau_d0 exp[(E_d-E_lambda)(1/T-1/T0)]
@@ -144,8 +146,10 @@ consistency, and the long-time `1/t` NGP decay. A stronger glass-transition
 comparison can additionally ask whether they reproduce the same growth of
 `D tau_alpha` when cooling increases the delayed-renewal control parameter
 `lambda tau_d`, whether they predict a fractional exponent `xi_SE<1`, and
-whether their dynamic-heterogeneity measure has the same renewal-count
-susceptibility peak. The strongest falsifiability test is now the
+whether they produce growing apparent alpha-activation/fragility without an
+extra fit parameter. They should also explain whether their dynamic-heterogeneity
+measure has the same renewal-count susceptibility peak. The strongest
+falsifiability test is now the
 scattering-transport inversion: once `F_s` plateau, `D`, `tau_alpha`, and
 `tau_d` are specified, the model either has no positive-`q` solution or predicts
 the NGP peak time and height without another free parameter.
