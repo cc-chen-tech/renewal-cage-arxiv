@@ -120,6 +120,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
+    sota_glassbench_trajectory_npz_schema_probe_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
@@ -2588,6 +2589,70 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         ka = by_system["KA"]
         self.assertEqual(ka["tar_probe_stage"], "trajectory_member_prefix_incomplete")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_npz_schema_probe_verifies_coordinate_arrays(self):
+        tar_probe_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "trajectory_layout_ready": 1.0,
+                "primary_blocker": "streaming_npz_extraction_policy",
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "first_npz_member": "none",
+                "trajectory_layout_ready": 0.0,
+                "primary_blocker": "trajectory_payload",
+            },
+        ]
+        schema_manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                    "npz_member_bytes": 444_786,
+                    "npz_member_md5": "f51fd76f59b8288405a9e7abb61cdd0a",
+                    "npz_magic_verified": True,
+                    "arrays": [
+                        {"name": "box.npy", "shape": [], "dtype": "float64"},
+                        {"name": "types.npy", "shape": [1290], "dtype": "int64"},
+                        {"name": "initial_positions.npy", "shape": [1290, 2], "dtype": "float64"},
+                        {"name": "positions.npy", "shape": [20, 1290, 2], "dtype": "float64"},
+                    ],
+                }
+            ]
+        }
+
+        rows = sota_glassbench_trajectory_npz_schema_probe_gate(
+            schema_probe_id="glassbench_trajectory_npz_schema_probe",
+            accession_id="glassbench_zenodo_10118191",
+            tar_probe_rows=tar_probe_rows,
+            schema_probe_manifest=schema_manifest,
+            required_arrays=["box.npy", "types.npy", "positions.npy"],
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["schema_probe_stage"], "trajectory_npz_coordinate_schema_verified")
+        self.assertEqual(ka2d["first_npz_member"], "T0.30/train/N1290T0.30_3_tc01.npz")
+        self.assertEqual(ka2d["npz_magic_verified"], 1.0)
+        self.assertEqual(ka2d["npz_schema_ready"], 1.0)
+        self.assertEqual(ka2d["coordinate_array_ready"], 1.0)
+        self.assertEqual(ka2d["particle_count"], 1290.0)
+        self.assertEqual(ka2d["frame_count"], 20.0)
+        self.assertEqual(ka2d["spatial_dimension"], 2.0)
+        self.assertEqual(ka2d["array_names"], "box.npy;types.npy;initial_positions.npy;positions.npy")
+        self.assertEqual(ka2d["trajectory_extraction_ready"], 0.0)
+        self.assertEqual(ka2d["real_reanalysis_ready"], 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "full_npz_ensemble_extraction_policy")
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["schema_probe_stage"], "trajectory_inner_tar_layout_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):

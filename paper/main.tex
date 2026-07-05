@@ -1224,6 +1224,30 @@ requirements.
   trajectory archives.}
 \end{figure}
 
+The first-\texttt{npz} schema probe then opens those streamed members far
+enough to inspect their NumPy-array headers. The \texttt{T=0.23} member exposes
+\texttt{box.npy}, \texttt{types.npy}, \texttt{initial\_positions.npy},
+\texttt{initial\_positions\_inherent.npy}, and \texttt{positions.npy}; the
+\texttt{T=0.30} member exposes \texttt{box.npy}, \texttt{types.npy},
+\texttt{initial\_positions.npy}, and \texttt{positions.npy}. In both cases
+\texttt{positions.npy} has shape \texttt{20x1290x2} and dtype
+\texttt{float64}, while \texttt{types.npy} has length \texttt{1290}. This is
+the first direct coordinate-schema evidence in the GlassBench chain: the
+remote trajectory payloads contain two-dimensional particle trajectories with
+particle identities and box metadata. The gate remains below real reanalysis,
+because only the first member in each temperature archive has been schema
+probed and no full-ensemble extraction, time-step semantics, periodic-boundary
+normalization, or uncertainty weighting has been performed.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf}
+  \caption{GlassBench \texttt{npz} trajectory schema probe. First streamed
+  \texttt{npz} members are opened to verify array names, shapes, and dtypes for
+  coordinate-level trajectory ingestion, while full ensemble extraction and
+  uncertainty-weighted renewal-cage inversion remain later gates.}
+\end{figure}
+
 \clearpage
 
 The reanalysis-state ledger

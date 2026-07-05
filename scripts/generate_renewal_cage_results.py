@@ -106,6 +106,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
+    sota_glassbench_trajectory_npz_schema_probe_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_glassbench_payload_index_gate,
     sota_local_cache_verification_gate,
@@ -3383,6 +3384,26 @@ def write_sota_glassbench_trajectory_inner_tar_header_probe_csv(
     return rows
 
 
+def write_sota_glassbench_trajectory_npz_schema_probe_csv(
+    path: Path,
+    *,
+    tar_probe_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Verify first-NPZ coordinate-array schemas for GlassBench trajectories."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "trajectory_npz_schema_probe_10118191.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = sota_glassbench_trajectory_npz_schema_probe_gate(
+        schema_probe_id="glassbench_trajectory_npz_schema_probe",
+        accession_id="glassbench_zenodo_10118191",
+        tar_probe_rows=tar_probe_rows,
+        schema_probe_manifest=manifest,
+        required_arrays=manifest["required_arrays"],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -6082,6 +6103,63 @@ def write_sota_glassbench_trajectory_inner_tar_header_probe_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_npz_schema_probe_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 430
+    left, top = 75, 112
+    row_h = 72
+    colors = {
+        "trajectory_npz_coordinate_schema_verified": "#2b6cb0",
+        "trajectory_npz_schema_probe_missing": "#c05621",
+        "trajectory_npz_schema_probe_failed": "#c05621",
+        "trajectory_inner_tar_layout_incomplete": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["schema_probe_stage"])
+        color = colors[stage]
+        schema = int(float(row["npz_schema_ready"]))
+        coords = int(float(row["coordinate_array_ready"]))
+        extract = int(float(row["trajectory_extraction_ready"]))
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        shape = f'{int(float(row["frame_count"]))}x{int(float(row["particle_count"]))}x{int(float(row["spatial_dimension"]))}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 4}" width="320" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:45]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 460}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">schema={schema}; coords={coords}; shape={shape}; extract={extract}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">member: {str(row["first_npz_member"])[:108]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 56}" font-family="Arial, sans-serif" font-size="9" fill="#555">arrays: {str(row["array_names"])[:118]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA GlassBench NPZ trajectory schema probe</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">First NPZ trajectory members are opened from streamed prefixes to verify coordinate-array names, shapes, and dtypes.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 460}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">schema and blocker</text>
+  {"".join(marks)}
+  <rect x="75" y="382" width="14" height="14" fill="#2b6cb0" /><text x="96" y="394" font-family="Arial, sans-serif" font-size="12">single-member coordinate schema verified</text>
+  <rect x="390" y="382" width="14" height="14" fill="#c05621" /><text x="411" y="394" font-family="Arial, sans-serif" font-size="12">schema missing or upstream layout incomplete</text>
+  <text x="710" y="394" font-family="Arial, sans-serif" font-size="12">full ensemble extraction and uncertainty weighting remain later gates</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -7831,6 +7909,14 @@ def main() -> None:
     write_sota_glassbench_trajectory_inner_tar_header_probe_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.svg",
         glassbench_trajectory_inner_tar_header_probe_rows,
+    )
+    glassbench_trajectory_npz_schema_probe_rows = write_sota_glassbench_trajectory_npz_schema_probe_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_schema_probe.csv",
+        tar_probe_rows=glassbench_trajectory_inner_tar_header_probe_rows,
+    )
+    write_sota_glassbench_trajectory_npz_schema_probe_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_schema_probe.svg",
+        glassbench_trajectory_npz_schema_probe_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"

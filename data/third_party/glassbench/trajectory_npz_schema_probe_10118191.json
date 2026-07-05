@@ -1,0 +1,99 @@
+{
+  "source": "remote_zip_member_to_first_npz_schema_probe",
+  "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+  "required_arrays": [
+    "box.npy",
+    "types.npy",
+    "positions.npy"
+  ],
+  "entries": [
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.23",
+      "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+      "npz_member_bytes": 465710,
+      "npz_member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+      "npz_magic_verified": true,
+      "arrays": [
+        {
+          "name": "box.npy",
+          "shape": [],
+          "dtype": "float64"
+        },
+        {
+          "name": "types.npy",
+          "shape": [
+            1290
+          ],
+          "dtype": "int64"
+        },
+        {
+          "name": "initial_positions.npy",
+          "shape": [
+            1290,
+            2
+          ],
+          "dtype": "float64"
+        },
+        {
+          "name": "initial_positions_inherent.npy",
+          "shape": [
+            1290,
+            2
+          ],
+          "dtype": "float64"
+        },
+        {
+          "name": "positions.npy",
+          "shape": [
+            20,
+            1290,
+            2
+          ],
+          "dtype": "float64"
+        }
+      ]
+    },
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.30",
+      "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+      "npz_member_bytes": 444786,
+      "npz_member_md5": "f51fd76f59b8288405a9e7abb61cdd0a",
+      "npz_magic_verified": true,
+      "arrays": [
+        {
+          "name": "box.npy",
+          "shape": [],
+          "dtype": "float64"
+        },
+        {
+          "name": "types.npy",
+          "shape": [
+            1290
+          ],
+          "dtype": "int64"
+        },
+        {
+          "name": "initial_positions.npy",
+          "shape": [
+            1290,
+            2
+          ],
+          "dtype": "float64"
+        },
+        {
+          "name": "positions.npy",
+          "shape": [
+            20,
+            1290,
+            2
+          ],
+          "dtype": "float64"
+        }
+      ]
+    }
+  ]
+}

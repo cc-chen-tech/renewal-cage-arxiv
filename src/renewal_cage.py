@@ -3194,6 +3194,174 @@ def sota_glassbench_trajectory_inner_tar_header_probe_gate(
     return rows
 
 
+def sota_glassbench_trajectory_npz_schema_probe_gate(
+    *,
+    schema_probe_id: str,
+    accession_id: str,
+    tar_probe_rows: Sequence[dict[str, float | str]],
+    schema_probe_manifest: dict,
+    required_arrays: Sequence[str],
+) -> list[dict[str, float | str]]:
+    """Verify first-NPZ array schemas after inner tar headers are visible."""
+
+    if not schema_probe_id:
+        raise ValueError("schema_probe_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not required_arrays:
+        raise ValueError("required_arrays must be nonempty")
+
+    entries_value = schema_probe_manifest.get("entries", [])
+    schema_entries = (
+        [entry for entry in entries_value if isinstance(entry, dict)]
+        if isinstance(entries_value, list)
+        else []
+    )
+    schema_by_key = {
+        (str(entry.get("path", "")), str(entry.get("first_npz_member", ""))): entry
+        for entry in schema_entries
+        if entry.get("path") and entry.get("first_npz_member")
+    }
+
+    rows: list[dict[str, float | str]] = []
+    for tar_probe in tar_probe_rows:
+        system_id = str(tar_probe.get("system_id", "unknown"))
+        temperature = str(tar_probe.get("temperature", "none"))
+        source_path = str(tar_probe.get("source_path", "none"))
+        first_npz_member = str(tar_probe.get("first_npz_member", "none"))
+        layout_ready = bool(float(tar_probe.get("trajectory_layout_ready", 0.0)))
+        row_id = f"{schema_probe_id}_{system_id.lower()}_t{temperature.replace('.', '_')}"
+        if not layout_ready or source_path == "none" or first_npz_member == "none":
+            rows.append(
+                {
+                    "schema_probe_id": row_id,
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "npz_member_bytes": 0.0,
+                    "npz_member_md5": "none",
+                    "array_names": "none",
+                    "array_shapes": "none",
+                    "array_dtypes": "none",
+                    "required_arrays_present": 0.0,
+                    "npz_magic_verified": 0.0,
+                    "npz_schema_ready": 0.0,
+                    "coordinate_array_ready": 0.0,
+                    "particle_count": 0.0,
+                    "frame_count": 0.0,
+                    "spatial_dimension": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": str(tar_probe.get("primary_blocker", "inner_tar_layout")),
+                    "schema_probe_stage": "trajectory_inner_tar_layout_incomplete",
+                }
+            )
+            continue
+
+        entry = schema_by_key.get((source_path, first_npz_member))
+        if entry is None:
+            rows.append(
+                {
+                    "schema_probe_id": row_id,
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "npz_member_bytes": 0.0,
+                    "npz_member_md5": "none",
+                    "array_names": "none",
+                    "array_shapes": "none",
+                    "array_dtypes": "none",
+                    "required_arrays_present": 0.0,
+                    "npz_magic_verified": 0.0,
+                    "npz_schema_ready": 0.0,
+                    "coordinate_array_ready": 0.0,
+                    "particle_count": 0.0,
+                    "frame_count": 0.0,
+                    "spatial_dimension": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "npz_schema_probe",
+                    "schema_probe_stage": "trajectory_npz_schema_probe_missing",
+                }
+            )
+            continue
+
+        arrays_value = entry.get("arrays", [])
+        arrays = (
+            [array for array in arrays_value if isinstance(array, dict)]
+            if isinstance(arrays_value, list)
+            else []
+        )
+        array_names = [str(array.get("name", "")) for array in arrays if array.get("name")]
+        shape_by_name = {
+            str(array.get("name", "")): array.get("shape", [])
+            for array in arrays
+            if array.get("name")
+        }
+        dtype_by_name = {
+            str(array.get("name", "")): str(array.get("dtype", "unknown"))
+            for array in arrays
+            if array.get("name")
+        }
+        required_present = all(name in array_names for name in required_arrays)
+        positions_shape = shape_by_name.get("positions.npy", [])
+        positions_ready = (
+            isinstance(positions_shape, list)
+            and len(positions_shape) == 3
+            and all(isinstance(value, int) and value > 0 for value in positions_shape)
+            and dtype_by_name.get("positions.npy") in {"float32", "float64"}
+        )
+        frame_count = positions_shape[0] if positions_ready else 0
+        particle_count = positions_shape[1] if positions_ready else 0
+        dimension = positions_shape[2] if positions_ready else 0
+        npz_bytes = int(entry.get("npz_member_bytes", 0) or 0)
+        magic_verified = bool(entry.get("npz_magic_verified", False))
+        schema_ready = npz_bytes > 0 and magic_verified and required_present and positions_ready
+        if schema_ready:
+            stage = "trajectory_npz_coordinate_schema_verified"
+            blocker = "full_npz_ensemble_extraction_policy"
+        else:
+            stage = "trajectory_npz_schema_probe_failed"
+            blocker = "npz_coordinate_schema"
+
+        rows.append(
+            {
+                "schema_probe_id": row_id,
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "first_npz_member": first_npz_member,
+                "npz_member_bytes": float(npz_bytes),
+                "npz_member_md5": str(entry.get("npz_member_md5", "none")),
+                "array_names": ";".join(array_names) or "none",
+                "array_shapes": ";".join(
+                    f"{name}:{'x'.join(str(value) for value in shape_by_name.get(name, [])) or 'scalar'}"
+                    for name in array_names
+                )
+                or "none",
+                "array_dtypes": ";".join(f"{name}:{dtype_by_name.get(name, 'unknown')}" for name in array_names)
+                or "none",
+                "required_arrays_present": float(required_present),
+                "npz_magic_verified": float(magic_verified),
+                "npz_schema_ready": float(schema_ready),
+                "coordinate_array_ready": float(positions_ready),
+                "particle_count": float(particle_count),
+                "frame_count": float(frame_count),
+                "spatial_dimension": float(dimension),
+                "trajectory_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": blocker,
+                "schema_probe_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

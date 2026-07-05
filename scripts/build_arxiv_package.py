@@ -2353,6 +2353,67 @@ def write_sota_glassbench_trajectory_inner_tar_header_probe_pdf(path: Path) -> N
     c.save()
 
 
+def write_sota_glassbench_trajectory_npz_schema_probe_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_schema_probe.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA GlassBench NPZ trajectory schema probe")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "First NPZ members are opened from streamed trajectory prefixes to verify coordinate-array schemas.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "target")
+    c.drawString(left + 75, top, "stage")
+    c.drawString(left + 330, top, "schema")
+    c.drawString(left + 380, top, "coords")
+    c.drawString(left + 430, top, "shape")
+    c.drawString(left + 505, top, "extract")
+    c.drawString(left + 555, top, "blocker")
+    palette = {
+        "trajectory_npz_coordinate_schema_verified": colors.HexColor("#2b6cb0"),
+        "trajectory_npz_schema_probe_missing": colors.HexColor("#c05621"),
+        "trajectory_npz_schema_probe_failed": colors.HexColor("#c05621"),
+        "trajectory_inner_tar_layout_incomplete": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 6.9)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 52
+        stage = row["schema_probe_stage"]
+        target = f"{row['system_id']} T={row['temperature']}"
+        shape = (
+            f"{int(float(row['frame_count']))}x"
+            f"{int(float(row['particle_count']))}x"
+            f"{int(float(row['spatial_dimension']))}"
+        )
+        c.setFillColor(colors.black)
+        c.drawString(left, y, target)
+        c.setFillColor(palette[stage])
+        c.rect(left + 75, y - 4, 232, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 81, y, stage.replace("_", " ")[:36])
+        c.setFillColor(colors.black)
+        c.drawString(left + 345, y, str(int(float(row["npz_schema_ready"]))))
+        c.drawString(left + 397, y, str(int(float(row["coordinate_array_ready"]))))
+        c.drawString(left + 430, y, shape)
+        c.drawString(left + 522, y, str(int(float(row["trajectory_extraction_ready"]))))
+        c.drawString(left + 555, y, row["primary_blocker"].replace("_", " ")[:30])
+        c.drawString(left + 75, y - 12, f"member={row['first_npz_member'][:95]}")
+        c.drawString(
+            left + 75,
+            y - 24,
+            f"bytes={int(float(row['npz_member_bytes']))}; md5={row['npz_member_md5']}; arrays={row['array_names'][:70]}",
+        )
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3573,6 +3634,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_inner_tar_header_probe_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf"
     )
+    sota_glassbench_trajectory_npz_schema_probe_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -3647,6 +3711,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_glassbench_trajectory_inner_tar_header_probe_pdf(
         sota_glassbench_trajectory_inner_tar_header_probe_pdf
     )
+    write_sota_glassbench_trajectory_npz_schema_probe_pdf(sota_glassbench_trajectory_npz_schema_probe_pdf)
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
     write_sota_remote_result_curve_target_fetch_pdf(sota_remote_result_curve_target_fetch_pdf)
@@ -3742,6 +3807,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_inner_tar_header_probe_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf",
+        )
+        archive.write(
+            sota_glassbench_trajectory_npz_schema_probe_pdf,
+            "figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf",
         )
         archive.write(
             sota_remote_result_curve_cache_pdf,
