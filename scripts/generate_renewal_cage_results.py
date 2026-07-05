@@ -98,6 +98,7 @@ from renewal_cage import (  # noqa: E402
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
+    sota_archive_preflight_gate,
     sota_data_accession_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
@@ -2989,6 +2990,81 @@ def write_sota_data_accession_csv(path: Path) -> list[dict[str, float | str]]:
             has_precomputed_descriptors=False,
             local_cache_present=False,
             intended_protocols=["thermodynamic_entropy_closure"],
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_archive_preflight_csv(path: Path) -> list[dict[str, float | str]]:
+    """Preflight public trajectory archives before local SOTA reanalysis."""
+
+    glassbench_required_fields = [
+        "coordinate_file",
+        "time_grid",
+        "particle_identity",
+        "box_geometry",
+        "temperature_or_state_point",
+        "species_labels",
+        "units_metadata",
+    ]
+    rows = [
+        sota_archive_preflight_gate(
+            preflight_id="glassbench_archive_preflight",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            archive_name="GlassBench.zip",
+            archive_size_bytes=6042260027,
+            archive_md5="82c83a7146eb749e13417e4350022417",
+            readme_name="README",
+            readme_size_bytes=2147,
+            readme_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            max_automatic_download_bytes=100_000_000,
+            full_archive_download_approved=False,
+            local_readme_present=False,
+            local_archive_present=False,
+            required_schema_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            observed_schema_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            required_local_fields=glassbench_required_fields,
+            available_local_fields=[],
+        ),
+        sota_archive_preflight_gate(
+            preflight_id="synthetic_archive_preflight",
+            accession_id="synthetic_local_cache",
+            source_id="synthetic_intermediate_scattering_fixture",
+            archive_name="synthetic.zip",
+            archive_size_bytes=2500000,
+            archive_md5="0123456789abcdef0123456789abcdef",
+            readme_name="README.md",
+            readme_size_bytes=2048,
+            readme_md5="abcdef0123456789abcdef0123456789",
+            max_automatic_download_bytes=100_000_000,
+            full_archive_download_approved=False,
+            local_readme_present=True,
+            local_archive_present=True,
+            required_schema_tokens=["synthetic", "_trajectories"],
+            observed_schema_tokens=["synthetic", "_trajectories"],
+            required_local_fields=["coordinate_file", "time_grid", "particle_identity"],
+            available_local_fields=["coordinate_file", "time_grid", "particle_identity"],
+        ),
+        sota_archive_preflight_gate(
+            preflight_id="missing_schema_preflight",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            archive_name="GlassBench.zip",
+            archive_size_bytes=6042260027,
+            archive_md5="82c83a7146eb749e13417e4350022417",
+            readme_name="README",
+            readme_size_bytes=2147,
+            readme_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            max_automatic_download_bytes=100_000_000,
+            full_archive_download_approved=True,
+            local_readme_present=False,
+            local_archive_present=False,
+            required_schema_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            observed_schema_tokens=["KA", "_models", "_results"],
+            required_local_fields=glassbench_required_fields,
+            available_local_fields=[],
         ),
     ]
     write_sweep_csv(path, rows)
@@ -6388,6 +6464,9 @@ def main() -> None:
     write_sota_data_accession_svg(
         FIGURE_DIR / "renewal_cage_sota_data_accession.svg",
         data_accession_rows,
+    )
+    write_sota_archive_preflight_csv(
+        DATA_DIR / "renewal_cage_sota_archive_preflight.csv"
     )
     readme_schema_rows = write_sota_readme_schema_csv(
         DATA_DIR / "renewal_cage_sota_readme_schema.csv"

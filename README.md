@@ -268,6 +268,7 @@ data/renewal_cage_inversion_identifiability_audit.csv
 data/renewal_cage_frontier_benchmark_horizon.csv
 data/renewal_cage_sota_source_provenance.csv
 data/renewal_cage_sota_data_accession.csv
+data/renewal_cage_sota_archive_preflight.csv
 data/renewal_cage_sota_readme_schema.csv
 data/renewal_cage_trajectory_adapter_contract.csv
 data/renewal_cage_literature_inversion_readiness.csv

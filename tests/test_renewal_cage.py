@@ -112,6 +112,7 @@ from renewal_cage import (  # noqa: E402
     stokes_einstein_benchmark_consistency,
     stretched_alpha_benchmark_consistency,
     stokes_einstein_product,
+    sota_archive_preflight_gate,
     sota_claim_alignment,
     sota_data_accession_gate,
     sota_readme_schema_gate,
@@ -1944,6 +1945,96 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["accession_stage"], "scope_boundary_accession")
         self.assertEqual(row["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
         self.assertEqual(row["scope_boundary"], 1.0)
+
+    def test_sota_archive_preflight_gate_requires_large_download_approval_for_glassbench(self):
+        row = sota_archive_preflight_gate(
+            preflight_id="glassbench_preflight",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            archive_name="GlassBench.zip",
+            archive_size_bytes=6042260027,
+            archive_md5="82c83a7146eb749e13417e4350022417",
+            readme_name="README",
+            readme_size_bytes=2147,
+            readme_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            max_automatic_download_bytes=100_000_000,
+            full_archive_download_approved=False,
+            local_readme_present=False,
+            local_archive_present=False,
+            required_schema_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            observed_schema_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            required_local_fields=[
+                "coordinate_file",
+                "time_grid",
+                "particle_identity",
+                "box_geometry",
+                "temperature_or_state_point",
+                "species_labels",
+                "units_metadata",
+            ],
+            available_local_fields=[],
+        )
+
+        self.assertEqual(row["preflight_stage"], "large_archive_approval_required")
+        self.assertEqual(row["ready_for_readme_schema_cache"], 1.0)
+        self.assertEqual(row["ready_for_local_reanalysis"], 0.0)
+        self.assertEqual(row["large_archive"], 1.0)
+        self.assertEqual(row["primary_blocker"], "large_archive_download_approval")
+        self.assertGreater(row["archive_size_gb"], 6.0)
+        self.assertEqual(row["missing_schema_tokens"], "none")
+
+    def test_sota_archive_preflight_gate_marks_local_archive_ready(self):
+        row = sota_archive_preflight_gate(
+            preflight_id="synthetic_archive_preflight",
+            accession_id="synthetic_local_cache",
+            source_id="synthetic_intermediate_scattering_fixture",
+            archive_name="synthetic.zip",
+            archive_size_bytes=2500000,
+            archive_md5="0123456789abcdef0123456789abcdef",
+            readme_name="README.md",
+            readme_size_bytes=2048,
+            readme_md5="abcdef0123456789abcdef0123456789",
+            max_automatic_download_bytes=100_000_000,
+            full_archive_download_approved=False,
+            local_readme_present=True,
+            local_archive_present=True,
+            required_schema_tokens=["synthetic", "_trajectories"],
+            observed_schema_tokens=["synthetic", "_trajectories"],
+            required_local_fields=["coordinate_file", "time_grid", "particle_identity"],
+            available_local_fields=["coordinate_file", "time_grid", "particle_identity"],
+        )
+
+        self.assertEqual(row["preflight_stage"], "local_archive_reanalysis_ready")
+        self.assertEqual(row["ready_for_local_reanalysis"], 1.0)
+        self.assertEqual(row["full_archive_download_allowed"], 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
+
+    def test_sota_archive_preflight_gate_blocks_incomplete_readme_schema(self):
+        row = sota_archive_preflight_gate(
+            preflight_id="missing_schema_preflight",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            archive_name="GlassBench.zip",
+            archive_size_bytes=6042260027,
+            archive_md5="82c83a7146eb749e13417e4350022417",
+            readme_name="README",
+            readme_size_bytes=2147,
+            readme_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            max_automatic_download_bytes=100_000_000,
+            full_archive_download_approved=True,
+            local_readme_present=False,
+            local_archive_present=False,
+            required_schema_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            observed_schema_tokens=["KA", "_models", "_results"],
+            required_local_fields=["coordinate_file"],
+            available_local_fields=[],
+        )
+
+        self.assertEqual(row["preflight_stage"], "readme_schema_incomplete")
+        self.assertEqual(row["ready_for_readme_schema_cache"], 0.0)
+        self.assertEqual(row["ready_for_local_reanalysis"], 0.0)
+        self.assertEqual(row["primary_blocker"], "schema_tokens")
+        self.assertIn("_trajectories", row["missing_schema_tokens"])
 
     def test_sota_readme_schema_gate_marks_glassbench_remote_schema_ready(self):
         row = sota_readme_schema_gate(

@@ -1067,6 +1067,14 @@ step for those sources. For the public GlassBench Zenodo record it stores DOI
 README/schema availability. Because the archive is not locally cached in this
 repository, this row is marked as remote-accession ready but not yet a local
 real-data reanalysis.
+The archive-preflight table
+\texttt{renewal\_cage\_sota\_archive\_preflight.csv} makes this operational:
+the GlassBench README is small enough for schema caching and has its own md5
+checksum, but the full \texttt{GlassBench.zip} archive is a 6.04 GB download
+and is blocked until a large-file download policy or local cache is supplied.
+The same table includes a synthetic positive-control archive and a
+missing-schema negative control, so remote metadata readiness is not confused
+with completed trajectory fitting.
 The README-schema gate
 \texttt{renewal\_cage\_sota\_readme\_schema.csv} then checks the next layer of
 metadata without downloading the full archive: the public README names the

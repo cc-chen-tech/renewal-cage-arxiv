@@ -337,6 +337,30 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermo["accession_stage"], "scope_boundary_accession")
         self.assertEqual(float(thermo["scope_boundary"]), 1.0)
 
+    def test_sota_archive_preflight_requires_policy_before_full_glassbench_download(self):
+        path = ROOT / "data" / "renewal_cage_sota_archive_preflight.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["preflight_id"]: row for row in rows}
+        glassbench = by_id["glassbench_archive_preflight"]
+        self.assertEqual(glassbench["preflight_stage"], "large_archive_approval_required")
+        self.assertEqual(glassbench["archive_name"], "GlassBench.zip")
+        self.assertEqual(glassbench["readme_name"], "README")
+        self.assertEqual(glassbench["archive_md5"], "82c83a7146eb749e13417e4350022417")
+        self.assertEqual(glassbench["readme_md5"], "f1a192f54a2fa7a2b3533af0011b80dc")
+        self.assertEqual(float(glassbench["ready_for_readme_schema_cache"]), 1.0)
+        self.assertEqual(float(glassbench["ready_for_local_reanalysis"]), 0.0)
+        self.assertEqual(float(glassbench["large_archive"]), 1.0)
+        self.assertEqual(glassbench["primary_blocker"], "large_archive_download_approval")
+        self.assertIn("_trajectories", glassbench["required_schema_tokens"])
+
+        synthetic = by_id["synthetic_archive_preflight"]
+        self.assertEqual(synthetic["preflight_stage"], "local_archive_reanalysis_ready")
+        self.assertEqual(float(synthetic["ready_for_local_reanalysis"]), 1.0)
+        self.assertEqual(synthetic["primary_blocker"], "none")
+
     def test_sota_readme_schema_gate_records_remote_schema_without_archive_inspection(self):
         path = ROOT / "data" / "renewal_cage_sota_readme_schema.csv"
         self.assertTrue(path.exists())

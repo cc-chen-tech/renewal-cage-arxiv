@@ -1861,6 +1861,144 @@ def sota_data_accession_gate(
     }
 
 
+def sota_archive_preflight_gate(
+    *,
+    preflight_id: str,
+    accession_id: str,
+    source_id: str,
+    archive_name: str,
+    archive_size_bytes: int,
+    archive_md5: str,
+    readme_name: str,
+    readme_size_bytes: int,
+    readme_md5: str,
+    max_automatic_download_bytes: int,
+    full_archive_download_approved: bool,
+    local_readme_present: bool,
+    local_archive_present: bool,
+    required_schema_tokens: Sequence[str],
+    observed_schema_tokens: Sequence[str],
+    required_local_fields: Sequence[str],
+    available_local_fields: Sequence[str],
+) -> dict[str, float | str]:
+    """Preflight a public trajectory archive before claiming local reanalysis."""
+
+    for name, value in {
+        "preflight_id": preflight_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "archive_name": archive_name,
+        "archive_md5": archive_md5,
+        "readme_name": readme_name,
+        "readme_md5": readme_md5,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    for name, value in {
+        "archive_size_bytes": archive_size_bytes,
+        "readme_size_bytes": readme_size_bytes,
+        "max_automatic_download_bytes": max_automatic_download_bytes,
+    }.items():
+        if value < 0:
+            raise ValueError(f"{name} must be nonnegative")
+    if max_automatic_download_bytes <= 0:
+        raise ValueError("max_automatic_download_bytes must be positive")
+    if not required_schema_tokens:
+        raise ValueError("required_schema_tokens must be nonempty")
+    if not required_local_fields:
+        raise ValueError("required_local_fields must be nonempty")
+    for name, values in {
+        "required_schema_tokens": required_schema_tokens,
+        "observed_schema_tokens": observed_schema_tokens,
+        "required_local_fields": required_local_fields,
+        "available_local_fields": available_local_fields,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    schema_required = list(dict.fromkeys(required_schema_tokens))
+    schema_observed = list(dict.fromkeys(observed_schema_tokens))
+    fields_required = list(dict.fromkeys(required_local_fields))
+    fields_available = list(dict.fromkeys(available_local_fields))
+    missing_schema = [token for token in schema_required if token not in set(schema_observed)]
+    missing_fields = [field for field in fields_required if field not in set(fields_available)]
+
+    archive_checksum_available = archive_md5 != "none" and len(archive_md5) >= 16
+    readme_checksum_available = readme_md5 != "none" and len(readme_md5) >= 16
+    large_archive = archive_size_bytes > max_automatic_download_bytes
+    readme_download_allowed = readme_size_bytes <= max_automatic_download_bytes
+    full_download_allowed = (not large_archive) or bool(full_archive_download_approved)
+    schema_ready = bool(schema_required) and not missing_schema and readme_checksum_available
+    ready_for_readme_cache = schema_ready and readme_download_allowed
+    ready_for_local = (
+        local_archive_present
+        and archive_checksum_available
+        and schema_ready
+        and not missing_fields
+    )
+
+    if not archive_checksum_available:
+        stage = "archive_checksum_missing"
+        blocker = "archive_md5"
+    elif not readme_checksum_available:
+        stage = "readme_checksum_missing"
+        blocker = "readme_md5"
+    elif missing_schema:
+        stage = "readme_schema_incomplete"
+        blocker = "schema_tokens"
+    elif ready_for_local:
+        stage = "local_archive_reanalysis_ready"
+        blocker = "none"
+    elif local_archive_present and missing_fields:
+        stage = "local_adapter_contract_incomplete"
+        blocker = missing_fields[0]
+    elif large_archive and not full_archive_download_approved:
+        stage = "large_archive_approval_required"
+        blocker = "large_archive_download_approval"
+    elif full_download_allowed:
+        stage = "archive_download_ready"
+        blocker = "local_archive"
+    else:
+        stage = "archive_download_blocked"
+        blocker = "download_policy"
+
+    return {
+        "preflight_id": preflight_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "archive_name": archive_name,
+        "archive_size_bytes": float(archive_size_bytes),
+        "archive_size_gb": archive_size_bytes / 1_000_000_000.0,
+        "archive_md5": archive_md5,
+        "readme_name": readme_name,
+        "readme_size_bytes": float(readme_size_bytes),
+        "readme_md5": readme_md5,
+        "max_automatic_download_bytes": float(max_automatic_download_bytes),
+        "large_archive": float(large_archive),
+        "readme_download_allowed": float(readme_download_allowed),
+        "full_archive_download_allowed": float(full_download_allowed),
+        "full_archive_download_approved": float(full_archive_download_approved),
+        "local_readme_present": float(local_readme_present),
+        "local_archive_present": float(local_archive_present),
+        "required_schema_tokens": ";".join(schema_required),
+        "observed_schema_tokens": ";".join(schema_observed) if schema_observed else "none",
+        "missing_schema_tokens": ";".join(missing_schema) if missing_schema else "none",
+        "required_local_fields": ";".join(fields_required),
+        "available_local_fields": ";".join(fields_available) if fields_available else "none",
+        "missing_local_fields": ";".join(missing_fields) if missing_fields else "none",
+        "schema_token_coverage": (
+            (len(schema_required) - len(missing_schema)) / len(schema_required)
+        ),
+        "local_field_coverage": (
+            (len(fields_required) - len(missing_fields)) / len(fields_required)
+        ),
+        "ready_for_readme_schema_cache": float(ready_for_readme_cache),
+        "ready_for_local_reanalysis": float(ready_for_local),
+        "primary_blocker": blocker,
+        "preflight_stage": stage,
+    }
+
+
 def sota_readme_schema_gate(
     *,
     schema_id: str,
