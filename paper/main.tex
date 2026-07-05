@@ -1013,6 +1013,11 @@ Fickian non-Gaussian colloid data \cite{guan2014fickian} as qualitatively
 useful but not yet machine-readable, uncertainty-weighted inversion inputs in
 this repository. This is the current boundary between literature-level SOTA
 agreement and a future raw-data fit.
+The file
+\texttt{renewal\_cage\_observable\_falsification\_matrix.csv} refines this
+boundary by asking a stricter question: for each benchmark paper, which
+diagnostic protocols can be falsified from the observables actually reported,
+and which missing observable is the primary blocker?
 
 \begin{figure}[h]
   \centering
@@ -1194,6 +1199,18 @@ agreement and a future raw-data fit.
   of model-required observables available from representative benchmark
   papers, while the flags separate qualitative comparison readiness from
   quantitative and uncertainty-weighted inversion readiness.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_observable_falsification_matrix.pdf}
+  \caption{Observable-to-diagnostic falsification matrix. Each benchmark paper
+  is crossed with the van-Hove recovery, multi-$k$ alpha-shape,
+  persistence/exchange-$\chi_4$, Stokes-Einstein, and four-point facilitation
+  diagnostics. Blue cells have the structural observables needed for a
+  falsification check but still lack machine-readable uncertainty estimates;
+  yellow and red cells identify the first missing observable that blocks the
+  corresponding diagnostic.}
 \end{figure}
 
 \begin{figure}[h]

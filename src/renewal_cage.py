@@ -1101,6 +1101,60 @@ def literature_inversion_readiness(
     }
 
 
+def observable_falsification_matrix(
+    *,
+    benchmark_id: str,
+    benchmark_source: str,
+    available_observables: list[str],
+    diagnostic_requirements: dict[str, list[str]],
+    has_machine_readable_data: bool,
+    has_uncertainty_estimates: bool,
+) -> list[dict[str, float | str]]:
+    """Map literature observables to the diagnostic tests they can falsify."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not benchmark_source:
+        raise ValueError("benchmark_source must be nonempty")
+    if not diagnostic_requirements:
+        raise ValueError("diagnostic_requirements must be nonempty")
+    if any(not item for item in available_observables):
+        raise ValueError("available_observables must be nonempty strings")
+
+    available = list(dict.fromkeys(available_observables))
+    available_set = set(available)
+    rows: list[dict[str, float | str]] = []
+    for diagnostic_id, required_observables in diagnostic_requirements.items():
+        if not diagnostic_id:
+            raise ValueError("diagnostic ids must be nonempty")
+        if not required_observables:
+            raise ValueError("diagnostic requirements must be nonempty")
+        required = list(dict.fromkeys(required_observables))
+        if any(not item for item in required):
+            raise ValueError("diagnostic requirements must be nonempty strings")
+        missing = [item for item in required if item not in available_set]
+        coverage = (len(required) - len(missing)) / len(required)
+        structural_ready = len(missing) == 0
+        quantitative_ready = structural_ready and has_machine_readable_data and has_uncertainty_estimates
+        rows.append(
+            {
+                "benchmark_id": benchmark_id,
+                "benchmark_source": benchmark_source,
+                "diagnostic_id": diagnostic_id,
+                "required_observables": ";".join(required),
+                "available_observables": ";".join(available) if available else "none",
+                "missing_observables": ";".join(missing) if missing else "none",
+                "primary_blocker": missing[0] if missing else "none",
+                "observable_coverage_fraction": coverage,
+                "structural_falsification_ready": float(structural_ready),
+                "has_machine_readable_data": float(has_machine_readable_data),
+                "has_uncertainty_estimates": float(has_uncertainty_estimates),
+                "quantitative_falsification_ready": float(quantitative_ready),
+            }
+        )
+    return rows
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

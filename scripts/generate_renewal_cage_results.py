@@ -71,6 +71,7 @@ from renewal_cage import (  # noqa: E402
     ngp_1d,
     normalized_alpha_decay,
     observable_consistency_diagnostics,
+    observable_falsification_matrix,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
     persistence_exchange_alpha_relaxation_time,
@@ -2133,6 +2134,52 @@ def write_literature_inversion_readiness_csv(path: Path) -> list[dict[str, float
     return rows
 
 
+def write_observable_falsification_matrix_csv(
+    path: Path,
+    literature_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Map benchmark observables to the diagnostics they can structurally falsify."""
+
+    diagnostic_requirements = {
+        "van_hove_gaussian_recovery": ["time_grid", "van_hove_tail", "ngp", "diffusion"],
+        "multi_k_alpha_shape": [
+            "time_grid",
+            "self_intermediate_scattering",
+            "tau_alpha",
+            "wave_numbers",
+        ],
+        "joint_persistence_exchange_chi4": [
+            "diffusion",
+            "tau_alpha",
+            "persistence_time",
+            "exchange_time",
+            "late_ngp",
+            "chi4_peak",
+        ],
+        "stokes_einstein_decoupling": ["temperature_grid", "diffusion", "tau_alpha"],
+        "four_point_facilitation_proxy": ["tau_alpha", "chi4_peak", "dynamic_length", "diffusion"],
+    }
+    rows: list[dict[str, float | str]] = []
+    for literature_row in literature_rows:
+        available = [
+            observable
+            for observable in str(literature_row["available_observables"]).split(";")
+            if observable and observable != "none"
+        ]
+        rows.extend(
+            observable_falsification_matrix(
+                benchmark_id=str(literature_row["benchmark_id"]),
+                benchmark_source=str(literature_row["benchmark_source"]),
+                available_observables=available,
+                diagnostic_requirements=diagnostic_requirements,
+                has_machine_readable_data=bool(float(literature_row["has_machine_readable_data"])),
+                has_uncertainty_estimates=bool(float(literature_row["has_uncertainty_estimates"])),
+            )
+        )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -3310,6 +3357,67 @@ def write_persistence_exchange_uncertainty_protocol_svg(path: Path, rows: list[d
     path.write_text(svg)
 
 
+def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 660
+    left, top = 270, 105
+    cell_w, cell_h = 135, 56
+    benchmarks = list(dict.fromkeys(str(row["benchmark_id"]) for row in rows))
+    diagnostics = list(dict.fromkeys(str(row["diagnostic_id"]) for row in rows))
+    row_by_key = {
+        (str(row["benchmark_id"]), str(row["diagnostic_id"])): row
+        for row in rows
+    }
+    cells = []
+    for y_idx, benchmark_id in enumerate(benchmarks):
+        y = top + y_idx * cell_h
+        cells.append(
+            f'<text x="34" y="{y + 33}" font-family="Arial, sans-serif" font-size="11">{benchmark_id.replace("_", " ")[:36]}</text>'
+        )
+        for x_idx, diagnostic_id in enumerate(diagnostics):
+            x = left + x_idx * cell_w
+            row = row_by_key[(benchmark_id, diagnostic_id)]
+            structural = int(float(row["structural_falsification_ready"]))
+            quantitative = int(float(row["quantitative_falsification_ready"]))
+            coverage = float(row["observable_coverage_fraction"])
+            if quantitative:
+                fill = "#2f855a"
+            elif structural:
+                fill = "#2b6cb0"
+            elif coverage >= 0.5:
+                fill = "#d69e2e"
+            else:
+                fill = "#c05621"
+            cells.append(
+                f'<rect x="{x}" y="{y}" width="{cell_w - 8}" height="{cell_h - 8}" fill="{fill}" opacity="0.88" />'
+            )
+            cells.append(
+                f'<text x="{x + 11}" y="{y + 22}" font-family="Arial, sans-serif" font-size="12" fill="#fff">cov {coverage:.2f}</text>'
+            )
+            cells.append(
+                f'<text x="{x + 11}" y="{y + 39}" font-family="Arial, sans-serif" font-size="10" fill="#fff">block {str(row["primary_blocker"])[:13]}</text>'
+            )
+    headers = []
+    for idx, diagnostic_id in enumerate(diagnostics):
+        x = left + idx * cell_w + 4
+        headers.append(
+            f'<text x="{x}" y="88" font-family="Arial, sans-serif" font-size="11">{diagnostic_id.replace("_", " ")[:18]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Observable falsification matrix</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Rows show which literature benchmarks contain the observables needed to falsify each diagnostic protocol.</text>
+  {"".join(headers)}
+  {"".join(cells)}
+  <rect x="75" y="585" width="14" height="14" fill="#2f855a" /><text x="96" y="597" font-family="Arial, sans-serif" font-size="12">quantitative ready</text>
+  <rect x="235" y="585" width="14" height="14" fill="#2b6cb0" /><text x="256" y="597" font-family="Arial, sans-serif" font-size="12">all observables, no machine-readable uncertainty</text>
+  <rect x="548" y="585" width="14" height="14" fill="#d69e2e" /><text x="569" y="597" font-family="Arial, sans-serif" font-size="12">partial observable coverage</text>
+  <rect x="760" y="585" width="14" height="14" fill="#c05621" /><text x="781" y="597" font-family="Arial, sans-serif" font-size="12">underconstrained</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -3664,6 +3772,14 @@ def main() -> None:
     write_literature_inversion_readiness_svg(
         FIGURE_DIR / "renewal_cage_literature_inversion_readiness.svg",
         literature_readiness_rows,
+    )
+    observable_falsification_rows = write_observable_falsification_matrix_csv(
+        DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",
+        literature_readiness_rows,
+    )
+    write_observable_falsification_matrix_svg(
+        FIGURE_DIR / "renewal_cage_observable_falsification_matrix.svg",
+        observable_falsification_rows,
     )
 
     delay_values = [1.2, 2.0, 3.0, 5.0]

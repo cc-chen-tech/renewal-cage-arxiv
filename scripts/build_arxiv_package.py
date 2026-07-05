@@ -1287,6 +1287,58 @@ def write_literature_inversion_readiness_pdf(path: Path) -> None:
     c.save()
 
 
+def write_observable_falsification_matrix_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_observable_falsification_matrix.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Observable falsification matrix")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Benchmark observables are mapped to the diagnostic protocols they can structurally or quantitatively falsify.",
+    )
+    benchmarks = list(dict.fromkeys(row["benchmark_id"] for row in rows))
+    diagnostics = list(dict.fromkeys(row["diagnostic_id"] for row in rows))
+    by_key = {(row["benchmark_id"], row["diagnostic_id"]): row for row in rows}
+    left, top = 185, page_h - 92
+    cell_w, cell_h = 108, 42
+    c.setFont("Helvetica", 6.5)
+    for idx, diagnostic_id in enumerate(diagnostics):
+        c.drawString(left + idx * cell_w, top + 16, diagnostic_id[:18])
+    for y_idx, benchmark_id in enumerate(benchmarks):
+        y = top - 8 - y_idx * cell_h
+        c.setFillColor(colors.black)
+        c.drawString(42, y + 18, benchmark_id[:34])
+        for x_idx, diagnostic_id in enumerate(diagnostics):
+            row = by_key[(benchmark_id, diagnostic_id)]
+            x = left + x_idx * cell_w
+            structural = int(float(row["structural_falsification_ready"]))
+            quantitative = int(float(row["quantitative_falsification_ready"]))
+            coverage = float(row["observable_coverage_fraction"])
+            if quantitative:
+                fill = colors.HexColor("#2f855a")
+            elif structural:
+                fill = colors.HexColor("#2b6cb0")
+            elif coverage >= 0.5:
+                fill = colors.HexColor("#d69e2e")
+            else:
+                fill = colors.HexColor("#c05621")
+            c.setFillColor(fill)
+            c.rect(x, y, cell_w - 5, cell_h - 6, stroke=0, fill=1)
+            c.setFillColor(colors.white)
+            c.drawString(x + 5, y + 21, f"cov {coverage:.2f}")
+            c.drawString(x + 5, y + 9, f"block {row['primary_blocker'][:12]}")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 7)
+    c.drawString(42, 32, "green: quantitative ready; blue: all observables but no machine-readable uncertainties; yellow/red: blocked by missing observables")
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1700,6 +1752,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
     sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
+    observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1724,6 +1777,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
+    write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1759,6 +1813,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
         archive.write(sota_benchmark_consistency_pdf, "figures/renewal_cage_sota_benchmark_consistency.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
+        archive.write(
+            observable_falsification_matrix_pdf,
+            "figures/renewal_cage_observable_falsification_matrix.pdf",
+        )
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

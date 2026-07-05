@@ -67,6 +67,7 @@ from renewal_cage import (  # noqa: E402
     mct_beta_temperature_scan,
     ngp_peak_benchmark_consistency,
     observable_consistency_diagnostics,
+    observable_falsification_matrix,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
     van_hove_tail_benchmark_consistency,
@@ -1466,6 +1467,50 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["qualitative_comparison_ready"], 1.0)
         self.assertEqual(row["quantitative_inversion_ready"], 0.0)
         self.assertEqual(row["uncertainty_weighted_ready"], 0.0)
+
+    def test_observable_falsification_matrix_marks_diagnostic_blockers(self):
+        rows = observable_falsification_matrix(
+            benchmark_id="kob_andersen_combined_1995",
+            benchmark_source="kob1995vanhove;kob1995intermediate",
+            available_observables=[
+                "time_grid",
+                "self_intermediate_scattering",
+                "tau_alpha",
+                "wave_numbers",
+                "van_hove_tail",
+                "ngp",
+            ],
+            diagnostic_requirements={
+                "multi_k_alpha_shape": [
+                    "time_grid",
+                    "self_intermediate_scattering",
+                    "tau_alpha",
+                    "wave_numbers",
+                ],
+                "van_hove_gaussian_recovery": ["time_grid", "van_hove_tail", "ngp", "diffusion"],
+                "joint_persistence_exchange_chi4": [
+                    "diffusion",
+                    "tau_alpha",
+                    "persistence_time",
+                    "exchange_time",
+                    "late_ngp",
+                    "chi4_peak",
+                ],
+            },
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+        )
+
+        by_diagnostic = {row["diagnostic_id"]: row for row in rows}
+        self.assertEqual(by_diagnostic["multi_k_alpha_shape"]["structural_falsification_ready"], 1.0)
+        self.assertEqual(by_diagnostic["multi_k_alpha_shape"]["quantitative_falsification_ready"], 0.0)
+        self.assertEqual(by_diagnostic["van_hove_gaussian_recovery"]["missing_observables"], "diffusion")
+        self.assertEqual(by_diagnostic["van_hove_gaussian_recovery"]["primary_blocker"], "diffusion")
+        self.assertEqual(
+            by_diagnostic["joint_persistence_exchange_chi4"]["missing_observables"],
+            "diffusion;persistence_time;exchange_time;late_ngp;chi4_peak",
+        )
+        self.assertEqual(by_diagnostic["joint_persistence_exchange_chi4"]["structural_falsification_ready"], 0.0)
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(
