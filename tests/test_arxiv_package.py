@@ -834,6 +834,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
             self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_sota_signed_constraints.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_evidence_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", names)
             self.assertIn("figures/renewal_cage_cross_observable_prediction_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_inversion_identifiability_audit.pdf", names)
@@ -876,6 +877,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_evidence_verdict.pdf", main_tex)
         self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_data_accession.pdf", main_tex)
@@ -898,6 +900,7 @@ class ArxivPackageTests(unittest.TestCase):
         readiness_figures = [
             "figures/renewal_cage_sota_benchmark_consistency.pdf",
             "figures/renewal_cage_sota_claim_alignment.pdf",
+            "figures/renewal_cage_sota_evidence_verdict.pdf",
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
             "figures/renewal_cage_sota_source_provenance.pdf",
             "figures/renewal_cage_sota_data_accession.pdf",
@@ -923,6 +926,21 @@ class ArxivPackageTests(unittest.TestCase):
         )
         discussion_index = main_tex.index("\\section{Discussion}")
         self.assertIn("\\clearpage", main_tex[raw_protocol_index:discussion_index])
+
+    def test_main_text_does_not_overclaim_complete_glass_transition_theory(self):
+        text = (ROOT / "paper" / "main.tex").read_text().lower()
+        normalized = " ".join(text.split())
+        forbidden_claims = [
+            "explains all glass-transition phenomena",
+            "explains all glass transition phenomena",
+            "complete glass transition theory",
+            "derives the thermodynamic glass transition",
+            "derives an ideal glass transition",
+        ]
+        for claim in forbidden_claims:
+            self.assertNotIn(claim, normalized)
+        self.assertIn("dynamical glass signatures", normalized)
+        self.assertIn("thermodynamic glass-transition phenomena left as explicit closures", normalized)
 
     def test_supplemental_large_figures_are_packaged_not_embedded(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
@@ -988,6 +1006,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_sota_signed_constraints = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_signed_constraints.pdf"
+            ).read_bytes()
+            first_sota_evidence_verdict = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_evidence_verdict.pdf"
             ).read_bytes()
             first_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
@@ -1097,6 +1118,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_signed_constraints = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_signed_constraints.pdf"
             ).read_bytes()
+            second_sota_evidence_verdict = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_evidence_verdict.pdf"
+            ).read_bytes()
             second_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
             ).read_bytes()
@@ -1189,6 +1213,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_benchmark_consistency, second_sota_benchmark_consistency)
         self.assertEqual(first_sota_claim_alignment, second_sota_claim_alignment)
         self.assertEqual(first_sota_signed_constraints, second_sota_signed_constraints)
+        self.assertEqual(first_sota_evidence_verdict, second_sota_evidence_verdict)
         self.assertEqual(first_real_benchmark_assimilation_gate, second_real_benchmark_assimilation_gate)
         self.assertEqual(first_cross_observable_prediction_ledger, second_cross_observable_prediction_ledger)
         self.assertEqual(first_inversion_identifiability_audit, second_inversion_identifiability_audit)
