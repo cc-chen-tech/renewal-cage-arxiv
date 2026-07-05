@@ -1243,6 +1243,97 @@ def benchmark_fusion_readiness(
     }
 
 
+def raw_curve_ingestion_contract(
+    *,
+    benchmark_id: str,
+    observable_requirements: dict[str, dict[str, list[str] | str]],
+    available_columns_by_observable: dict[str, list[str]],
+    machine_readable: bool,
+    shared_temperature_grid: bool,
+    shared_time_units: bool,
+) -> list[dict[str, float | str]]:
+    """Check whether raw benchmark curves satisfy the ingestion contract."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not observable_requirements:
+        raise ValueError("observable_requirements must be nonempty")
+
+    rows: list[dict[str, float | str]] = []
+    for observable_id, requirement in observable_requirements.items():
+        if not observable_id:
+            raise ValueError("observable ids must be nonempty")
+        if "required_columns" not in requirement:
+            raise ValueError(f"missing required_columns for {observable_id}")
+        if "uncertainty_columns" not in requirement:
+            raise ValueError(f"missing uncertainty_columns for {observable_id}")
+        if "target_diagnostic" not in requirement:
+            raise ValueError(f"missing target_diagnostic for {observable_id}")
+        required_columns = list(dict.fromkeys(requirement["required_columns"]))  # type: ignore[arg-type]
+        uncertainty_columns = list(dict.fromkeys(requirement["uncertainty_columns"]))  # type: ignore[arg-type]
+        target_diagnostic = str(requirement["target_diagnostic"])
+        if not required_columns:
+            raise ValueError("required_columns must be nonempty")
+        if any(not column for column in required_columns + uncertainty_columns):
+            raise ValueError("column names must be nonempty")
+        if not target_diagnostic:
+            raise ValueError("target_diagnostic must be nonempty")
+
+        available_columns = list(
+            dict.fromkeys(available_columns_by_observable.get(observable_id, []))
+        )
+        if any(not column for column in available_columns):
+            raise ValueError("available columns must be nonempty strings")
+        available_set = set(available_columns)
+        missing_columns = [column for column in required_columns if column not in available_set]
+        missing_uncertainty_columns = [
+            column for column in uncertainty_columns if column not in available_set
+        ]
+        structural_ready = (
+            machine_readable
+            and shared_temperature_grid
+            and shared_time_units
+            and len(missing_columns) == 0
+        )
+        uncertainty_ready = structural_ready and len(missing_uncertainty_columns) == 0
+        if not machine_readable:
+            blocker = "machine_readable_data"
+        elif not shared_temperature_grid:
+            blocker = "temperature_grid_mismatch"
+        elif not shared_time_units:
+            blocker = "time_unit_mismatch"
+        elif missing_columns:
+            blocker = missing_columns[0]
+        elif missing_uncertainty_columns:
+            blocker = missing_uncertainty_columns[0]
+        else:
+            blocker = "none"
+
+        rows.append(
+            {
+                "benchmark_id": benchmark_id,
+                "observable_id": observable_id,
+                "target_diagnostic": target_diagnostic,
+                "required_columns": ";".join(required_columns),
+                "available_columns": ";".join(available_columns) if available_columns else "none",
+                "missing_columns": ";".join(missing_columns) if missing_columns else "none",
+                "uncertainty_columns": ";".join(uncertainty_columns) if uncertainty_columns else "none",
+                "missing_uncertainty_columns": (
+                    ";".join(missing_uncertainty_columns)
+                    if missing_uncertainty_columns
+                    else "none"
+                ),
+                "machine_readable": float(machine_readable),
+                "shared_temperature_grid": float(shared_temperature_grid),
+                "shared_time_units": float(shared_time_units),
+                "structural_ingestion_ready": float(structural_ready),
+                "uncertainty_ingestion_ready": float(uncertainty_ready),
+                "primary_blocker": blocker,
+            }
+        )
+    return rows
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

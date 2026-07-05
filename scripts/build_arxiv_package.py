@@ -1391,6 +1391,49 @@ def write_benchmark_fusion_readiness_pdf(path: Path) -> None:
     c.save()
 
 
+def write_raw_curve_ingestion_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_raw_curve_ingestion_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Raw-curve ingestion contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "KA I/II fused validation requires machine-readable observable columns and uncertainty columns before quantitative inversion.",
+    )
+    left, top = 52, page_h - 95
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top, "observable")
+    c.drawString(left + 190, top, "diagnostic")
+    c.drawString(left + 390, top, "struct")
+    c.drawString(left + 440, top, "unc")
+    c.drawString(left + 485, top, "primary blocker")
+    c.drawString(left + 620, top, "missing uncertainty columns")
+    c.setFont("Helvetica", 7.5)
+    for idx, row in enumerate(rows):
+        y = top - 24 - idx * 38
+        structural = int(float(row["structural_ingestion_ready"]))
+        uncertainty = int(float(row["uncertainty_ingestion_ready"]))
+        color = colors.HexColor("#2f855a") if uncertainty else colors.HexColor("#2b6cb0") if structural else colors.HexColor("#c05621")
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["observable_id"][:28])
+        c.drawString(left + 190, y, row["target_diagnostic"][:30])
+        c.setFillColor(color)
+        c.rect(left + 390, y - 4, 16, 10, stroke=0, fill=1)
+        c.rect(left + 440, y - 4, 16, 10, stroke=0, fill=1 if uncertainty else 0)
+        c.setFillColor(colors.black)
+        c.drawString(left + 410, y, str(structural))
+        c.drawString(left + 460, y, str(uncertainty))
+        c.drawString(left + 485, y, row["primary_blocker"][:24])
+        c.drawString(left + 620, y, row["missing_uncertainty_columns"][:60])
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1806,6 +1849,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
+    raw_curve_ingestion_contract_pdf = PAPER_FIGURE_DIR / "renewal_cage_raw_curve_ingestion_contract.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1832,6 +1876,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
+    write_raw_curve_ingestion_contract_pdf(raw_curve_ingestion_contract_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1872,6 +1917,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_observable_falsification_matrix.pdf",
         )
         archive.write(benchmark_fusion_readiness_pdf, "figures/renewal_cage_benchmark_fusion_readiness.pdf")
+        archive.write(raw_curve_ingestion_contract_pdf, "figures/renewal_cage_raw_curve_ingestion_contract.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

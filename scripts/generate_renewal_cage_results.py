@@ -86,6 +86,7 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_scattering_susceptibility,
     PersistenceExchangeParams,
     radial_van_hove_3d,
+    raw_curve_ingestion_contract,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     spatial_facilitation_chi4_scan,
@@ -2288,6 +2289,53 @@ def write_benchmark_fusion_readiness_csv(path: Path) -> list[dict[str, float | s
     return rows
 
 
+def write_raw_curve_ingestion_contract_csv(path: Path) -> list[dict[str, float | str]]:
+    """Define the machine-readable curve contract for the KA I/II fused benchmark."""
+
+    rows = raw_curve_ingestion_contract(
+        benchmark_id="kob_andersen_i_ii_dynamic_closure",
+        observable_requirements={
+            "ka_self_intermediate_scattering": {
+                "required_columns": ["temperature", "wave_number", "time", "F_s"],
+                "uncertainty_columns": ["sigma_F_s"],
+                "target_diagnostic": "multi_k_alpha_shape",
+            },
+            "ka_van_hove_ngp": {
+                "required_columns": ["temperature", "time", "radius", "G_s", "alpha2", "diffusion"],
+                "uncertainty_columns": ["sigma_G_s", "sigma_alpha2", "sigma_diffusion"],
+                "target_diagnostic": "van_hove_gaussian_recovery",
+            },
+            "ka_joint_transport_alpha": {
+                "required_columns": [
+                    "temperature",
+                    "wave_number",
+                    "tau_alpha",
+                    "diffusion",
+                    "alpha_shape_residual",
+                ],
+                "uncertainty_columns": ["sigma_tau_alpha", "sigma_diffusion", "sigma_alpha_shape_residual"],
+                "target_diagnostic": "stokes_einstein_and_tts",
+            },
+        },
+        available_columns_by_observable={
+            "ka_self_intermediate_scattering": ["temperature", "wave_number", "time", "F_s"],
+            "ka_van_hove_ngp": ["temperature", "time", "radius", "G_s", "alpha2", "diffusion"],
+            "ka_joint_transport_alpha": [
+                "temperature",
+                "wave_number",
+                "tau_alpha",
+                "diffusion",
+                "alpha_shape_residual",
+            ],
+        },
+        machine_readable=True,
+        shared_temperature_grid=True,
+        shared_time_units=True,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -3570,6 +3618,48 @@ def write_benchmark_fusion_readiness_svg(path: Path, rows: list[dict[str, float 
     path.write_text(svg)
 
 
+def write_raw_curve_ingestion_contract_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 500
+    left, top, right, bottom = 95, 105, 1030, 330
+    row_h = (bottom - top) / len(rows)
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        structural = int(float(row["structural_ingestion_ready"]))
+        uncertainty = int(float(row["uncertainty_ingestion_ready"]))
+        color = "#2f855a" if uncertainty else "#2b6cb0" if structural else "#c05621"
+        marks.append(
+            f'<text x="{left}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">{str(row["observable_id"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 295}" y="{y + 2:.2f}" width="130" height="22" fill="{color}" opacity="0.9" />'
+        )
+        marks.append(
+            f'<text x="{left + 307}" y="{y + 17:.2f}" font-family="Arial, sans-serif" font-size="11" fill="#fff">struct/unc={structural}/{uncertainty}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 455}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">diagnostic: {str(row["target_diagnostic"]).replace("_", " ")[:30]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 720}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">block: {str(row["primary_blocker"])[:28]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 38:.2f}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing uncertainty: {str(row["missing_uncertainty_columns"])[:95]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Raw-curve ingestion contract</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">KA I/II fused validation needs machine-readable observable columns plus uncertainty columns before quantitative inversion.</text>
+  {"".join(marks)}
+  <rect x="95" y="405" width="14" height="14" fill="#2f855a" /><text x="116" y="417" font-family="Arial, sans-serif" font-size="12">uncertainty-weighted ready</text>
+  <rect x="300" y="405" width="14" height="14" fill="#2b6cb0" /><text x="321" y="417" font-family="Arial, sans-serif" font-size="12">structural columns present, uncertainty missing</text>
+  <rect x="610" y="405" width="14" height="14" fill="#c05621" /><text x="631" y="417" font-family="Arial, sans-serif" font-size="12">blocked before ingestion</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -3939,6 +4029,13 @@ def main() -> None:
     write_benchmark_fusion_readiness_svg(
         FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.svg",
         benchmark_fusion_rows,
+    )
+    raw_curve_contract_rows = write_raw_curve_ingestion_contract_csv(
+        DATA_DIR / "renewal_cage_raw_curve_ingestion_contract.csv"
+    )
+    write_raw_curve_ingestion_contract_svg(
+        FIGURE_DIR / "renewal_cage_raw_curve_ingestion_contract.svg",
+        raw_curve_contract_rows,
     )
 
     delay_values = [1.2, 2.0, 3.0, 5.0]

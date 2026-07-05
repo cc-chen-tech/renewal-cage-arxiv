@@ -160,6 +160,7 @@ figures/renewal_cage_sota_benchmark_consistency.svg
 figures/renewal_cage_literature_inversion_readiness.svg
 figures/renewal_cage_observable_falsification_matrix.svg
 figures/renewal_cage_benchmark_fusion_readiness.svg
+figures/renewal_cage_raw_curve_ingestion_contract.svg
 figures/renewal_cage_barrier_requirements.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
@@ -195,6 +196,7 @@ data/renewal_cage_sota_benchmark_consistency.csv
 data/renewal_cage_literature_inversion_readiness.csv
 data/renewal_cage_observable_falsification_matrix.csv
 data/renewal_cage_benchmark_fusion_readiness.csv
+data/renewal_cage_raw_curve_ingestion_contract.csv
 data/renewal_cage_barrier_requirements.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
@@ -227,6 +229,7 @@ paper/figures/renewal_cage_sota_benchmark_consistency.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf
 paper/figures/renewal_cage_observable_falsification_matrix.pdf
 paper/figures/renewal_cage_benchmark_fusion_readiness.pdf
+paper/figures/renewal_cage_raw_curve_ingestion_contract.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf

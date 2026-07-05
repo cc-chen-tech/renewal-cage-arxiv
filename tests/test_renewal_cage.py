@@ -69,6 +69,7 @@ from renewal_cage import (  # noqa: E402
     ngp_peak_benchmark_consistency,
     observable_consistency_diagnostics,
     observable_falsification_matrix,
+    raw_curve_ingestion_contract,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
     van_hove_tail_benchmark_consistency,
@@ -1594,6 +1595,71 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["shared_temperature_grid_consistent"], 0.0)
         self.assertEqual(row["shared_ensemble_consistent"], 0.0)
         self.assertEqual(row["structural_fusion_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "temperature_grid_mismatch")
+
+    def test_raw_curve_ingestion_contract_marks_missing_uncertainty_columns(self):
+        rows = raw_curve_ingestion_contract(
+            benchmark_id="kob_andersen_i_ii_dynamic_closure",
+            observable_requirements={
+                "self_intermediate_scattering": {
+                    "required_columns": ["temperature", "wave_number", "time", "F_s"],
+                    "uncertainty_columns": ["sigma_F_s"],
+                    "target_diagnostic": "multi_k_alpha_shape",
+                },
+                "van_hove_ngp": {
+                    "required_columns": ["temperature", "time", "radius", "G_s", "alpha2", "diffusion"],
+                    "uncertainty_columns": ["sigma_G_s", "sigma_alpha2", "sigma_diffusion"],
+                    "target_diagnostic": "van_hove_gaussian_recovery",
+                },
+            },
+            available_columns_by_observable={
+                "self_intermediate_scattering": ["temperature", "wave_number", "time", "F_s"],
+                "van_hove_ngp": [
+                    "temperature",
+                    "time",
+                    "radius",
+                    "G_s",
+                    "alpha2",
+                    "diffusion",
+                    "sigma_G_s",
+                    "sigma_alpha2",
+                    "sigma_diffusion",
+                ],
+            },
+            machine_readable=True,
+            shared_temperature_grid=True,
+            shared_time_units=True,
+        )
+
+        by_observable = {row["observable_id"]: row for row in rows}
+        self.assertEqual(by_observable["self_intermediate_scattering"]["structural_ingestion_ready"], 1.0)
+        self.assertEqual(by_observable["self_intermediate_scattering"]["uncertainty_ingestion_ready"], 0.0)
+        self.assertEqual(by_observable["self_intermediate_scattering"]["missing_columns"], "none")
+        self.assertEqual(by_observable["self_intermediate_scattering"]["missing_uncertainty_columns"], "sigma_F_s")
+        self.assertEqual(by_observable["self_intermediate_scattering"]["primary_blocker"], "sigma_F_s")
+        self.assertEqual(by_observable["van_hove_ngp"]["uncertainty_ingestion_ready"], 1.0)
+        self.assertEqual(by_observable["van_hove_ngp"]["primary_blocker"], "none")
+
+    def test_raw_curve_ingestion_contract_rejects_unshared_units_for_fused_input(self):
+        rows = raw_curve_ingestion_contract(
+            benchmark_id="kob_andersen_i_ii_dynamic_closure",
+            observable_requirements={
+                "self_intermediate_scattering": {
+                    "required_columns": ["temperature", "wave_number", "time", "F_s"],
+                    "uncertainty_columns": [],
+                    "target_diagnostic": "multi_k_alpha_shape",
+                }
+            },
+            available_columns_by_observable={
+                "self_intermediate_scattering": ["temperature", "wave_number", "time", "F_s"],
+            },
+            machine_readable=True,
+            shared_temperature_grid=False,
+            shared_time_units=True,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["structural_ingestion_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "temperature_grid_mismatch")
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):

@@ -1026,6 +1026,15 @@ shared. Under this rule, Kob-Andersen parts I and II form a structural
 van-Hove/alpha benchmark, but splicing Hedges persistence clocks or
 La{\v{c}}evi{\'c} four-point data into the same quantitative diagnostic remains
 blocked unless the raw observables are remeasured on a common ensemble.
+Finally,
+\texttt{renewal\_cage\_raw\_curve\_ingestion\_contract.csv} specifies the
+column-level contract for turning the structurally valid Kob-Andersen I/II
+fusion into an actual uncertainty-weighted inversion: self-intermediate
+scattering requires \texttt{temperature}, \texttt{wave\_number}, \texttt{time},
+and \texttt{F\_s} plus \texttt{sigma\_F\_s}; the van-Hove/NGP input requires
+\texttt{G\_s}, $\alpha_2$, diffusion, and their uncertainties. Thus the paper
+does not treat digitized curves as a full real-data fit until the uncertainty
+columns are supplied.
 
 \begin{figure}[h]
   \centering
@@ -1230,6 +1239,16 @@ blocked unless the raw observables are remeasured on a common ensemble.
   machine-readable curves and uncertainty estimates blocks quantitative
   inversion. The remaining rows mark cross-paper splices that contain useful
   observables but fail the shared-grid or shared-ensemble requirement.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_raw_curve_ingestion_contract.pdf}
+  \caption{Raw-curve ingestion contract for the structurally valid
+  Kob-Andersen I/II fused benchmark. The required observable columns are
+  present for the synthetic machine-readable contract, but the
+  uncertainty-weighted inversion remains blocked until the listed uncertainty
+  columns are available.}
 \end{figure}
 
 \begin{figure}[h]
