@@ -2989,6 +2989,85 @@ def sota_remote_result_curve_target_fetch_gate(
     return rows
 
 
+def _semantic_token(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def sota_remote_result_curve_published_semantic_audit_gate(
+    *,
+    audit_id: str,
+    accession_id: str,
+    payload_cache: dict,
+    physical_observable_labels: Sequence[str],
+) -> list[dict[str, float | str]]:
+    """Audit published figure curves before treating them as physical observables."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    observable_tokens = {_semantic_token(label) for label in physical_observable_labels if label}
+    if not observable_tokens:
+        raise ValueError("physical_observable_labels must contain nonempty labels")
+
+    entries_value = payload_cache.get("entries", [])
+    entries = [entry for entry in entries_value if isinstance(entry, dict)] if isinstance(entries_value, list) else []
+    rows: list[dict[str, float | str]] = []
+    for entry in entries:
+        if str(entry.get("curve_role", "")) != "published_figure_curve":
+            continue
+        path = str(entry.get("path", ""))
+        if not path:
+            raise ValueError("published figure entries require path")
+        header_value = entry.get("header", [])
+        header = [str(item) for item in header_value] if isinstance(header_value, list) else []
+        header_tokens = [_semantic_token(item) for item in header]
+        numeric_row_count = int(entry.get("numeric_row_count", 0) or 0)
+        numeric_column_count = int(entry.get("numeric_column_count", 0) or 0)
+        header_ready = bool(header)
+        time_axis_present = bool(header_tokens) and (
+            header_tokens[0] in {"t", "time", "inversetemperature", "1t"} or header[0] == "1/T"
+        )
+        physical_match = any(token in observable_tokens for token in header_tokens[1:])
+        published_ready = header_ready and numeric_row_count > 0 and numeric_column_count > 0
+        ml_feature_column_count = max(0, numeric_column_count - (1 if time_axis_present else 0))
+
+        if not published_ready:
+            stage = "published_curve_numeric_payload_blocked"
+            blocker = "numeric_rows"
+        elif physical_match:
+            stage = "published_curve_physical_observable_label_uncertainty_missing"
+            blocker = "uncertainty"
+        else:
+            stage = "published_curve_ml_benchmark_not_physical_observable"
+            blocker = "physical_observable_label"
+
+        rows.append(
+            {
+                "audit_id": f"{audit_id}_{str(entry.get('system_id', 'unknown')).lower()}_{Path(path).stem.lower()}",
+                "accession_id": accession_id,
+                "system_id": str(entry.get("system_id", "unknown")),
+                "source_path": path,
+                "curve_role": str(entry.get("curve_role", "unknown")),
+                "header_tokens": ";".join(header) if header else "none",
+                "numeric_row_count": float(numeric_row_count),
+                "numeric_column_count": float(numeric_column_count),
+                "time_axis_present": float(time_axis_present),
+                "header_semantics_ready": float(header_ready),
+                "physical_observable_label_match": float(physical_match),
+                "ml_feature_column_count": float(ml_feature_column_count),
+                "published_curve_ready": float(published_ready),
+                "observable_comparison_ready": 0.0,
+                "real_inversion_ready": 0.0,
+                "primary_blocker": blocker,
+                "semantic_stage": stage,
+            }
+        )
+    if not rows:
+        raise ValueError("no published figure curves were found")
+    return rows
+
+
 def _numeric_payload_rows(entry: dict) -> list[list[float]]:
     rows_value = entry.get("rows", [])
     if not isinstance(rows_value, list):

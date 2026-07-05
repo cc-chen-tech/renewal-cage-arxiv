@@ -1568,6 +1568,26 @@ benchmark.
   header-only rather than a numeric \(\chi_4(t)\) table.}
 \end{figure}
 
+The remaining cached \texttt{FIG*.dat} result payloads are also audited before
+they are used as benchmarks. Their headers are dominated by method or feature
+labels such as \texttt{BOTAN}, \texttt{CAGE}, \texttt{GlassMLP}, \texttt{SE3},
+\texttt{DEN}, \texttt{EPOT}, \texttt{PSI4}, and \texttt{TT}; they do not carry
+direct physical-observable labels such as MSD, \(F_s\), NGP, diffusion, or
+\(\chi_4\). The semantic audit therefore classifies these rows as
+\texttt{published\_curve\_ml\_benchmark\_not\_physical\_observable}. They are
+machine-readable SOTA payloads, but not direct renewal-cage diagnostic inputs
+until a documented mapping to a physical observable and uncertainty model is
+supplied.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_remote_result_curve_published_semantics.pdf}
+  \caption{SOTA published curve semantic audit. Cached GlassBench
+  \texttt{FIG*.dat} payloads are numeric ML benchmark curves, but their headers
+  do not identify direct physical observables required by the renewal-cage
+  diagnostic protocol.}
+\end{figure}
+
 The companion payload cache,
 \texttt{range\_result\_curve\_values\_10118191.json}, stores the numeric rows
 reconstructed from those verified ranges. The payload-adapter gate then pairs

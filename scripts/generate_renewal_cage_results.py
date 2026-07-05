@@ -111,6 +111,7 @@ from renewal_cage import (  # noqa: E402
     sota_remote_result_curve_observable_semantics_gate,
     sota_remote_result_curve_cache_gate,
     sota_remote_result_curve_payload_adapter_gate,
+    sota_remote_result_curve_published_semantic_audit_gate,
     sota_remote_result_curve_target_fetch_gate,
     sota_reanalysis_state_gate,
     sota_readme_schema_gate,
@@ -3365,6 +3366,31 @@ def write_sota_remote_result_curve_target_fetch_csv(path: Path) -> list[dict[str
     return rows
 
 
+def write_sota_remote_result_curve_published_semantics_csv(path: Path) -> list[dict[str, float | str]]:
+    """Audit published GlassBench figure curves against physical-observable labels."""
+
+    payload_path = DATA_DIR / "third_party" / "glassbench" / "range_result_curve_values_10118191.json"
+    rows = sota_remote_result_curve_published_semantic_audit_gate(
+        audit_id="glassbench_published_curve_semantic_audit",
+        accession_id="glassbench_zenodo_10118191",
+        payload_cache=json.loads(payload_path.read_text(encoding="utf-8")),
+        physical_observable_labels=[
+            "msd",
+            "f_s",
+            "fs",
+            "ngp",
+            "alpha2",
+            "alpha_2",
+            "chi4",
+            "chi_4",
+            "diffusion",
+            "tau_alpha",
+        ],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_payload_adapter_csv(path: Path) -> list[dict[str, float | str]]:
     """Pair cached GlassBench numeric result curves into structural adapter rows."""
 
@@ -5909,6 +5935,52 @@ def write_sota_remote_result_curve_target_fetch_svg(path: Path, rows: list[dict[
     path.write_text(svg)
 
 
+def write_sota_remote_result_curve_published_semantics_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 560
+    left, top = 75, 112
+    row_h = 50
+    colors = {
+        "published_curve_numeric_payload_blocked": "#c05621",
+        "published_curve_physical_observable_label_uncertainty_missing": "#2b6cb0",
+        "published_curve_ml_benchmark_not_physical_observable": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["semantic_stage"])
+        color = colors[stage]
+        label = str(row["source_path"]).replace("GlassBench/", "")[:43]
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="10.5" font-weight="700">{label}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 285}" y="{y - 4}" width="315" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 294}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:46]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">rows={int(float(row["numeric_row_count"]))}; cols={int(float(row["numeric_column_count"]))}; physical={int(float(row["physical_observable_label_match"]))}; compare={int(float(row["observable_comparison_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 285}" y="{y + 31}" font-family="Arial, sans-serif" font-size="8.5" fill="#555">headers: {str(row["header_tokens"])[:110]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA published curve semantic audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached GlassBench FIG payloads are numeric ML benchmark curves, not direct Fs, NGP, MSD, diffusion, or chi4 observables unless labels say so.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">payload</text>
+  <text x="{left + 285}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">semantic stage</text>
+  <text x="{left + 620}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness flags</text>
+  {"".join(marks)}
+  <rect x="75" y="520" width="14" height="14" fill="#805ad5" /><text x="96" y="532" font-family="Arial, sans-serif" font-size="12">ML/figure benchmark payload, not a physical observable table</text>
+  <rect x="555" y="520" width="14" height="14" fill="#2b6cb0" /><text x="576" y="532" font-family="Arial, sans-serif" font-size="12">physical label found, uncertainty still required</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_payload_adapter_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 510
@@ -7448,6 +7520,13 @@ def main() -> None:
     write_sota_remote_result_curve_target_fetch_svg(
         FIGURE_DIR / "renewal_cage_sota_remote_result_curve_target_fetch.svg",
         remote_result_curve_target_fetch_rows,
+    )
+    remote_result_curve_published_semantics_rows = write_sota_remote_result_curve_published_semantics_csv(
+        DATA_DIR / "renewal_cage_sota_remote_result_curve_published_semantics.csv"
+    )
+    write_sota_remote_result_curve_published_semantics_svg(
+        FIGURE_DIR / "renewal_cage_sota_remote_result_curve_published_semantics.svg",
+        remote_result_curve_published_semantics_rows,
     )
     remote_result_curve_payload_adapter_rows = write_sota_remote_result_curve_payload_adapter_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.csv"

@@ -123,6 +123,7 @@ from renewal_cage import (  # noqa: E402
     sota_remote_result_curve_cache_gate,
     sota_remote_result_curve_fetch_gap_gate,
     sota_remote_result_curve_payload_adapter_gate,
+    sota_remote_result_curve_published_semantic_audit_gate,
     sota_remote_result_curve_target_fetch_gate,
     sota_remote_result_curve_observable_semantics_gate,
     sota_remote_zip_central_directory_gate,
@@ -2550,6 +2551,42 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["observable_comparison_ready"], 0.0)
         self.assertEqual(row["real_inversion_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "numeric_rows")
+
+    def test_sota_remote_result_curve_published_semantic_audit_blocks_ml_feature_curves(self):
+        payload_cache = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_results/FIG3.dat",
+                    "system_id": "KA2D",
+                    "temperature": "none",
+                    "curve_role": "published_figure_curve",
+                    "header": ["t", "BOTAN", "CAGE", "GlassMLP", "SE3", "DEN", "EPOT", "PSI4", "TT"],
+                    "numeric_row_count": 6,
+                    "numeric_column_count": 9,
+                    "rows": [[0.11, 0.92, 0.39, 0.26, 0.89, -0.03, 0.02, 0.01, -0.01]],
+                }
+            ]
+        }
+
+        rows = sota_remote_result_curve_published_semantic_audit_gate(
+            audit_id="glassbench_published_curve_semantic_audit",
+            accession_id="glassbench_zenodo_10118191",
+            payload_cache=payload_cache,
+            physical_observable_labels=["msd", "f_s", "ngp", "alpha2", "chi4", "diffusion", "tau_alpha"],
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["semantic_stage"], "published_curve_ml_benchmark_not_physical_observable")
+        self.assertEqual(row["source_path"], "GlassBench/KA2D_results/FIG3.dat")
+        self.assertEqual(row["time_axis_present"], 1.0)
+        self.assertEqual(row["header_semantics_ready"], 1.0)
+        self.assertEqual(row["physical_observable_label_match"], 0.0)
+        self.assertEqual(row["ml_feature_column_count"], 8.0)
+        self.assertEqual(row["published_curve_ready"], 1.0)
+        self.assertEqual(row["observable_comparison_ready"], 0.0)
+        self.assertEqual(row["real_inversion_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "physical_observable_label")
 
     def test_sota_remote_result_curve_payload_adapter_pairs_time_and_rhomax(self):
         manifest = {

@@ -166,6 +166,10 @@ The target-fetch gate then records the actual 36-byte range payload for that
 file. The payload is checksum-ready, but it contains only the header
 `t True Shiba Alkemade Jung Francois` and no numeric rows, so the status is
 `target_fetch_header_only_parse_blocked`, not a `chi4` comparison.
+The published-curve semantic audit checks all cached GlassBench `FIG*.dat`
+payload headers. Rows with headers such as `BOTAN`, `CAGE`, `GlassMLP`, `SE3`,
+`DEN`, and `EPOT` are kept as ML/figure benchmark curves, not promoted to
+physical observables such as MSD, `F_s`, NGP, diffusion, or `chi4`.
 The companion payload adapter stores the actual numeric rows from those byte
 ranges and pairs time grids with same-temperature `rhomax` curves. KA2D at
 `T=0.30` has structurally adapter-ready `rhomax_md` and `rhomax_bb` rows; KA at
@@ -268,6 +272,7 @@ figures/renewal_cage_sota_glassbench_payload_index.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
+figures/renewal_cage_sota_remote_result_curve_published_semantics.svg
 figures/renewal_cage_sota_remote_result_curve_payload_adapter.svg
 figures/renewal_cage_sota_remote_result_curve_observable_semantics.svg
 figures/renewal_cage_sota_readme_schema.svg
@@ -330,6 +335,7 @@ data/renewal_cage_sota_glassbench_payload_index.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
+data/renewal_cage_sota_remote_result_curve_published_semantics.csv
 data/renewal_cage_sota_remote_result_curve_payload_adapter.csv
 data/renewal_cage_sota_remote_result_curve_observable_semantics.csv
 data/renewal_cage_sota_readme_digest.csv
@@ -405,6 +411,7 @@ paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf
+paper/figures/renewal_cage_sota_remote_result_curve_published_semantics.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf
