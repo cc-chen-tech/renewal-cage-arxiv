@@ -37,6 +37,7 @@ from renewal_cage import (  # noqa: E402
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
+    inversion_identifiability_audit,
     joint_inversion_benchmark_consistency,
     literature_inversion_readiness,
     generalized_delay_ngp_short_time,
@@ -1592,6 +1593,67 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["closure_observable_count"], 1.0)
         self.assertEqual(row["requires_external_closure"], 1.0)
         self.assertEqual(row["fit_only_overclaim_risk"], 0.0)
+
+    def test_inversion_identifiability_audit_marks_heldout_protocol_identifiable(self):
+        row = inversion_identifiability_audit(
+            protocol_id="joint_persistence_exchange_multik_chi4",
+            source_key="raw_curve_persistence_exchange_protocol",
+            model_scope="transport_decoupling",
+            fit_observables=["diffusion", "anchor_tau_alpha"],
+            inferred_parameters=["exchange_time", "persistence_time"],
+            heldout_predictions=["multi_k_tau_alpha", "late_ngp", "stokes_einstein_product"],
+            external_closures=[],
+            degenerate_parameters=[],
+        )
+
+        self.assertEqual(row["identifiability_class"], "identifiable_prediction")
+        self.assertEqual(row["rank_margin"], 0.0)
+        self.assertEqual(row["heldout_prediction_count"], 3.0)
+        self.assertEqual(row["overclaim_risk"], 0.0)
+
+    def test_inversion_identifiability_audit_flags_alpha_only_underidentified_fit(self):
+        row = inversion_identifiability_audit(
+            protocol_id="single_alpha_fit_only_null",
+            source_key="hypothetical_alpha_only_fit",
+            model_scope="dynamical_signature",
+            fit_observables=["tau_alpha"],
+            inferred_parameters=["exchange_time", "persistence_time"],
+            heldout_predictions=[],
+            external_closures=[],
+            degenerate_parameters=[],
+        )
+
+        self.assertEqual(row["identifiability_class"], "underidentified_fit")
+        self.assertEqual(row["rank_margin"], -1.0)
+        self.assertEqual(row["overclaim_risk"], 1.0)
+
+    def test_inversion_identifiability_audit_separates_closure_and_thermodynamic_boundaries(self):
+        spatial = inversion_identifiability_audit(
+            protocol_id="spatial_chi4_front_closure",
+            source_key="lacevic2003fourpoint",
+            model_scope="spatial_heterogeneity",
+            fit_observables=["tau_alpha", "diffusion", "chi4_peak"],
+            inferred_parameters=["correlation_length", "front_diffusivity"],
+            heldout_predictions=["dynamic_length"],
+            external_closures=["front_diffusivity_law"],
+            degenerate_parameters=[],
+        )
+        thermo = inversion_identifiability_audit(
+            protocol_id="thermodynamic_entropy_boundary",
+            source_key="kauzmann1948nature",
+            model_scope="thermodynamic_transition",
+            fit_observables=["configurational_entropy", "temperature_grid"],
+            inferred_parameters=["kauzmann_temperature", "entropy_slope"],
+            heldout_predictions=["heat_capacity_anomaly"],
+            external_closures=["entropy_law"],
+            degenerate_parameters=[],
+        )
+
+        self.assertEqual(spatial["identifiability_class"], "conditionally_identifiable")
+        self.assertEqual(spatial["requires_external_closure"], 1.0)
+        self.assertEqual(spatial["overclaim_risk"], 0.0)
+        self.assertEqual(thermo["identifiability_class"], "scope_boundary")
+        self.assertEqual(thermo["overclaim_risk"], 0.0)
 
     def test_sota_claim_alignment_scores_supported_dynamic_claim(self):
         row = sota_claim_alignment(

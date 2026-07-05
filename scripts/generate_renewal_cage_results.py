@@ -48,6 +48,7 @@ from renewal_cage import (  # noqa: E402
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
+    inversion_identifiability_audit,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
@@ -2429,6 +2430,99 @@ def write_cross_observable_prediction_ledger_csv(path: Path) -> list[dict[str, f
     return rows
 
 
+def write_inversion_identifiability_audit_csv(path: Path) -> list[dict[str, float | str]]:
+    """Audit whether inversion protocols are identifiable before quantitative fitting."""
+
+    rows = [
+        inversion_identifiability_audit(
+            protocol_id="scattering_transport_inversion",
+            source_key="kob1995intermediate;delayed_renewal_closed_form",
+            model_scope="dynamical_signature",
+            fit_observables=[
+                "debye_waller_plateau",
+                "diffusion",
+                "anchor_tau_alpha",
+            ],
+            inferred_parameters=["cage_variance", "jump_variance", "renewal_rate"],
+            heldout_predictions=["ngp_peak_height", "ngp_peak_time", "late_gaussian_recovery"],
+            external_closures=[],
+            degenerate_parameters=[],
+        ),
+        inversion_identifiability_audit(
+            protocol_id="full_observable_inversion",
+            source_key="synthetic_full_ngp_scattering_protocol",
+            model_scope="dynamical_signature",
+            fit_observables=[
+                "debye_waller_plateau",
+                "diffusion",
+                "ngp_peak_time",
+                "ngp_peak_height",
+            ],
+            inferred_parameters=["cage_variance", "jump_variance", "renewal_rate", "renewal_delay"],
+            heldout_predictions=["tau_alpha", "multi_k_alpha_shape"],
+            external_closures=[],
+            degenerate_parameters=[],
+        ),
+        inversion_identifiability_audit(
+            protocol_id="joint_persistence_exchange_multik_chi4",
+            source_key="raw_curve_persistence_exchange_protocol",
+            model_scope="transport_decoupling",
+            fit_observables=["diffusion", "anchor_tau_alpha"],
+            inferred_parameters=["exchange_time", "persistence_time"],
+            heldout_predictions=[
+                "multi_k_tau_alpha",
+                "late_ngp",
+                "stokes_einstein_product",
+                "chi4_peak_proxy",
+            ],
+            external_closures=[],
+            degenerate_parameters=[],
+        ),
+        inversion_identifiability_audit(
+            protocol_id="single_alpha_fit_only_null",
+            source_key="hypothetical_alpha_only_fit",
+            model_scope="dynamical_signature",
+            fit_observables=["tau_alpha"],
+            inferred_parameters=["exchange_time", "persistence_time"],
+            heldout_predictions=[],
+            external_closures=[],
+            degenerate_parameters=[],
+        ),
+        inversion_identifiability_audit(
+            protocol_id="static_vs_finite_exchange_late_window",
+            source_key="late_mechanism_selection",
+            model_scope="dynamical_signature",
+            fit_observables=["late_ngp_point_1", "late_ngp_point_2", "alpha_slope"],
+            inferred_parameters=["static_shape", "exchange_ratio"],
+            heldout_predictions=["gaussian_recovery_class"],
+            external_closures=[],
+            degenerate_parameters=["static_shape_vs_exchange_ratio"],
+        ),
+        inversion_identifiability_audit(
+            protocol_id="spatial_chi4_front_closure",
+            source_key="lacevic2003fourpoint;berthier2024experimental",
+            model_scope="spatial_heterogeneity",
+            fit_observables=["tau_alpha", "diffusion", "chi4_peak"],
+            inferred_parameters=["correlation_length", "front_diffusivity"],
+            heldout_predictions=["dynamic_length"],
+            external_closures=["front_diffusivity_law"],
+            degenerate_parameters=[],
+        ),
+        inversion_identifiability_audit(
+            protocol_id="thermodynamic_entropy_boundary",
+            source_key="kauzmann1948nature;adam1965temperature",
+            model_scope="thermodynamic_transition",
+            fit_observables=["configurational_entropy", "temperature_grid"],
+            inferred_parameters=["kauzmann_temperature", "entropy_slope"],
+            heldout_predictions=["heat_capacity_anomaly", "ideal_glass_transition"],
+            external_closures=["entropy_law"],
+            degenerate_parameters=[],
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -3691,6 +3785,65 @@ def write_cross_observable_prediction_ledger_svg(path: Path, rows: list[dict[str
     path.write_text(svg)
 
 
+def write_inversion_identifiability_audit_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 600
+    left, top = 70, 105
+    row_h = 58
+    colors = {
+        "identifiable_prediction": "#2f855a",
+        "conditionally_identifiable": "#2b6cb0",
+        "underidentified_fit": "#c05621",
+        "degenerate_fit": "#c53030",
+        "scope_boundary": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        klass = str(row["identifiability_class"])
+        color = colors[klass]
+        rank_margin = int(float(row["rank_margin"]))
+        fit_count = int(float(row["fit_observable_count"]))
+        parameter_count = int(float(row["inferred_parameter_count"]))
+        heldout_count = int(float(row["heldout_prediction_count"]))
+        closure_count = int(float(row["closure_count"]))
+        risk = int(float(row["overclaim_risk"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["protocol_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 315}" y="{y - 4}" width="190" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 323}" y="{y + 11}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{klass.replace("_", " ")[:29]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 525}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">fit={fit_count}; params={parameter_count}; margin={rank_margin}; held={heldout_count}; closure={closure_count}; risk={risk}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 70}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">parameters: {str(row["inferred_parameters"]).replace("_", " ")[:62]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 525}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">held-out: {str(row["heldout_predictions"]).replace("_", " ")[:72]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Inversion identifiability audit</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Each inversion protocol is checked for fit-rank margin, held-out predictions, closure dependence, and explicit parameter degeneracy.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">protocol</text>
+  <text x="{left + 315}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">identifiability class</text>
+  <text x="{left + 525}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">pre-fit audit counts</text>
+  {"".join(marks)}
+  <rect x="70" y="550" width="14" height="14" fill="#2f855a" /><text x="92" y="562" font-family="Arial, sans-serif" font-size="12">identifiable with held-out predictions</text>
+  <rect x="325" y="550" width="14" height="14" fill="#2b6cb0" /><text x="347" y="562" font-family="Arial, sans-serif" font-size="12">closure-assisted</text>
+  <rect x="500" y="550" width="14" height="14" fill="#c05621" /><text x="522" y="562" font-family="Arial, sans-serif" font-size="12">underidentified</text>
+  <rect x="665" y="550" width="14" height="14" fill="#c53030" /><text x="687" y="562" font-family="Arial, sans-serif" font-size="12">degenerate fit</text>
+  <rect x="820" y="550" width="14" height="14" fill="#805ad5" /><text x="842" y="562" font-family="Arial, sans-serif" font-size="12">scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -4688,6 +4841,13 @@ def main() -> None:
     write_cross_observable_prediction_ledger_svg(
         FIGURE_DIR / "renewal_cage_cross_observable_prediction_ledger.svg",
         prediction_ledger_rows,
+    )
+    identifiability_rows = write_inversion_identifiability_audit_csv(
+        DATA_DIR / "renewal_cage_inversion_identifiability_audit.csv"
+    )
+    write_inversion_identifiability_audit_svg(
+        FIGURE_DIR / "renewal_cage_inversion_identifiability_audit.svg",
+        identifiability_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"

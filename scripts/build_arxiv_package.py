@@ -1586,6 +1586,61 @@ def write_cross_observable_prediction_ledger_pdf(path: Path) -> None:
     c.save()
 
 
+def write_inversion_identifiability_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_inversion_identifiability_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Inversion identifiability audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Pre-fit rank, held-out prediction, closure, and degeneracy checks prevent fit-only overclaims.",
+    )
+    left, top = 42, page_h - 86
+    c.setFont("Helvetica-Bold", 7.2)
+    c.drawString(left, top, "protocol")
+    c.drawString(left + 215, top, "class")
+    c.drawString(left + 394, top, "fit")
+    c.drawString(left + 428, top, "par")
+    c.drawString(left + 465, top, "rank")
+    c.drawString(left + 505, top, "held")
+    c.drawString(left + 545, top, "closure")
+    c.drawString(left + 595, top, "risk")
+    c.drawString(left + 635, top, "held-out predictions")
+    palette = {
+        "identifiable_prediction": colors.HexColor("#2f855a"),
+        "conditionally_identifiable": colors.HexColor("#2b6cb0"),
+        "underidentified_fit": colors.HexColor("#c05621"),
+        "degenerate_fit": colors.HexColor("#c53030"),
+        "scope_boundary": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 35
+        klass = row["identifiability_class"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["protocol_id"].replace("_", " ")[:34])
+        c.setFillColor(palette[klass])
+        c.rect(left + 215, y - 4, 154, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 220, y, klass.replace("_", " ")[:26])
+        c.setFillColor(colors.black)
+        c.drawString(left + 400, y, str(int(float(row["fit_observable_count"]))))
+        c.drawString(left + 435, y, str(int(float(row["inferred_parameter_count"]))))
+        c.drawString(left + 476, y, str(int(float(row["rank_margin"]))))
+        c.drawString(left + 515, y, str(int(float(row["heldout_prediction_count"]))))
+        c.drawString(left + 560, y, str(int(float(row["closure_count"]))))
+        c.drawString(left + 605, y, str(int(float(row["overclaim_risk"]))))
+        c.drawString(left + 635, y, row["heldout_predictions"].replace("_", " ")[:36])
+        c.drawString(left + 80, y - 10, f"params: {row['inferred_parameters'].replace('_', ' ')[:76]}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2130,6 +2185,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     cross_observable_prediction_ledger_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_cross_observable_prediction_ledger.pdf"
     )
+    inversion_identifiability_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_inversion_identifiability_audit.pdf"
+    )
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2164,6 +2222,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_claim_alignment_pdf(sota_claim_alignment_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
+    write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2212,6 +2271,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             cross_observable_prediction_ledger_pdf,
             "figures/renewal_cage_cross_observable_prediction_ledger.pdf",
+        )
+        archive.write(
+            inversion_identifiability_audit_pdf,
+            "figures/renewal_cage_inversion_identifiability_audit.pdf",
         )
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(

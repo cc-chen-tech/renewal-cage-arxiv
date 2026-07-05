@@ -1306,6 +1306,94 @@ def cross_observable_prediction_ledger(
     }
 
 
+def inversion_identifiability_audit(
+    *,
+    protocol_id: str,
+    source_key: str,
+    model_scope: str,
+    fit_observables: Sequence[str],
+    inferred_parameters: Sequence[str],
+    heldout_predictions: Sequence[str],
+    external_closures: Sequence[str],
+    degenerate_parameters: Sequence[str],
+) -> dict[str, float | str]:
+    """Classify whether an inversion protocol is identifiable before fitting data."""
+
+    for name, value in {
+        "protocol_id": protocol_id,
+        "source_key": source_key,
+        "model_scope": model_scope,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+
+    allowed_scopes = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    if model_scope not in allowed_scopes:
+        raise ValueError("model_scope is not recognized")
+    if not fit_observables:
+        raise ValueError("fit_observables must be nonempty")
+    if not inferred_parameters:
+        raise ValueError("inferred_parameters must be nonempty")
+    for name, values in {
+        "fit_observables": fit_observables,
+        "inferred_parameters": inferred_parameters,
+        "heldout_predictions": heldout_predictions,
+        "external_closures": external_closures,
+        "degenerate_parameters": degenerate_parameters,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    fit = list(dict.fromkeys(fit_observables))
+    parameters = list(dict.fromkeys(inferred_parameters))
+    heldout = list(dict.fromkeys(heldout_predictions))
+    closures = list(dict.fromkeys(external_closures))
+    degenerate = list(dict.fromkeys(degenerate_parameters))
+
+    rank_margin = len(fit) - len(parameters)
+    requires_closure = bool(closures)
+    has_degeneracy = bool(degenerate)
+    has_heldout_prediction = bool(heldout)
+
+    if model_scope == "thermodynamic_transition":
+        identifiability_class = "scope_boundary"
+    elif has_degeneracy:
+        identifiability_class = "degenerate_fit"
+    elif rank_margin < 0 or not has_heldout_prediction:
+        identifiability_class = "underidentified_fit"
+    elif requires_closure:
+        identifiability_class = "conditionally_identifiable"
+    else:
+        identifiability_class = "identifiable_prediction"
+
+    overclaim_risk = identifiability_class in {"underidentified_fit", "degenerate_fit"}
+
+    return {
+        "protocol_id": protocol_id,
+        "source_key": source_key,
+        "model_scope": model_scope,
+        "fit_observables": ";".join(fit),
+        "inferred_parameters": ";".join(parameters),
+        "heldout_predictions": ";".join(heldout) if heldout else "none",
+        "external_closures": ";".join(closures) if closures else "none",
+        "degenerate_parameters": ";".join(degenerate) if degenerate else "none",
+        "fit_observable_count": float(len(fit)),
+        "inferred_parameter_count": float(len(parameters)),
+        "heldout_prediction_count": float(len(heldout)),
+        "closure_count": float(len(closures)),
+        "rank_margin": float(rank_margin),
+        "requires_external_closure": float(requires_closure),
+        "has_degeneracy": float(has_degeneracy),
+        "overclaim_risk": float(overclaim_risk),
+        "identifiability_class": identifiability_class,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,
