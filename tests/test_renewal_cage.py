@@ -116,6 +116,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
+    trajectory_observable_protocol,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -2235,6 +2236,50 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["late_ngp_z_consistent"], 0.0)
         self.assertEqual(row["raw_curve_protocol_passes"], 0.0)
         self.assertGreater(row["late_ngp_z"], 3.0)
+
+    def test_trajectory_observable_protocol_extracts_msd_ngp_fs_and_chi4(self):
+        times = np.array([0.0, 1.0, 2.0])
+        positions = np.array(
+            [
+                [[0.0], [0.0], [0.0], [0.0]],
+                [[0.0], [0.0], [2.0], [2.0]],
+                [[0.0], [0.0], [2.0], [2.0]],
+            ]
+        )
+
+        rows = trajectory_observable_protocol(
+            positions=positions,
+            times=times,
+            lag_indices=[1, 2],
+            wave_numbers=[math.pi],
+            overlap_radius=0.5,
+        )
+
+        by_lag = {int(row["lag_index"]): row for row in rows}
+        lag1 = by_lag[1]
+        self.assertAlmostEqual(lag1["lag_time"], 1.0)
+        self.assertAlmostEqual(lag1["msd"], 1.0)
+        self.assertAlmostEqual(lag1["ngp"], 1.0 / 3.0)
+        self.assertAlmostEqual(lag1["self_intermediate_scattering"], 1.0)
+        self.assertAlmostEqual(lag1["overlap_mean"], 0.75)
+        self.assertAlmostEqual(lag1["chi4_overlap"], 0.25)
+        self.assertEqual(lag1["structural_observable_set"], "msd;ngp;self_intermediate_scattering;overlap_chi4")
+
+        lag2 = by_lag[2]
+        self.assertAlmostEqual(lag2["lag_time"], 2.0)
+        self.assertAlmostEqual(lag2["msd"], 2.0)
+        self.assertAlmostEqual(lag2["ngp"], -1.0 / 3.0)
+        self.assertAlmostEqual(lag2["overlap_mean"], 0.5)
+
+    def test_trajectory_observable_protocol_validates_inputs(self):
+        with self.assertRaises(ValueError):
+            trajectory_observable_protocol(
+                positions=np.zeros((2, 3)),
+                times=np.array([0.0, 1.0]),
+                lag_indices=[1],
+                wave_numbers=[1.0],
+                overlap_radius=0.5,
+            )
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(

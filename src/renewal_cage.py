@@ -2196,6 +2196,83 @@ def raw_curve_persistence_exchange_protocol(
     return out
 
 
+def trajectory_observable_protocol(
+    *,
+    positions: np.ndarray,
+    times: np.ndarray,
+    lag_indices: Sequence[int],
+    wave_numbers: Sequence[float],
+    overlap_radius: float,
+) -> list[dict[str, float | str]]:
+    """Extract model-facing observables directly from particle trajectories."""
+
+    position_array = np.asarray(positions, dtype=float)
+    time_array = np.asarray(times, dtype=float)
+    if position_array.ndim != 3:
+        raise ValueError("positions must have shape (frames, particles, dimensions)")
+    if time_array.ndim != 1:
+        raise ValueError("times must be one-dimensional")
+    if position_array.shape[0] != time_array.size:
+        raise ValueError("times length must match the number of trajectory frames")
+    if position_array.shape[0] < 2:
+        raise ValueError("at least two frames are required")
+    if position_array.shape[1] < 1 or position_array.shape[2] < 1:
+        raise ValueError("positions must include particles and dimensions")
+    if np.any(np.diff(time_array) <= 0.0):
+        raise ValueError("times must be strictly increasing")
+    if not lag_indices:
+        raise ValueError("lag_indices must be nonempty")
+    if not wave_numbers:
+        raise ValueError("wave_numbers must be nonempty")
+    if overlap_radius <= 0.0:
+        raise ValueError("overlap_radius must be positive")
+    for lag in lag_indices:
+        if int(lag) != lag or lag <= 0 or lag >= position_array.shape[0]:
+            raise ValueError("lag_indices must be positive frame offsets smaller than the trajectory length")
+    for wave_number in wave_numbers:
+        if wave_number <= 0.0:
+            raise ValueError("wave_numbers must be positive")
+
+    unique_lags = list(dict.fromkeys(int(lag) for lag in lag_indices))
+    unique_wave_numbers = list(dict.fromkeys(float(wave_number) for wave_number in wave_numbers))
+    dimension = position_array.shape[2]
+    particle_count = position_array.shape[1]
+    rows: list[dict[str, float | str]] = []
+    for lag in unique_lags:
+        displacements = position_array[lag:, :, :] - position_array[:-lag, :, :]
+        squared_radius = np.sum(displacements * displacements, axis=2)
+        flat_squared_radius = squared_radius.reshape(-1)
+        msd = float(np.mean(flat_squared_radius))
+        fourth_moment = float(np.mean(flat_squared_radius * flat_squared_radius))
+        ngp = 0.0 if msd == 0.0 else float(dimension / (dimension + 2.0) * fourth_moment / (msd * msd) - 1.0)
+        projected_displacements = displacements[:, :, 0].reshape(-1)
+        fs_values = [
+            float(np.mean(np.cos(wave_number * projected_displacements)))
+            for wave_number in unique_wave_numbers
+        ]
+        overlap_by_origin = np.mean(np.sqrt(squared_radius) <= overlap_radius, axis=1)
+        lag_times = time_array[lag:] - time_array[:-lag]
+        rows.append(
+            {
+                "lag_index": float(lag),
+                "lag_time": float(np.mean(lag_times)),
+                "time_origin_count": float(displacements.shape[0]),
+                "particle_count": float(particle_count),
+                "dimension": float(dimension),
+                "msd": msd,
+                "ngp": ngp,
+                "wave_numbers": ";".join(f"{wave_number:g}" for wave_number in unique_wave_numbers),
+                "self_intermediate_scattering_by_k": ";".join(f"{value:.12g}" for value in fs_values),
+                "self_intermediate_scattering": fs_values[0],
+                "overlap_radius": float(overlap_radius),
+                "overlap_mean": float(np.mean(overlap_by_origin)),
+                "chi4_overlap": float(particle_count * np.var(overlap_by_origin)),
+                "structural_observable_set": "msd;ngp;self_intermediate_scattering;overlap_chi4",
+            }
+        )
+    return rows
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

@@ -108,6 +108,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
+    trajectory_observable_protocol,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -3135,6 +3136,42 @@ def write_raw_curve_persistence_exchange_protocol_csv(path: Path) -> list[dict[s
     return rows
 
 
+def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float | str]]:
+    """Extract raw observables from a deterministic intermittent trajectory."""
+
+    frame_count = 9
+    particle_count = 12
+    times = np.arange(frame_count, dtype=float)
+    increments = np.zeros((frame_count - 1, particle_count, 1), dtype=float)
+    for step in range(frame_count - 1):
+        if step % 2 == 0:
+            increments[step, particle_count // 2 :, 0] = 2.0
+        if step in {3, 4}:
+            increments[step, : particle_count // 3, 0] = -1.5
+    positions = np.concatenate(
+        [
+            np.zeros((1, particle_count, 1), dtype=float),
+            np.cumsum(increments, axis=0),
+        ],
+        axis=0,
+    )
+    rows = trajectory_observable_protocol(
+        positions=positions,
+        times=times,
+        lag_indices=[1, 2, 3, 4],
+        wave_numbers=[0.7, 1.1, 1.6],
+        overlap_radius=0.5,
+    )
+    for row in rows:
+        row["benchmark_id"] = "synthetic_intermittent_trajectory"
+        row["target_protocol"] = "trajectory_to_raw_curve_bridge"
+        row["machine_readable_trajectory"] = 1.0
+        row["uncertainty_estimates"] = 0.0
+        row["primary_blocker"] = "uncertainty_estimates"
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -4995,6 +5032,56 @@ def write_raw_curve_persistence_exchange_protocol_svg(
     path.write_text(svg)
 
 
+def write_trajectory_observable_protocol_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left, top, right, bottom = 90, 95, 1035, 420
+    lag = np.array([float(row["lag_time"]) for row in rows])
+    msd = np.array([float(row["msd"]) for row in rows])
+    ngp = np.array([float(row["ngp"]) for row in rows])
+    chi4 = np.array([float(row["chi4_overlap"]) for row in rows])
+    fs = np.array([float(row["self_intermediate_scattering"]) for row in rows])
+
+    def x(values: np.ndarray) -> np.ndarray:
+        return scale(values, left, right)
+
+    def y(values: np.ndarray) -> np.ndarray:
+        return scale(values, bottom, top)
+
+    curves = [
+        ("MSD", msd, "#2b6cb0"),
+        ("NGP", ngp, "#c05621"),
+        ("overlap chi4", chi4, "#805ad5"),
+        ("F_s(k0,t)", fs, "#2f855a"),
+    ]
+    marks = []
+    for idx, (label, values, color) in enumerate(curves):
+        marks.append(polyline(x(lag), y(values), color, width=2.5))
+        marks.append(
+            f'<text x="{left + 18 + idx * 190}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
+        )
+        for xx, yy in zip(x(lag), y(values)):
+            marks.append(f'<circle cx="{xx:.1f}" cy="{yy:.1f}" r="4" fill="{color}" />')
+    peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Trajectory-to-observable bridge</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Particle trajectories are reduced to MSD, NGP, self-intermediate scattering, and overlap chi4 rows before inversion.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{(left + right) / 2 - 42}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">lag time</text>
+  <text x="38" y="300" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 38 300)">scaled observable</text>
+  {"".join(marks)}
+  <text x="{left}" y="{bottom + 90}" font-family="Arial, sans-serif" font-size="11">peak chi4 lag = {float(peak["lag_time"]):.1f}; chi4 = {float(peak["chi4_overlap"]):.3f}; NGP = {float(peak["ngp"]):.3f}</text>
+  <text x="{left}" y="{bottom + 108}" font-family="Arial, sans-serif" font-size="11">observable set: {peak["structural_observable_set"]}</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -5771,6 +5858,13 @@ def main() -> None:
     write_raw_curve_persistence_exchange_protocol_svg(
         FIGURE_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.svg",
         raw_curve_persistence_exchange_rows,
+    )
+    trajectory_observable_rows = write_trajectory_observable_protocol_csv(
+        DATA_DIR / "renewal_cage_trajectory_observable_protocol.csv"
+    )
+    write_trajectory_observable_protocol_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.svg",
+        trajectory_observable_rows,
     )
 
     barrier = ActivatedBarrierParams(

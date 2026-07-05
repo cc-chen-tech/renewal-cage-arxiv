@@ -1075,6 +1075,16 @@ shared. Under this rule, Kob-Andersen parts I and II form a structural
 van-Hove/alpha benchmark, but splicing Hedges persistence clocks or
 La{\v{c}}evi{\'c} four-point data into the same quantitative diagnostic remains
 blocked unless the raw observables are remeasured on a common ensemble.
+The file
+\texttt{renewal\_cage\_trajectory\_observable\_protocol.csv} adds the
+pre-curve layer needed for trajectory-level benchmarks such as GlassBench-style
+particle data: positions are reduced to lag-resolved MSD, NGP,
+self-intermediate scattering, and overlap-$\chi_4$ rows on the same observable
+schema used by the raw-curve protocols. The included deterministic
+intermittent-trajectory example is not a real-data fit; it verifies that the
+repository now has a direct trajectory-to-diagnostic bridge before any
+machine-readable simulation or experimental trajectory is promoted to an
+uncertainty-weighted benchmark.
 Finally,
 \texttt{renewal\_cage\_raw\_curve\_ingestion\_contract.csv} specifies the
 column-level contract for turning the structurally valid Kob-Andersen I/II

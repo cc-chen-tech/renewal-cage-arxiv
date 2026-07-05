@@ -106,6 +106,9 @@ The real-benchmark assimilation gate adds a stricter pre-fit check: a source
 must have the required observables, a shared system/temperature grid,
 machine-readable curves, and uncertainty estimates before it is promoted from
 qualitative SOTA agreement to uncertainty-weighted inversion.
+The trajectory-observable bridge adds the missing pre-curve layer for
+trajectory-level SOTA datasets: particle positions are reduced to MSD, NGP,
+self-intermediate scattering, and overlap-chi4 rows before raw-curve inversion.
 The cross-observable prediction ledger separates calibration inputs from
 held-out predictions and external closures, making fit-only overclaims visible.
 The inversion-identifiability audit then checks fit-rank margins, held-out
@@ -199,6 +202,7 @@ figures/renewal_cage_benchmark_fusion_readiness.svg
 figures/renewal_cage_raw_curve_ingestion_contract.svg
 figures/renewal_cage_raw_curve_diagnostic_readiness.svg
 figures/renewal_cage_raw_curve_persistence_exchange_protocol.svg
+figures/renewal_cage_trajectory_observable_protocol.svg
 figures/renewal_cage_barrier_requirements.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
@@ -244,6 +248,7 @@ data/renewal_cage_benchmark_fusion_readiness.csv
 data/renewal_cage_raw_curve_ingestion_contract.csv
 data/renewal_cage_raw_curve_diagnostic_readiness.csv
 data/renewal_cage_raw_curve_persistence_exchange_protocol.csv
+data/renewal_cage_trajectory_observable_protocol.csv
 data/renewal_cage_barrier_requirements.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
@@ -286,6 +291,7 @@ paper/figures/renewal_cage_benchmark_fusion_readiness.pdf
 paper/figures/renewal_cage_raw_curve_ingestion_contract.pdf
 paper/figures/renewal_cage_raw_curve_diagnostic_readiness.pdf
 paper/figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf
+paper/figures/renewal_cage_trajectory_observable_protocol.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf

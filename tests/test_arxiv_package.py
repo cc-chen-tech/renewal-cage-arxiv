@@ -406,6 +406,19 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertGreater(float(by_scenario["late_ngp_mismatch"]["late_ngp_z"]), 3.0)
 
+    def test_trajectory_observable_protocol_exports_raw_trajectory_bridge(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_observable_protocol.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        self.assertGreaterEqual(len(rows), 4)
+        peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+        self.assertEqual(peak["structural_observable_set"], "msd;ngp;self_intermediate_scattering;overlap_chi4")
+        self.assertGreater(float(peak["chi4_overlap"]), 0.1)
+        self.assertGreater(float(peak["ngp"]), 0.0)
+        self.assertIn("1.1", peak["wave_numbers"])
+
     def test_translation_rotation_protocol_detects_rotational_decoupling_gap(self):
         path = ROOT / "data" / "renewal_cage_translation_rotation_protocol.csv"
         self.assertTrue(path.exists())
@@ -462,6 +475,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_raw_curve_ingestion_contract.pdf", names)
             self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -535,6 +549,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_frontier_benchmark_horizon.pdf",
             "figures/renewal_cage_sota_signed_constraints.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
+            "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_barrier_requirements.pdf",
             "figures/renewal_cage_barrier.pdf",
             "figures/renewal_cage_heterogeneity.pdf",
@@ -618,6 +633,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_raw_curve_persistence_exchange_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
+            ).read_bytes()
+            first_trajectory_observable_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_observable_protocol.pdf"
             ).read_bytes()
             first_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
@@ -706,6 +724,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_raw_curve_persistence_exchange_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
             ).read_bytes()
+            second_trajectory_observable_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_observable_protocol.pdf"
+            ).read_bytes()
             second_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
             ).read_bytes()
@@ -760,6 +781,7 @@ class ArxivPackageTests(unittest.TestCase):
             first_raw_curve_persistence_exchange_protocol,
             second_raw_curve_persistence_exchange_protocol,
         )
+        self.assertEqual(first_trajectory_observable_protocol, second_trajectory_observable_protocol)
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)
