@@ -26,11 +26,13 @@ from renewal_cage import (  # noqa: E402
     dimensionless_peak_prediction,
     fractional_stokes_einstein_exponents,
     gamma_exchange_temperature_scan,
+    glass_phenomenon_audit,
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
+    gamma_exchange_alpha_relaxation_time,
     gamma_exchange_count_moments,
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_diagnostic_map,
@@ -1009,6 +1011,71 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertTrue(np.all(np.diff(alpha_renormalization) < 0.0))
         self.assertGreater(rows[-1]["late_ngp_renewal_amplitude"], 50.0)
         self.assertLess(rows[-1]["alpha_rate_renormalization"], rows[0]["alpha_rate_renormalization"] / 2.0)
+
+    def test_gamma_exchange_alpha_relaxation_time_solves_finite_exchange_decay(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+        heterogeneity = GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0)
+        wave_number = 1.1
+
+        tau_exchange = gamma_exchange_alpha_relaxation_time(wave_number, params, heterogeneity)
+        tau_poisson = alpha_relaxation_time(wave_number, params)
+        decay = gamma_exchange_normalized_alpha_decay(
+            wave_number,
+            np.array([tau_exchange]),
+            params,
+            heterogeneity,
+        )[0]
+
+        self.assertGreater(tau_exchange, tau_poisson)
+        self.assertAlmostEqual(decay, math.exp(-1.0), delta=1e-10)
+
+    def test_glass_phenomenon_audit_separates_supported_dynamics_from_thermodynamic_transition(self):
+        cage_law = TemperatureLawParams(
+            reference_temperature=1.0,
+            cage_variance_ref=1.0,
+            cage_tau_ref=0.7,
+            jump_to_cage_ref=0.8,
+            renewal_rate_ref=0.18,
+            renewal_delay_ref=3.0,
+            rate_activation=2.0,
+            delay_activation=5.0,
+            cage_stiffening=0.2,
+            jump_to_cage_growth=0.25,
+        )
+        exchange_law = FacilitatedExchangeLawParams(
+            reference_temperature=1.0,
+            shape_ref=0.4,
+            exchange_renewal_count_ref=10.0,
+            shape_broadening_barrier=1.5,
+            exchange_slowing_barrier=2.5,
+        )
+        audit = glass_phenomenon_audit(
+            np.array([1.0, 0.85, 0.72, 0.62]),
+            cage_law,
+            exchange_law,
+            wave_number=1.1,
+        )
+        rows = audit["rows"]
+
+        self.assertEqual(audit["diffusion_slowdown"], 1.0)
+        self.assertEqual(audit["alpha_slowdown"], 1.0)
+        self.assertEqual(audit["ngp_peak_shift"], 1.0)
+        self.assertEqual(audit["stokes_einstein_violation"], 1.0)
+        self.assertEqual(audit["fragility_growth"], 1.0)
+        self.assertEqual(audit["heterogeneity_growth"], 1.0)
+        self.assertEqual(audit["stretched_alpha_window"], 1.0)
+        self.assertEqual(audit["chi4_peak_growth"], 1.0)
+        self.assertEqual(audit["gaussian_recovery"], 1.0)
+        self.assertEqual(audit["thermodynamic_transition"], 0.0)
+        self.assertGreater(audit["supported_dynamic_signatures"], 8.0)
+        self.assertGreater(rows[-1]["tau_alpha_exchange"] / rows[0]["tau_alpha_exchange"], 10.0)
+        self.assertGreater(rows[-1]["chi4_peak"] / rows[0]["chi4_peak"], 1.0)
 
     def test_fractional_stokes_einstein_exponents_recover_power_law_slope(self):
         tau_alpha = np.array([2.0, 4.0, 8.0, 16.0, 32.0])

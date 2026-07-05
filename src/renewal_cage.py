@@ -502,6 +502,45 @@ def gamma_exchange_normalized_alpha_decay(
     return (1.0 + gamma * renewal / effective_shape) ** (-effective_shape)
 
 
+def gamma_exchange_alpha_relaxation_time(
+    wave_number: float,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+    *,
+    threshold: float = math.exp(-1.0),
+) -> float:
+    """Alpha time for finite-exchange heterogeneity after removing the cage factor."""
+
+    _validate(params)
+    _validate_gamma_exchange(heterogeneity)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must lie between 0 and 1")
+
+    low = 0.0
+    high = alpha_relaxation_time(wave_number, params, threshold=threshold)
+    while gamma_exchange_normalized_alpha_decay(
+        wave_number,
+        np.array([high]),
+        params,
+        heterogeneity,
+    )[0] > threshold:
+        high *= 2.0
+    for _ in range(100):
+        mid = 0.5 * (low + high)
+        if gamma_exchange_normalized_alpha_decay(
+            wave_number,
+            np.array([mid]),
+            params,
+            heterogeneity,
+        )[0] > threshold:
+            low = mid
+        else:
+            high = mid
+    return 0.5 * (low + high)
+
+
 def gamma_exchange_self_intermediate_scattering(
     wave_number: float,
     t: np.ndarray,
@@ -1625,6 +1664,137 @@ def gamma_exchange_temperature_scan(
             }
         )
     return rows
+
+
+def glass_phenomenon_audit(
+    temperatures: np.ndarray,
+    cage_law: TemperatureLawParams,
+    exchange_law: FacilitatedExchangeLawParams,
+    *,
+    wave_number: float,
+    threshold: float = math.exp(-1.0),
+) -> dict[str, float | list[dict[str, float]]]:
+    """Audit which glassy dynamical signatures follow from one parameter law.
+
+    The audit deliberately distinguishes dynamical consequences of the
+    delayed-renewal cage model from phenomena it does not derive. In particular,
+    a thermodynamic transition is marked unsupported: the model supplies an
+    effective renewal clock, not an equilibrium singularity.
+    """
+
+    temperatures = np.asarray(temperatures, dtype=float)
+    if temperatures.ndim != 1 or temperatures.size < 2:
+        raise ValueError("temperatures must contain at least two points")
+    if np.any(temperatures <= 0.0):
+        raise ValueError("temperatures must be positive")
+    _validate_temperature_law(cage_law)
+    _validate_facilitated_exchange_law(exchange_law)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if not math.isclose(cage_law.reference_temperature, exchange_law.reference_temperature):
+        raise ValueError("cage and exchange laws must share a reference temperature")
+
+    rows: list[dict[str, float]] = []
+    baseline_se_product = None
+    for temperature in temperatures:
+        params = temperature_dependent_params(float(temperature), cage_law)
+        heterogeneity = temperature_dependent_gamma_exchange(float(temperature), exchange_law)
+        diffusion = long_time_diffusion_coefficient(params)
+        tau_alpha_poisson = alpha_relaxation_time(wave_number, params, threshold=threshold)
+        tau_alpha_exchange = gamma_exchange_alpha_relaxation_time(
+            wave_number,
+            params,
+            heterogeneity,
+            threshold=threshold,
+        )
+        se_product = diffusion * tau_alpha_exchange
+        if baseline_se_product is None:
+            baseline_se_product = se_product
+        peak = dimensionless_peak_prediction(params)
+        asymptotic = gamma_exchange_asymptotic_diagnostics(wave_number, params, heterogeneity)
+
+        time_grid = np.geomspace(
+            max(1e-4, 0.02 * params.cage_tau),
+            max(20.0 * tau_alpha_exchange, 20.0 * params.renewal_delay, 20.0 * params.cage_tau),
+            700,
+        )
+        decay = gamma_exchange_normalized_alpha_decay(wave_number, time_grid, params, heterogeneity)
+        local_beta = local_alpha_stretching_exponent(time_grid, decay)
+        alpha_window = (-np.log(decay) > 0.3) & (-np.log(decay) < 2.0) & np.isfinite(local_beta)
+        if np.any(alpha_window):
+            median_beta = float(np.nanmedian(local_beta[alpha_window]))
+        else:
+            median_beta = math.nan
+        chi4_peak = float(np.max(gamma_exchange_scattering_susceptibility(wave_number, time_grid, params, heterogeneity)))
+        late_time = 20.0 * tau_alpha_exchange
+        later_time = 60.0 * tau_alpha_exchange
+        late_ngp = float(gamma_exchange_ngp_1d(np.array([late_time]), params, heterogeneity)[0])
+        later_ngp = float(gamma_exchange_ngp_1d(np.array([later_time]), params, heterogeneity)[0])
+
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "inverse_temperature_shift": 1.0 / float(temperature) - 1.0 / cage_law.reference_temperature,
+                "diffusion_coefficient": diffusion,
+                "tau_alpha_poisson": tau_alpha_poisson,
+                "tau_alpha_exchange": tau_alpha_exchange,
+                "normalized_stokes_einstein_product": se_product / baseline_se_product,
+                "ngp_peak_time": peak["peak_time"],
+                "ngp_peak_height": peak["peak_ngp"],
+                "heterogeneity_ratio": asymptotic["heterogeneity_ratio"],
+                "late_ngp_renewal_amplitude": asymptotic["late_ngp_renewal_amplitude"],
+                "alpha_rate_renormalization": asymptotic["alpha_rate_renormalization"],
+                "median_alpha_window_beta": median_beta,
+                "chi4_peak": chi4_peak,
+                "late_ngp": late_ngp,
+                "later_ngp": later_ngp,
+                "gaussian_recovery_ratio": later_ngp / late_ngp,
+            }
+        )
+
+    diffusion = np.array([row["diffusion_coefficient"] for row in rows])
+    tau_exchange = np.array([row["tau_alpha_exchange"] for row in rows])
+    peak_times = np.array([row["ngp_peak_time"] for row in rows])
+    se_products = np.array([row["normalized_stokes_einstein_product"] for row in rows])
+    heterogeneity_ratios = np.array([row["heterogeneity_ratio"] for row in rows])
+    beta_values = np.array([row["median_alpha_window_beta"] for row in rows])
+    chi4_peaks = np.array([row["chi4_peak"] for row in rows])
+    recovery_ratios = np.array([row["gaussian_recovery_ratio"] for row in rows])
+    activation_energies = apparent_alpha_activation_energies(temperatures, tau_exchange)
+    fragility_indices = activation_energies / (temperatures * math.log(10.0))
+    for row, activation, fragility in zip(rows, activation_energies, fragility_indices):
+        row["apparent_alpha_activation_energy"] = float(activation)
+        row["local_fragility_index"] = float(fragility)
+
+    flags = {
+        "diffusion_slowdown": float(np.all(np.diff(diffusion) < 0.0)),
+        "alpha_slowdown": float(np.all(np.diff(tau_exchange) > 0.0)),
+        "ngp_peak_shift": float(np.all(np.diff(peak_times) > 0.0)),
+        "stokes_einstein_violation": float(se_products[-1] > 1.5 * se_products[0]),
+        "fragility_growth": float(fragility_indices[-1] > fragility_indices[0]),
+        "heterogeneity_growth": float(np.all(np.diff(heterogeneity_ratios) > 0.0)),
+        "stretched_alpha_window": float(np.nanmin(beta_values) < 0.9),
+        "chi4_peak_growth": float(chi4_peaks[-1] > chi4_peaks[0]),
+        "gaussian_recovery": float(np.all(recovery_ratios < 1.0)),
+        "thermodynamic_transition": 0.0,
+    }
+    dynamic_keys = [
+        "diffusion_slowdown",
+        "alpha_slowdown",
+        "ngp_peak_shift",
+        "stokes_einstein_violation",
+        "fragility_growth",
+        "heterogeneity_growth",
+        "stretched_alpha_window",
+        "chi4_peak_growth",
+        "gaussian_recovery",
+    ]
+    return {
+        **flags,
+        "supported_dynamic_signatures": float(sum(flags[key] for key in dynamic_keys)),
+        "tested_dynamic_signatures": float(len(dynamic_keys)),
+        "rows": rows,
+    }
 
 
 def poisson_weights(mean: float, *, max_count: int) -> np.ndarray:

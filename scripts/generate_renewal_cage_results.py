@@ -37,6 +37,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
+    glass_phenomenon_audit,
     infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
     infer_renewal_correlation_size,
@@ -261,6 +262,61 @@ def write_facilitated_exchange_csv(
         row["heterogeneity_ratio_over_hot"] = row["heterogeneity_ratio"] / reference_ratio
         row["late_alpha_decay_per_renewal_over_hot"] = (
             row["late_alpha_decay_per_renewal"] / reference_late_alpha
+        )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_glass_audit_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    cage_law: TemperatureLawParams,
+    exchange_law: FacilitatedExchangeLawParams,
+    *,
+    wave_number: float,
+) -> list[dict[str, float | str]]:
+    audit = glass_phenomenon_audit(
+        temperatures,
+        cage_law,
+        exchange_law,
+        wave_number=wave_number,
+    )
+    rows: list[dict[str, float | str]] = []
+    for row in audit["rows"]:
+        out: dict[str, float | str] = {
+            "record_type": "temperature_row",
+            "signature": "",
+            "flag_value": np.nan,
+        }
+        out.update(row)
+        rows.append(out)
+    for key, value in audit.items():
+        if key == "rows":
+            continue
+        rows.append(
+            {
+                "record_type": "summary_flag",
+                "signature": key,
+                "temperature": np.nan,
+                "inverse_temperature_shift": np.nan,
+                "diffusion_coefficient": np.nan,
+                "tau_alpha_poisson": np.nan,
+                "tau_alpha_exchange": np.nan,
+                "normalized_stokes_einstein_product": np.nan,
+                "ngp_peak_time": np.nan,
+                "ngp_peak_height": np.nan,
+                "heterogeneity_ratio": np.nan,
+                "late_ngp_renewal_amplitude": np.nan,
+                "alpha_rate_renormalization": np.nan,
+                "median_alpha_window_beta": np.nan,
+                "chi4_peak": np.nan,
+                "late_ngp": np.nan,
+                "later_ngp": np.nan,
+                "gaussian_recovery_ratio": np.nan,
+                "apparent_alpha_activation_energy": np.nan,
+                "local_fragility_index": np.nan,
+                "flag_value": value,
+            }
         )
     write_sweep_csv(path, rows)
     return rows
@@ -1207,6 +1263,99 @@ def write_facilitated_exchange_svg(path: Path, rows: list[dict[str, float]]) -> 
     path.write_text(svg)
 
 
+def write_glass_audit_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1200, 650
+    left_a, top_a, right_a, bottom_a = 80, 90, 540, 330
+    left_b, top_b, right_b, bottom_b = 690, 90, 1130, 330
+    left_c, top_c, right_c, bottom_c = 80, 410, 1130, 590
+    palette = ["#2b6cb0", "#c05621", "#805ad5", "#2f855a"]
+    temperature_rows = [row for row in rows if row["record_type"] == "temperature_row"]
+    summary_rows = [row for row in rows if row["record_type"] == "summary_flag"]
+    flag_map = {str(row["signature"]): float(row["flag_value"]) for row in summary_rows}
+
+    def axes(left: int, top: int, right: int, bottom: int, title: str, xlabel: str) -> str:
+        return f"""<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 70}" y="{bottom + 36}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(
+        left: int,
+        top: int,
+        right: int,
+        bottom: int,
+        x_values: np.ndarray,
+        curves: list[tuple[str, np.ndarray]],
+    ) -> str:
+        x = scale(x_values, left, right)
+        all_values = np.concatenate([curve for _, curve in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, palette[idx % len(palette)]))
+            out.append(
+                f'<text x="{left + 16}" y="{top + 22 + idx * 17}" font-family="Arial, sans-serif" font-size="12" fill="{palette[idx % len(palette)]}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    x = np.array([float(row["inverse_temperature_shift"]) for row in temperature_rows])
+    tau = np.array([float(row["tau_alpha_exchange"]) for row in temperature_rows])
+    diffusion = np.array([float(row["diffusion_coefficient"]) for row in temperature_rows])
+    se_product = np.array([float(row["normalized_stokes_einstein_product"]) for row in temperature_rows])
+    heterogeneity = np.array([float(row["heterogeneity_ratio"]) for row in temperature_rows])
+    chi4 = np.array([float(row["chi4_peak"]) for row in temperature_rows])
+    beta = np.array([float(row["median_alpha_window_beta"]) for row in temperature_rows])
+
+    signature_order = [
+        "diffusion_slowdown",
+        "alpha_slowdown",
+        "ngp_peak_shift",
+        "stokes_einstein_violation",
+        "fragility_growth",
+        "heterogeneity_growth",
+        "stretched_alpha_window",
+        "chi4_peak_growth",
+        "gaussian_recovery",
+        "thermodynamic_transition",
+    ]
+    bars = []
+    group_width = (right_c - left_c) / len(signature_order)
+    bar_width = group_width - 10
+    for idx, signature in enumerate(signature_order):
+        value = flag_map[signature]
+        x0 = left_c + idx * group_width + 5
+        bar_height = value * (bottom_c - top_c - 40)
+        color = "#2f855a" if value >= 1.0 else "#a0aec0"
+        bars.append(
+            f'<rect x="{x0:.2f}" y="{bottom_c - bar_height:.2f}" width="{bar_width:.2f}" height="{bar_height:.2f}" fill="{color}" />'
+        )
+        label = signature.replace("_", " ")
+        bars.append(
+            f'<text x="{x0 + 3:.2f}" y="{bottom_c + 16}" font-family="Arial, sans-serif" font-size="10" transform="rotate(35 {x0 + 3:.2f} {bottom_c + 16})">{label}</text>'
+        )
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="80" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Glass-dynamics phenomenon audit</text>
+  <text x="80" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">One delayed-renewal cage law is tested against dynamical signatures; no thermodynamic transition is claimed.</text>
+  {axes(left_a, top_a, right_a, bottom_a, "A. Transport and relaxation under cooling", "inverse-temperature shift")}
+  {plot(left_a, top_a, right_a, bottom_a, x, [("tau_alpha exchange", tau / tau[0]), ("1 / diffusion", diffusion[0] / diffusion), ("D tau_alpha", se_product)])}
+  {axes(left_b, top_b, right_b, bottom_b, "B. Heterogeneity signatures", "inverse-temperature shift")}
+  {plot(left_b, top_b, right_b, bottom_b, x, [("exchange ratio", heterogeneity / heterogeneity[0]), ("chi4 peak", chi4 / chi4[0]), ("alpha-window beta", beta)])}
+  <line x1="{left_c}" y1="{bottom_c}" x2="{right_c}" y2="{bottom_c}" stroke="#222" />
+  <line x1="{left_c}" y1="{bottom_c}" x2="{left_c}" y2="{top_c}" stroke="#222" />
+  <text x="{left_c}" y="{top_c - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">C. Supported signatures from the effective dynamics</text>
+  {"".join(bars)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -1710,6 +1859,14 @@ def main() -> None:
         FIGURE_DIR / "renewal_cage_facilitated_exchange.svg",
         facilitated_exchange_rows,
     )
+    glass_audit_rows = write_glass_audit_csv(
+        DATA_DIR / "renewal_cage_glass_audit.csv",
+        temperatures,
+        temperature_law,
+        exchange_law,
+        wave_number=1.1,
+    )
+    write_glass_audit_svg(FIGURE_DIR / "renewal_cage_glass_audit.svg", glass_audit_rows)
 
     barrier = ActivatedBarrierParams(
         reference_temperature=1.0,
