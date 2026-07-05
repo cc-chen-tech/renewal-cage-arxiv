@@ -38,6 +38,7 @@ from renewal_cage import (  # noqa: E402
     cross_observable_prediction_ledger,
     dynamic_heterogeneity_benchmark_consistency,
     fragility_benchmark_consistency,
+    frontier_benchmark_horizon,
     gaussian_radial_3d,
     gaussian_recovery_benchmark_consistency,
     gamma_exchange_alpha_relaxation_time,
@@ -2523,6 +2524,135 @@ def write_inversion_identifiability_audit_csv(path: Path) -> list[dict[str, floa
     return rows
 
 
+def write_frontier_benchmark_horizon_csv(path: Path) -> list[dict[str, float | str]]:
+    """Track recent SOTA benchmarks as direct reanalysis, closure, or extension targets."""
+
+    rows = [
+        frontier_benchmark_horizon(
+            benchmark_id="glassbench_trajectory_horizon",
+            source_key="jung2025roadmap_glassbench",
+            source_year=2025,
+            model_scope="dynamical_signature",
+            target_protocol="alpha_vanhove_transport",
+            available_observables=[
+                "particle_trajectories",
+                "time_grid",
+                "temperature_grid",
+                "structure",
+                "local_mobility_labels",
+            ],
+            required_observables=[
+                "particle_trajectories",
+                "time_grid",
+                "temperature_grid",
+                "self_intermediate_scattering",
+                "ngp",
+                "diffusion",
+            ],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=False,
+            has_shared_transport_grid=True,
+            requires_external_closure=False,
+            model_extension_required=False,
+        ),
+        frontier_benchmark_horizon(
+            benchmark_id="gst_nn_potential_transport_horizon",
+            source_key="marcorini2025gst_dynamic_heterogeneity",
+            source_year=2025,
+            model_scope="transport_decoupling",
+            target_protocol="joint_persistence_exchange_multik_chi4",
+            available_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "stokes_einstein_product",
+                "chi4_peak",
+                "fragility_proxy",
+            ],
+            required_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "late_ngp",
+                "multi_k_tau_alpha",
+                "chi4_peak",
+            ],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=False,
+            has_shared_transport_grid=True,
+            requires_external_closure=False,
+            model_extension_required=False,
+        ),
+        frontier_benchmark_horizon(
+            benchmark_id="near_tg_molecular_motion_rotational_gap",
+            source_key="simon2026molecular_motion",
+            source_year=2026,
+            model_scope="transport_decoupling",
+            target_protocol="translation_rotation_persistence_exchange",
+            available_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "rotational_relaxation",
+                "stokes_einstein_product",
+            ],
+            required_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "rotational_relaxation",
+                "late_ngp",
+            ],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=True,
+            has_shared_transport_grid=True,
+            requires_external_closure=False,
+            model_extension_required=True,
+        ),
+        frontier_benchmark_horizon(
+            benchmark_id="experimental_dynamic_heterogeneity_closure_horizon",
+            source_key="berthier2024experimental",
+            source_year=2024,
+            model_scope="spatial_heterogeneity",
+            target_protocol="spatial_chi4_front_closure",
+            available_observables=[
+                "temperature_grid",
+                "tau_alpha",
+                "dynamic_length",
+                "local_dynamic_heterogeneity",
+            ],
+            required_observables=[
+                "temperature_grid",
+                "tau_alpha",
+                "diffusion",
+                "chi4_peak",
+                "dynamic_length",
+            ],
+            has_machine_readable_repository=False,
+            has_uncertainty_estimates=False,
+            has_shared_transport_grid=False,
+            requires_external_closure=True,
+            model_extension_required=False,
+        ),
+        frontier_benchmark_horizon(
+            benchmark_id="heat_capacity_entropy_frontier",
+            source_key="thermodynamic_calorimetry_candidate",
+            source_year=2025,
+            model_scope="thermodynamic_transition",
+            target_protocol="thermodynamic_entropy_closure",
+            available_observables=["temperature_grid", "configurational_entropy", "heat_capacity"],
+            required_observables=["temperature_grid", "configurational_entropy", "heat_capacity"],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=True,
+            has_shared_transport_grid=True,
+            requires_external_closure=True,
+            model_extension_required=False,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -3844,6 +3974,77 @@ def write_inversion_identifiability_audit_svg(path: Path, rows: list[dict[str, f
     path.write_text(svg)
 
 
+def write_frontier_benchmark_horizon_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 540
+    left, top = 70, 100
+    row_h = 65
+    colors = {
+        "trajectory_reanalysis_candidate": "#2f855a",
+        "transport_heterogeneity_candidate": "#2b6cb0",
+        "model_extension_required": "#c05621",
+        "closure_horizon": "#805ad5",
+        "scope_boundary": "#718096",
+        "quantitative_inversion_candidate": "#276749",
+        "structural_inversion_candidate": "#319795",
+        "qualitative_horizon": "#d69e2e",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        klass = str(row["horizon_class"])
+        color = colors[klass]
+        coverage = float(row["effective_observable_coverage"])
+        score = float(row["frontier_priority_score"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["benchmark_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 315}" y="{y - 4}" width="210" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 323}" y="{y + 11}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{klass.replace("_", " ")[:32]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 555}" y="{y - 2}" width="150" height="12" fill="#e2e8f0" />'
+        )
+        marks.append(
+            f'<rect x="{left + 555}" y="{y - 2}" width="{150 * coverage:.1f}" height="12" fill="#2b6cb0" />'
+        )
+        marks.append(
+            f'<rect x="{left + 730}" y="{y - 2}" width="150" height="12" fill="#e2e8f0" />'
+        )
+        marks.append(
+            f'<rect x="{left + 730}" y="{y - 2}" width="{150 * score:.1f}" height="12" fill="#2f855a" />'
+        )
+        marks.append(
+            f'<text x="{left + 905}" y="{y + 8}" font-family="Arial, sans-serif" font-size="10">blocker: {str(row["primary_blocker"]).replace("_", " ")[:28]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 70}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">source: {str(row["source_key"]).replace("_", " ")[:72]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 555}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">missing: {str(row["missing_observables"]).replace("_", " ")[:76]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Frontier benchmark horizon</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Recent SOTA sources are classified as reanalysis targets, transport/heterogeneity candidates, model-extension gaps, closures, or scope boundaries.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">benchmark</text>
+  <text x="{left + 315}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">horizon class</text>
+  <text x="{left + 555}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">coverage</text>
+  <text x="{left + 730}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">priority</text>
+  {"".join(marks)}
+  <rect x="70" y="490" width="14" height="14" fill="#2f855a" /><text x="92" y="502" font-family="Arial, sans-serif" font-size="12">trajectory reanalysis</text>
+  <rect x="245" y="490" width="14" height="14" fill="#2b6cb0" /><text x="267" y="502" font-family="Arial, sans-serif" font-size="12">transport/heterogeneity</text>
+  <rect x="455" y="490" width="14" height="14" fill="#c05621" /><text x="477" y="502" font-family="Arial, sans-serif" font-size="12">model extension</text>
+  <rect x="620" y="490" width="14" height="14" fill="#805ad5" /><text x="642" y="502" font-family="Arial, sans-serif" font-size="12">closure horizon</text>
+  <rect x="780" y="490" width="14" height="14" fill="#718096" /><text x="802" y="502" font-family="Arial, sans-serif" font-size="12">scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -4848,6 +5049,13 @@ def main() -> None:
     write_inversion_identifiability_audit_svg(
         FIGURE_DIR / "renewal_cage_inversion_identifiability_audit.svg",
         identifiability_rows,
+    )
+    frontier_horizon_rows = write_frontier_benchmark_horizon_csv(
+        DATA_DIR / "renewal_cage_frontier_benchmark_horizon.csv"
+    )
+    write_frontier_benchmark_horizon_svg(
+        FIGURE_DIR / "renewal_cage_frontier_benchmark_horizon.svg",
+        frontier_horizon_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"

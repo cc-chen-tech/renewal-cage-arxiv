@@ -55,6 +55,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_scattering_susceptibility,
     gamma_exchange_self_intermediate_scattering,
     fragility_benchmark_consistency,
+    frontier_benchmark_horizon,
     gaussian_recovery_benchmark_consistency,
     infer_spatial_facilitation_diffusivity,
     kww_alpha_fit,
@@ -1653,6 +1654,121 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(spatial["requires_external_closure"], 1.0)
         self.assertEqual(spatial["overclaim_risk"], 0.0)
         self.assertEqual(thermo["identifiability_class"], "scope_boundary")
+        self.assertEqual(thermo["overclaim_risk"], 0.0)
+
+    def test_frontier_benchmark_horizon_marks_trajectory_reanalysis_candidate(self):
+        row = frontier_benchmark_horizon(
+            benchmark_id="glassbench_trajectory_horizon",
+            source_key="jung2025roadmap_glassbench",
+            source_year=2025,
+            model_scope="dynamical_signature",
+            target_protocol="alpha_vanhove_transport",
+            available_observables=[
+                "particle_trajectories",
+                "time_grid",
+                "temperature_grid",
+                "structure",
+                "local_mobility_labels",
+            ],
+            required_observables=[
+                "particle_trajectories",
+                "time_grid",
+                "temperature_grid",
+                "self_intermediate_scattering",
+                "ngp",
+                "diffusion",
+            ],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=False,
+            has_shared_transport_grid=True,
+            requires_external_closure=False,
+            model_extension_required=False,
+        )
+
+        self.assertEqual(row["horizon_class"], "trajectory_reanalysis_candidate")
+        self.assertEqual(row["can_compute_missing_from_trajectories"], 1.0)
+        self.assertIn("self_intermediate_scattering", row["computable_missing_observables"])
+        self.assertEqual(row["overclaim_risk"], 0.0)
+
+    def test_frontier_benchmark_horizon_marks_transport_heterogeneity_candidate(self):
+        row = frontier_benchmark_horizon(
+            benchmark_id="gst_nn_potential_transport_horizon",
+            source_key="marcorini2025gst_dynamic_heterogeneity",
+            source_year=2025,
+            model_scope="transport_decoupling",
+            target_protocol="joint_persistence_exchange_multik_chi4",
+            available_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "stokes_einstein_product",
+                "chi4_peak",
+                "fragility_proxy",
+            ],
+            required_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "late_ngp",
+                "multi_k_tau_alpha",
+                "chi4_peak",
+            ],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=False,
+            has_shared_transport_grid=True,
+            requires_external_closure=False,
+            model_extension_required=False,
+        )
+
+        self.assertEqual(row["horizon_class"], "transport_heterogeneity_candidate")
+        self.assertEqual(row["primary_blocker"], "late_ngp")
+        self.assertGreater(row["frontier_priority_score"], 0.5)
+
+    def test_frontier_benchmark_horizon_preserves_extension_and_scope_boundaries(self):
+        rotational = frontier_benchmark_horizon(
+            benchmark_id="near_tg_molecular_motion_rotational_gap",
+            source_key="simon2026molecular_motion",
+            source_year=2026,
+            model_scope="transport_decoupling",
+            target_protocol="translation_rotation_persistence_exchange",
+            available_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "rotational_relaxation",
+                "stokes_einstein_product",
+            ],
+            required_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "rotational_relaxation",
+                "late_ngp",
+            ],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=True,
+            has_shared_transport_grid=True,
+            requires_external_closure=False,
+            model_extension_required=True,
+        )
+        thermo = frontier_benchmark_horizon(
+            benchmark_id="heat_capacity_entropy_frontier",
+            source_key="thermodynamic_calorimetry_candidate",
+            source_year=2025,
+            model_scope="thermodynamic_transition",
+            target_protocol="thermodynamic_entropy_closure",
+            available_observables=["temperature_grid", "configurational_entropy", "heat_capacity"],
+            required_observables=["temperature_grid", "configurational_entropy", "heat_capacity"],
+            has_machine_readable_repository=True,
+            has_uncertainty_estimates=True,
+            has_shared_transport_grid=True,
+            requires_external_closure=True,
+            model_extension_required=False,
+        )
+
+        self.assertEqual(rotational["horizon_class"], "model_extension_required")
+        self.assertEqual(rotational["model_extension_required"], 1.0)
+        self.assertEqual(thermo["horizon_class"], "scope_boundary")
         self.assertEqual(thermo["overclaim_risk"], 0.0)
 
     def test_sota_claim_alignment_scores_supported_dynamic_claim(self):

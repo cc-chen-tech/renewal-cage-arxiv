@@ -237,6 +237,29 @@ class ArxivPackageTests(unittest.TestCase):
         thermo = by_id["thermodynamic_entropy_boundary"]
         self.assertEqual(thermo["identifiability_class"], "scope_boundary")
 
+    def test_frontier_benchmark_horizon_marks_next_sota_reanalysis_targets(self):
+        path = ROOT / "data" / "renewal_cage_frontier_benchmark_horizon.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["benchmark_id"]: row for row in rows}
+        glassbench = by_id["glassbench_trajectory_horizon"]
+        self.assertEqual(glassbench["horizon_class"], "trajectory_reanalysis_candidate")
+        self.assertEqual(float(glassbench["can_compute_missing_from_trajectories"]), 1.0)
+        self.assertIn("self_intermediate_scattering", glassbench["computable_missing_observables"])
+
+        gst = by_id["gst_nn_potential_transport_horizon"]
+        self.assertEqual(gst["horizon_class"], "transport_heterogeneity_candidate")
+        self.assertEqual(gst["primary_blocker"], "late_ngp")
+
+        molecular_motion = by_id["near_tg_molecular_motion_rotational_gap"]
+        self.assertEqual(molecular_motion["horizon_class"], "model_extension_required")
+        self.assertEqual(float(molecular_motion["model_extension_required"]), 1.0)
+
+        thermo = by_id["heat_capacity_entropy_frontier"]
+        self.assertEqual(thermo["horizon_class"], "scope_boundary")
+
     def test_observable_falsification_matrix_maps_literature_to_diagnostic_blockers(self):
         path = ROOT / "data" / "renewal_cage_observable_falsification_matrix.csv"
         self.assertTrue(path.exists())
@@ -385,6 +408,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", names)
             self.assertIn("figures/renewal_cage_cross_observable_prediction_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_inversion_identifiability_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_frontier_benchmark_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", names)
@@ -460,6 +484,7 @@ class ArxivPackageTests(unittest.TestCase):
         supplemental_figures = [
             "figures/renewal_cage_cross_observable_prediction_ledger.pdf",
             "figures/renewal_cage_inversion_identifiability_audit.pdf",
+            "figures/renewal_cage_frontier_benchmark_horizon.pdf",
             "figures/renewal_cage_barrier_requirements.pdf",
             "figures/renewal_cage_barrier.pdf",
             "figures/renewal_cage_heterogeneity.pdf",
@@ -519,6 +544,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_inversion_identifiability_audit = (
                 ROOT / "paper" / "figures" / "renewal_cage_inversion_identifiability_audit.pdf"
+            ).read_bytes()
+            first_frontier_benchmark_horizon = (
+                ROOT / "paper" / "figures" / "renewal_cage_frontier_benchmark_horizon.pdf"
             ).read_bytes()
             first_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
@@ -598,6 +626,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_inversion_identifiability_audit = (
                 ROOT / "paper" / "figures" / "renewal_cage_inversion_identifiability_audit.pdf"
             ).read_bytes()
+            second_frontier_benchmark_horizon = (
+                ROOT / "paper" / "figures" / "renewal_cage_frontier_benchmark_horizon.pdf"
+            ).read_bytes()
             second_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
@@ -656,6 +687,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_real_benchmark_assimilation_gate, second_real_benchmark_assimilation_gate)
         self.assertEqual(first_cross_observable_prediction_ledger, second_cross_observable_prediction_ledger)
         self.assertEqual(first_inversion_identifiability_audit, second_inversion_identifiability_audit)
+        self.assertEqual(first_frontier_benchmark_horizon, second_frontier_benchmark_horizon)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
         self.assertEqual(first_observable_falsification_matrix, second_observable_falsification_matrix)
         self.assertEqual(first_benchmark_fusion_readiness, second_benchmark_fusion_readiness)

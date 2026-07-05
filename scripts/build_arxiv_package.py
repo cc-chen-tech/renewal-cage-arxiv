@@ -1641,6 +1641,58 @@ def write_inversion_identifiability_audit_pdf(path: Path) -> None:
     c.save()
 
 
+def write_frontier_benchmark_horizon_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_frontier_benchmark_horizon.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Frontier benchmark horizon")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Recent SOTA sources are classified as reanalysis targets, closure horizons, model-extension gaps, or scope boundaries.",
+    )
+    left, top = 42, page_h - 86
+    c.setFont("Helvetica-Bold", 7.2)
+    c.drawString(left, top, "benchmark")
+    c.drawString(left + 220, top, "class")
+    c.drawString(left + 420, top, "cov")
+    c.drawString(left + 456, top, "score")
+    c.drawString(left + 500, top, "blocker")
+    c.drawString(left + 630, top, "missing")
+    palette = {
+        "trajectory_reanalysis_candidate": colors.HexColor("#2f855a"),
+        "transport_heterogeneity_candidate": colors.HexColor("#2b6cb0"),
+        "model_extension_required": colors.HexColor("#c05621"),
+        "closure_horizon": colors.HexColor("#805ad5"),
+        "scope_boundary": colors.HexColor("#718096"),
+        "quantitative_inversion_candidate": colors.HexColor("#276749"),
+        "structural_inversion_candidate": colors.HexColor("#319795"),
+        "qualitative_horizon": colors.HexColor("#d69e2e"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 45
+        klass = row["horizon_class"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["benchmark_id"].replace("_", " ")[:35])
+        c.setFillColor(palette[klass])
+        c.rect(left + 220, y - 4, 172, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 225, y, klass.replace("_", " ")[:28])
+        c.setFillColor(colors.black)
+        c.drawString(left + 425, y, f"{float(row['effective_observable_coverage']):.2f}")
+        c.drawString(left + 463, y, f"{float(row['frontier_priority_score']):.2f}")
+        c.drawString(left + 500, y, row["primary_blocker"].replace("_", " ")[:24])
+        c.drawString(left + 630, y, row["missing_observables"].replace("_", " ")[:38])
+        c.drawString(left + 80, y - 10, f"source: {row['source_key'].replace('_', ' ')[:82]}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2188,6 +2240,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     inversion_identifiability_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_inversion_identifiability_audit.pdf"
     )
+    frontier_benchmark_horizon_pdf = PAPER_FIGURE_DIR / "renewal_cage_frontier_benchmark_horizon.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2223,6 +2276,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
+    write_frontier_benchmark_horizon_pdf(frontier_benchmark_horizon_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2276,6 +2330,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             inversion_identifiability_audit_pdf,
             "figures/renewal_cage_inversion_identifiability_audit.pdf",
         )
+        archive.write(frontier_benchmark_horizon_pdf, "figures/renewal_cage_frontier_benchmark_horizon.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(
             observable_falsification_matrix_pdf,

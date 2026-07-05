@@ -1394,6 +1394,151 @@ def inversion_identifiability_audit(
     }
 
 
+def frontier_benchmark_horizon(
+    *,
+    benchmark_id: str,
+    source_key: str,
+    source_year: int,
+    model_scope: str,
+    target_protocol: str,
+    available_observables: Sequence[str],
+    required_observables: Sequence[str],
+    has_machine_readable_repository: bool,
+    has_uncertainty_estimates: bool,
+    has_shared_transport_grid: bool,
+    requires_external_closure: bool,
+    model_extension_required: bool,
+) -> dict[str, float | str]:
+    """Score frontier benchmarks as direct, reanalysis, closure, or extension targets."""
+
+    for name, value in {
+        "benchmark_id": benchmark_id,
+        "source_key": source_key,
+        "model_scope": model_scope,
+        "target_protocol": target_protocol,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    allowed_scopes = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    if model_scope not in allowed_scopes:
+        raise ValueError("model_scope is not recognized")
+    if source_year < 1900:
+        raise ValueError("source_year must be a plausible publication year")
+    if not available_observables:
+        raise ValueError("available_observables must be nonempty")
+    if not required_observables:
+        raise ValueError("required_observables must be nonempty")
+    if any(not observable for observable in available_observables):
+        raise ValueError("available_observables must contain nonempty strings")
+    if any(not observable for observable in required_observables):
+        raise ValueError("required_observables must contain nonempty strings")
+
+    available = list(dict.fromkeys(available_observables))
+    required = list(dict.fromkeys(required_observables))
+    available_set = set(available)
+    missing = [observable for observable in required if observable not in available_set]
+    trajectory_derivable = {
+        "self_intermediate_scattering",
+        "ngp",
+        "late_ngp",
+        "diffusion",
+        "van_hove_tail",
+        "multi_k_tau_alpha",
+        "chi4_peak_proxy",
+    }
+    computable_missing = (
+        [observable for observable in missing if observable in trajectory_derivable]
+        if "particle_trajectories" in available_set
+        else []
+    )
+    can_compute_missing = bool(missing) and set(missing).issubset(set(computable_missing))
+    direct_coverage = (len(required) - len(missing)) / len(required)
+    effective_coverage = (len(required) - len([item for item in missing if item not in computable_missing])) / len(
+        required
+    )
+    transport_heterogeneity_observables = {
+        "diffusion",
+        "tau_alpha",
+        "chi4_peak",
+        "stokes_einstein_product",
+    }
+    has_transport_heterogeneity_core = len(transport_heterogeneity_observables & available_set) >= 3
+
+    if model_scope == "thermodynamic_transition":
+        horizon_class = "scope_boundary"
+        primary_blocker = "renewal_dynamics_not_thermodynamic_theory"
+    elif model_extension_required:
+        horizon_class = "model_extension_required"
+        primary_blocker = "model_extension_required"
+    elif requires_external_closure:
+        horizon_class = "closure_horizon"
+        primary_blocker = "external_closure"
+    elif can_compute_missing and has_machine_readable_repository and has_shared_transport_grid:
+        horizon_class = "trajectory_reanalysis_candidate"
+        primary_blocker = "uncertainty_estimates" if not has_uncertainty_estimates else "derived_observables"
+    elif model_scope == "transport_decoupling" and has_transport_heterogeneity_core and missing:
+        horizon_class = "transport_heterogeneity_candidate"
+        primary_blocker = missing[0]
+    elif not missing and has_machine_readable_repository and has_uncertainty_estimates and has_shared_transport_grid:
+        horizon_class = "quantitative_inversion_candidate"
+        primary_blocker = "none"
+    elif not missing and has_machine_readable_repository and has_shared_transport_grid:
+        horizon_class = "structural_inversion_candidate"
+        primary_blocker = "uncertainty_estimates"
+    elif missing:
+        horizon_class = "qualitative_horizon"
+        primary_blocker = missing[0]
+    elif not has_machine_readable_repository:
+        horizon_class = "qualitative_horizon"
+        primary_blocker = "machine_readable_repository"
+    elif not has_shared_transport_grid:
+        horizon_class = "qualitative_horizon"
+        primary_blocker = "shared_transport_grid"
+    else:
+        horizon_class = "structural_inversion_candidate"
+        primary_blocker = "uncertainty_estimates"
+
+    recent_bonus = 1.0 if source_year >= 2024 else 0.0
+    score = 0.45 * effective_coverage + 0.2 * recent_bonus
+    score += 0.15 * float(has_machine_readable_repository)
+    score += 0.1 * float(has_shared_transport_grid)
+    score += 0.1 * float(has_uncertainty_estimates)
+    score -= 0.2 * float(requires_external_closure)
+    score -= 0.25 * float(model_extension_required)
+    score -= 0.35 * float(model_scope == "thermodynamic_transition")
+    score = min(1.0, max(0.0, score))
+    overclaim_risk = horizon_class == "model_extension_required"
+
+    return {
+        "benchmark_id": benchmark_id,
+        "source_key": source_key,
+        "source_year": float(source_year),
+        "model_scope": model_scope,
+        "target_protocol": target_protocol,
+        "available_observables": ";".join(available),
+        "required_observables": ";".join(required),
+        "missing_observables": ";".join(missing) if missing else "none",
+        "computable_missing_observables": ";".join(computable_missing) if computable_missing else "none",
+        "direct_observable_coverage": float(direct_coverage),
+        "effective_observable_coverage": float(effective_coverage),
+        "has_machine_readable_repository": float(has_machine_readable_repository),
+        "has_uncertainty_estimates": float(has_uncertainty_estimates),
+        "has_shared_transport_grid": float(has_shared_transport_grid),
+        "requires_external_closure": float(requires_external_closure),
+        "model_extension_required": float(model_extension_required),
+        "can_compute_missing_from_trajectories": float(can_compute_missing),
+        "frontier_priority_score": float(score),
+        "primary_blocker": primary_blocker,
+        "overclaim_risk": float(overclaim_risk),
+        "horizon_class": horizon_class,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,
