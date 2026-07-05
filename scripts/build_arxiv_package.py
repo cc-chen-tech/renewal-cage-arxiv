@@ -2129,6 +2129,60 @@ def write_sota_glassbench_payload_index_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_trajectory_payload_locator_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_payload_locator.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA GlassBench trajectory payload locator")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Remote central-directory entries are resolved to concrete trajectory payload files before byte-range extraction or PE inversion is claimed.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "target")
+    c.drawString(left + 75, top, "stage")
+    c.drawString(left + 305, top, "located")
+    c.drawString(left + 355, top, "range")
+    c.drawString(left + 400, top, "real")
+    c.drawString(left + 445, top, "blocker")
+    palette = {
+        "remote_trajectory_payload_located": colors.HexColor("#2f855a"),
+        "remote_trajectory_payload_range_fetch_ready": colors.HexColor("#276749"),
+        "local_trajectory_payload_available": colors.HexColor("#276749"),
+        "remote_trajectory_payload_missing": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 6.9)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 52
+        stage = row["locator_stage"]
+        target = f"{row['system_id']} T={row['temperature']}"
+        c.setFillColor(colors.black)
+        c.drawString(left, y, target)
+        c.setFillColor(palette[stage])
+        c.rect(left + 75, y - 4, 205, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 81, y, stage.replace("_", " ")[:31])
+        c.setFillColor(colors.black)
+        c.drawString(left + 320, y, str(int(float(row["remote_payload_located"]))))
+        c.drawString(left + 370, y, str(int(float(row["range_fetch_ready"]))))
+        c.drawString(left + 412, y, str(int(float(row["real_reanalysis_ready"]))))
+        c.drawString(left + 445, y, row["primary_blocker"].replace("_", " ")[:30])
+        c.drawString(left + 75, y - 12, f"path: {row['source_path'][:95]}")
+        c.drawString(
+            left + 75,
+            y - 24,
+            f"format={row['payload_format']}; range-supported={int(float(row['range_supported']))}; entry-metadata={int(float(row['entry_metadata_ready']))}; full-cache={int(float(row['full_archive_cached']))}",
+        )
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3337,6 +3391,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_zip_central_directory.pdf"
     )
     sota_glassbench_payload_index_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_payload_index.pdf"
+    sota_glassbench_trajectory_payload_locator_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_payload_locator.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -3405,6 +3462,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_zenodo_record_fingerprint_pdf(sota_zenodo_record_fingerprint_pdf)
     write_sota_remote_zip_central_directory_pdf(sota_remote_zip_central_directory_pdf)
     write_sota_glassbench_payload_index_pdf(sota_glassbench_payload_index_pdf)
+    write_sota_glassbench_trajectory_payload_locator_pdf(sota_glassbench_trajectory_payload_locator_pdf)
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
     write_sota_remote_result_curve_target_fetch_pdf(sota_remote_result_curve_target_fetch_pdf)
@@ -3485,6 +3543,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_sota_remote_zip_central_directory.pdf",
         )
         archive.write(sota_glassbench_payload_index_pdf, "figures/renewal_cage_sota_glassbench_payload_index.pdf")
+        archive.write(
+            sota_glassbench_trajectory_payload_locator_pdf,
+            "figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf",
+        )
         archive.write(
             sota_remote_result_curve_cache_pdf,
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",

@@ -151,6 +151,12 @@ targets: KA2D has common trajectory/model/result payload temperatures
 `0.23;0.30`, while KA has model/result temperatures `0.44;0.50;0.56;0.64`
 but no remote trajectory payload beyond the README in the central-directory
 cache.
+The GlassBench trajectory-payload locator then sharpens the KA2D target to
+concrete remote files: `GlassBench/KA2D_trajectories/T0.23.tar.xz` and
+`GlassBench/KA2D_trajectories/T0.30.tar.xz`. This is the first file-level
+trajectory reanalysis target in the SOTA chain, but it remains blocked at
+`zip_entry_metadata` because the current central-directory cache stores paths
+rather than per-entry offsets and compressed sizes.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
@@ -269,6 +275,7 @@ figures/renewal_cage_sota_data_accession.svg
 figures/renewal_cage_sota_zenodo_record_fingerprint.svg
 figures/renewal_cage_sota_remote_zip_central_directory.svg
 figures/renewal_cage_sota_glassbench_payload_index.svg
+figures/renewal_cage_sota_glassbench_trajectory_payload_locator.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
@@ -332,6 +339,7 @@ data/renewal_cage_sota_zenodo_record_fingerprint.csv
 data/renewal_cage_sota_archive_preflight.csv
 data/renewal_cage_sota_remote_zip_central_directory.csv
 data/renewal_cage_sota_glassbench_payload_index.csv
+data/renewal_cage_sota_glassbench_trajectory_payload_locator.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
@@ -408,6 +416,7 @@ paper/figures/renewal_cage_sota_data_accession.pdf
 paper/figures/renewal_cage_sota_zenodo_record_fingerprint.pdf
 paper/figures/renewal_cage_sota_remote_zip_central_directory.pdf
 paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
+paper/figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf

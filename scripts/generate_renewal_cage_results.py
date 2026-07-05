@@ -103,6 +103,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_glassbench_trajectory_payload_locator_gate,
     sota_glassbench_payload_index_gate,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
@@ -3306,6 +3307,24 @@ def write_sota_glassbench_payload_index_csv(path: Path) -> list[dict[str, float 
     return rows
 
 
+def write_sota_glassbench_trajectory_payload_locator_csv(path: Path) -> list[dict[str, float | str]]:
+    """Locate GlassBench trajectory payload files visible in the remote ZIP manifest."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "remote_zip_central_directory_10118191.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = sota_glassbench_trajectory_payload_locator_gate(
+        locator_id="glassbench_trajectory_payload_locator",
+        accession_id="glassbench_zenodo_10118191",
+        source_id="glassbench_zenodo_trajectory_release",
+        manifest=manifest,
+        systems=["KA", "KA2D"],
+        full_archive_cached=False,
+        entry_metadata_ready=False,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -5783,6 +5802,60 @@ def write_sota_glassbench_payload_index_svg(path: Path, rows: list[dict[str, flo
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_payload_locator_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 430
+    left, top = 75, 112
+    row_h = 72
+    colors = {
+        "remote_trajectory_payload_located": "#2f855a",
+        "remote_trajectory_payload_range_fetch_ready": "#276749",
+        "local_trajectory_payload_available": "#276749",
+        "remote_trajectory_payload_missing": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["locator_stage"])
+        color = colors[stage]
+        located = int(float(row["remote_payload_located"]))
+        range_ready = int(float(row["range_fetch_ready"]))
+        real_ready = int(float(row["real_reanalysis_ready"]))
+        label = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{label}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 4}" width="255" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:36]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 395}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">located={located}; range fetch={range_ready}; real={real_ready}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">path: {str(row["source_path"])[:118]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 56}" font-family="Arial, sans-serif" font-size="9" fill="#555">format={row["payload_format"]}; range-supported={int(float(row["range_supported"]))}; entry-metadata={int(float(row["entry_metadata_ready"]))}; full-cache={int(float(row["full_archive_cached"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA GlassBench trajectory payload locator</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Remote central-directory entries are resolved to concrete trajectory payload files before any byte-range extraction or PE inversion is claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 395}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness and blocker</text>
+  {"".join(marks)}
+  <rect x="75" y="382" width="14" height="14" fill="#2f855a" /><text x="96" y="394" font-family="Arial, sans-serif" font-size="12">trajectory archive path located remotely</text>
+  <rect x="390" y="382" width="14" height="14" fill="#c05621" /><text x="411" y="394" font-family="Arial, sans-serif" font-size="12">trajectory payload absent for this system</text>
+  <text x="720" y="394" font-family="Arial, sans-serif" font-size="12">ZIP entry metadata is still required for safe range extraction</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -7499,6 +7572,13 @@ def main() -> None:
     write_sota_glassbench_payload_index_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_payload_index.svg",
         glassbench_payload_index_rows,
+    )
+    glassbench_trajectory_payload_locator_rows = write_sota_glassbench_trajectory_payload_locator_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_trajectory_payload_locator.csv"
+    )
+    write_sota_glassbench_trajectory_payload_locator_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_payload_locator.svg",
+        glassbench_trajectory_payload_locator_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"

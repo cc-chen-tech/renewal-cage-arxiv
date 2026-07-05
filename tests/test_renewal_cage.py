@@ -117,6 +117,7 @@ from renewal_cage import (  # noqa: E402
     sota_claim_alignment,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_glassbench_trajectory_payload_locator_gate,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_glassbench_payload_index_gate,
@@ -2364,6 +2365,49 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(ka["trajectory_payload_count"], 0.0)
         self.assertEqual(ka["model_result_index_ready"], 1.0)
         self.assertEqual(ka["common_model_result_temperatures"], "0.44;0.50;0.56;0.64")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_payload_locator_marks_ka2d_remote_archives(self):
+        manifest = {
+            "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+            "range_supported": True,
+            "entries": [
+                "GlassBench/KA_trajectories/README",
+                "GlassBench/KA2D_trajectories/README",
+                "GlassBench/KA2D_trajectories/example_T0.23.py",
+                "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "GlassBench/KA2D_models/T0.30.tar.gz",
+                "GlassBench/KA2D_results/times_0.30.dat",
+            ],
+        }
+
+        rows = sota_glassbench_trajectory_payload_locator_gate(
+            locator_id="glassbench_trajectory_payload_locator",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            manifest=manifest,
+            systems=["KA", "KA2D"],
+            full_archive_cached=False,
+            entry_metadata_ready=False,
+        )
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["source_path"], "GlassBench/KA2D_trajectories/T0.30.tar.xz")
+        self.assertEqual(ka2d_030["payload_format"], "tar.xz")
+        self.assertEqual(ka2d_030["locator_stage"], "remote_trajectory_payload_located")
+        self.assertEqual(ka2d_030["remote_payload_located"], 1.0)
+        self.assertEqual(ka2d_030["range_supported"], 1.0)
+        self.assertEqual(ka2d_030["entry_metadata_ready"], 0.0)
+        self.assertEqual(ka2d_030["range_fetch_ready"], 0.0)
+        self.assertEqual(ka2d_030["real_reanalysis_ready"], 0.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "zip_entry_metadata")
+
+        ka = [row for row in rows if row["system_id"] == "KA"][0]
+        self.assertEqual(ka["locator_stage"], "remote_trajectory_payload_missing")
+        self.assertEqual(ka["source_path"], "none")
+        self.assertEqual(ka["temperature"], "none")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):

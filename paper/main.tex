@@ -1139,6 +1139,26 @@ model and result entries at \texttt{0.44}, \texttt{0.50}, \texttt{0.56}, and
 directory does not expose a KA trajectory payload beyond the README. The KA row
 is therefore useful for model/result metadata planning but remains blocked by
 \texttt{trajectory\_payload} for trajectory-level inversion.
+The trajectory-payload locator
+\texttt{renewal\_cage\_sota\_glassbench\_trajectory\_payload\_locator.csv}
+sharpens the KA2D target from a system-level candidate to concrete remote files:
+\texttt{GlassBench/KA2D\_trajectories/T0.23.tar.xz} and
+\texttt{GlassBench/KA2D\_trajectories/T0.30.tar.xz}. This is a real
+file-level SOTA trajectory target, but it is still not a fitted comparison:
+the current central-directory cache stores paths rather than per-entry byte
+offsets and compressed sizes, so the row has
+\texttt{range\_fetch\_ready=0}, \texttt{real\_reanalysis\_ready=0}, and
+\texttt{primary\_blocker=zip\_entry\_metadata}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf}
+  \caption{GlassBench trajectory payload locator. The audit resolves the public
+  remote archive to concrete KA2D trajectory files while keeping real
+  renewal-cage reanalysis blocked until ZIP entry metadata or a verified local
+  archive is available.}
+\end{figure}
+
 The reanalysis-state ledger
 \texttt{renewal\_cage\_sota\_reanalysis\_state.csv} collapses these gates into
 a single claim boundary. The current GlassBench row has

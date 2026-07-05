@@ -2683,6 +2683,118 @@ def sota_glassbench_payload_index_gate(
     return rows
 
 
+def _glassbench_payload_format(path: str) -> str:
+    for suffix, label in [
+        (".tar.xz", "tar.xz"),
+        (".tar.gz", "tar.gz"),
+        (".zip", "zip"),
+        (".gsd", "gsd"),
+        (".xyz", "xyz"),
+    ]:
+        if path.endswith(suffix):
+            return label
+    return "unknown"
+
+
+def sota_glassbench_trajectory_payload_locator_gate(
+    *,
+    locator_id: str,
+    accession_id: str,
+    source_id: str,
+    manifest: dict,
+    systems: Sequence[str],
+    full_archive_cached: bool,
+    entry_metadata_ready: bool,
+) -> list[dict[str, float | str]]:
+    """Locate remote GlassBench trajectory payload files before any large download."""
+
+    for name, value in {
+        "locator_id": locator_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if not systems:
+        raise ValueError("systems must be nonempty")
+
+    entries_value = manifest.get("entries", [])
+    entries = [
+        str(entry).strip("/")
+        for entry in entries_value
+        if str(entry).strip("/")
+    ] if isinstance(entries_value, list) else []
+    archive_url = str(manifest.get("archive_url", "unknown"))
+    range_supported = bool(manifest.get("range_supported", False))
+
+    rows: list[dict[str, float | str]] = []
+    for system in dict.fromkeys(systems):
+        prefix = f"GlassBench/{system}_trajectories/"
+        trajectory_entries = sorted(
+            entry
+            for entry in entries
+            if entry.startswith(prefix)
+            and (entry.endswith(".tar.xz") or entry.endswith(".tar.gz") or entry.endswith(".zip"))
+        )
+        if not trajectory_entries:
+            rows.append(
+                {
+                    "locator_id": f"{locator_id}_{system.lower()}_missing",
+                    "accession_id": accession_id,
+                    "source_id": source_id,
+                    "archive_url": archive_url,
+                    "system_id": system,
+                    "temperature": "none",
+                    "source_path": "none",
+                    "payload_format": "none",
+                    "remote_payload_located": 0.0,
+                    "range_supported": float(range_supported),
+                    "entry_metadata_ready": float(entry_metadata_ready),
+                    "full_archive_cached": float(full_archive_cached),
+                    "range_fetch_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "trajectory_payload",
+                    "locator_stage": "remote_trajectory_payload_missing",
+                }
+            )
+            continue
+
+        for entry in trajectory_entries:
+            temperatures = sorted(_glassbench_temperature_tokens(entry), key=float)
+            temperature = temperatures[0] if temperatures else "unknown"
+            range_fetch_ready = range_supported and entry_metadata_ready
+            if full_archive_cached:
+                stage = "local_trajectory_payload_available"
+                blocker = "local_adapter"
+            elif range_fetch_ready:
+                stage = "remote_trajectory_payload_range_fetch_ready"
+                blocker = "local_archive_slice"
+            else:
+                stage = "remote_trajectory_payload_located"
+                blocker = "zip_entry_metadata"
+            rows.append(
+                {
+                    "locator_id": f"{locator_id}_{system.lower()}_t{temperature.replace('.', '_')}",
+                    "accession_id": accession_id,
+                    "source_id": source_id,
+                    "archive_url": archive_url,
+                    "system_id": system,
+                    "temperature": temperature,
+                    "source_path": entry,
+                    "payload_format": _glassbench_payload_format(entry),
+                    "remote_payload_located": 1.0,
+                    "range_supported": float(range_supported),
+                    "entry_metadata_ready": float(entry_metadata_ready),
+                    "full_archive_cached": float(full_archive_cached),
+                    "range_fetch_ready": float(range_fetch_ready),
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": blocker,
+                    "locator_stage": stage,
+                }
+            )
+    return rows
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,
