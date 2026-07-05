@@ -329,6 +329,22 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_inversion.pdf", main_tex)
         self.assertNotIn(".svg", main_tex)
 
+    def test_readiness_figures_use_page_float_specifiers(self):
+        main_tex = (ROOT / "paper" / "main.tex").read_text()
+        readiness_figures = [
+            "figures/renewal_cage_sota_benchmark_consistency.pdf",
+            "figures/renewal_cage_literature_inversion_readiness.pdf",
+            "figures/renewal_cage_observable_falsification_matrix.pdf",
+            "figures/renewal_cage_benchmark_fusion_readiness.pdf",
+            "figures/renewal_cage_raw_curve_ingestion_contract.pdf",
+            "figures/renewal_cage_raw_curve_diagnostic_readiness.pdf",
+        ]
+        for figure in readiness_figures:
+            figure_index = main_tex.index(figure)
+            preceding_begin = main_tex.rfind("\\begin{figure}", 0, figure_index)
+            self.assertNotEqual(preceding_begin, -1)
+            self.assertIn("\\begin{figure}[p]", main_tex[preceding_begin:figure_index])
+
     def test_build_arxiv_package_generates_deterministic_pdf_figures(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             build_arxiv_package(output_dir=Path(first))
