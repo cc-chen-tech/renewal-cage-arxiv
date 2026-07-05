@@ -48,6 +48,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
     gamma_exchange_self_intermediate_scattering,
+    fragility_benchmark_consistency,
     gaussian_recovery_benchmark_consistency,
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
@@ -1263,6 +1264,31 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["overall_consistent"], 1.0)
         self.assertGreater(row["peak_tail_ratio"], row["min_peak_tail_ratio"])
         self.assertLess(row["late_tail_abs_deviation"], row["max_late_tail_deviation"])
+
+    def test_fragility_benchmark_consistency_checks_super_arrhenius_growth_without_origin_claim(self):
+        row = fragility_benchmark_consistency(
+            benchmark_id="angell_adam_gibbs_fragility_growth",
+            observed_fragility_growth=True,
+            observed_adam_gibbs_slowdown=True,
+            hot_activation_energy=2.69,
+            cold_activation_energy=3.43,
+            hot_fragility_index=1.17,
+            cold_fragility_index=2.41,
+            adam_gibbs_slowdown=1.48e8,
+            material_specific_origin_claimed=False,
+            min_activation_growth=1.2,
+            min_fragility_growth=1.5,
+            min_adam_gibbs_slowdown=10.0,
+        )
+
+        self.assertEqual(row["model_predicts_fragility_growth"], 1.0)
+        self.assertEqual(row["activation_growth_consistent"], 1.0)
+        self.assertEqual(row["fragility_index_consistent"], 1.0)
+        self.assertEqual(row["adam_gibbs_slowdown_consistent"], 1.0)
+        self.assertEqual(row["fragility_scope_boundary_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+        self.assertGreater(row["activation_energy_growth"], row["min_activation_growth"])
+        self.assertGreater(row["fragility_index_growth"], row["min_fragility_growth"])
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

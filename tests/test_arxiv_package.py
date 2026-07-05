@@ -44,6 +44,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("alpha_tts_breakdown_shape_residual", by_id)
         self.assertIn("persistence_exchange_transport_inversion", by_id)
         self.assertIn("kob_andersen_van_hove_tail_recovery", by_id)
+        self.assertIn("angell_adam_gibbs_fragility_growth", by_id)
         self.assertEqual(float(by_id["kob_andersen_1995_beta_window"]["overall_consistent"]), 1.0)
         self.assertEqual(
             float(by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]["mechanism_selection_consistent"]),
@@ -66,6 +67,12 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(by_id["kob_andersen_van_hove_tail_recovery"]["overall_consistent"]), 1.0)
         self.assertGreater(float(by_id["kob_andersen_van_hove_tail_recovery"]["peak_tail_ratio"]), 1.5)
         self.assertLess(float(by_id["kob_andersen_van_hove_tail_recovery"]["late_tail_abs_deviation"]), 0.15)
+        self.assertEqual(float(by_id["angell_adam_gibbs_fragility_growth"]["overall_consistent"]), 1.0)
+        self.assertGreater(float(by_id["angell_adam_gibbs_fragility_growth"]["fragility_index_growth"]), 1.5)
+        self.assertEqual(
+            float(by_id["angell_adam_gibbs_fragility_growth"]["fragility_scope_boundary_consistent"]),
+            1.0,
+        )
 
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:

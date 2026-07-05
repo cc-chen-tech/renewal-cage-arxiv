@@ -33,6 +33,7 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     dynamic_heterogeneity_benchmark_consistency,
+    fragility_benchmark_consistency,
     gaussian_radial_3d,
     gaussian_recovery_benchmark_consistency,
     gamma_exchange_asymptotic_diagnostics,
@@ -748,9 +749,11 @@ def write_sota_benchmark_consistency_csv(
     params: DelayedRenewalCageParams,
     heterogeneity: GammaExchangeParams,
     temperature_law: TemperatureLawParams,
+    temperature_rows: list[dict[str, float]],
     spatial_chi4_rows: list[dict[str, float]],
     alpha_shape_rows: list[dict[str, float | str]],
     tail_ratio_rows: list[dict[str, float | str]],
+    thermodynamic_rows: list[dict[str, float]],
 ) -> list[dict[str, float | str]]:
     fieldnames = [
         "benchmark_id",
@@ -826,6 +829,25 @@ def write_sota_benchmark_consistency_csv(
         "van_hove_tail_consistent",
         "tail_recovery_consistent",
         "peak_ngp_consistent",
+        "observed_fragility_growth",
+        "observed_adam_gibbs_slowdown",
+        "hot_activation_energy",
+        "cold_activation_energy",
+        "activation_energy_growth",
+        "hot_fragility_index",
+        "cold_fragility_index",
+        "fragility_index_growth",
+        "adam_gibbs_slowdown",
+        "min_activation_growth",
+        "min_fragility_growth",
+        "min_adam_gibbs_slowdown",
+        "material_specific_origin_claimed",
+        "model_predicts_fragility_growth",
+        "model_predicts_adam_gibbs_slowdown",
+        "activation_growth_consistent",
+        "fragility_index_consistent",
+        "adam_gibbs_slowdown_consistent",
+        "fragility_scope_boundary_consistent",
         "overall_consistent",
     ]
 
@@ -881,6 +903,8 @@ def write_sota_benchmark_consistency_csv(
         alpha_summary_by_temperature.setdefault(float(row["temperature"]), row)
     if not alpha_summary_by_temperature:
         raise ValueError("alpha_shape_rows must be nonempty")
+    if len(temperature_rows) < 2:
+        raise ValueError("temperature_rows must contain at least hot and cold endpoints")
     hot_alpha = alpha_summary_by_temperature[max(alpha_summary_by_temperature)]
     cold_alpha = alpha_summary_by_temperature[min(alpha_summary_by_temperature)]
     tts_row = alpha_tts_benchmark_consistency(
@@ -956,6 +980,20 @@ def write_sota_benchmark_consistency_csv(
         max_late_tail_deviation=0.15,
         min_peak_ngp=0.05,
     )
+    fragility_row = fragility_benchmark_consistency(
+        benchmark_id="angell_adam_gibbs_fragility_growth",
+        observed_fragility_growth=True,
+        observed_adam_gibbs_slowdown=True,
+        hot_activation_energy=temperature_rows[0]["apparent_alpha_activation_energy"],
+        cold_activation_energy=temperature_rows[-1]["apparent_alpha_activation_energy"],
+        hot_fragility_index=temperature_rows[0]["local_fragility_index"],
+        cold_fragility_index=temperature_rows[-1]["local_fragility_index"],
+        adam_gibbs_slowdown=thermodynamic_rows[-1]["thermodynamic_slowdown"],
+        material_specific_origin_claimed=False,
+        min_activation_growth=1.2,
+        min_fragility_growth=1.5,
+        min_adam_gibbs_slowdown=10.0,
+    )
     rows = [
         normalize(mct_row, "mct_beta_window"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
@@ -964,6 +1002,7 @@ def write_sota_benchmark_consistency_csv(
         normalize(tts_row, "alpha_tts_breakdown"),
         normalize(persistence_exchange_row, "persistence_exchange_inversion"),
         normalize(van_hove_row, "van_hove_tail_recovery"),
+        normalize(fragility_row, "fragility_adam_gibbs"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -1510,9 +1549,9 @@ def write_sota_comparison_csv(path: Path) -> list[dict[str, float | str]]:
         },
         {
             "phenomenon": "fragility_growth",
-            "benchmark_observable": "apparent activation energy grows in fragile liquids",
-            "benchmark_source": "berthier2011theoretical",
-            "model_prediction": "barrier law produces apparent activation and local fragility proxies",
+            "benchmark_observable": "apparent activation energy grows in fragile liquids and Adam-Gibbs slowdown can amplify relaxation",
+            "benchmark_source": "angell1995formation;adam1965temperature;berthier2011theoretical",
+            "model_prediction": "barrier law produces apparent activation and local fragility proxies while Adam-Gibbs enters as an entropy-driven closure",
             "model_status": "partial",
             "next_gap": "derive material-specific barriers from microscopic structure",
         },
@@ -2253,7 +2292,7 @@ def write_mct_beta_closure_svg(path: Path, rows: list[dict[str, float]], base: M
 
 def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    width, height = 1120, 610
+    width, height = 1120, 630
     by_id = {str(row["benchmark_id"]): row for row in rows}
     mct_row = by_id["kob_andersen_1995_beta_window"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
@@ -2262,6 +2301,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
+    fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
@@ -2321,6 +2361,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_b}" y="{bottom + 110}" font-family="Arial, sans-serif" font-size="12">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
   <text x="{left_b}" y="{bottom + 128}" font-family="Arial, sans-serif" font-size="12">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
   <text x="{left_b}" y="{bottom + 146}" font-family="Arial, sans-serif" font-size="12">van Hove row consistent = {int(float(van_hove_row['overall_consistent']))}; peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}, late tail = {float(van_hove_row['late_tail_ratio']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 164}" font-family="Arial, sans-serif" font-size="12">fragility row consistent = {int(float(fragility_row['overall_consistent']))}; m growth = {float(fragility_row['fragility_index_growth']):.2f}, AG slowdown = {float(fragility_row['adam_gibbs_slowdown']):.2g}</text>
 </svg>
 """
     path.write_text(svg)
@@ -3131,9 +3172,11 @@ def main() -> None:
         params,
         GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0),
         temperature_law,
+        temperature_rows,
         spatial_chi4_rows,
         alpha_shape_rows,
         tail_ratio_rows,
+        thermodynamic_rows,
     )
     write_sota_benchmark_consistency_svg(
         FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.svg",

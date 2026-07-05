@@ -821,6 +821,74 @@ def van_hove_tail_benchmark_consistency(
     }
 
 
+def fragility_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_fragility_growth: bool,
+    observed_adam_gibbs_slowdown: bool,
+    hot_activation_energy: float,
+    cold_activation_energy: float,
+    hot_fragility_index: float,
+    cold_fragility_index: float,
+    adam_gibbs_slowdown: float,
+    material_specific_origin_claimed: bool,
+    min_activation_growth: float,
+    min_fragility_growth: float,
+    min_adam_gibbs_slowdown: float,
+) -> dict[str, float | str]:
+    """Check effective fragility growth while preserving the material-origin boundary."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "hot_activation_energy": hot_activation_energy,
+        "cold_activation_energy": cold_activation_energy,
+        "hot_fragility_index": hot_fragility_index,
+        "cold_fragility_index": cold_fragility_index,
+        "adam_gibbs_slowdown": adam_gibbs_slowdown,
+        "min_activation_growth": min_activation_growth,
+        "min_fragility_growth": min_fragility_growth,
+        "min_adam_gibbs_slowdown": min_adam_gibbs_slowdown,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+
+    activation_growth = cold_activation_energy / hot_activation_energy
+    fragility_growth = cold_fragility_index / hot_fragility_index
+    activation_flag = activation_growth >= min_activation_growth
+    fragility_flag = fragility_growth >= min_fragility_growth
+    adam_gibbs_flag = adam_gibbs_slowdown >= min_adam_gibbs_slowdown
+    model_fragility_flag = activation_flag and fragility_flag
+    scope_boundary_flag = not material_specific_origin_claimed
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_fragility_growth": float(observed_fragility_growth),
+        "observed_adam_gibbs_slowdown": float(observed_adam_gibbs_slowdown),
+        "hot_activation_energy": hot_activation_energy,
+        "cold_activation_energy": cold_activation_energy,
+        "activation_energy_growth": activation_growth,
+        "hot_fragility_index": hot_fragility_index,
+        "cold_fragility_index": cold_fragility_index,
+        "fragility_index_growth": fragility_growth,
+        "adam_gibbs_slowdown": adam_gibbs_slowdown,
+        "min_activation_growth": min_activation_growth,
+        "min_fragility_growth": min_fragility_growth,
+        "min_adam_gibbs_slowdown": min_adam_gibbs_slowdown,
+        "material_specific_origin_claimed": float(material_specific_origin_claimed),
+        "model_predicts_fragility_growth": float(model_fragility_flag),
+        "model_predicts_adam_gibbs_slowdown": float(adam_gibbs_flag),
+        "activation_growth_consistent": float(activation_flag == observed_fragility_growth),
+        "fragility_index_consistent": float(fragility_flag == observed_fragility_growth),
+        "adam_gibbs_slowdown_consistent": float(adam_gibbs_flag == observed_adam_gibbs_slowdown),
+        "fragility_scope_boundary_consistent": float(scope_boundary_flag),
+        "overall_consistent": float(
+            model_fragility_flag == observed_fragility_growth
+            and adam_gibbs_flag == observed_adam_gibbs_slowdown
+            and scope_boundary_flag
+        ),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

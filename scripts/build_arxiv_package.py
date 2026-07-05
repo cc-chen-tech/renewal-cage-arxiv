@@ -920,6 +920,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
+    fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
@@ -1012,6 +1013,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(van_hove_row['overall_consistent']))}; "
         f"peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}; "
         f"late tail = {float(van_hove_row['late_tail_ratio']):.2f}",
+    )
+    c.drawString(
+        430,
+        34,
+        "fragility row consistent = "
+        f"{int(float(fragility_row['overall_consistent']))}; "
+        f"m growth = {float(fragility_row['fragility_index_growth']):.2f}; "
+        f"AG = {float(fragility_row['adam_gibbs_slowdown']):.2g}",
     )
     c.showPage()
     c.save()
