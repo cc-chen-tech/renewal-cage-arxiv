@@ -789,6 +789,69 @@ def write_persistence_exchange_uncertainty_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_translation_rotation_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_translation_rotation_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Translation-rotation renewal diagnostic")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A rotational renewal clock extends persistence/exchange tests to Debye-Stokes-Einstein decoupling.",
+    )
+
+    labels = [row["scenario"].replace("_", " ") for row in rows]
+    ratio = np.array([float(row["translation_rotation_ratio"]) for row in rows])
+    dse = np.array([float(row["rotational_dse_product"]) for row in rows])
+    residual = np.array([abs(float(row["rotational_tau_log_residual"])) for row in rows])
+    detected = np.array([float(row["translation_rotation_decoupling_detected"]) for row in rows])
+
+    left_a, left_b, bottom, width, height = 55.0, 430.0, 150.0, 300.0, 260.0
+    for left, title in [(left_a, "A. Clock decoupling"), (left_b, "B. Inversion residual")]:
+        c.setStrokeColor(colors.black)
+        c.line(left, bottom, left + width, bottom)
+        c.line(left, bottom, left, bottom + height)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(left, bottom + height + 13, title)
+
+    x_positions = np.linspace(left_a + 80, left_a + width - 80, len(rows))
+    y_max = max(float(np.max(ratio)), float(np.max(dse / dse[0])), 1.0) * 1.15
+    for idx, label in enumerate(labels):
+        color = colors.HexColor("#c05621") if detected[idx] > 0.5 else colors.HexColor("#2f855a")
+        ratio_h = ratio[idx] / y_max * height
+        dse_h = (dse[idx] / dse[0]) / y_max * height
+        c.setFillColor(color)
+        c.rect(float(x_positions[idx] - 18), bottom, 18, ratio_h, stroke=0, fill=1)
+        c.setFillColor(colors.HexColor("#805ad5"))
+        c.rect(float(x_positions[idx] + 6), bottom, 18, dse_h, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(float(x_positions[idx]), bottom - 24, label)
+        c.drawCentredString(float(x_positions[idx]), bottom - 35, f"tau_r/tau_a={ratio[idx]:.2f}")
+
+    residual_max = max(float(np.max(residual)), 0.01)
+    x_res = np.linspace(left_b + 85, left_b + width - 85, len(rows))
+    for idx, label in enumerate(labels):
+        y = bottom + residual[idx] / residual_max * height if residual_max > 0.0 else bottom
+        c.setFillColor(colors.HexColor("#2b6cb0"))
+        c.circle(float(x_res[idx]), y, 5, fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(float(x_res[idx]), bottom - 24, label)
+        c.drawCentredString(float(x_res[idx]), bottom - 35, f"|res|={residual[idx]:.1e}")
+
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    c.drawString(55, 95, "Orange bars mark detected translation-rotation decoupling; purple bars show D tau_rot normalized by the coupled clock.")
+    c.showPage()
+    c.save()
+
+
 def write_glass_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_glass_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2224,6 +2287,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     persistence_exchange_uncertainty_protocol_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.pdf"
     )
+    translation_rotation_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_translation_rotation_protocol.pdf"
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
@@ -2266,6 +2330,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_persistence_exchange_protocol_pdf(persistence_exchange_protocol_pdf)
     write_persistence_exchange_joint_protocol_pdf(persistence_exchange_joint_protocol_pdf)
     write_persistence_exchange_uncertainty_protocol_pdf(persistence_exchange_uncertainty_protocol_pdf)
+    write_translation_rotation_protocol_pdf(translation_rotation_protocol_pdf)
     write_glass_audit_pdf(glass_audit_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_spatial_chi4_pdf(spatial_chi4_pdf)
@@ -2311,6 +2376,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             persistence_exchange_uncertainty_protocol_pdf,
             "figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf",
         )
+        archive.write(translation_rotation_protocol_pdf, "figures/renewal_cage_translation_rotation_protocol.pdf")
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")

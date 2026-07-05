@@ -254,8 +254,9 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(gst["primary_blocker"], "late_ngp")
 
         molecular_motion = by_id["near_tg_molecular_motion_rotational_gap"]
-        self.assertEqual(molecular_motion["horizon_class"], "model_extension_required")
-        self.assertEqual(float(molecular_motion["model_extension_required"]), 1.0)
+        self.assertEqual(molecular_motion["horizon_class"], "structural_inversion_candidate")
+        self.assertEqual(molecular_motion["primary_blocker"], "uncertainty_estimates")
+        self.assertEqual(float(molecular_motion["model_extension_required"]), 0.0)
 
         thermo = by_id["heat_capacity_entropy_frontier"]
         self.assertEqual(thermo["horizon_class"], "scope_boundary")
@@ -377,6 +378,23 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertGreater(float(by_scenario["late_ngp_mismatch"]["late_ngp_z"]), 3.0)
 
+    def test_translation_rotation_protocol_detects_rotational_decoupling_gap(self):
+        path = ROOT / "data" / "renewal_cage_translation_rotation_protocol.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_scenario = {row["scenario"]: row for row in rows}
+        coupled = by_scenario["coupled_clock"]
+        rotational = by_scenario["rotationally_slow_clock"]
+        self.assertEqual(float(coupled["translation_rotation_decoupling_detected"]), 0.0)
+        self.assertEqual(float(rotational["translation_rotation_decoupling_detected"]), 1.0)
+        self.assertGreater(float(rotational["rotational_to_translational_persistence_ratio"]), 2.0)
+        self.assertGreater(
+            float(rotational["rotational_dse_product"]),
+            float(coupled["rotational_dse_product"]),
+        )
+
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             zip_path = build_arxiv_package(output_dir=Path(tmpdir))
@@ -421,6 +439,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_persistence_exchange_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange_joint_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_translation_rotation_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -485,6 +504,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_cross_observable_prediction_ledger.pdf",
             "figures/renewal_cage_inversion_identifiability_audit.pdf",
             "figures/renewal_cage_frontier_benchmark_horizon.pdf",
+            "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_barrier_requirements.pdf",
             "figures/renewal_cage_barrier.pdf",
             "figures/renewal_cage_heterogeneity.pdf",
@@ -584,6 +604,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_persistence_exchange_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_persistence_exchange_uncertainty_protocol.pdf"
             ).read_bytes()
+            first_translation_rotation_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_translation_rotation_protocol.pdf"
+            ).read_bytes()
             first_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
             time.sleep(1.1)
@@ -665,6 +688,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_persistence_exchange_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_persistence_exchange_uncertainty_protocol.pdf"
             ).read_bytes()
+            second_translation_rotation_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_translation_rotation_protocol.pdf"
+            ).read_bytes()
             second_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
         self.assertEqual(first_results, second_results)
@@ -703,6 +729,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_persistence_exchange_protocol, second_persistence_exchange_protocol)
         self.assertEqual(first_persistence_exchange_joint_protocol, second_persistence_exchange_joint_protocol)
         self.assertEqual(first_persistence_exchange_uncertainty_protocol, second_persistence_exchange_uncertainty_protocol)
+        self.assertEqual(first_translation_rotation_protocol, second_translation_rotation_protocol)
         self.assertEqual(first_inversion, second_inversion)
 
 

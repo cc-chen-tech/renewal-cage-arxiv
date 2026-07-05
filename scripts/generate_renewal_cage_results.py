@@ -107,6 +107,10 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
+    TranslationRotationExchangeParams,
+    translation_rotation_decoupling_diagnostic,
+    translation_rotation_inversion_protocol,
+    translation_rotation_rotational_relaxation_time,
     van_hove_tail_benchmark_consistency,
 )
 
@@ -540,6 +544,70 @@ def write_persistence_exchange_csv(
                     "alpha_decay": float(decay[idx]),
                 }
             )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_translation_rotation_protocol_csv(path: Path, *, wave_number: float) -> list[dict[str, float | str]]:
+    """Generate a two-clock translation/rotation decoupling diagnostic."""
+
+    scenarios = [
+        (
+            "coupled_clock",
+            TranslationRotationExchangeParams(
+                cage_variance=1.0,
+                cage_tau=0.2,
+                jump_variance=0.7,
+                translational_persistence_mean=4.0,
+                translational_exchange_mean=1.0,
+                rotational_persistence_mean=4.0,
+                rotational_exchange_mean=1.0,
+                rotational_step_correlation=0.62,
+            ),
+        ),
+        (
+            "rotationally_slow_clock",
+            TranslationRotationExchangeParams(
+                cage_variance=1.0,
+                cage_tau=0.2,
+                jump_variance=0.7,
+                translational_persistence_mean=4.0,
+                translational_exchange_mean=1.0,
+                rotational_persistence_mean=14.0,
+                rotational_exchange_mean=1.0,
+                rotational_step_correlation=0.62,
+            ),
+        ),
+    ]
+    rows: list[dict[str, float | str]] = []
+    for scenario, params in scenarios:
+        diagnostic = translation_rotation_decoupling_diagnostic(
+            scenario,
+            params,
+            wave_number=wave_number,
+        )
+        inversion = translation_rotation_inversion_protocol(
+            benchmark_id=scenario,
+            wave_number=wave_number,
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=diagnostic["diffusion_coefficient"],
+            observed_tau_alpha=diagnostic["tau_alpha"],
+            observed_rotational_relaxation_time=diagnostic["rotational_relaxation_time"],
+            rotational_step_correlation=params.rotational_step_correlation,
+            rotational_exchange_mean=params.rotational_exchange_mean,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+        )
+        rows.append(
+            {
+                **diagnostic,
+                "inferred_translational_persistence_mean": inversion["translational_persistence_mean"],
+                "inferred_rotational_persistence_mean": inversion["rotational_persistence_mean"],
+                "tau_alpha_log_residual": inversion["tau_alpha_log_residual"],
+                "rotational_tau_log_residual": inversion["rotational_tau_log_residual"],
+                "poisson_rotational_relaxation_time": inversion["poisson_rotational_relaxation_time"],
+            }
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -2601,13 +2669,12 @@ def write_frontier_benchmark_horizon_csv(path: Path) -> list[dict[str, float | s
                 "diffusion",
                 "tau_alpha",
                 "rotational_relaxation",
-                "late_ngp",
             ],
             has_machine_readable_repository=True,
-            has_uncertainty_estimates=True,
+            has_uncertainty_estimates=False,
             has_shared_transport_grid=True,
             requires_external_closure=False,
-            model_extension_required=True,
+            model_extension_required=False,
         ),
         frontier_benchmark_horizon(
             benchmark_id="experimental_dynamic_heterogeneity_closure_horizon",
@@ -4224,6 +4291,63 @@ def write_persistence_exchange_svg(path: Path, rows: list[dict[str, float | str]
     path.write_text(svg)
 
 
+def write_translation_rotation_protocol_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 980, 500
+    left, top, bottom = 90, 105, 380
+    panel_w = 330
+    scenarios = [str(row["scenario"]).replace("_", " ") for row in rows]
+    x_positions = np.linspace(left + 95, left + panel_w - 70, len(rows))
+    ratio_values = np.array([float(row["translation_rotation_ratio"]) for row in rows])
+    dse_values = np.array([float(row["rotational_dse_product"]) for row in rows])
+    residual_values = np.array([abs(float(row["rotational_tau_log_residual"])) for row in rows])
+
+    def scale_with_range(values: np.ndarray, data_max: float) -> np.ndarray:
+        if data_max <= 0.0:
+            return np.full_like(values, bottom)
+        return bottom + values / data_max * (top - bottom)
+
+    ratio_y = scale_with_range(ratio_values, max(1.0, float(np.max(ratio_values))) * 1.15)
+    dse_y = scale_with_range(dse_values / dse_values[0], max(1.0, float(np.max(dse_values / dse_values[0]))) * 1.15)
+    residual_y = scale_with_range(residual_values, max(0.01, float(np.max(residual_values))) * 1.2)
+
+    bars = []
+    for idx, row in enumerate(rows):
+        detected = float(row["translation_rotation_decoupling_detected"]) > 0.5
+        color = "#c05621" if detected else "#2f855a"
+        x0 = x_positions[idx]
+        bars.append(f'<rect x="{x0 - 22:.1f}" y="{ratio_y[idx]:.1f}" width="28" height="{bottom - ratio_y[idx]:.1f}" fill="{color}" />')
+        bars.append(f'<rect x="{x0 + 14:.1f}" y="{dse_y[idx]:.1f}" width="28" height="{bottom - dse_y[idx]:.1f}" fill="#805ad5" />')
+        bars.append(f'<text x="{x0 - 55:.1f}" y="{bottom + 24}" font-family="Arial, sans-serif" font-size="11">{scenarios[idx]}</text>')
+        bars.append(
+            f'<text x="{x0 - 55:.1f}" y="{bottom + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">tau_r/tau_a={ratio_values[idx]:.2f}; pass={int(detected)}</text>'
+        )
+        bars.append(
+            f'<circle cx="{left + panel_w + 145 + idx * 95:.1f}" cy="{residual_y[idx]:.1f}" r="5" fill="#2b6cb0" />'
+        )
+        bars.append(
+            f'<text x="{left + panel_w + 112 + idx * 95:.1f}" y="{bottom + 24}" font-family="Arial, sans-serif" font-size="11">{scenarios[idx][:18]}</text>'
+        )
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Translation-rotation renewal diagnostic</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A rotational renewal clock extends persistence/exchange diagnostics to Debye-Stokes-Einstein and translation-rotation decoupling tests.</text>
+  <line x1="{left}" y1="{bottom}" x2="{left + panel_w}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Clock decoupling</text>
+  <line x1="{left + panel_w + 80}" y1="{bottom}" x2="{left + panel_w + 345}" y2="{bottom}" stroke="#222" />
+  <line x1="{left + panel_w + 80}" y1="{bottom}" x2="{left + panel_w + 80}" y2="{top}" stroke="#222" />
+  <text x="{left + panel_w + 80}" y="{top - 22}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Inversion residual</text>
+  {"".join(bars)}
+  <rect x="{left + 18}" y="{top + 20}" width="14" height="14" fill="#c05621" /><text x="{left + 40}" y="{top + 32}" font-family="Arial, sans-serif" font-size="12">tau_rot / tau_alpha</text>
+  <rect x="{left + 165}" y="{top + 20}" width="14" height="14" fill="#805ad5" /><text x="{left + 187}" y="{top + 32}" font-family="Arial, sans-serif" font-size="12">D tau_rot / coupled</text>
+  <text x="{left + panel_w + 100}" y="{top + 32}" font-family="Arial, sans-serif" font-size="12" fill="#2b6cb0">|log tau_rot residual| after inversion</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_persistence_exchange_protocol_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 560
@@ -5428,6 +5552,14 @@ def main() -> None:
     write_persistence_exchange_uncertainty_protocol_svg(
         FIGURE_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.svg",
         persistence_exchange_uncertainty_protocol_rows,
+    )
+    translation_rotation_rows = write_translation_rotation_protocol_csv(
+        DATA_DIR / "renewal_cage_translation_rotation_protocol.csv",
+        wave_number=1.1,
+    )
+    write_translation_rotation_protocol_svg(
+        FIGURE_DIR / "renewal_cage_translation_rotation_protocol.svg",
+        translation_rotation_rows,
     )
     raw_curve_persistence_exchange_rows = write_raw_curve_persistence_exchange_protocol_csv(
         DATA_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.csv"

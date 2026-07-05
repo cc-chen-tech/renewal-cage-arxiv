@@ -146,6 +146,26 @@ class PersistenceExchangeParams:
     exchange_mean: float
 
 
+@dataclass(frozen=True)
+class TranslationRotationExchangeParams:
+    """Coupled translational and rotational persistence/exchange clocks.
+
+    Translation uses the existing renewal-cage displacement parameters.
+    Rotation is represented by a second renewal clock and a per-exchange
+    orientational correlation factor. This is an effective diagnostic for
+    translation-rotation decoupling, not a microscopic orientational potential.
+    """
+
+    cage_variance: float
+    cage_tau: float
+    jump_variance: float
+    translational_persistence_mean: float
+    translational_exchange_mean: float
+    rotational_persistence_mean: float
+    rotational_exchange_mean: float
+    rotational_step_correlation: float
+
+
 def _validate(params: DelayedRenewalCageParams) -> None:
     for name in ("cage_variance", "cage_tau", "jump_variance", "renewal_rate", "renewal_delay"):
         value = getattr(params, name)
@@ -225,6 +245,23 @@ def _validate_persistence_exchange(params: PersistenceExchangeParams) -> None:
         value = getattr(params, name)
         if value <= 0.0:
             raise ValueError(f"{name} must be positive")
+
+
+def _validate_translation_rotation(params: TranslationRotationExchangeParams) -> None:
+    for name in (
+        "cage_variance",
+        "cage_tau",
+        "jump_variance",
+        "translational_persistence_mean",
+        "translational_exchange_mean",
+        "rotational_persistence_mean",
+        "rotational_exchange_mean",
+    ):
+        value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if not 0.0 < params.rotational_step_correlation < 1.0:
+        raise ValueError("rotational_step_correlation must lie between zero and one")
 
 
 def activated_barrier_temperature_law(barrier: ActivatedBarrierParams) -> TemperatureLawParams:
@@ -2592,6 +2629,216 @@ def persistence_exchange_alpha_relaxation_time(
         else:
             upper = mid
     return 0.5 * (lower + upper)
+
+
+def _translation_component(params: TranslationRotationExchangeParams) -> PersistenceExchangeParams:
+    return PersistenceExchangeParams(
+        cage_variance=params.cage_variance,
+        cage_tau=params.cage_tau,
+        jump_variance=params.jump_variance,
+        persistence_mean=params.translational_persistence_mean,
+        exchange_mean=params.translational_exchange_mean,
+    )
+
+
+def _rotation_component(params: TranslationRotationExchangeParams) -> PersistenceExchangeParams:
+    return PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=1.0,
+        jump_variance=1.0,
+        persistence_mean=params.rotational_persistence_mean,
+        exchange_mean=params.rotational_exchange_mean,
+    )
+
+
+def translation_rotation_rotational_correlation(
+    t: np.ndarray,
+    params: TranslationRotationExchangeParams,
+) -> np.ndarray:
+    """Normalized orientational correlation for a rotational renewal clock."""
+
+    _validate_translation_rotation(params)
+    return persistence_exchange_count_pgf(params.rotational_step_correlation, t, _rotation_component(params))
+
+
+def translation_rotation_rotational_relaxation_time(
+    params: TranslationRotationExchangeParams,
+    *,
+    threshold: float = math.exp(-1.0),
+) -> float:
+    """Solve the rotational alpha time from the renewal orientational correlation."""
+
+    _validate_translation_rotation(params)
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must be between zero and one")
+    lower = 0.0
+    upper = max(params.rotational_persistence_mean, params.rotational_exchange_mean)
+    while translation_rotation_rotational_correlation(np.array([upper]), params)[0] > threshold:
+        upper *= 2.0
+        if upper > 1.0e7:
+            raise RuntimeError("rotational relaxation time bracket failed")
+    for _ in range(70):
+        mid = 0.5 * (lower + upper)
+        if translation_rotation_rotational_correlation(np.array([mid]), params)[0] > threshold:
+            lower = mid
+        else:
+            upper = mid
+    return 0.5 * (lower + upper)
+
+
+def translation_rotation_decoupling_diagnostic(
+    scenario: str,
+    params: TranslationRotationExchangeParams,
+    *,
+    wave_number: float,
+    threshold: float = math.exp(-1.0),
+    min_decoupling_ratio: float = 1.5,
+) -> dict[str, float | str]:
+    """Compare translational and rotational relaxation clocks at fixed diffusion."""
+
+    if not scenario:
+        raise ValueError("scenario must be nonempty")
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if min_decoupling_ratio <= 1.0:
+        raise ValueError("min_decoupling_ratio must exceed one")
+    _validate_translation_rotation(params)
+    translation = _translation_component(params)
+    tau_alpha = persistence_exchange_alpha_relaxation_time(wave_number, translation, threshold=threshold)
+    tau_rot = translation_rotation_rotational_relaxation_time(params, threshold=threshold)
+    diffusion = persistence_exchange_diffusion_coefficient(translation)
+    ratio = tau_rot / tau_alpha
+    translational_clock_ratio = params.translational_persistence_mean / params.translational_exchange_mean
+    rotational_clock_ratio = params.rotational_persistence_mean / params.rotational_exchange_mean
+    persistence_ratio = params.rotational_persistence_mean / params.translational_persistence_mean
+    decoupled = ratio >= min_decoupling_ratio and persistence_ratio >= min_decoupling_ratio
+
+    return {
+        "scenario": scenario,
+        "wave_number": wave_number,
+        "diffusion_coefficient": diffusion,
+        "tau_alpha": tau_alpha,
+        "rotational_relaxation_time": tau_rot,
+        "translational_persistence_mean": params.translational_persistence_mean,
+        "translational_exchange_mean": params.translational_exchange_mean,
+        "rotational_persistence_mean": params.rotational_persistence_mean,
+        "rotational_exchange_mean": params.rotational_exchange_mean,
+        "rotational_step_correlation": params.rotational_step_correlation,
+        "translational_clock_ratio": translational_clock_ratio,
+        "rotational_clock_ratio": rotational_clock_ratio,
+        "rotational_to_translational_persistence_ratio": persistence_ratio,
+        "translation_rotation_ratio": ratio,
+        "stokes_einstein_product": diffusion * tau_alpha,
+        "rotational_dse_product": diffusion * tau_rot,
+        "translation_rotation_decoupling_detected": float(decoupled),
+    }
+
+
+def translation_rotation_inversion_protocol(
+    *,
+    benchmark_id: str,
+    wave_number: float,
+    jump_variance: float,
+    diffusion_coefficient: float,
+    observed_tau_alpha: float,
+    observed_rotational_relaxation_time: float,
+    rotational_step_correlation: float,
+    rotational_exchange_mean: float,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    min_decoupling_ratio: float = 1.5,
+) -> dict[str, float | str]:
+    """Infer translational and rotational persistence clocks from transport clocks."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if observed_rotational_relaxation_time <= 0.0:
+        raise ValueError("observed_rotational_relaxation_time must be positive")
+    if not 0.0 < rotational_step_correlation < 1.0:
+        raise ValueError("rotational_step_correlation must lie between zero and one")
+    if rotational_exchange_mean <= 0.0:
+        raise ValueError("rotational_exchange_mean must be positive")
+
+    translation = infer_persistence_exchange_from_alpha_transport(
+        wave_number=wave_number,
+        jump_variance=jump_variance,
+        diffusion_coefficient=diffusion_coefficient,
+        observed_tau_alpha=observed_tau_alpha,
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        threshold=threshold,
+    )
+
+    def rotational_tau(persistence_mean: float) -> float:
+        params = TranslationRotationExchangeParams(
+            cage_variance=cage_variance,
+            cage_tau=cage_tau,
+            jump_variance=jump_variance,
+            translational_persistence_mean=translation["persistence_mean"],
+            translational_exchange_mean=translation["exchange_mean"],
+            rotational_persistence_mean=persistence_mean,
+            rotational_exchange_mean=rotational_exchange_mean,
+            rotational_step_correlation=rotational_step_correlation,
+        )
+        return translation_rotation_rotational_relaxation_time(params, threshold=threshold)
+
+    poisson_rot_tau = rotational_tau(rotational_exchange_mean)
+    if observed_rotational_relaxation_time < poisson_rot_tau and not math.isclose(
+        observed_rotational_relaxation_time,
+        poisson_rot_tau,
+        rel_tol=1e-10,
+        abs_tol=1e-12,
+    ):
+        raise ValueError("observed_rotational_relaxation_time is faster than the rotational Poisson baseline")
+
+    lower = rotational_exchange_mean
+    if math.isclose(observed_rotational_relaxation_time, poisson_rot_tau, rel_tol=1e-12, abs_tol=1e-12):
+        rotational_persistence_mean = lower
+    else:
+        upper = max(2.0 * lower, observed_rotational_relaxation_time, lower + 1.0e-12)
+        while rotational_tau(upper) < observed_rotational_relaxation_time:
+            upper *= 2.0
+            if upper > 1.0e10:
+                raise RuntimeError("rotational persistence inversion bracket failed")
+        for _ in range(80):
+            mid = 0.5 * (lower + upper)
+            if rotational_tau(mid) < observed_rotational_relaxation_time:
+                lower = mid
+            else:
+                upper = mid
+        rotational_persistence_mean = 0.5 * (lower + upper)
+
+    params = TranslationRotationExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        translational_persistence_mean=translation["persistence_mean"],
+        translational_exchange_mean=translation["exchange_mean"],
+        rotational_persistence_mean=rotational_persistence_mean,
+        rotational_exchange_mean=rotational_exchange_mean,
+        rotational_step_correlation=rotational_step_correlation,
+    )
+    row = translation_rotation_decoupling_diagnostic(
+        benchmark_id,
+        params,
+        wave_number=wave_number,
+        threshold=threshold,
+        min_decoupling_ratio=min_decoupling_ratio,
+    )
+    row.update(
+        {
+            "benchmark_id": benchmark_id,
+            "observed_tau_alpha": observed_tau_alpha,
+            "observed_rotational_relaxation_time": observed_rotational_relaxation_time,
+            "tau_alpha_log_residual": math.log(row["tau_alpha"] / observed_tau_alpha),
+            "rotational_tau_log_residual": math.log(
+                row["rotational_relaxation_time"] / observed_rotational_relaxation_time
+            ),
+            "poisson_rotational_relaxation_time": poisson_rot_tau,
+        }
+    )
+    return row
 
 
 def infer_persistence_exchange_from_alpha_transport(

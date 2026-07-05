@@ -115,6 +115,10 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
+    TranslationRotationExchangeParams,
+    translation_rotation_decoupling_diagnostic,
+    translation_rotation_inversion_protocol,
+    translation_rotation_rotational_relaxation_time,
 )
 
 
@@ -1724,7 +1728,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["primary_blocker"], "late_ngp")
         self.assertGreater(row["frontier_priority_score"], 0.5)
 
-    def test_frontier_benchmark_horizon_preserves_extension_and_scope_boundaries(self):
+    def test_frontier_benchmark_horizon_marks_translation_rotation_candidate_and_scope_boundary(self):
         rotational = frontier_benchmark_horizon(
             benchmark_id="near_tg_molecular_motion_rotational_gap",
             source_key="simon2026molecular_motion",
@@ -1743,13 +1747,12 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 "diffusion",
                 "tau_alpha",
                 "rotational_relaxation",
-                "late_ngp",
             ],
             has_machine_readable_repository=True,
-            has_uncertainty_estimates=True,
+            has_uncertainty_estimates=False,
             has_shared_transport_grid=True,
             requires_external_closure=False,
-            model_extension_required=True,
+            model_extension_required=False,
         )
         thermo = frontier_benchmark_horizon(
             benchmark_id="heat_capacity_entropy_frontier",
@@ -1766,8 +1769,9 @@ class DelayedRenewalCageTests(unittest.TestCase):
             model_extension_required=False,
         )
 
-        self.assertEqual(rotational["horizon_class"], "model_extension_required")
-        self.assertEqual(rotational["model_extension_required"], 1.0)
+        self.assertEqual(rotational["horizon_class"], "structural_inversion_candidate")
+        self.assertEqual(rotational["primary_blocker"], "uncertainty_estimates")
+        self.assertEqual(rotational["model_extension_required"], 0.0)
         self.assertEqual(thermo["horizon_class"], "scope_boundary")
         self.assertEqual(thermo["overclaim_risk"], 0.0)
 
@@ -2797,6 +2801,93 @@ class DelayedRenewalCageTests(unittest.TestCase):
             persistence_exchange_diffusion_coefficient(decoupled) * decoupled_tau,
             3.0 * persistence_exchange_diffusion_coefficient(base) * base_tau,
         )
+
+    def test_translation_rotation_exchange_detects_rotational_decoupling(self):
+        coupled = TranslationRotationExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            translational_persistence_mean=4.0,
+            translational_exchange_mean=1.0,
+            rotational_persistence_mean=4.0,
+            rotational_exchange_mean=1.0,
+            rotational_step_correlation=0.62,
+        )
+        decoupled = TranslationRotationExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            translational_persistence_mean=4.0,
+            translational_exchange_mean=1.0,
+            rotational_persistence_mean=14.0,
+            rotational_exchange_mean=1.0,
+            rotational_step_correlation=0.62,
+        )
+
+        coupled_row = translation_rotation_decoupling_diagnostic(
+            "coupled",
+            coupled,
+            wave_number=1.1,
+        )
+        decoupled_row = translation_rotation_decoupling_diagnostic(
+            "rotationally_slow",
+            decoupled,
+            wave_number=1.1,
+        )
+
+        self.assertAlmostEqual(coupled_row["translation_rotation_ratio"], 1.0, delta=0.05)
+        self.assertGreater(decoupled_row["translation_rotation_ratio"], 2.5)
+        self.assertGreater(decoupled_row["rotational_dse_product"], coupled_row["rotational_dse_product"])
+
+    def test_translation_rotation_inversion_recovers_hidden_rotational_clock(self):
+        params = TranslationRotationExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            translational_persistence_mean=6.0,
+            translational_exchange_mean=1.0,
+            rotational_persistence_mean=15.0,
+            rotational_exchange_mean=1.0,
+            rotational_step_correlation=0.62,
+        )
+        wave_number = 1.1
+        tau_alpha = persistence_exchange_alpha_relaxation_time(
+            wave_number,
+            PersistenceExchangeParams(
+                cage_variance=params.cage_variance,
+                cage_tau=params.cage_tau,
+                jump_variance=params.jump_variance,
+                persistence_mean=params.translational_persistence_mean,
+                exchange_mean=params.translational_exchange_mean,
+            ),
+        )
+        tau_rot = translation_rotation_rotational_relaxation_time(params)
+
+        row = translation_rotation_inversion_protocol(
+            benchmark_id="near_tg_molecular_motion_synthetic",
+            wave_number=wave_number,
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(
+                PersistenceExchangeParams(
+                    cage_variance=params.cage_variance,
+                    cage_tau=params.cage_tau,
+                    jump_variance=params.jump_variance,
+                    persistence_mean=params.translational_persistence_mean,
+                    exchange_mean=params.translational_exchange_mean,
+                )
+            ),
+            observed_tau_alpha=tau_alpha,
+            observed_rotational_relaxation_time=tau_rot,
+            rotational_step_correlation=params.rotational_step_correlation,
+            rotational_exchange_mean=params.rotational_exchange_mean,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+        )
+
+        self.assertAlmostEqual(row["translational_persistence_mean"], 6.0, places=7)
+        self.assertAlmostEqual(row["rotational_persistence_mean"], 15.0, places=7)
+        self.assertGreater(row["rotational_to_translational_persistence_ratio"], 2.0)
+        self.assertEqual(row["translation_rotation_decoupling_detected"], 1.0)
 
     def test_persistence_exchange_transport_alpha_inversion_predicts_late_ngp(self):
         inference_fn = getattr(sys.modules["renewal_cage"], "infer_persistence_exchange_from_alpha_transport", None)

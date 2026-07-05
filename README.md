@@ -109,6 +109,9 @@ fit is claimed.
 The frontier benchmark horizon classifies recent SOTA sources as trajectory
 reanalysis candidates, transport/heterogeneity candidates, closure horizons,
 model-extension gaps, or thermodynamic scope boundaries.
+The translation-rotation protocol adds an effective rotational renewal clock
+for Debye-Stokes-Einstein and near-Tg molecular-motion diagnostics without
+claiming a microscopic orientational potential theory.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 
@@ -172,6 +175,7 @@ figures/renewal_cage_persistence_exchange.svg
 figures/renewal_cage_persistence_exchange_protocol.svg
 figures/renewal_cage_persistence_exchange_joint_protocol.svg
 figures/renewal_cage_persistence_exchange_uncertainty_protocol.svg
+figures/renewal_cage_translation_rotation_protocol.svg
 figures/renewal_cage_glass_audit.svg
 figures/renewal_cage_glass_phase_diagram.svg
 figures/renewal_cage_spatial_chi4.svg
@@ -214,6 +218,7 @@ data/renewal_cage_persistence_exchange.csv
 data/renewal_cage_persistence_exchange_protocol.csv
 data/renewal_cage_persistence_exchange_joint_protocol.csv
 data/renewal_cage_persistence_exchange_uncertainty_protocol.csv
+data/renewal_cage_translation_rotation_protocol.csv
 data/renewal_cage_glass_audit.csv
 data/renewal_cage_glass_phase_diagram.csv
 data/renewal_cage_spatial_chi4.csv
@@ -255,6 +260,7 @@ paper/figures/renewal_cage_persistence_exchange.pdf
 paper/figures/renewal_cage_persistence_exchange_protocol.pdf
 paper/figures/renewal_cage_persistence_exchange_joint_protocol.pdf
 paper/figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf
+paper/figures/renewal_cage_translation_rotation_protocol.pdf
 paper/figures/renewal_cage_glass_audit.pdf
 paper/figures/renewal_cage_glass_phase_diagram.pdf
 paper/figures/renewal_cage_spatial_chi4.pdf
