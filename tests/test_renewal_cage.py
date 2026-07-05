@@ -128,6 +128,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_table_csv_adapter,
     trajectory_table_adapter,
     trajectory_observable_curve_bridge,
+    trajectory_curve_persistence_exchange_gate,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -2641,6 +2642,76 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(bridge["curve_bridge_ready"], 0.0)
         self.assertEqual(bridge["primary_blocker"], "alpha_threshold_crossing")
         self.assertEqual(bridge["tau_alpha_by_k"], "none")
+
+    def test_trajectory_curve_persistence_exchange_gate_runs_joint_protocol_from_bridge(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=7.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        tau_by_k = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        late_time = 80.0 * params.persistence_mean
+        time_grid = np.geomspace(0.02, 400.0, 900)
+        bridge_row = {
+            "benchmark_id": "synthetic_bridge_joint_protocol",
+            "bridge_stage": "trajectory_curve_bridge_ready",
+            "curve_bridge_ready": 1.0,
+            "wave_numbers": "0.7;1.1;1.6",
+            "anchor_wave_number": 1.1,
+            "tau_alpha_by_k": ";".join(f"{wave_number}:{tau_by_k[wave_number]}" for wave_number in wave_numbers),
+            "diffusion_coefficient": persistence_exchange_diffusion_coefficient(params),
+            "late_time": late_time,
+            "late_ngp": float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0]),
+            "chi4_peak": float(
+                np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, params))
+            ),
+        }
+
+        gate = trajectory_curve_persistence_exchange_gate(
+            bridge_row=bridge_row,
+            jump_variance=params.jump_variance,
+            tau_alpha_relative_error_by_k={wave_number: 0.03 for wave_number in wave_numbers},
+            late_ngp_relative_error=0.05,
+            chi4_peak_relative_error=0.05,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=3.0,
+        )
+
+        self.assertEqual(gate["gate_stage"], "trajectory_persistence_exchange_protocol_ready")
+        self.assertEqual(gate["trajectory_pe_protocol_ready"], 1.0)
+        self.assertEqual(gate["primary_blocker"], "none")
+        self.assertEqual(gate["passes_uncertainty_protocol"], 1.0)
+        self.assertAlmostEqual(gate["persistence_exchange_ratio"], 7.0, delta=0.1)
+        self.assertLess(gate["max_multik_tau_alpha_z"], 1.0)
+        self.assertLess(gate["late_ngp_z"], 1.0)
+        self.assertLess(gate["chi4_peak_z"], 1.0)
+
+    def test_trajectory_curve_persistence_exchange_gate_blocks_incomplete_bridge(self):
+        bridge_row = {
+            "benchmark_id": "short_bridge",
+            "bridge_stage": "trajectory_curve_bridge_incomplete",
+            "curve_bridge_ready": 0.0,
+            "primary_blocker": "alpha_threshold_crossing",
+        }
+
+        gate = trajectory_curve_persistence_exchange_gate(
+            bridge_row=bridge_row,
+            jump_variance=0.7,
+            tau_alpha_relative_error_by_k={1.1: 0.03},
+            late_ngp_relative_error=0.05,
+            chi4_peak_relative_error=0.05,
+        )
+
+        self.assertEqual(gate["gate_stage"], "trajectory_curve_bridge_incomplete")
+        self.assertEqual(gate["trajectory_pe_protocol_ready"], 0.0)
+        self.assertEqual(gate["primary_blocker"], "alpha_threshold_crossing")
 
     def test_trajectory_table_adapter_orders_frames_particles_and_extracts_arrays(self):
         records = [

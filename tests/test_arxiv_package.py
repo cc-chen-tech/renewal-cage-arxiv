@@ -573,6 +573,25 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(short["curve_bridge_ready"]), 0.0)
         self.assertEqual(short["primary_blocker"], "alpha_threshold_crossing")
 
+    def test_trajectory_curve_pe_gate_runs_joint_protocol_after_bridge(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_curve_pe_gate.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["benchmark_id"]: row for row in rows}
+        ready = by_id["synthetic_bridge_pe_protocol_ready"]
+        self.assertEqual(ready["gate_stage"], "trajectory_persistence_exchange_protocol_ready")
+        self.assertEqual(float(ready["trajectory_pe_protocol_ready"]), 1.0)
+        self.assertEqual(float(ready["passes_uncertainty_protocol"]), 1.0)
+        self.assertGreater(float(ready["persistence_exchange_ratio"]), 6.0)
+        self.assertLess(float(ready["max_multik_tau_alpha_z"]), 1.0)
+
+        blocked = by_id["synthetic_short_csv_bridge"]
+        self.assertEqual(blocked["gate_stage"], "trajectory_curve_bridge_incomplete")
+        self.assertEqual(float(blocked["trajectory_pe_protocol_ready"]), 0.0)
+        self.assertEqual(blocked["primary_blocker"], "alpha_threshold_crossing")
+
     def test_trajectory_uncertainty_protocol_exports_jackknife_sigmas(self):
         path = ROOT / "data" / "renewal_cage_trajectory_uncertainty_protocol.csv"
         self.assertTrue(path.exists())

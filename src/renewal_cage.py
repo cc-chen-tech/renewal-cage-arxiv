@@ -3049,6 +3049,121 @@ def trajectory_observable_curve_bridge(
     }
 
 
+def _parse_wave_number_value_map(value: object, *, name: str) -> dict[float, float]:
+    text = str(value)
+    if not text or text == "none":
+        raise ValueError(f"{name} must contain wave:value entries")
+    out: dict[float, float] = {}
+    for entry in text.split(";"):
+        if ":" not in entry:
+            raise ValueError(f"{name} entries must have wave:value format")
+        wave_text, value_text = entry.split(":", 1)
+        wave_number = float(wave_text)
+        if wave_number <= 0.0:
+            raise ValueError(f"{name} wave numbers must be positive")
+        out[wave_number] = float(value_text)
+    return out
+
+
+def trajectory_curve_persistence_exchange_gate(
+    *,
+    bridge_row: dict[str, object],
+    jump_variance: float,
+    tau_alpha_relative_error_by_k: dict[float, float],
+    late_ngp_relative_error: float,
+    chi4_peak_relative_error: float,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    z_threshold: float = 2.0,
+) -> dict[str, float | str]:
+    """Run the persistence/exchange protocol only after trajectory curve bridging."""
+
+    benchmark_id = str(bridge_row.get("benchmark_id", "trajectory_curve_bridge"))
+    bridge_ready = float(bridge_row.get("curve_bridge_ready", 0.0)) == 1.0
+    if not bridge_ready:
+        blocker = str(bridge_row.get("primary_blocker", "curve_bridge_ready"))
+        return {
+            "benchmark_id": benchmark_id,
+            "trajectory_pe_protocol_ready": 0.0,
+            "primary_blocker": blocker,
+            "gate_stage": "trajectory_curve_bridge_incomplete",
+        }
+    if jump_variance <= 0.0:
+        raise ValueError("jump_variance must be positive")
+
+    required_columns = [
+        "wave_numbers",
+        "anchor_wave_number",
+        "tau_alpha_by_k",
+        "diffusion_coefficient",
+        "late_time",
+        "late_ngp",
+        "chi4_peak",
+    ]
+    missing = [column for column in required_columns if column not in bridge_row]
+    if missing:
+        return {
+            "benchmark_id": benchmark_id,
+            "trajectory_pe_protocol_ready": 0.0,
+            "primary_blocker": missing[0],
+            "gate_stage": "trajectory_curve_bridge_incomplete",
+        }
+
+    wave_numbers = _parse_semicolon_float_values(bridge_row["wave_numbers"], name="wave_numbers")
+    observed_tau_alpha_by_k = _parse_wave_number_value_map(
+        bridge_row["tau_alpha_by_k"],
+        name="tau_alpha_by_k",
+    )
+    anchor_wave_number = float(bridge_row["anchor_wave_number"])
+    diffusion = float(bridge_row["diffusion_coefficient"])
+    late_time = float(bridge_row["late_time"])
+    late_ngp = float(bridge_row["late_ngp"])
+    chi4_peak = float(bridge_row["chi4_peak"])
+    if diffusion <= 0.0 or late_time <= 0.0 or late_ngp <= 0.0 or chi4_peak <= 0.0:
+        raise ValueError("diffusion, late_time, late_ngp, and chi4_peak must be positive")
+
+    error_by_k = {float(key): float(value) for key, value in tau_alpha_relative_error_by_k.items()}
+    missing_error = [wave_number for wave_number in wave_numbers if wave_number not in error_by_k]
+    if missing_error:
+        return {
+            "benchmark_id": benchmark_id,
+            "trajectory_pe_protocol_ready": 0.0,
+            "primary_blocker": "tau_alpha_relative_error_by_k",
+            "gate_stage": "trajectory_uncertainty_incomplete",
+        }
+
+    max_time = max(10.0, 2.0 * late_time, 20.0 * max(observed_tau_alpha_by_k.values()))
+    min_time = max(1e-4, min(cage_tau, min(observed_tau_alpha_by_k.values())) / 100.0)
+    time_grid = np.geomspace(min_time, max_time, 1200)
+    scored = persistence_exchange_data_protocol(
+        anchor_wave_number=anchor_wave_number,
+        wave_numbers=wave_numbers,
+        observed_tau_alpha_by_k=observed_tau_alpha_by_k,
+        tau_alpha_relative_error_by_k=error_by_k,
+        jump_variance=jump_variance,
+        diffusion_coefficient=diffusion,
+        late_time=late_time,
+        observed_late_ngp=late_ngp,
+        late_ngp_relative_error=late_ngp_relative_error,
+        observed_chi4_peak=chi4_peak,
+        chi4_peak_relative_error=chi4_peak_relative_error,
+        time_grid=time_grid,
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        threshold=threshold,
+        z_threshold=z_threshold,
+    )
+    out: dict[str, float | str] = {
+        "benchmark_id": benchmark_id,
+        "trajectory_pe_protocol_ready": 1.0,
+        "primary_blocker": "none",
+        "gate_stage": "trajectory_persistence_exchange_protocol_ready",
+    }
+    out.update(scored)
+    return out
+
+
 def trajectory_observable_uncertainty_protocol(
     *,
     positions: np.ndarray,

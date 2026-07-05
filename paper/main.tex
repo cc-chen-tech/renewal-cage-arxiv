@@ -1107,6 +1107,13 @@ each wave number, the anchor $D\tau_\alpha$ product, and the overlap-$\chi_4$
 peak. It also records a negative short-trajectory case where the observable
 rows exist but $F_s(k,t)$ has not crossed the alpha threshold, so the row is
 kept out of the inversion gate rather than overclaimed.
+The downstream file
+\texttt{renewal\_cage\_trajectory\_curve\_pe\_gate.csv} takes this one step
+further by feeding a bridge-ready row into the persistence/exchange joint
+protocol with explicit relative errors on $\tau_\alpha(k)$, late NGP, and
+$\chi_4$. The synthetic consistency row passes the uncertainty-weighted
+protocol and recovers the imposed persistence/exchange ratio, while the
+short-trajectory row remains blocked at the alpha-threshold-crossing gate.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the
