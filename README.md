@@ -77,14 +77,15 @@ A static-gamma null model gives `Var N=R+R^2/kappa0`,
 `alpha_2(t)->1/kappa0`, and `-log Phi_alpha/R->0`; it can broaden alpha
 relaxation but fails long-time Gaussian recovery.
 The SOTA benchmark consistency table turns selected literature-level claims
-into checkable rows, currently covering Kob-Andersen beta-window visibility and
-MCT exponent-parameter consistency, Gaussian-recovery mechanism selection
-against the static-disorder null, fractional Stokes-Einstein decoupling,
-dynamic-heterogeneity chi4 growth, alpha-shape time-temperature-superposition
-breakdown, spatial facilitation-front growth-law inversion,
-KWW stretched-alpha window fitting, persistence/exchange transport inversion
-with held-out late-NGP validation, a van Hove tail/recovery consistency check,
-and an Angell/Adam-Gibbs fragility-growth scope check.
+into checkable rows, currently covering Debye-Waller cage localization,
+Kob-Andersen beta-window visibility and MCT exponent-parameter consistency,
+Gaussian-recovery mechanism selection against the static-disorder null,
+fractional Stokes-Einstein decoupling, dynamic-heterogeneity chi4 growth,
+alpha-shape time-temperature-superposition breakdown, spatial
+facilitation-front growth-law inversion, KWW stretched-alpha window fitting,
+persistence/exchange transport inversion with held-out late-NGP validation, a
+van Hove tail/recovery consistency check, and an Angell/Adam-Gibbs
+fragility-growth scope check.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 

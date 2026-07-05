@@ -1066,6 +1066,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_benchmark_consistency.csv").open() as f:
         rows = list(csv.DictReader(f))
     by_id = {row["benchmark_id"]: row for row in rows}
+    cage_row = by_id["debye_waller_cage_localization"]
     mct_row = by_id["kob_andersen_1995_beta_window"]
     mct_exponent_row = by_id["kob_andersen_1995_mct_exponent_parameter"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
@@ -1103,7 +1104,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         [
             ("observed/model flags", observed_model, colors.HexColor("#2b6cb0")),
         ],
-        "AI. MCT beta visibility",
+        "AI. Cage and MCT checks",
         xlabel="critical obs/model, von obs/model",
         y_range=(0.0, 1.05),
     )
@@ -1128,10 +1129,18 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         xlabel="finite exchange, static, threshold",
     )
     c.setFont("Helvetica", 9)
-    c.drawString(45, 118, f"MCT row consistent = {int(float(mct_row['overall_consistent']))}")
     c.drawString(
         45,
-        104,
+        118,
+        "cage row consistent = "
+        f"{int(float(cage_row['overall_consistent']))}; "
+        f"f_DW = {float(cage_row['debye_waller_plateau']):.3f}; "
+        f"renewal frac = {float(cage_row['renewal_msd_fraction']):.3f}",
+    )
+    c.drawString(45, 104, f"MCT row consistent = {int(float(mct_row['overall_consistent']))}")
+    c.drawString(
+        45,
+        90,
         "exponent row consistent = "
         f"{int(float(mct_exponent_row['overall_consistent']))}; "
         f"lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}; "

@@ -28,6 +28,8 @@ from renewal_cage import (  # noqa: E402
     activated_barrier_temperature_law,
     adam_gibbs_thermodynamic_scan,
     barrier_amplification_laws,
+    cage_localization_benchmark_consistency,
+    cage_localization_diagnostics,
     correlated_domain_susceptibility,
     delayed_poisson_mean,
     delayed_renewal_shape,
@@ -1035,6 +1037,18 @@ def write_sota_benchmark_consistency_csv(
     fieldnames = [
         "benchmark_id",
         "benchmark_family",
+        "observed_cage_localization",
+        "debye_waller_plateau",
+        "min_debye_waller_plateau",
+        "max_debye_waller_plateau",
+        "renewal_msd_fraction",
+        "max_renewal_msd_fraction",
+        "alpha_to_cage_time_ratio",
+        "min_alpha_to_cage_time_ratio",
+        "model_predicts_cage_localization",
+        "debye_waller_consistent",
+        "renewal_fraction_consistent",
+        "alpha_separation_consistent",
         "observed_critical_decay",
         "observed_von_schweidler",
         "required_decades",
@@ -1166,6 +1180,22 @@ def write_sota_benchmark_consistency_csv(
         normalized["benchmark_family"] = family
         return normalized
 
+    cage_diagnostic = cage_localization_diagnostics(
+        wave_number=1.1,
+        plateau_time=1.0,
+        params=params,
+    )
+    cage_row = cage_localization_benchmark_consistency(
+        benchmark_id="debye_waller_cage_localization",
+        observed_cage_localization=True,
+        debye_waller_plateau=cage_diagnostic["debye_waller_plateau"],
+        renewal_msd_fraction=cage_diagnostic["renewal_msd_fraction"],
+        alpha_to_cage_time_ratio=cage_diagnostic["alpha_to_cage_time_ratio"],
+        min_debye_waller_plateau=0.2,
+        max_debye_waller_plateau=0.95,
+        max_renewal_msd_fraction=0.05,
+        min_alpha_to_cage_time_ratio=20.0,
+    )
     mct_row = mct_beta_benchmark_consistency(
         beta,
         benchmark_id="kob_andersen_1995_beta_window",
@@ -1341,6 +1371,7 @@ def write_sota_benchmark_consistency_csv(
         min_adam_gibbs_slowdown=10.0,
     )
     rows = [
+        normalize(cage_row, "cage_localization"),
         normalize(mct_row, "mct_beta_window"),
         normalize(mct_exponent_row, "mct_exponent_parameter"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
@@ -2643,6 +2674,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 630
     by_id = {str(row["benchmark_id"]): row for row in rows}
+    cage_row = by_id["debye_waller_cage_localization"]
     mct_row = by_id["kob_andersen_1995_beta_window"]
     mct_exponent_row = by_id["kob_andersen_1995_mct_exponent_parameter"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
@@ -2699,10 +2731,11 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Benchmark rows convert literature-level conclusions into explicit consistency checks.</text>
   <line x1="{left_a}" y1="{bottom}" x2="{right_a}" y2="{bottom}" stroke="#222" />
   <line x1="{left_a}" y1="{bottom}" x2="{left_a}" y2="{top}" stroke="#222" />
-  <text x="{left_a}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. MCT beta visibility</text>
+  <text x="{left_a}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Cage and MCT checks</text>
   {"".join(bars)}
-  <text x="{left_a}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">MCT row consistent = {int(float(mct_row['overall_consistent']))}</text>
-  <text x="{left_a}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">exponent row consistent = {int(float(mct_exponent_row['overall_consistent']))}; lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}, lambda_b = {float(mct_exponent_row['lambda_from_b']):.3f}</text>
+  <text x="{left_a}" y="{bottom + 52}" font-family="Arial, sans-serif" font-size="11">cage row consistent = {int(float(cage_row['overall_consistent']))}; f_DW = {float(cage_row['debye_waller_plateau']):.3f}, renewal MSD frac = {float(cage_row['renewal_msd_fraction']):.3f}</text>
+  <text x="{left_a}" y="{bottom + 68}" font-family="Arial, sans-serif" font-size="11">MCT row consistent = {int(float(mct_row['overall_consistent']))}</text>
+  <text x="{left_a}" y="{bottom + 84}" font-family="Arial, sans-serif" font-size="11">exponent row consistent = {int(float(mct_exponent_row['overall_consistent']))}; lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}, lambda_b = {float(mct_exponent_row['lambda_from_b']):.3f}</text>
   <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
   <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
   <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>

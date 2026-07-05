@@ -4,10 +4,11 @@
   <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Benchmark rows convert literature-level conclusions into explicit consistency checks.</text>
   <line x1="90" y1="430" x2="520" y2="430" stroke="#222" />
   <line x1="90" y1="430" x2="90" y2="105" stroke="#222" />
-  <text x="90" y="81" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. MCT beta visibility</text>
+  <text x="90" y="81" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Cage and MCT checks</text>
   <rect x="90" y="430.00" width="54" height="0.00" fill="#718096" /><text x="82" y="454" font-family="Arial, sans-serif" font-size="11">obs critical</text><rect x="182" y="430.00" width="54" height="0.00" fill="#2b6cb0" /><text x="174" y="454" font-family="Arial, sans-serif" font-size="11">model critical</text><rect x="274" y="105.00" width="54" height="325.00" fill="#718096" /><text x="266" y="454" font-family="Arial, sans-serif" font-size="11">obs von</text><rect x="366" y="105.00" width="54" height="325.00" fill="#c05621" /><text x="358" y="454" font-family="Arial, sans-serif" font-size="11">model von</text>
-  <text x="90" y="486" font-family="Arial, sans-serif" font-size="12">MCT row consistent = 1</text>
-  <text x="90" y="504" font-family="Arial, sans-serif" font-size="12">exponent row consistent = 1; lambda_a = 0.716, lambda_b = 0.725</text>
+  <text x="90" y="482" font-family="Arial, sans-serif" font-size="11">cage row consistent = 1; f_DW = 0.546, renewal MSD frac = 0.005</text>
+  <text x="90" y="498" font-family="Arial, sans-serif" font-size="11">MCT row consistent = 1</text>
+  <text x="90" y="514" font-family="Arial, sans-serif" font-size="11">exponent row consistent = 1; lambda_a = 0.716, lambda_b = 0.725</text>
   <line x1="660" y1="430" x2="1040" y2="430" stroke="#222" />
   <line x1="660" y1="430" x2="660" y2="105" stroke="#222" />
   <text x="660" y="81" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>

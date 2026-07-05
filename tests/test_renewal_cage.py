@@ -21,6 +21,8 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_shape_curve,
     alpha_shape_superposition_residual,
     barrier_amplification_laws,
+    cage_localization_benchmark_consistency,
+    cage_localization_diagnostics,
     correlated_domain_susceptibility,
     classify_delay_exponent,
     delayed_poisson_mean,
@@ -1226,6 +1228,46 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(row["lambda_from_a"], 0.716312910468668, places=12)
         self.assertAlmostEqual(row["lambda_from_b"], 0.7246032624007417, places=12)
         self.assertEqual(row["mct_exponent_parameter_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+
+    def test_cage_localization_diagnostics_quantifies_debye_waller_plateau(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            renewal_rate=0.18,
+            renewal_delay=3.0,
+        )
+
+        row = cage_localization_diagnostics(
+            wave_number=1.1,
+            plateau_time=1.0,
+            params=params,
+        )
+
+        self.assertAlmostEqual(row["debye_waller_plateau"], math.exp(-0.5 * 1.1**2), places=12)
+        self.assertLess(row["renewal_msd_fraction"], 0.02)
+        self.assertGreater(row["alpha_to_cage_time_ratio"], 50.0)
+        self.assertGreater(row["cage_plateau_msd"], 0.95)
+        self.assertLess(row["cage_plateau_msd"], 1.05)
+
+    def test_cage_localization_benchmark_consistency_detects_cage_plateau(self):
+        row = cage_localization_benchmark_consistency(
+            benchmark_id="debye_waller_cage_localization",
+            observed_cage_localization=True,
+            debye_waller_plateau=0.5460744266397094,
+            renewal_msd_fraction=0.0048,
+            alpha_to_cage_time_ratio=147.0,
+            min_debye_waller_plateau=0.2,
+            max_debye_waller_plateau=0.95,
+            max_renewal_msd_fraction=0.05,
+            min_alpha_to_cage_time_ratio=20.0,
+        )
+
+        self.assertEqual(row["model_predicts_cage_localization"], 1.0)
+        self.assertEqual(row["debye_waller_consistent"], 1.0)
+        self.assertEqual(row["renewal_fraction_consistent"], 1.0)
+        self.assertEqual(row["alpha_separation_consistent"], 1.0)
         self.assertEqual(row["overall_consistent"], 1.0)
 
     def test_gaussian_recovery_benchmark_consistency_rejects_static_disorder(self):

@@ -535,6 +535,91 @@ def mct_beta_benchmark_consistency(
     }
 
 
+def cage_localization_diagnostics(
+    *,
+    wave_number: float,
+    plateau_time: float,
+    params: DelayedRenewalCageParams,
+) -> dict[str, float]:
+    """Quantify Debye-Waller localization and renewal leakage in the cage plateau."""
+
+    _validate(params)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if plateau_time <= 0.0:
+        raise ValueError("plateau_time must be positive")
+    local = float(local_cage_variance(np.array([plateau_time]), params)[0])
+    renewal = float(delayed_poisson_mean(np.array([plateau_time]), params)[0])
+    renewal_msd = params.jump_variance * renewal
+    plateau_msd = local + renewal_msd
+    tau_alpha = alpha_relaxation_time(wave_number, params)
+    return {
+        "wave_number": wave_number,
+        "plateau_time": plateau_time,
+        "cage_variance": params.cage_variance,
+        "cage_tau": params.cage_tau,
+        "local_cage_msd": local,
+        "renewal_count_at_plateau": renewal,
+        "renewal_msd_at_plateau": renewal_msd,
+        "cage_plateau_msd": plateau_msd,
+        "renewal_msd_fraction": renewal_msd / plateau_msd if plateau_msd > 0.0 else math.nan,
+        "debye_waller_plateau": math.exp(-0.5 * wave_number**2 * params.cage_variance),
+        "tau_alpha": tau_alpha,
+        "alpha_to_cage_time_ratio": tau_alpha / params.cage_tau,
+    }
+
+
+def cage_localization_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_cage_localization: bool,
+    debye_waller_plateau: float,
+    renewal_msd_fraction: float,
+    alpha_to_cage_time_ratio: float,
+    min_debye_waller_plateau: float,
+    max_debye_waller_plateau: float,
+    max_renewal_msd_fraction: float,
+    min_alpha_to_cage_time_ratio: float,
+) -> dict[str, float | str]:
+    """Check cage localization against plateau, renewal leakage, and alpha separation."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not (0.0 < min_debye_waller_plateau < max_debye_waller_plateau < 1.0):
+        raise ValueError("Debye-Waller thresholds must satisfy 0 < min < max < 1")
+    for name, value in {
+        "debye_waller_plateau": debye_waller_plateau,
+        "alpha_to_cage_time_ratio": alpha_to_cage_time_ratio,
+        "max_renewal_msd_fraction": max_renewal_msd_fraction,
+        "min_alpha_to_cage_time_ratio": min_alpha_to_cage_time_ratio,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if renewal_msd_fraction < 0.0:
+        raise ValueError("renewal_msd_fraction must be nonnegative")
+
+    debye_flag = min_debye_waller_plateau <= debye_waller_plateau <= max_debye_waller_plateau
+    renewal_flag = renewal_msd_fraction <= max_renewal_msd_fraction
+    separation_flag = alpha_to_cage_time_ratio >= min_alpha_to_cage_time_ratio
+    model_flag = debye_flag and renewal_flag and separation_flag
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_cage_localization": float(observed_cage_localization),
+        "debye_waller_plateau": debye_waller_plateau,
+        "min_debye_waller_plateau": min_debye_waller_plateau,
+        "max_debye_waller_plateau": max_debye_waller_plateau,
+        "renewal_msd_fraction": renewal_msd_fraction,
+        "max_renewal_msd_fraction": max_renewal_msd_fraction,
+        "alpha_to_cage_time_ratio": alpha_to_cage_time_ratio,
+        "min_alpha_to_cage_time_ratio": min_alpha_to_cage_time_ratio,
+        "model_predicts_cage_localization": float(model_flag),
+        "debye_waller_consistent": float(debye_flag == observed_cage_localization),
+        "renewal_fraction_consistent": float(renewal_flag == observed_cage_localization),
+        "alpha_separation_consistent": float(separation_flag == observed_cage_localization),
+        "overall_consistent": float(model_flag == observed_cage_localization),
+    }
+
+
 def mct_exponent_benchmark_consistency(
     *,
     benchmark_id: str,

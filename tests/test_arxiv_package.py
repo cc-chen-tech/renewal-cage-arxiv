@@ -37,6 +37,7 @@ class ArxivPackageTests(unittest.TestCase):
             rows = list(csv.DictReader(f))
 
         by_id = {row["benchmark_id"]: row for row in rows}
+        self.assertIn("debye_waller_cage_localization", by_id)
         self.assertIn("kob_andersen_1995_beta_window", by_id)
         self.assertIn("kob_andersen_1995_mct_exponent_parameter", by_id)
         self.assertIn("gaussian_recovery_finite_exchange_vs_static_disorder", by_id)
@@ -48,6 +49,9 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("persistence_exchange_transport_inversion", by_id)
         self.assertIn("kob_andersen_van_hove_tail_recovery", by_id)
         self.assertIn("angell_adam_gibbs_fragility_growth", by_id)
+        self.assertEqual(float(by_id["debye_waller_cage_localization"]["overall_consistent"]), 1.0)
+        self.assertLess(float(by_id["debye_waller_cage_localization"]["renewal_msd_fraction"]), 0.05)
+        self.assertGreater(float(by_id["debye_waller_cage_localization"]["alpha_to_cage_time_ratio"]), 20.0)
         self.assertEqual(float(by_id["kob_andersen_1995_beta_window"]["overall_consistent"]), 1.0)
         self.assertEqual(float(by_id["kob_andersen_1995_mct_exponent_parameter"]["overall_consistent"]), 1.0)
         self.assertLess(
