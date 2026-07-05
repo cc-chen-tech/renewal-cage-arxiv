@@ -938,7 +938,6 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_raw_curve_ingestion_contract.pdf",
             "figures/renewal_cage_raw_curve_diagnostic_readiness.pdf",
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
-            "figures/renewal_cage_benchmark_publication_ladder.pdf",
         ]
         for figure in readiness_figures:
             figure_index = main_tex.index(figure)
