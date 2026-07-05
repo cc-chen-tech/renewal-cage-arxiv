@@ -710,6 +710,29 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertAlmostEqual(float(final["msd"]), 0.005414723094)
         self.assertAlmostEqual(float(final["ngp_2d"]), 0.051977831407)
 
+    def test_sota_glassbench_trajectory_first_npz_inversion_readiness_records_blockers(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["readiness_stage"], "frame_index_curve_only")
+        self.assertEqual(ka2d_030["primary_blocker"], "physical_time_semantics")
+        self.assertEqual(float(ka2d_030["frame_count"]), 20.0)
+        self.assertEqual(float(ka2d_030["member_count"]), 1.0)
+        self.assertEqual(float(ka2d_030["physical_time_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["ensemble_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["sota_inversion_ready"]), 0.0)
+        self.assertIn("lag_time", ka2d_030["missing_observables"])
+        self.assertIn("self_intermediate_scattering_by_k", ka2d_030["missing_observables"])
+        self.assertIn("sigma_msd", ka2d_030["missing_uncertainty_columns"])
+
+        ka = by_key[("KA", "none")]
+        self.assertEqual(ka["readiness_stage"], "upstream_curve_incomplete")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
     def test_sota_remote_result_curve_cache_records_range_cached_numeric_curves(self):
         manifest_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
         path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_cache.csv"
@@ -1316,6 +1339,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)
@@ -1373,6 +1397,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", main_tex)
@@ -1413,6 +1438,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf",
+            "figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
             "figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf",
@@ -1586,6 +1612,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf"
             ).read_bytes()
+            first_sota_glassbench_trajectory_first_npz_inversion_readiness = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
+            ).read_bytes()
             first_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1751,6 +1783,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf"
             ).read_bytes()
+            second_sota_glassbench_trajectory_first_npz_inversion_readiness = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
+            ).read_bytes()
             second_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1880,6 +1918,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_glassbench_trajectory_first_npz_observable_curve,
             second_sota_glassbench_trajectory_first_npz_observable_curve,
+        )
+        self.assertEqual(
+            first_sota_glassbench_trajectory_first_npz_inversion_readiness,
+            second_sota_glassbench_trajectory_first_npz_inversion_readiness,
         )
         self.assertEqual(first_sota_remote_result_curve_cache, second_sota_remote_result_curve_cache)
         self.assertEqual(first_sota_remote_result_curve_fetch_gap, second_sota_remote_result_curve_fetch_gap)

@@ -104,6 +104,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_verdict,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
+    sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
@@ -3450,6 +3451,38 @@ def write_sota_glassbench_trajectory_first_npz_observable_curve_csv(
     return rows
 
 
+def write_sota_glassbench_trajectory_first_npz_inversion_readiness_csv(
+    path: Path,
+    *,
+    curve_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Gate first-NPZ curves before promoting them to SOTA inversion inputs."""
+
+    rows = sota_glassbench_trajectory_first_npz_inversion_readiness_gate(
+        benchmark_id="glassbench_first_npz_sota_inversion_readiness",
+        accession_id="glassbench_zenodo_10118191",
+        curve_rows=curve_rows,
+        required_observables=[
+            "lag_time",
+            "msd",
+            "ngp_2d",
+            "self_intermediate_scattering_by_k",
+            "chi4_overlap",
+        ],
+        required_uncertainty_columns=[
+            "sigma_msd",
+            "sigma_ngp_2d",
+            "sigma_self_intermediate_scattering_by_k",
+            "sigma_chi4_overlap",
+        ],
+        min_member_count=4,
+        min_frame_count=20,
+        has_physical_time=False,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -6321,6 +6354,66 @@ def write_sota_glassbench_trajectory_first_npz_observable_curve_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_first_npz_inversion_readiness_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 430
+    left, top = 75, 115
+    row_h = 82
+    colors = {
+        "uncertainty_weighted_sota_inversion_ready": "#2f855a",
+        "frame_index_curve_only": "#2b6cb0",
+        "single_member_curve_only": "#805ad5",
+        "structural_curve_without_uncertainty": "#b7791f",
+        "upstream_curve_incomplete": "#c05621",
+    }
+    marks = []
+    for index, row in enumerate(rows):
+        y = top + index * row_h
+        stage = str(row["readiness_stage"])
+        color = colors.get(stage, "#4a5568")
+        ready = int(float(row["sota_inversion_ready"]))
+        physical = int(float(row["physical_time_ready"]))
+        ensemble = int(float(row["ensemble_ready"]))
+        uncertainty = int(float(row["uncertainty_ready"]))
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        missing = str(row["missing_observables"]).replace("_", " ")
+        sigmas = str(row["missing_uncertainty_columns"]).replace("_", " ")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 125}" y="{y - 4}" width="330" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 135}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:45]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 475}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">ready={ready}; physical={physical}; ensemble={ensemble}; uncertainty={uncertainty}; frames={int(float(row["frame_count"]))}; members={int(float(row["member_count"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 125}" y="{y + 43}" font-family="Arial, sans-serif" font-size="9" fill="#555">missing observables: {missing[:100]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 125}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">missing sigmas: {sigmas[:104]}; next: {str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench first-NPZ SOTA inversion readiness</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Frame-index curves are gated before any physical-time, ensemble, or uncertainty-weighted persistence/exchange comparison is claimed.</text>
+  <text x="{left}" y="{top - 25}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 125}" y="{top - 25}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness stage</text>
+  <text x="{left + 475}" y="{top - 25}" font-family="Arial, sans-serif" font-size="12" font-weight="700">SOTA inversion prerequisites</text>
+  {"".join(marks)}
+  <rect x="75" y="365" width="14" height="14" fill="#2b6cb0" /><text x="96" y="377" font-family="Arial, sans-serif" font-size="12">real payload reaches frame-index curve only</text>
+  <rect x="395" y="365" width="14" height="14" fill="#2f855a" /><text x="416" y="377" font-family="Arial, sans-serif" font-size="12">uncertainty-weighted SOTA inversion ready</text>
+  <text x="705" y="377" font-family="Arial, sans-serif" font-size="12">current blocker: physical time, ensemble members, Fs/chi4, and uncertainties</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -8098,6 +8191,16 @@ def main() -> None:
     write_sota_glassbench_trajectory_first_npz_observable_curve_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.svg",
         glassbench_trajectory_first_npz_observable_curve_rows,
+    )
+    glassbench_trajectory_first_npz_inversion_readiness_rows = (
+        write_sota_glassbench_trajectory_first_npz_inversion_readiness_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv",
+            curve_rows=glassbench_trajectory_first_npz_observable_curve_rows,
+        )
+    )
+    write_sota_glassbench_trajectory_first_npz_inversion_readiness_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.svg",
+        glassbench_trajectory_first_npz_inversion_readiness_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"

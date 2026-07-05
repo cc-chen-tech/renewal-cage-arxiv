@@ -3665,6 +3665,160 @@ def sota_glassbench_trajectory_first_npz_observable_curve_gate(
     return rows
 
 
+def sota_glassbench_trajectory_first_npz_inversion_readiness_gate(
+    *,
+    benchmark_id: str,
+    accession_id: str,
+    curve_rows: Sequence[dict[str, float | str]],
+    required_observables: Sequence[str],
+    required_uncertainty_columns: Sequence[str],
+    min_member_count: int,
+    min_frame_count: int,
+    has_physical_time: bool,
+) -> list[dict[str, float | str]]:
+    """Gate first-NPZ GlassBench curves before claiming SOTA inversion readiness."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not curve_rows:
+        raise ValueError("curve_rows must be nonempty")
+    if not required_observables:
+        raise ValueError("required_observables must be nonempty")
+    if int(min_member_count) != min_member_count or min_member_count < 1:
+        raise ValueError("min_member_count must be a positive integer")
+    if int(min_frame_count) != min_frame_count or min_frame_count < 2:
+        raise ValueError("min_frame_count must be an integer at least two")
+    if any(not observable for observable in required_observables):
+        raise ValueError("required_observables must contain nonempty strings")
+    if any(not column for column in required_uncertainty_columns):
+        raise ValueError("required_uncertainty_columns must contain nonempty strings")
+
+    required = list(dict.fromkeys(str(observable) for observable in required_observables))
+    required_sigmas = list(dict.fromkeys(str(column) for column in required_uncertainty_columns))
+    grouped: dict[tuple[str, str], list[dict[str, float | str]]] = {}
+    for row in curve_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(grouped.items()):
+        ready_group = [row for row in group if float(row.get("observable_curve_ready", 0.0)) == 1.0]
+        if ready_group:
+            source_paths = sorted({str(row.get("source_path", "none")) for row in ready_group})
+            members = sorted({str(row.get("first_npz_member", "none")) for row in ready_group})
+            frame_indices = sorted({float(row.get("frame_index", -1.0)) for row in ready_group})
+        else:
+            source_paths = sorted({str(row.get("source_path", "none")) for row in group})
+            members = sorted({str(row.get("first_npz_member", "none")) for row in group})
+            frame_indices = []
+        members = [member for member in members if member != "none"]
+        available: list[str] = []
+        available_sigmas: list[str] = []
+        positive_sigmas: set[str] = set()
+        rows_for_columns = ready_group if ready_group else group
+        for row in rows_for_columns:
+            for observable in required:
+                if observable in row:
+                    available.append(observable)
+            for column in required_sigmas:
+                if column in row:
+                    available_sigmas.append(column)
+                    try:
+                        if float(row[column]) > 0.0:
+                            positive_sigmas.add(column)
+                    except (TypeError, ValueError):
+                        pass
+
+        available_unique = list(dict.fromkeys(available))
+        sigma_unique = list(dict.fromkeys(available_sigmas))
+        missing_observables = [observable for observable in required if observable not in set(available_unique)]
+        missing_sigmas = [column for column in required_sigmas if column not in set(sigma_unique)]
+        nonpositive_sigmas = [
+            column for column in required_sigmas if column in set(sigma_unique) and column not in positive_sigmas
+        ]
+        frame_count = len(frame_indices)
+        member_count = len(members)
+        upstream_ready = bool(ready_group)
+        physical_time_ready = bool(has_physical_time and "lag_time" not in missing_observables)
+        ensemble_ready = member_count >= int(min_member_count)
+        structural_ready = (
+            upstream_ready
+            and physical_time_ready
+            and ensemble_ready
+            and frame_count >= int(min_frame_count)
+            and not missing_observables
+        )
+        uncertainty_ready = structural_ready and not missing_sigmas and not nonpositive_sigmas
+
+        if not upstream_ready:
+            stage = "upstream_curve_incomplete"
+            blocker = str(group[0].get("primary_blocker", "observable_curve_ready"))
+            next_action = "complete_first_npz_observable_curve"
+        elif not physical_time_ready:
+            stage = "frame_index_curve_only"
+            blocker = "physical_time_semantics"
+            next_action = "attach_physical_lag_time_and_units"
+        elif frame_count < int(min_frame_count):
+            stage = "curve_too_short_for_alpha_window"
+            blocker = "frame_count"
+            next_action = "extract_longer_trajectory_window"
+        elif not ensemble_ready:
+            stage = "single_member_curve_only"
+            blocker = "ensemble_members"
+            next_action = "extract_multiple_independent_npz_members"
+        elif missing_observables:
+            stage = "observable_set_incomplete"
+            blocker = missing_observables[0]
+            next_action = f"compute_{missing_observables[0]}"
+        elif missing_sigmas:
+            stage = "structural_curve_without_uncertainty"
+            blocker = missing_sigmas[0]
+            next_action = "add_block_jackknife_uncertainty_columns"
+        elif nonpositive_sigmas:
+            stage = "structural_curve_without_uncertainty"
+            blocker = nonpositive_sigmas[0]
+            next_action = "replace_nonpositive_uncertainty_columns"
+        else:
+            stage = "uncertainty_weighted_sota_inversion_ready"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+
+        out.append(
+            {
+                "benchmark_id": benchmark_id,
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "first_npz_members": ";".join(members) if members else "none",
+                "frame_count": float(frame_count),
+                "member_count": float(member_count),
+                "min_frame_count": float(min_frame_count),
+                "min_member_count": float(min_member_count),
+                "required_observables": ";".join(required),
+                "available_observables": ";".join(available_unique) if available_unique else "none",
+                "missing_observables": ";".join(missing_observables) if missing_observables else "none",
+                "required_uncertainty_columns": ";".join(required_sigmas) if required_sigmas else "none",
+                "available_uncertainty_columns": ";".join(sigma_unique) if sigma_unique else "none",
+                "missing_uncertainty_columns": ";".join(missing_sigmas) if missing_sigmas else "none",
+                "nonpositive_uncertainty_columns": ";".join(nonpositive_sigmas)
+                if nonpositive_sigmas
+                else "none",
+                "physical_time_ready": float(physical_time_ready),
+                "ensemble_ready": float(ensemble_ready),
+                "structural_curve_ready": float(structural_ready),
+                "uncertainty_ready": float(uncertainty_ready),
+                "sota_inversion_ready": float(uncertainty_ready),
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "readiness_stage": stage,
+            }
+        )
+    return out
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

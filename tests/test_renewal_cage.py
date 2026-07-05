@@ -119,6 +119,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_verdict,
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
+    sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
@@ -2788,6 +2789,127 @@ class DelayedRenewalCageTests(unittest.TestCase):
         blocked = by_key[("KA", "none", -1.0)]
         self.assertEqual(blocked["curve_stage"], "first_npz_observable_smoke_incomplete")
         self.assertEqual(blocked["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_first_npz_inversion_readiness_blocks_single_member_frame_curves(self):
+        curve_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "observable_curve_ready": 1.0,
+                "frame_index": float(frame),
+                "msd": 0.005 + 0.0001 * frame,
+                "ngp_2d": 0.05 + 0.001 * frame,
+            }
+            for frame in range(20)
+        ]
+        curve_rows.append(
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "first_npz_member": "none",
+                "observable_curve_ready": 0.0,
+                "frame_index": -1.0,
+                "msd": 0.0,
+                "ngp_2d": 0.0,
+                "primary_blocker": "trajectory_payload",
+            }
+        )
+
+        rows = sota_glassbench_trajectory_first_npz_inversion_readiness_gate(
+            benchmark_id="glassbench_first_npz_sota_inversion_readiness",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            required_observables=[
+                "lag_time",
+                "msd",
+                "ngp_2d",
+                "self_intermediate_scattering_by_k",
+                "chi4_overlap",
+            ],
+            required_uncertainty_columns=[
+                "sigma_msd",
+                "sigma_ngp_2d",
+                "sigma_self_intermediate_scattering_by_k",
+                "sigma_chi4_overlap",
+            ],
+            min_member_count=4,
+            min_frame_count=20,
+            has_physical_time=False,
+        )
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d["readiness_stage"], "frame_index_curve_only")
+        self.assertEqual(ka2d["primary_blocker"], "physical_time_semantics")
+        self.assertEqual(float(ka2d["frame_count"]), 20.0)
+        self.assertEqual(float(ka2d["member_count"]), 1.0)
+        self.assertEqual(float(ka2d["structural_curve_ready"]), 0.0)
+        self.assertEqual(float(ka2d["sota_inversion_ready"]), 0.0)
+        self.assertIn("lag_time", ka2d["missing_observables"])
+        self.assertIn("self_intermediate_scattering_by_k", ka2d["missing_observables"])
+        self.assertIn("sigma_msd", ka2d["missing_uncertainty_columns"])
+        self.assertEqual(ka2d["next_required_action"], "attach_physical_lag_time_and_units")
+
+        ka = by_key[("KA", "none")]
+        self.assertEqual(ka["readiness_stage"], "upstream_curve_incomplete")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_first_npz_inversion_readiness_promotes_uncertainty_weighted_ensemble(self):
+        curve_rows = []
+        for member in range(4):
+            for frame in range(20):
+                curve_rows.append(
+                    {
+                        "system_id": "KA2D",
+                        "temperature": "0.30",
+                        "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                        "first_npz_member": f"T0.30/train/member_{member}.npz",
+                        "observable_curve_ready": 1.0,
+                        "frame_index": float(frame),
+                        "lag_time": 0.1 * frame,
+                        "msd": 0.005 + 0.0001 * frame,
+                        "ngp_2d": 0.05 + 0.001 * frame,
+                        "self_intermediate_scattering_by_k": "1.1:0.4",
+                        "chi4_overlap": 0.2 + 0.01 * frame,
+                        "sigma_msd": 1e-4,
+                        "sigma_ngp_2d": 1e-3,
+                        "sigma_self_intermediate_scattering_by_k": 2e-3,
+                        "sigma_chi4_overlap": 3e-3,
+                    }
+                )
+
+        rows = sota_glassbench_trajectory_first_npz_inversion_readiness_gate(
+            benchmark_id="glassbench_first_npz_sota_inversion_readiness",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            required_observables=[
+                "lag_time",
+                "msd",
+                "ngp_2d",
+                "self_intermediate_scattering_by_k",
+                "chi4_overlap",
+            ],
+            required_uncertainty_columns=[
+                "sigma_msd",
+                "sigma_ngp_2d",
+                "sigma_self_intermediate_scattering_by_k",
+                "sigma_chi4_overlap",
+            ],
+            min_member_count=4,
+            min_frame_count=20,
+            has_physical_time=True,
+        )
+
+        ready = rows[0]
+        self.assertEqual(ready["readiness_stage"], "uncertainty_weighted_sota_inversion_ready")
+        self.assertEqual(ready["primary_blocker"], "none")
+        self.assertEqual(float(ready["structural_curve_ready"]), 1.0)
+        self.assertEqual(float(ready["ensemble_ready"]), 1.0)
+        self.assertEqual(float(ready["uncertainty_ready"]), 1.0)
+        self.assertEqual(float(ready["sota_inversion_ready"]), 1.0)
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):
         manifest = {

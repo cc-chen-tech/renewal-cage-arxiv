@@ -2539,6 +2539,80 @@ def write_sota_glassbench_trajectory_first_npz_observable_curve_pdf(path: Path) 
     c.save()
 
 
+def write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench first-NPZ SOTA inversion readiness")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Frame-index curves are gated before physical-time, ensemble, and uncertainty-weighted comparisons.",
+    )
+    left, top = 48, page_h - 94
+    row_h = 64
+    colors_by_stage = {
+        "uncertainty_weighted_sota_inversion_ready": colors.HexColor("#2f855a"),
+        "frame_index_curve_only": colors.HexColor("#2b6cb0"),
+        "single_member_curve_only": colors.HexColor("#805ad5"),
+        "structural_curve_without_uncertainty": colors.HexColor("#b7791f"),
+        "upstream_curve_incomplete": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 20, "target")
+    c.drawString(left + 92, top + 20, "stage")
+    c.drawString(left + 335, top + 20, "requirements and next action")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["readiness_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(colors.black)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 92, y - 12, 225, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 100, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 335,
+            y,
+            "ready={}; physical={}; ensemble={}; uncertainty={}; frames={}; members={}".format(
+                int(float(row["sota_inversion_ready"])),
+                int(float(row["physical_time_ready"])),
+                int(float(row["ensemble_ready"])),
+                int(float(row["uncertainty_ready"])),
+                int(float(row["frame_count"])),
+                int(float(row["member_count"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 335,
+            y - 14,
+            f'missing obs: {row["missing_observables"].replace("_", " ")[:85]}',
+        )
+        c.drawString(
+            left + 335,
+            y - 27,
+            f'next: {row["next_required_action"].replace("_", " ")[:92]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "No row is promoted to a real SOTA inversion until lag-time, ensemble members, Fs/chi4 observables, and positive uncertainties are present.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3768,6 +3842,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_first_npz_observable_curve_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf"
     )
+    sota_glassbench_trajectory_first_npz_inversion_readiness_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -3848,6 +3925,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_first_npz_observable_curve_pdf(
         sota_glassbench_trajectory_first_npz_observable_curve_pdf
+    )
+    write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(
+        sota_glassbench_trajectory_first_npz_inversion_readiness_pdf
     )
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
@@ -3956,6 +4036,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_first_npz_observable_curve_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf",
+        )
+        archive.write(
+            sota_glassbench_trajectory_first_npz_inversion_readiness_pdf,
+            "figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf",
         )
         archive.write(
             sota_remote_result_curve_cache_pdf,
