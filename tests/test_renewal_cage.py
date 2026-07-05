@@ -71,6 +71,7 @@ from renewal_cage import (  # noqa: E402
     observable_falsification_matrix,
     raw_curve_ingestion_contract,
     raw_curve_diagnostic_readiness,
+    raw_curve_persistence_exchange_protocol,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
     van_hove_tail_benchmark_consistency,
@@ -1705,6 +1706,104 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(by_diagnostic["combined_alpha_vanhove_closure"]["structural_diagnostic_ready"], 1.0)
         self.assertEqual(by_diagnostic["combined_alpha_vanhove_closure"]["uncertainty_diagnostic_ready"], 0.0)
         self.assertEqual(by_diagnostic["combined_alpha_vanhove_closure"]["primary_blocker"], "sigma_F_s")
+
+    def test_raw_curve_persistence_exchange_protocol_extracts_observables_and_passes(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=7.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        time_grid = np.geomspace(0.02, 800.0, 1600)
+        alpha_curves = {
+            wave_number: (
+                time_grid,
+                persistence_exchange_normalized_alpha_decay(wave_number, time_grid, params),
+            )
+            for wave_number in wave_numbers
+        }
+        late_time = 80.0 * params.persistence_mean
+        ngp_time = np.geomspace(0.1, 1200.0, 1400)
+        ngp_curve = (ngp_time, persistence_exchange_ngp_1d(ngp_time, params))
+        chi4_time = np.geomspace(0.02, 400.0, 900)
+        chi4_curve = (
+            chi4_time,
+            persistence_exchange_scattering_susceptibility(1.1, chi4_time, params),
+        )
+
+        row = raw_curve_persistence_exchange_protocol(
+            benchmark_id="synthetic_raw_curve_closure",
+            anchor_wave_number=1.1,
+            alpha_curves_by_k=alpha_curves,
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            late_time=late_time,
+            ngp_curve=ngp_curve,
+            chi4_curve=chi4_curve,
+            tau_alpha_relative_error_by_k={wave_number: 0.03 for wave_number in wave_numbers},
+            late_ngp_relative_error=0.05,
+            chi4_peak_relative_error=0.05,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=3.0,
+        )
+
+        self.assertEqual(row["benchmark_id"], "synthetic_raw_curve_closure")
+        self.assertEqual(row["raw_curve_protocol_passes"], 1.0)
+        self.assertAlmostEqual(row["persistence_exchange_ratio"], 7.0, delta=0.1)
+        self.assertGreater(row["stokes_einstein_growth_over_poisson"], 2.0)
+        self.assertLess(row["max_multik_tau_alpha_z"], 1.0)
+        self.assertLess(row["late_ngp_z"], 1.0)
+        self.assertLess(row["chi4_peak_z"], 1.0)
+
+    def test_raw_curve_persistence_exchange_protocol_rejects_late_ngp_mismatch(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=7.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        time_grid = np.geomspace(0.02, 800.0, 1600)
+        alpha_curves = {
+            wave_number: (
+                time_grid,
+                persistence_exchange_normalized_alpha_decay(wave_number, time_grid, params),
+            )
+            for wave_number in wave_numbers
+        }
+        late_time = 80.0 * params.persistence_mean
+        ngp_time = np.geomspace(0.1, 1200.0, 1400)
+        corrupted_ngp = 1.8 * persistence_exchange_ngp_1d(ngp_time, params)
+        chi4_time = np.geomspace(0.02, 400.0, 900)
+        chi4_curve = (
+            chi4_time,
+            persistence_exchange_scattering_susceptibility(1.1, chi4_time, params),
+        )
+
+        row = raw_curve_persistence_exchange_protocol(
+            benchmark_id="synthetic_raw_curve_late_ngp_mismatch",
+            anchor_wave_number=1.1,
+            alpha_curves_by_k=alpha_curves,
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            late_time=late_time,
+            ngp_curve=(ngp_time, corrupted_ngp),
+            chi4_curve=chi4_curve,
+            tau_alpha_relative_error_by_k={wave_number: 0.03 for wave_number in wave_numbers},
+            late_ngp_relative_error=0.05,
+            chi4_peak_relative_error=0.05,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=3.0,
+        )
+
+        self.assertEqual(row["late_ngp_z_consistent"], 0.0)
+        self.assertEqual(row["raw_curve_protocol_passes"], 0.0)
+        self.assertGreater(row["late_ngp_z"], 3.0)
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(

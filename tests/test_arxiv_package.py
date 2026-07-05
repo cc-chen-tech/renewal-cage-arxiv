@@ -256,6 +256,21 @@ class ArxivPackageTests(unittest.TestCase):
             0.0,
         )
 
+    def test_raw_curve_persistence_exchange_protocol_has_pass_and_rejection_cases(self):
+        path = ROOT / "data" / "renewal_cage_raw_curve_persistence_exchange_protocol.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_scenario = {row["scenario"]: row for row in rows}
+        self.assertEqual(float(by_scenario["consistent_raw_curves"]["raw_curve_protocol_passes"]), 1.0)
+        self.assertEqual(float(by_scenario["late_ngp_mismatch"]["raw_curve_protocol_passes"]), 0.0)
+        self.assertGreater(
+            float(by_scenario["consistent_raw_curves"]["persistence_exchange_ratio"]),
+            6.0,
+        )
+        self.assertGreater(float(by_scenario["late_ngp_mismatch"]["late_ngp_z"]), 3.0)
+
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             zip_path = build_arxiv_package(output_dir=Path(tmpdir))
@@ -288,6 +303,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_raw_curve_ingestion_contract.pdf", names)
             self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", names)
+            self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -320,6 +336,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_ingestion_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", main_tex)
         self.assertIn("figures/renewal_cage_barrier_requirements.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
@@ -338,6 +355,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_benchmark_fusion_readiness.pdf",
             "figures/renewal_cage_raw_curve_ingestion_contract.pdf",
             "figures/renewal_cage_raw_curve_diagnostic_readiness.pdf",
+            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
         ]
         for figure in readiness_figures:
             figure_index = main_tex.index(figure)
@@ -396,6 +414,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_raw_curve_diagnostic_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_raw_curve_diagnostic_readiness.pdf"
+            ).read_bytes()
+            first_raw_curve_persistence_exchange_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
             ).read_bytes()
             first_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
@@ -460,6 +481,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_raw_curve_diagnostic_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_raw_curve_diagnostic_readiness.pdf"
             ).read_bytes()
+            second_raw_curve_persistence_exchange_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
+            ).read_bytes()
             second_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
             ).read_bytes()
@@ -501,6 +525,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_benchmark_fusion_readiness, second_benchmark_fusion_readiness)
         self.assertEqual(first_raw_curve_ingestion_contract, second_raw_curve_ingestion_contract)
         self.assertEqual(first_raw_curve_diagnostic_readiness, second_raw_curve_diagnostic_readiness)
+        self.assertEqual(
+            first_raw_curve_persistence_exchange_protocol,
+            second_raw_curve_persistence_exchange_protocol,
+        )
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)

@@ -1476,6 +1476,89 @@ def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     c.save()
 
 
+def write_raw_curve_persistence_exchange_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Raw-curve persistence/exchange inversion")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Machine-readable alpha, late NGP, diffusion, and chi4 curves are reduced to held-out z-score diagnostics.",
+    )
+    left, bottom = 80, 105
+    plot_w, plot_h = 640, 300
+    z_threshold = float(rows[0]["z_threshold"])
+    z_values = np.array(
+        [
+            [
+                float(row["max_multik_tau_alpha_z"]),
+                float(row["late_ngp_z"]),
+                float(row["chi4_peak_z"]),
+            ]
+            for row in rows
+        ]
+    )
+    z_max = max(float(np.max(z_values)), z_threshold) * 1.15
+
+    c.setStrokeColor(colors.black)
+    c.line(left, bottom, left + plot_w, bottom)
+    c.line(left, bottom, left, bottom + plot_h)
+    threshold_y = bottom + z_threshold * plot_h / z_max
+    c.setStrokeColor(colors.grey)
+    c.setDash(4, 3)
+    c.line(left, threshold_y, left + plot_w, threshold_y)
+    c.setDash()
+    c.setFont("Helvetica", 8)
+    c.drawString(left + plot_w + 8, threshold_y - 3, f"z={z_threshold:g}")
+    labels = ["multi-k alpha", "late NGP", "chi4 peak"]
+    keys = [
+        "multik_tau_alpha_z_consistent",
+        "late_ngp_z_consistent",
+        "chi4_peak_z_consistent",
+    ]
+    palette = [colors.HexColor("#2b6cb0"), colors.HexColor("#2f855a"), colors.HexColor("#805ad5")]
+    group_x = np.linspace(left + 190, left + plot_w - 190, len(rows))
+    offsets = [-34, 0, 34]
+    c.setFont("Helvetica", 7)
+    for idx, row in enumerate(rows):
+        for jdx, label in enumerate(labels):
+            value = z_values[idx, jdx]
+            passed = float(row[keys[jdx]]) > 0.5
+            color = palette[jdx] if passed else colors.HexColor("#c05621")
+            bar_h = value * plot_h / z_max
+            x = group_x[idx] + offsets[jdx]
+            c.setFillColor(color)
+            c.rect(x - 10, bottom, 20, bar_h, stroke=0, fill=1)
+            c.drawString(x - 22, bottom - 36 - jdx * 9, label[:16])
+        c.setFillColor(colors.black)
+        c.drawCentredString(group_x[idx], bottom - 20, row["scenario"].replace("_", " "))
+        c.drawString(
+            group_x[idx] - 72,
+            bottom + plot_h - 24,
+            f"tau_p/tau_x={float(row['persistence_exchange_ratio']):.2f}",
+        )
+        c.drawString(
+            group_x[idx] - 72,
+            bottom + plot_h - 38,
+            f"SE growth={float(row['stokes_einstein_growth_over_poisson']):.2f}",
+        )
+        c.drawString(
+            group_x[idx] - 72,
+            bottom + plot_h - 52,
+            f"pass={int(float(row['raw_curve_protocol_passes']))}",
+        )
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    c.drawString(34, bottom + 145, "absolute z score")
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1893,6 +1976,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
     raw_curve_ingestion_contract_pdf = PAPER_FIGURE_DIR / "renewal_cage_raw_curve_ingestion_contract.pdf"
     raw_curve_diagnostic_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_raw_curve_diagnostic_readiness.pdf"
+    raw_curve_persistence_exchange_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
+    )
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1921,6 +2007,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
     write_raw_curve_ingestion_contract_pdf(raw_curve_ingestion_contract_pdf)
     write_raw_curve_diagnostic_readiness_pdf(raw_curve_diagnostic_readiness_pdf)
+    write_raw_curve_persistence_exchange_protocol_pdf(raw_curve_persistence_exchange_protocol_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1963,6 +2050,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(benchmark_fusion_readiness_pdf, "figures/renewal_cage_benchmark_fusion_readiness.pdf")
         archive.write(raw_curve_ingestion_contract_pdf, "figures/renewal_cage_raw_curve_ingestion_contract.pdf")
         archive.write(raw_curve_diagnostic_readiness_pdf, "figures/renewal_cage_raw_curve_diagnostic_readiness.pdf")
+        archive.write(
+            raw_curve_persistence_exchange_protocol_pdf,
+            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
+        )
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

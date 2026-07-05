@@ -1040,6 +1040,14 @@ The file
 these observable-level contracts to the diagnostic level, so that the multi-$k$
 alpha-shape, van-Hove recovery, and combined alpha/van-Hove/transport closure
 each carry separate structural-readiness and uncertainty-readiness flags.
+The companion
+\texttt{renewal\_cage\_raw\_curve\_persistence\_exchange\_protocol.csv}
+demonstrates the full synthetic-to-diagnostic path: machine-readable
+$F_s(k,t)$ curves are reduced to $\tau_\alpha(k)$ by threshold crossing, the
+late NGP and $\chi_4$ proxy are extracted directly from raw time series, and the
+same persistence/exchange clocks must then pass the multi-$k$, late-NGP,
+Stokes-Einstein, and $\chi_4$ tests. A deliberately corrupted late-NGP curve is
+rejected without refitting the clocks.
 
 \begin{figure}[h]
   \centering
@@ -1264,6 +1272,16 @@ each carry separate structural-readiness and uncertainty-readiness flags.
   the listed diagnostic protocols, but each protocol remains below the
   uncertainty-weighted real-inversion threshold until the corresponding
   uncertainty columns are supplied.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf}
+  \caption{Raw-curve persistence/exchange inversion protocol. Synthetic
+  machine-readable $F_s(k,t)$, late-NGP, diffusion, and $\chi_4$ curves are
+  reduced to observable clocks and scored with the uncertainty-weighted
+  persistence/exchange protocol. The consistent raw curves pass all held-out
+  checks, while a late-NGP mismatch fails without refitting.}
 \end{figure}
 
 \begin{figure}[h]

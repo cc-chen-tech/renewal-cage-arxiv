@@ -1400,6 +1400,145 @@ def raw_curve_diagnostic_readiness(
     return rows
 
 
+def _as_strictly_increasing_curve(
+    curve: tuple[np.ndarray, np.ndarray],
+    *,
+    name: str,
+    values_must_be_positive: bool = True,
+) -> tuple[np.ndarray, np.ndarray]:
+    time, value = curve
+    time = np.asarray(time, dtype=float)
+    value = np.asarray(value, dtype=float)
+    if time.ndim != 1 or value.ndim != 1 or time.size != value.size or time.size < 2:
+        raise ValueError(f"{name} must contain matching one-dimensional time and value arrays")
+    if np.any(~np.isfinite(time)) or np.any(~np.isfinite(value)):
+        raise ValueError(f"{name} must contain finite values")
+    if np.any(time <= 0.0) or np.any(np.diff(time) <= 0.0):
+        raise ValueError(f"{name} time grid must be positive and strictly increasing")
+    if values_must_be_positive and np.any(value <= 0.0):
+        raise ValueError(f"{name} values must be positive")
+    return time, value
+
+
+def _first_log_threshold_crossing_time(
+    time: np.ndarray,
+    value: np.ndarray,
+    *,
+    threshold: float,
+    name: str,
+) -> float:
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must be between zero and one")
+    if value[0] <= threshold:
+        raise ValueError(f"{name} starts below the alpha threshold")
+    crossing_indices = np.flatnonzero(value <= threshold)
+    if crossing_indices.size == 0:
+        raise ValueError(f"{name} does not cross the alpha threshold")
+    index = int(crossing_indices[0])
+    if index == 0:
+        return float(time[0])
+    t0 = float(time[index - 1])
+    t1 = float(time[index])
+    y0 = float(value[index - 1])
+    y1 = float(value[index])
+    if y0 <= 0.0 or y1 <= 0.0:
+        raise ValueError(f"{name} values must be positive near the crossing")
+    if math.isclose(y0, y1, rel_tol=1e-14, abs_tol=1e-14):
+        return t1
+    fraction = (math.log(threshold) - math.log(y0)) / (math.log(y1) - math.log(y0))
+    return t0 + min(1.0, max(0.0, fraction)) * (t1 - t0)
+
+
+def raw_curve_persistence_exchange_protocol(
+    *,
+    benchmark_id: str,
+    anchor_wave_number: float,
+    alpha_curves_by_k: dict[float, tuple[np.ndarray, np.ndarray]],
+    jump_variance: float,
+    diffusion_coefficient: float,
+    late_time: float,
+    ngp_curve: tuple[np.ndarray, np.ndarray],
+    chi4_curve: tuple[np.ndarray, np.ndarray],
+    tau_alpha_relative_error_by_k: dict[float, float],
+    late_ngp_relative_error: float,
+    chi4_peak_relative_error: float,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    z_threshold: float = 2.0,
+) -> dict[str, float | str]:
+    """Extract raw-curve observables and run the persistence/exchange protocol."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if anchor_wave_number <= 0.0:
+        raise ValueError("anchor_wave_number must be positive")
+    if not alpha_curves_by_k:
+        raise ValueError("alpha_curves_by_k must be nonempty")
+    if anchor_wave_number not in alpha_curves_by_k:
+        raise ValueError("alpha_curves_by_k must include the anchor wave number")
+
+    wave_numbers = sorted(alpha_curves_by_k)
+    observed_tau_alpha_by_k: dict[float, float] = {}
+    for wave_number in wave_numbers:
+        if wave_number <= 0.0:
+            raise ValueError("alpha wave numbers must be positive")
+        time, alpha = _as_strictly_increasing_curve(
+            alpha_curves_by_k[wave_number],
+            name=f"alpha curve k={wave_number}",
+        )
+        observed_tau_alpha_by_k[wave_number] = _first_log_threshold_crossing_time(
+            time,
+            alpha,
+            threshold=threshold,
+            name=f"alpha curve k={wave_number}",
+        )
+
+    ngp_time, ngp_value = _as_strictly_increasing_curve(ngp_curve, name="NGP curve")
+    if late_time < float(ngp_time[0]) or late_time > float(ngp_time[-1]):
+        raise ValueError("late_time must lie inside the NGP raw-curve time grid")
+    observed_late_ngp = float(np.interp(late_time, ngp_time, ngp_value))
+    if observed_late_ngp <= 0.0:
+        raise ValueError("interpolated late NGP must be positive")
+
+    chi4_time, chi4_value = _as_strictly_increasing_curve(
+        chi4_curve,
+        name="chi4 curve",
+        values_must_be_positive=False,
+    )
+    if np.any(chi4_value < 0.0):
+        raise ValueError("chi4 values must be nonnegative")
+    observed_chi4_peak = float(np.max(chi4_value))
+    if observed_chi4_peak <= 0.0:
+        raise ValueError("observed chi4 peak must be positive")
+
+    scored = persistence_exchange_data_protocol(
+        anchor_wave_number=anchor_wave_number,
+        wave_numbers=wave_numbers,
+        observed_tau_alpha_by_k=observed_tau_alpha_by_k,
+        tau_alpha_relative_error_by_k=tau_alpha_relative_error_by_k,
+        jump_variance=jump_variance,
+        diffusion_coefficient=diffusion_coefficient,
+        late_time=late_time,
+        observed_late_ngp=observed_late_ngp,
+        late_ngp_relative_error=late_ngp_relative_error,
+        observed_chi4_peak=observed_chi4_peak,
+        chi4_peak_relative_error=chi4_peak_relative_error,
+        time_grid=chi4_time,
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        threshold=threshold,
+        z_threshold=z_threshold,
+    )
+    out: dict[str, float | str] = {
+        "benchmark_id": benchmark_id,
+        "alpha_wave_numbers": ";".join(f"{wave_number:g}" for wave_number in wave_numbers),
+        "raw_curve_protocol_passes": scored["passes_uncertainty_protocol"],
+    }
+    out.update(scored)
+    return out
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

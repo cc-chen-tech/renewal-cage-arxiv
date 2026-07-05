@@ -88,6 +88,7 @@ from renewal_cage import (  # noqa: E402
     radial_van_hove_3d,
     raw_curve_ingestion_contract,
     raw_curve_diagnostic_readiness,
+    raw_curve_persistence_exchange_protocol,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     spatial_facilitation_chi4_scan,
@@ -2360,6 +2361,64 @@ def write_raw_curve_diagnostic_readiness_csv(
     return rows
 
 
+def write_raw_curve_persistence_exchange_protocol_csv(path: Path) -> list[dict[str, float | str]]:
+    """Run the persistence/exchange protocol from synthetic machine-readable curves."""
+
+    params = PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=0.2,
+        jump_variance=0.7,
+        persistence_mean=7.0,
+        exchange_mean=1.0,
+    )
+    wave_numbers = [0.7, 1.1, 1.6]
+    alpha_time = np.geomspace(0.02, 800.0, 1600)
+    alpha_curves = {
+        wave_number: (
+            alpha_time,
+            persistence_exchange_normalized_alpha_decay(wave_number, alpha_time, params),
+        )
+        for wave_number in wave_numbers
+    }
+    late_time = 80.0 * params.persistence_mean
+    ngp_time = np.geomspace(0.1, 1200.0, 1400)
+    ngp_values = persistence_exchange_ngp_1d(ngp_time, params)
+    chi4_time = np.geomspace(0.02, 400.0, 900)
+    chi4_curve = (
+        chi4_time,
+        persistence_exchange_scattering_susceptibility(1.1, chi4_time, params),
+    )
+    common_kwargs = dict(
+        anchor_wave_number=1.1,
+        alpha_curves_by_k=alpha_curves,
+        jump_variance=params.jump_variance,
+        diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+        late_time=late_time,
+        chi4_curve=chi4_curve,
+        tau_alpha_relative_error_by_k={wave_number: 0.03 for wave_number in wave_numbers},
+        late_ngp_relative_error=0.05,
+        chi4_peak_relative_error=0.05,
+        cage_variance=params.cage_variance,
+        cage_tau=params.cage_tau,
+        z_threshold=3.0,
+    )
+    rows = []
+    for scenario, multiplier in [
+        ("consistent_raw_curves", 1.0),
+        ("late_ngp_mismatch", 1.8),
+    ]:
+        row = raw_curve_persistence_exchange_protocol(
+            benchmark_id=f"synthetic_{scenario}",
+            ngp_curve=(ngp_time, multiplier * ngp_values),
+            **common_kwargs,
+        )
+        row["scenario"] = scenario
+        row["late_ngp_multiplier"] = multiplier
+        rows.append(row)
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -3723,6 +3782,69 @@ def write_raw_curve_diagnostic_readiness_svg(path: Path, rows: list[dict[str, fl
     path.write_text(svg)
 
 
+def write_raw_curve_persistence_exchange_protocol_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left, top, right, bottom = 90, 98, 1035, 415
+    z_threshold = float(rows[0]["z_threshold"])
+    labels = ["multi-k alpha", "late NGP", "chi4 peak"]
+    keys = ["max_multik_tau_alpha_z", "late_ngp_z", "chi4_peak_z"]
+    colors = ["#2b6cb0", "#2f855a", "#805ad5"]
+    z_values = np.array([[float(row[key]) for key in keys] for row in rows])
+    z_max = max(float(np.max(z_values)), z_threshold) * 1.15
+
+    def y(value: float) -> float:
+        return bottom + value * (top - bottom) / z_max
+
+    group_x = np.linspace(left + 190, right - 190, len(rows))
+    offsets = [-42, 0, 42]
+    marks = []
+    for idx, row in enumerate(rows):
+        scenario = str(row["scenario"]).replace("_", " ")
+        for jdx, label in enumerate(labels):
+            value = z_values[idx, jdx]
+            consistent_key = [
+                "multik_tau_alpha_z_consistent",
+                "late_ngp_z_consistent",
+                "chi4_peak_z_consistent",
+            ][jdx]
+            passed = float(row[consistent_key]) > 0.5
+            color = colors[jdx] if passed else "#c05621"
+            x = group_x[idx] + offsets[jdx]
+            marks.append(
+                f'<rect x="{x - 13:.1f}" y="{y(value):.1f}" width="26" height="{bottom - y(value):.1f}" fill="{color}" />'
+            )
+            marks.append(
+                f'<text x="{x - 30:.1f}" y="{bottom + 52 + jdx * 16}" font-family="Arial, sans-serif" font-size="10" fill="{color}">{label}</text>'
+            )
+        marks.append(
+            f'<text x="{group_x[idx] - 72:.1f}" y="{bottom + 35}" font-family="Arial, sans-serif" font-size="12">{scenario}</text>'
+        )
+        marks.append(
+            f'<text x="{group_x[idx] - 88:.1f}" y="{top + 32}" font-family="Arial, sans-serif" font-size="12">tau_p/tau_x={float(row["persistence_exchange_ratio"]):.2f}</text>'
+        )
+        marks.append(
+            f'<text x="{group_x[idx] - 88:.1f}" y="{top + 50}" font-family="Arial, sans-serif" font-size="12">SE growth={float(row["stokes_einstein_growth_over_poisson"]):.2f}</text>'
+        )
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Raw-curve persistence/exchange inversion</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Machine-readable F_s(k,t), late NGP, D, and chi4 curves are reduced to observables, then scored as held-out z tests.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="38" y="285" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 38 285)">absolute z score</text>
+  <line x1="{left}" y1="{y(z_threshold):.1f}" x2="{right}" y2="{y(z_threshold):.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{right - 78}" y="{y(z_threshold) - 8:.1f}" font-family="Arial, sans-serif" font-size="12" fill="#718096">z={z_threshold:g}</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -4442,6 +4564,13 @@ def main() -> None:
     write_persistence_exchange_uncertainty_protocol_svg(
         FIGURE_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.svg",
         persistence_exchange_uncertainty_protocol_rows,
+    )
+    raw_curve_persistence_exchange_rows = write_raw_curve_persistence_exchange_protocol_csv(
+        DATA_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.csv"
+    )
+    write_raw_curve_persistence_exchange_protocol_svg(
+        FIGURE_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.svg",
+        raw_curve_persistence_exchange_rows,
     )
 
     barrier = ActivatedBarrierParams(
