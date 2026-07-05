@@ -2188,6 +2188,63 @@ def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_remote_result_curve_payload_adapter_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA remote result-curve payload adapter")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cached GlassBench numeric payloads are paired into time/rhomax structural rows before any model inversion is claimed.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.2)
+    c.drawString(left, top, "system")
+    c.drawString(left + 55, top, "T")
+    c.drawString(left + 95, top, "role")
+    c.drawString(left + 160, top, "stage")
+    c.drawString(left + 405, top, "pts")
+    c.drawString(left + 450, top, "align")
+    c.drawString(left + 495, top, "struct")
+    c.drawString(left + 540, top, "real")
+    c.drawString(left + 585, top, "blocker")
+    palette = {
+        "range_curve_payload_adapter_ready": colors.HexColor("#2f855a"),
+        "range_curve_time_grid_missing": colors.HexColor("#c05621"),
+        "range_curve_value_missing": colors.HexColor("#c05621"),
+        "range_curve_payload_checksum_mismatch": colors.HexColor("#c05621"),
+        "range_curve_payload_shape_mismatch": colors.HexColor("#c05621"),
+        "range_curve_payload_parse_blocked": colors.HexColor("#c05621"),
+        "range_curve_time_alignment_mismatch": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 39
+        stage = row["adapter_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["system_id"])
+        c.drawString(left + 55, y, row["temperature"])
+        c.drawString(left + 95, y, row["curve_role"])
+        c.setFillColor(palette[stage])
+        c.rect(left + 160, y - 4, 210, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 166, y, stage.replace("_", " ")[:32])
+        c.setFillColor(colors.black)
+        c.drawString(left + 408, y, str(int(float(row["value_point_count"]))))
+        c.drawString(left + 458, y, str(int(float(row["time_grid_matches_value_time"]))))
+        c.drawString(left + 505, y, str(int(float(row["structural_adapter_ready"]))))
+        c.drawString(left + 548, y, str(int(float(row["real_inversion_ready"]))))
+        c.drawString(left + 585, y, row["primary_blocker"].replace("_", " ")[:26])
+        c.drawString(left + 160, y - 12, row["value_curve_path"][:96])
+    c.showPage()
+    c.save()
+
+
 def write_sota_readme_schema_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_readme_schema.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3075,6 +3132,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
+    sota_remote_result_curve_payload_adapter_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
+    )
     sota_readme_schema_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_readme_schema.pdf"
     trajectory_adapter_contract_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_adapter_contract.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
@@ -3126,6 +3186,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_remote_zip_central_directory_pdf(sota_remote_zip_central_directory_pdf)
     write_sota_glassbench_payload_index_pdf(sota_glassbench_payload_index_pdf)
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
+    write_sota_remote_result_curve_payload_adapter_pdf(sota_remote_result_curve_payload_adapter_pdf)
     write_sota_readme_schema_pdf(sota_readme_schema_pdf)
     write_trajectory_adapter_contract_pdf(trajectory_adapter_contract_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
@@ -3203,6 +3264,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_remote_result_curve_cache_pdf,
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
+        )
+        archive.write(
+            sota_remote_result_curve_payload_adapter_pdf,
+            "figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf",
         )
         archive.write(sota_readme_schema_pdf, "figures/renewal_cage_sota_readme_schema.pdf")
         archive.write(trajectory_adapter_contract_pdf, "figures/renewal_cage_trajectory_adapter_contract.pdf")

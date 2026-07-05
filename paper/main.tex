@@ -1526,6 +1526,27 @@ uncertainties are supplied.
   future raw-curve adapter, not completed model inversions.}
 \end{figure}
 
+The companion payload cache,
+\texttt{range\_result\_curve\_values\_10118191.json}, stores the numeric rows
+reconstructed from those verified ranges. The payload-adapter gate then pairs
+time-grid files with same-temperature \texttt{rhomax} curves. In the current
+cache, KA2D at \texttt{T=0.30} has structurally ready \texttt{rhomax\_md} and
+\texttt{rhomax\_bb} rows with columns \texttt{temperature}, \texttt{time}, and
+\texttt{rhomax}. KA at \texttt{T=0.44} remains blocked because the cached
+\texttt{rhomax\_md} payload has missing value entries at the last two time
+points. All rows still have \texttt{real\_inversion\_ready=0}: uncertainty
+columns and a model-observable semantics map are required before any
+persistence/exchange inversion is claimed.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf}
+  \caption{SOTA remote result-curve payload adapter. Cached numeric GlassBench
+  payloads are paired into time/\texttt{rhomax} structural rows. KA2D
+  \texttt{T=0.30} is structurally adapter-ready, while uncertainty columns and
+  diagnostic semantics still block real model inversion.}
+\end{figure}
+
 \clearpage
 
 \begin{figure}[p]

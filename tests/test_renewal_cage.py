@@ -121,6 +121,7 @@ from renewal_cage import (  # noqa: E402
     sota_readme_digest_gate,
     sota_glassbench_payload_index_gate,
     sota_remote_result_curve_cache_gate,
+    sota_remote_result_curve_payload_adapter_gate,
     sota_remote_zip_central_directory_gate,
     sota_zenodo_record_fingerprint_gate,
     sota_readme_schema_gate,
@@ -2446,6 +2447,79 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(ka2d["curve_cache_ready"], 1.0)
         self.assertEqual(ka2d["temperature_grid"], "0.30")
         self.assertEqual(ka2d["primary_blocker"], "raw_curve_adapter")
+
+    def test_sota_remote_result_curve_payload_adapter_pairs_time_and_rhomax(self):
+        manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA_results/times_0.44.dat",
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "time_grid",
+                    "crc32": "aaaa1111",
+                    "md5": "time-md5",
+                    "numeric_row_count": 3,
+                    "numeric_column_count": 1,
+                },
+                {
+                    "path": "GlassBench/KA_results/rhomax_T0.44_MD.dat",
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "rhomax_md",
+                    "crc32": "bbbb2222",
+                    "md5": "rho-md5",
+                    "numeric_row_count": 3,
+                    "numeric_column_count": 2,
+                },
+            ]
+        }
+        payload_cache = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA_results/times_0.44.dat",
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "time_grid",
+                    "crc32": "aaaa1111",
+                    "md5": "time-md5",
+                    "numeric_row_count": 3,
+                    "numeric_column_count": 1,
+                    "rows": [[0.13], [1.3], [13.0]],
+                },
+                {
+                    "path": "GlassBench/KA_results/rhomax_T0.44_MD.dat",
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "rhomax_md",
+                    "crc32": "bbbb2222",
+                    "md5": "rho-md5",
+                    "numeric_row_count": 3,
+                    "numeric_column_count": 2,
+                    "rows": [[0.13, 0.94], [1.3, 0.91], [13.0, 0.82]],
+                },
+            ]
+        }
+
+        rows = sota_remote_result_curve_payload_adapter_gate(
+            payload_adapter_id="glassbench_range_curve_payload_adapter",
+            accession_id="glassbench_zenodo_10118191",
+            manifest=manifest,
+            payload_cache=payload_cache,
+            paired_value_roles_by_system={"KA": ["rhomax_md"]},
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["adapter_stage"], "range_curve_payload_adapter_ready")
+        self.assertEqual(row["system_id"], "KA")
+        self.assertEqual(row["temperature"], "0.44")
+        self.assertEqual(row["curve_role"], "rhomax_md")
+        self.assertEqual(row["available_columns"], "temperature;time;rhomax")
+        self.assertEqual(row["time_grid_matches_value_time"], 1.0)
+        self.assertEqual(row["structural_adapter_ready"], 1.0)
+        self.assertEqual(row["uncertainty_adapter_ready"], 0.0)
+        self.assertEqual(row["real_inversion_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "sigma_rhomax")
 
     def test_sota_reanalysis_state_gate_marks_metadata_verified_not_reanalysis(self):
         row = sota_reanalysis_state_gate(

@@ -546,6 +546,41 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("0.30", ka2d["temperature_grid"])
         self.assertEqual(ka2d["primary_blocker"], "raw_curve_adapter")
 
+    def test_sota_remote_result_curve_payload_adapter_pairs_cached_values(self):
+        payload_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_values_10118191.json"
+        path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_payload_adapter.csv"
+        self.assertTrue(payload_path.exists())
+        self.assertTrue(path.exists())
+
+        payload = json.loads(payload_path.read_text())
+        self.assertEqual(payload["source"], "remote_zip_range_numeric_payload_cache")
+        self.assertGreaterEqual(len(payload["entries"]), 10)
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {
+            (row["system_id"], row["temperature"], row["curve_role"]): row
+            for row in rows
+        }
+        ka2d_md = by_key[("KA2D", "0.30", "rhomax_md")]
+        self.assertEqual(ka2d_md["adapter_stage"], "range_curve_payload_adapter_ready")
+        self.assertEqual(float(ka2d_md["structural_adapter_ready"]), 1.0)
+        self.assertEqual(float(ka2d_md["time_grid_matches_value_time"]), 1.0)
+        self.assertEqual(ka2d_md["available_columns"], "temperature;time;rhomax")
+        self.assertEqual(float(ka2d_md["uncertainty_adapter_ready"]), 0.0)
+        self.assertEqual(float(ka2d_md["real_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_md["primary_blocker"], "sigma_rhomax")
+
+        ka2d_bb = by_key[("KA2D", "0.30", "rhomax_bb")]
+        self.assertEqual(ka2d_bb["adapter_stage"], "range_curve_payload_adapter_ready")
+        self.assertEqual(float(ka2d_bb["value_point_count"]), 6.0)
+
+        ka = by_key[("KA", "0.44", "rhomax_md")]
+        self.assertEqual(ka["adapter_stage"], "range_curve_payload_parse_blocked")
+        self.assertEqual(float(ka["structural_adapter_ready"]), 0.0)
+        self.assertEqual(ka["primary_blocker"], "numeric_rows")
+
     def test_sota_reanalysis_state_summarizes_current_glassbench_blocker(self):
         path = ROOT / "data" / "renewal_cage_sota_reanalysis_state.csv"
         self.assertTrue(path.exists())
@@ -977,6 +1012,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_remote_zip_central_directory.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", names)
             self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
@@ -1022,6 +1058,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_remote_zip_central_directory.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", main_tex)
         self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
@@ -1050,6 +1087,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_remote_zip_central_directory.pdf",
             "figures/renewal_cage_sota_glassbench_payload_index.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
+            "figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
@@ -1186,6 +1224,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
+            first_sota_remote_result_curve_payload_adapter = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
+            ).read_bytes()
             first_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1309,6 +1350,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
+            second_sota_remote_result_curve_payload_adapter = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
+            ).read_bytes()
             second_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1394,6 +1438,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_remote_zip_central_directory, second_sota_remote_zip_central_directory)
         self.assertEqual(first_sota_glassbench_payload_index, second_sota_glassbench_payload_index)
         self.assertEqual(first_sota_remote_result_curve_cache, second_sota_remote_result_curve_cache)
+        self.assertEqual(
+            first_sota_remote_result_curve_payload_adapter,
+            second_sota_remote_result_curve_payload_adapter,
+        )
         self.assertEqual(first_sota_readme_schema, second_sota_readme_schema)
         self.assertEqual(first_trajectory_adapter_contract, second_trajectory_adapter_contract)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)

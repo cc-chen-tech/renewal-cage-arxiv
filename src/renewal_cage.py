@@ -2797,6 +2797,172 @@ def sota_remote_result_curve_cache_gate(
     return rows
 
 
+def _numeric_payload_rows(entry: dict) -> list[list[float]]:
+    rows_value = entry.get("rows", [])
+    if not isinstance(rows_value, list):
+        return []
+    rows: list[list[float]] = []
+    for row_value in rows_value:
+        if not isinstance(row_value, list):
+            return []
+        try:
+            rows.append([float(value) for value in row_value])
+        except (TypeError, ValueError):
+            return []
+    return rows
+
+
+def sota_remote_result_curve_payload_adapter_gate(
+    *,
+    payload_adapter_id: str,
+    accession_id: str,
+    manifest: dict,
+    payload_cache: dict,
+    paired_value_roles_by_system: dict[str, Sequence[str]],
+) -> list[dict[str, float | str]]:
+    """Pair cached numeric result-curve payloads into structural raw-curve rows."""
+
+    if not payload_adapter_id:
+        raise ValueError("payload_adapter_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not paired_value_roles_by_system:
+        raise ValueError("paired_value_roles_by_system must be nonempty")
+
+    manifest_entries_value = manifest.get("entries", [])
+    payload_entries_value = payload_cache.get("entries", [])
+    manifest_entries = (
+        [entry for entry in manifest_entries_value if isinstance(entry, dict)]
+        if isinstance(manifest_entries_value, list)
+        else []
+    )
+    payload_entries = (
+        [entry for entry in payload_entries_value if isinstance(entry, dict)]
+        if isinstance(payload_entries_value, list)
+        else []
+    )
+    manifest_by_path = {str(entry.get("path", "")): entry for entry in manifest_entries if entry.get("path")}
+    payload_by_path = {str(entry.get("path", "")): entry for entry in payload_entries if entry.get("path")}
+
+    rows: list[dict[str, float | str]] = []
+    for system in sorted(paired_value_roles_by_system):
+        roles = list(dict.fromkeys(paired_value_roles_by_system[system]))
+        if not roles or any(not role for role in roles):
+            raise ValueError("paired value roles must be nonempty strings")
+        system_payloads = [
+            entry for entry in payload_entries if str(entry.get("system_id", "")) == system
+        ]
+        temperatures = sorted(
+            {
+                str(entry.get("temperature", ""))
+                for entry in system_payloads
+                if entry.get("temperature") and str(entry.get("temperature")) != "none"
+            },
+            key=float,
+        )
+        for temperature in temperatures:
+            time_candidates = [
+                entry
+                for entry in system_payloads
+                if str(entry.get("temperature", "")) == temperature
+                and str(entry.get("curve_role", "")) == "time_grid"
+            ]
+            time_entry = time_candidates[0] if time_candidates else None
+            time_rows = _numeric_payload_rows(time_entry) if time_entry is not None else []
+            time_grid = [row[0] for row in time_rows if len(row) == 1]
+            time_path = str(time_entry.get("path", "")) if time_entry is not None else "none"
+            for role in roles:
+                value_candidates = [
+                    entry
+                    for entry in system_payloads
+                    if str(entry.get("temperature", "")) == temperature
+                    and str(entry.get("curve_role", "")) == role
+                ]
+                value_entry = value_candidates[0] if value_candidates else None
+                value_rows = _numeric_payload_rows(value_entry) if value_entry is not None else []
+                value_path = str(value_entry.get("path", "")) if value_entry is not None else "none"
+                value_times = [row[0] for row in value_rows if len(row) >= 2]
+
+                paths_to_check = [path for path in [time_path, value_path] if path != "none"]
+                checksum_ok = bool(paths_to_check)
+                shape_ok = bool(paths_to_check)
+                for path in paths_to_check:
+                    manifest_entry = manifest_by_path.get(path)
+                    payload_entry = payload_by_path.get(path)
+                    if manifest_entry is None or payload_entry is None:
+                        checksum_ok = False
+                        shape_ok = False
+                        continue
+                    checksum_ok = checksum_ok and str(manifest_entry.get("crc32", "")) == str(payload_entry.get("crc32", ""))
+                    checksum_ok = checksum_ok and str(manifest_entry.get("md5", "")) == str(payload_entry.get("md5", ""))
+                    shape_ok = shape_ok and int(manifest_entry.get("numeric_row_count", -1) or -1) == int(
+                        payload_entry.get("numeric_row_count", -2) or -2
+                    )
+                    shape_ok = shape_ok and int(manifest_entry.get("numeric_column_count", -1) or -1) == int(
+                        payload_entry.get("numeric_column_count", -2) or -2
+                    )
+
+                time_ready = bool(time_grid) and len(time_grid) == len(time_rows)
+                value_ready = bool(value_rows) and len(value_times) == len(value_rows)
+                time_matches = (
+                    time_ready
+                    and value_ready
+                    and len(time_grid) == len(value_times)
+                    and all(math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-12) for a, b in zip(time_grid, value_times))
+                )
+                structural_ready = checksum_ok and shape_ok and time_ready and value_ready and time_matches
+                if structural_ready:
+                    stage = "range_curve_payload_adapter_ready"
+                    blocker = "sigma_rhomax"
+                elif time_entry is None:
+                    stage = "range_curve_time_grid_missing"
+                    blocker = "time_grid"
+                elif value_entry is None:
+                    stage = "range_curve_value_missing"
+                    blocker = role
+                elif not checksum_ok:
+                    stage = "range_curve_payload_checksum_mismatch"
+                    blocker = "checksum"
+                elif not shape_ok:
+                    stage = "range_curve_payload_shape_mismatch"
+                    blocker = "numeric_shape"
+                elif not time_ready or not value_ready:
+                    stage = "range_curve_payload_parse_blocked"
+                    blocker = "numeric_rows"
+                else:
+                    stage = "range_curve_time_alignment_mismatch"
+                    blocker = "time_alignment"
+
+                rows.append(
+                    {
+                        "payload_adapter_id": f"{payload_adapter_id}_{system.lower()}_{temperature}_{role}",
+                        "accession_id": accession_id,
+                        "system_id": system,
+                        "temperature": temperature,
+                        "curve_role": role,
+                        "time_grid_path": time_path,
+                        "value_curve_path": value_path,
+                        "time_point_count": float(len(time_grid)),
+                        "value_point_count": float(len(value_rows)),
+                        "checksum_matches_manifest": float(checksum_ok),
+                        "numeric_shape_matches_manifest": float(shape_ok),
+                        "time_grid_matches_value_time": float(time_matches),
+                        "available_columns": "temperature;time;rhomax" if structural_ready else "none",
+                        "missing_columns": "none" if structural_ready else blocker,
+                        "uncertainty_columns": "sigma_rhomax",
+                        "missing_uncertainty_columns": "sigma_rhomax",
+                        "structural_adapter_ready": float(structural_ready),
+                        "uncertainty_adapter_ready": 0.0,
+                        "real_inversion_ready": 0.0,
+                        "primary_blocker": blocker,
+                        "adapter_stage": stage,
+                    }
+                )
+    if not rows:
+        raise ValueError("no payload adapter rows were produced")
+    return rows
+
+
 def sota_reanalysis_state_gate(
     *,
     state_id: str,

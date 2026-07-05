@@ -108,6 +108,7 @@ from renewal_cage import (  # noqa: E402
     sota_readme_digest_gate,
     sota_remote_zip_central_directory_gate,
     sota_remote_result_curve_cache_gate,
+    sota_remote_result_curve_payload_adapter_gate,
     sota_reanalysis_state_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
@@ -3321,6 +3322,27 @@ def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float
     return rows
 
 
+def write_sota_remote_result_curve_payload_adapter_csv(path: Path) -> list[dict[str, float | str]]:
+    """Pair cached GlassBench numeric result curves into structural adapter rows."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
+    payload_path = DATA_DIR / "third_party" / "glassbench" / "range_result_curve_values_10118191.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload_cache = json.loads(payload_path.read_text(encoding="utf-8"))
+    rows = sota_remote_result_curve_payload_adapter_gate(
+        payload_adapter_id="glassbench_range_curve_payload_adapter",
+        accession_id="glassbench_zenodo_10118191",
+        manifest=manifest,
+        payload_cache=payload_cache,
+        paired_value_roles_by_system={
+            "KA": ["rhomax_md"],
+            "KA2D": ["rhomax_md", "rhomax_bb"],
+        },
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_reanalysis_state_csv(
     path: Path,
     *,
@@ -5717,6 +5739,56 @@ def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, fl
     path.write_text(svg)
 
 
+def write_sota_remote_result_curve_payload_adapter_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 510
+    left, top = 75, 112
+    row_h = 46
+    colors = {
+        "range_curve_payload_adapter_ready": "#2f855a",
+        "range_curve_time_grid_missing": "#c05621",
+        "range_curve_value_missing": "#c05621",
+        "range_curve_payload_checksum_mismatch": "#c05621",
+        "range_curve_payload_shape_mismatch": "#c05621",
+        "range_curve_payload_parse_blocked": "#c05621",
+        "range_curve_time_alignment_mismatch": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["adapter_stage"])
+        color = colors[stage]
+        label = f'{row["system_id"]} T={row["temperature"]} {row["curve_role"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{label}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 155}" y="{y - 4}" width="235" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 164}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:34]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 410}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">points={int(float(row["value_point_count"]))}; align={int(float(row["time_grid_matches_value_time"]))}; struct={int(float(row["structural_adapter_ready"]))}; real={int(float(row["real_inversion_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 155}" y="{y + 30}" font-family="Arial, sans-serif" font-size="8.5" fill="#555">{row["value_curve_path"]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA remote result-curve payload adapter</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached GlassBench numeric payloads are paired into time/rhomax structural rows; uncertainty columns and model-observable semantics still gate real inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">curve</text>
+  <text x="{left + 155}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">adapter stage</text>
+  <text x="{left + 410}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">structural readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="470" width="14" height="14" fill="#2f855a" /><text x="96" y="482" font-family="Arial, sans-serif" font-size="12">time/rhomax payload pair structurally ready</text>
+  <rect x="385" y="470" width="14" height="14" fill="#c05621" /><text x="406" y="482" font-family="Arial, sans-serif" font-size="12">missing values, missing curve, or checksum/shape mismatch</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_readme_schema_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 380
@@ -7144,6 +7216,13 @@ def main() -> None:
     write_sota_remote_result_curve_cache_svg(
         FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.svg",
         remote_result_curve_cache_rows,
+    )
+    remote_result_curve_payload_adapter_rows = write_sota_remote_result_curve_payload_adapter_csv(
+        DATA_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.csv"
+    )
+    write_sota_remote_result_curve_payload_adapter_svg(
+        FIGURE_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.svg",
+        remote_result_curve_payload_adapter_rows,
     )
     readme_digest_rows = write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"
