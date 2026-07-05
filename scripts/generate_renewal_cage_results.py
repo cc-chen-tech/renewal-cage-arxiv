@@ -89,6 +89,7 @@ from renewal_cage import (  # noqa: E402
     raw_curve_ingestion_contract,
     raw_curve_diagnostic_readiness,
     raw_curve_persistence_exchange_protocol,
+    real_benchmark_assimilation_gate,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     spatial_facilitation_chi4_scan,
@@ -2236,6 +2237,123 @@ def write_sota_claim_alignment_csv(path: Path) -> list[dict[str, float | str]]:
     return rows
 
 
+def write_real_benchmark_assimilation_gate_csv(path: Path) -> list[dict[str, float | str]]:
+    """Gate real benchmark sources before any quantitative inversion claim."""
+
+    rows = [
+        real_benchmark_assimilation_gate(
+            benchmark_id="kob_andersen_published_figures",
+            source_key="kob1995vanhove;kob1995intermediate",
+            target_protocol="alpha_vanhove_transport",
+            available_observables=[
+                "time_grid",
+                "temperature_grid",
+                "wave_numbers",
+                "self_intermediate_scattering",
+                "van_hove_tail",
+                "ngp",
+                "diffusion",
+            ],
+            has_shared_system=True,
+            has_machine_readable_curves=False,
+            has_uncertainty_estimates=False,
+            model_scope="dynamical_signature",
+        ),
+        real_benchmark_assimilation_gate(
+            benchmark_id="kob_andersen_structural_digitization_candidate",
+            source_key="kob1995vanhove;kob1995intermediate",
+            target_protocol="alpha_vanhove_transport",
+            available_observables=[
+                "time_grid",
+                "temperature_grid",
+                "wave_numbers",
+                "self_intermediate_scattering",
+                "van_hove_tail",
+                "ngp",
+                "diffusion",
+            ],
+            has_shared_system=True,
+            has_machine_readable_curves=True,
+            has_uncertainty_estimates=False,
+            model_scope="dynamical_signature",
+        ),
+        real_benchmark_assimilation_gate(
+            benchmark_id="hedges_persistence_exchange_published_curves",
+            source_key="hedges2007persistence",
+            target_protocol="persistence_exchange_chi4",
+            available_observables=[
+                "temperature_grid",
+                "diffusion",
+                "tau_alpha",
+                "persistence_time",
+                "exchange_time",
+            ],
+            has_shared_system=True,
+            has_machine_readable_curves=False,
+            has_uncertainty_estimates=False,
+            model_scope="transport_decoupling",
+        ),
+        real_benchmark_assimilation_gate(
+            benchmark_id="lacevic_four_point_shared_transport_gap",
+            source_key="lacevic2003fourpoint",
+            target_protocol="spatial_chi4_front",
+            available_observables=[
+                "temperature_grid",
+                "tau_alpha",
+                "chi4_peak",
+                "dynamic_length",
+            ],
+            has_shared_system=True,
+            has_machine_readable_curves=False,
+            has_uncertainty_estimates=False,
+            model_scope="spatial_heterogeneity",
+        ),
+        real_benchmark_assimilation_gate(
+            benchmark_id="berthier_ml_experimental_dynamic_heterogeneity",
+            source_key="berthier2024experimental",
+            target_protocol="spatial_chi4_front",
+            available_observables=[
+                "temperature_grid",
+                "tau_alpha",
+                "chi4_peak",
+                "dynamic_length",
+            ],
+            has_shared_system=False,
+            has_machine_readable_curves=False,
+            has_uncertainty_estimates=False,
+            model_scope="spatial_heterogeneity",
+        ),
+        real_benchmark_assimilation_gate(
+            benchmark_id="guan_granick_fickian_non_gaussian_published_curves",
+            source_key="guan2014fickian",
+            target_protocol="alpha_vanhove_transport",
+            available_observables=[
+                "time_grid",
+                "temperature_grid",
+                "van_hove_tail",
+                "ngp",
+                "diffusion",
+            ],
+            has_shared_system=True,
+            has_machine_readable_curves=False,
+            has_uncertainty_estimates=False,
+            model_scope="dynamical_signature",
+        ),
+        real_benchmark_assimilation_gate(
+            benchmark_id="kauzmann_adam_gibbs_entropy_boundary",
+            source_key="kauzmann1948nature;adam1965temperature",
+            target_protocol="thermodynamic_entropy_closure",
+            available_observables=["temperature_grid", "configurational_entropy", "tau_alpha"],
+            has_shared_system=True,
+            has_machine_readable_curves=True,
+            has_uncertainty_estimates=True,
+            model_scope="thermodynamic_transition",
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -3377,6 +3495,70 @@ def write_sota_claim_alignment_svg(path: Path, rows: list[dict[str, float | str]
     path.write_text(svg)
 
 
+def write_real_benchmark_assimilation_gate_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 590
+    left, top = 70, 104
+    row_h = 56
+    colors = {
+        "uncertainty_weighted_inversion": "#2f855a",
+        "structural_digitization_ready": "#2b6cb0",
+        "qualitative_alignment_only": "#d69e2e",
+        "scope_boundary_only": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["assimilation_stage"])
+        color = colors[stage]
+        coverage = float(row["required_observable_coverage"])
+        structural = int(float(row["structural_inversion_ready"]))
+        weighted = int(float(row["uncertainty_weighted_ready"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["benchmark_id"]).replace("_", " ")[:40]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 275}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["target_protocol"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 455}" y="{y}" width="{210 * coverage:.1f}" height="11" fill="#2f855a" opacity="0.82" />'
+        )
+        marks.append(
+            f'<rect x="{left + 455}" y="{y}" width="210" height="11" fill="none" stroke="#333" stroke-width="0.6" />'
+        )
+        marks.append(
+            f'<rect x="{left + 690}" y="{y - 3}" width="168" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 698}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:28]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 880}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">struct={structural}; weighted={weighted}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 275}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">source: {str(row["source_key"])[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 690}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">blocker: {str(row["primary_blocker"]).replace("_", " ")[:44]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Real benchmark assimilation gate</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Published benchmark claims must pass observable coverage, shared-system, machine-readable, and uncertainty gates before quantitative inversion.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">benchmark</text>
+  <text x="{left + 275}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">protocol</text>
+  <text x="{left + 455}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">required-observable coverage</text>
+  <text x="{left + 690}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">assimilation stage</text>
+  {"".join(marks)}
+  <rect x="70" y="535" width="14" height="14" fill="#2f855a" /><text x="92" y="547" font-family="Arial, sans-serif" font-size="12">uncertainty-weighted real inversion</text>
+  <rect x="310" y="535" width="14" height="14" fill="#2b6cb0" /><text x="332" y="547" font-family="Arial, sans-serif" font-size="12">structural digitization only</text>
+  <rect x="520" y="535" width="14" height="14" fill="#d69e2e" /><text x="542" y="547" font-family="Arial, sans-serif" font-size="12">qualitative alignment only</text>
+  <rect x="720" y="535" width="14" height="14" fill="#805ad5" /><text x="742" y="547" font-family="Arial, sans-serif" font-size="12">scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -4360,6 +4542,13 @@ def main() -> None:
     write_sota_claim_alignment_svg(
         FIGURE_DIR / "renewal_cage_sota_claim_alignment.svg",
         sota_claim_alignment_rows,
+    )
+    real_assimilation_rows = write_real_benchmark_assimilation_gate_csv(
+        DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv"
+    )
+    write_real_benchmark_assimilation_gate_svg(
+        FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.svg",
+        real_assimilation_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"

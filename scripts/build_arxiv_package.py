@@ -1484,6 +1484,56 @@ def write_sota_claim_alignment_pdf(path: Path) -> None:
     c.save()
 
 
+def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Real benchmark assimilation gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Published benchmarks must pass coverage, shared-system, machine-readable, and uncertainty gates before quantitative inversion.",
+    )
+    left, top = 44, page_h - 88
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "benchmark")
+    c.drawString(left + 182, top, "protocol")
+    c.drawString(left + 320, top, "coverage")
+    c.drawString(left + 390, top, "stage")
+    c.drawString(left + 545, top, "struct")
+    c.drawString(left + 588, top, "unc")
+    c.drawString(left + 625, top, "blocker")
+    palette = {
+        "uncertainty_weighted_inversion": colors.HexColor("#2f855a"),
+        "structural_digitization_ready": colors.HexColor("#2b6cb0"),
+        "qualitative_alignment_only": colors.HexColor("#d69e2e"),
+        "scope_boundary_only": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 39
+        stage = row["assimilation_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["benchmark_id"].replace("_", " ")[:32])
+        c.drawString(left + 182, y, row["target_protocol"].replace("_", " ")[:24])
+        c.drawString(left + 320, y, f"{float(row['required_observable_coverage']):.2f}")
+        c.setFillColor(palette[stage])
+        c.rect(left + 390, y - 4, 135, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 395, y, stage.replace("_", " ")[:24])
+        c.setFillColor(colors.black)
+        c.drawString(left + 548, y, str(int(float(row["structural_inversion_ready"]))))
+        c.drawString(left + 592, y, str(int(float(row["uncertainty_weighted_ready"]))))
+        c.drawString(left + 625, y, row["primary_blocker"].replace("_", " ")[:27])
+        c.drawString(left + 182, y - 10, f"source: {row['source_key'][:54]}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2022,6 +2072,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
     sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
     sota_claim_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_claim_alignment.pdf"
+    real_benchmark_assimilation_gate_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
+    )
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2054,6 +2107,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
     write_sota_claim_alignment_pdf(sota_claim_alignment_pdf)
+    write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2095,6 +2149,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
         archive.write(sota_benchmark_consistency_pdf, "figures/renewal_cage_sota_benchmark_consistency.pdf")
         archive.write(sota_claim_alignment_pdf, "figures/renewal_cage_sota_claim_alignment.pdf")
+        archive.write(
+            real_benchmark_assimilation_gate_pdf,
+            "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
+        )
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(
             observable_falsification_matrix_pdf,

@@ -1101,6 +1101,122 @@ def literature_inversion_readiness(
     }
 
 
+def real_benchmark_assimilation_gate(
+    *,
+    benchmark_id: str,
+    source_key: str,
+    target_protocol: str,
+    available_observables: Sequence[str],
+    has_shared_system: bool,
+    has_machine_readable_curves: bool,
+    has_uncertainty_estimates: bool,
+    model_scope: str,
+) -> dict[str, float | str]:
+    """Gate a real benchmark before promoting it to quantitative inversion."""
+
+    for name, value in {
+        "benchmark_id": benchmark_id,
+        "source_key": source_key,
+        "target_protocol": target_protocol,
+        "model_scope": model_scope,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+
+    protocol_requirements = {
+        "alpha_vanhove_transport": [
+            "time_grid",
+            "temperature_grid",
+            "wave_numbers",
+            "self_intermediate_scattering",
+            "van_hove_tail",
+            "ngp",
+            "diffusion",
+        ],
+        "persistence_exchange_chi4": [
+            "temperature_grid",
+            "diffusion",
+            "tau_alpha",
+            "persistence_time",
+            "exchange_time",
+            "late_ngp",
+            "chi4_peak",
+        ],
+        "spatial_chi4_front": [
+            "temperature_grid",
+            "tau_alpha",
+            "chi4_peak",
+            "dynamic_length",
+            "diffusion",
+        ],
+        "thermodynamic_entropy_closure": [
+            "temperature_grid",
+            "configurational_entropy",
+            "tau_alpha",
+        ],
+    }
+    allowed_scopes = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    if target_protocol not in protocol_requirements:
+        raise ValueError("target_protocol is not recognized")
+    if model_scope not in allowed_scopes:
+        raise ValueError("model_scope is not recognized")
+    if not available_observables:
+        raise ValueError("available_observables must be nonempty")
+
+    required = protocol_requirements[target_protocol]
+    available = set(available_observables)
+    missing = [observable for observable in required if observable not in available]
+    coverage = (len(required) - len(missing)) / len(required)
+
+    if model_scope == "thermodynamic_transition":
+        primary_blocker = "renewal_dynamics_not_thermodynamic_theory"
+        structural_ready = False
+        uncertainty_ready = False
+        stage = "scope_boundary_only"
+    else:
+        structural_ready = (
+            has_shared_system and has_machine_readable_curves and not missing
+        )
+        uncertainty_ready = structural_ready and has_uncertainty_estimates
+        if uncertainty_ready:
+            primary_blocker = "none"
+            stage = "uncertainty_weighted_inversion"
+        elif structural_ready:
+            primary_blocker = "uncertainty_columns"
+            stage = "structural_digitization_ready"
+        else:
+            if not has_shared_system:
+                primary_blocker = "shared_system_or_temperature_grid"
+            elif missing:
+                primary_blocker = missing[0]
+            else:
+                primary_blocker = "machine_readable_curves"
+            stage = "qualitative_alignment_only"
+
+    return {
+        "benchmark_id": benchmark_id,
+        "source_key": source_key,
+        "target_protocol": target_protocol,
+        "model_scope": model_scope,
+        "required_observables": ";".join(required),
+        "available_observables": ";".join(available_observables),
+        "missing_observables": ";".join(missing) if missing else "none",
+        "required_observable_coverage": float(coverage),
+        "shared_system": float(has_shared_system),
+        "machine_readable_curves": float(has_machine_readable_curves),
+        "uncertainty_estimates": float(has_uncertainty_estimates),
+        "structural_inversion_ready": float(structural_ready),
+        "uncertainty_weighted_ready": float(uncertainty_ready),
+        "assimilation_stage": stage,
+        "primary_blocker": primary_blocker,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,

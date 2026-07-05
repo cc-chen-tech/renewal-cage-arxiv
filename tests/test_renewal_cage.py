@@ -72,6 +72,7 @@ from renewal_cage import (  # noqa: E402
     raw_curve_ingestion_contract,
     raw_curve_diagnostic_readiness,
     raw_curve_persistence_exchange_protocol,
+    real_benchmark_assimilation_gate,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
     van_hove_tail_benchmark_consistency,
@@ -1472,6 +1473,73 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["qualitative_comparison_ready"], 1.0)
         self.assertEqual(row["quantitative_inversion_ready"], 0.0)
         self.assertEqual(row["uncertainty_weighted_ready"], 0.0)
+
+    def test_real_benchmark_assimilation_gate_marks_uncertainty_weighted_inversion_ready(self):
+        row = real_benchmark_assimilation_gate(
+            benchmark_id="public_ka_alpha_vanhove_release",
+            source_key="kob1995vanhove;kob1995intermediate",
+            target_protocol="alpha_vanhove_transport",
+            available_observables=[
+                "time_grid",
+                "temperature_grid",
+                "wave_numbers",
+                "self_intermediate_scattering",
+                "van_hove_tail",
+                "ngp",
+                "diffusion",
+            ],
+            has_shared_system=True,
+            has_machine_readable_curves=True,
+            has_uncertainty_estimates=True,
+            model_scope="dynamical_signature",
+        )
+
+        self.assertEqual(row["assimilation_stage"], "uncertainty_weighted_inversion")
+        self.assertEqual(row["structural_inversion_ready"], 1.0)
+        self.assertEqual(row["uncertainty_weighted_ready"], 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
+
+    def test_real_benchmark_assimilation_gate_blocks_structural_data_without_uncertainties(self):
+        row = real_benchmark_assimilation_gate(
+            benchmark_id="digitized_ka_alpha_vanhove_candidate",
+            source_key="kob1995vanhove;kob1995intermediate",
+            target_protocol="alpha_vanhove_transport",
+            available_observables=[
+                "time_grid",
+                "temperature_grid",
+                "wave_numbers",
+                "self_intermediate_scattering",
+                "van_hove_tail",
+                "ngp",
+                "diffusion",
+            ],
+            has_shared_system=True,
+            has_machine_readable_curves=True,
+            has_uncertainty_estimates=False,
+            model_scope="dynamical_signature",
+        )
+
+        self.assertEqual(row["assimilation_stage"], "structural_digitization_ready")
+        self.assertEqual(row["structural_inversion_ready"], 1.0)
+        self.assertEqual(row["uncertainty_weighted_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "uncertainty_columns")
+
+    def test_real_benchmark_assimilation_gate_keeps_thermodynamics_as_scope_boundary(self):
+        row = real_benchmark_assimilation_gate(
+            benchmark_id="kauzmann_entropy_boundary",
+            source_key="kauzmann1948nature;adam1965temperature",
+            target_protocol="thermodynamic_entropy_closure",
+            available_observables=["temperature_grid", "configurational_entropy", "tau_alpha"],
+            has_shared_system=True,
+            has_machine_readable_curves=True,
+            has_uncertainty_estimates=True,
+            model_scope="thermodynamic_transition",
+        )
+
+        self.assertEqual(row["assimilation_stage"], "scope_boundary_only")
+        self.assertEqual(row["structural_inversion_ready"], 0.0)
+        self.assertEqual(row["uncertainty_weighted_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
 
     def test_sota_claim_alignment_scores_supported_dynamic_claim(self):
         row = sota_claim_alignment(
