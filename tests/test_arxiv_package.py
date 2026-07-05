@@ -611,6 +611,35 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(blocked["heldout_prediction_ready"]), 0.0)
         self.assertEqual(blocked["primary_blocker"], "alpha_threshold_crossing")
 
+    def test_trajectory_prediction_falsification_gate_separates_fit_from_heldout(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_prediction_falsification.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["protocol_id"]: row for row in rows}
+        passed = by_id["synthetic_trajectory_pe_heldout_protocol"]
+        self.assertEqual(
+            passed["falsification_stage"],
+            "trajectory_prediction_falsification_passed",
+        )
+        self.assertEqual(float(passed["trajectory_falsification_ready"]), 1.0)
+        self.assertEqual(float(passed["trajectory_predictions_falsified"]), 0.0)
+        self.assertEqual(float(passed["fit_only_overclaim_risk"]), 0.0)
+        self.assertGreaterEqual(float(passed["heldout_count"]), 2.0)
+        self.assertIn("tau_alpha(k=1.35)", passed["heldout_observables"])
+
+        upstream = by_id["short_trajectory_upstream_blocker"]
+        self.assertEqual(upstream["falsification_stage"], "upstream_prediction_incomplete")
+        self.assertEqual(float(upstream["trajectory_falsification_ready"]), 0.0)
+        self.assertEqual(upstream["primary_blocker"], "alpha_threshold_crossing")
+
+        fit_only = by_id["fit_only_negative_control"]
+        self.assertEqual(fit_only["falsification_stage"], "fit_only_overclaim_risk")
+        self.assertEqual(float(fit_only["fit_only_overclaim_risk"]), 1.0)
+        self.assertEqual(float(fit_only["heldout_count"]), 0.0)
+        self.assertEqual(fit_only["primary_blocker"], "heldout_observables")
+
     def test_trajectory_uncertainty_protocol_exports_jackknife_sigmas(self):
         path = ROOT / "data" / "renewal_cage_trajectory_uncertainty_protocol.csv"
         self.assertTrue(path.exists())

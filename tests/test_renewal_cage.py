@@ -130,6 +130,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_observable_curve_bridge,
     trajectory_curve_persistence_exchange_gate,
     trajectory_pe_heldout_prediction_gate,
+    trajectory_prediction_falsification_gate,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -2780,6 +2781,78 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(gate["prediction_stage"], "trajectory_pe_gate_incomplete")
         self.assertEqual(gate["heldout_prediction_ready"], 0.0)
         self.assertEqual(gate["primary_blocker"], "alpha_threshold_crossing")
+
+    def test_trajectory_prediction_falsification_gate_accepts_passed_heldouts(self):
+        row = trajectory_prediction_falsification_gate(
+            protocol_id="synthetic_trajectory_pe_heldout_protocol",
+            prediction_row={
+                "benchmark_id": "synthetic_bridge_pe_protocol_ready",
+                "heldout_prediction_ready": 1.0,
+                "heldout_tau_alpha_pass": 1.0,
+                "heldout_late_ngp_pass": 1.0,
+                "heldout_predictions_pass": 1.0,
+                "primary_blocker": "none",
+            },
+            calibration_observables=[
+                "tau_alpha(k=0.7)",
+                "tau_alpha(k=1.1)",
+                "tau_alpha(k=1.6)",
+                "late_ngp",
+                "chi4_peak",
+            ],
+            heldout_observables=["tau_alpha(k=1.35)", "late_ngp(t=120tau_p)"],
+            required_prediction_passes=["heldout_tau_alpha_pass", "heldout_late_ngp_pass"],
+        )
+
+        self.assertEqual(row["falsification_stage"], "trajectory_prediction_falsification_passed")
+        self.assertEqual(row["trajectory_falsification_ready"], 1.0)
+        self.assertEqual(row["trajectory_predictions_falsified"], 0.0)
+        self.assertEqual(row["all_required_predictions_pass"], 1.0)
+        self.assertEqual(row["fit_only_overclaim_risk"], 0.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(row["calibration_count"], 5.0)
+        self.assertEqual(row["heldout_count"], 2.0)
+        self.assertIn("late_ngp(t=120tau_p)", str(row["heldout_observables"]))
+
+    def test_trajectory_prediction_falsification_gate_blocks_upstream_incomplete(self):
+        row = trajectory_prediction_falsification_gate(
+            protocol_id="short_trajectory_upstream_blocker",
+            prediction_row={
+                "benchmark_id": "synthetic_short_csv_bridge",
+                "heldout_prediction_ready": 0.0,
+                "heldout_predictions_pass": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            },
+            calibration_observables=["tau_alpha(k=0.7)", "late_ngp"],
+            heldout_observables=["tau_alpha(k=1.35)", "late_ngp(t=120tau_p)"],
+            required_prediction_passes=["heldout_tau_alpha_pass", "heldout_late_ngp_pass"],
+        )
+
+        self.assertEqual(row["falsification_stage"], "upstream_prediction_incomplete")
+        self.assertEqual(row["trajectory_falsification_ready"], 0.0)
+        self.assertEqual(row["trajectory_predictions_falsified"], 0.0)
+        self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
+
+    def test_trajectory_prediction_falsification_gate_flags_fit_only_overclaim(self):
+        row = trajectory_prediction_falsification_gate(
+            protocol_id="fit_only_negative_control",
+            prediction_row={
+                "benchmark_id": "synthetic_bridge_pe_protocol_ready",
+                "heldout_prediction_ready": 1.0,
+                "heldout_tau_alpha_pass": 1.0,
+                "heldout_late_ngp_pass": 1.0,
+                "heldout_predictions_pass": 1.0,
+                "primary_blocker": "none",
+            },
+            calibration_observables=["tau_alpha(k=0.7)", "late_ngp"],
+            heldout_observables=[],
+            required_prediction_passes=["heldout_tau_alpha_pass"],
+        )
+
+        self.assertEqual(row["falsification_stage"], "fit_only_overclaim_risk")
+        self.assertEqual(row["trajectory_falsification_ready"], 0.0)
+        self.assertEqual(row["fit_only_overclaim_risk"], 1.0)
+        self.assertEqual(row["primary_blocker"], "heldout_observables")
 
     def test_trajectory_table_adapter_orders_frames_particles_and_extracts_arrays(self):
         records = [

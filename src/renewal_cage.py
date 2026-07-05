@@ -3261,6 +3261,94 @@ def trajectory_pe_heldout_prediction_gate(
     }
 
 
+def trajectory_prediction_falsification_gate(
+    *,
+    protocol_id: str,
+    prediction_row: dict[str, object],
+    calibration_observables: Sequence[str],
+    heldout_observables: Sequence[str],
+    required_prediction_passes: Sequence[str],
+) -> dict[str, float | str]:
+    """Convert held-out trajectory predictions into a falsifiable protocol status."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not calibration_observables:
+        raise ValueError("calibration_observables must be nonempty")
+    if not required_prediction_passes:
+        raise ValueError("required_prediction_passes must be nonempty")
+    for name, values in {
+        "calibration_observables": calibration_observables,
+        "heldout_observables": heldout_observables,
+        "required_prediction_passes": required_prediction_passes,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    benchmark_id = str(prediction_row.get("benchmark_id", "trajectory_prediction"))
+    calibration = list(dict.fromkeys(calibration_observables))
+    heldout = list(dict.fromkeys(heldout_observables))
+    required = list(dict.fromkeys(required_prediction_passes))
+
+    base: dict[str, float | str] = {
+        "protocol_id": protocol_id,
+        "benchmark_id": benchmark_id,
+        "calibration_observables": ";".join(calibration),
+        "heldout_observables": ";".join(heldout) if heldout else "none",
+        "required_prediction_passes": ";".join(required),
+        "calibration_count": float(len(calibration)),
+        "heldout_count": float(len(heldout)),
+        "required_prediction_count": float(len(required)),
+    }
+
+    upstream_ready = float(prediction_row.get("heldout_prediction_ready", 0.0)) == 1.0
+    if not upstream_ready:
+        base.update(
+            {
+                "trajectory_falsification_ready": 0.0,
+                "trajectory_predictions_falsified": 0.0,
+                "all_required_predictions_pass": 0.0,
+                "fit_only_overclaim_risk": 0.0,
+                "primary_blocker": str(
+                    prediction_row.get("primary_blocker", "heldout_prediction_ready")
+                ),
+                "falsification_stage": "upstream_prediction_incomplete",
+            }
+        )
+        return base
+
+    if not heldout:
+        base.update(
+            {
+                "trajectory_falsification_ready": 0.0,
+                "trajectory_predictions_falsified": 0.0,
+                "all_required_predictions_pass": 0.0,
+                "fit_only_overclaim_risk": 1.0,
+                "primary_blocker": "heldout_observables",
+                "falsification_stage": "fit_only_overclaim_risk",
+            }
+        )
+        return base
+
+    failed_flags = [
+        flag for flag in required if float(prediction_row.get(flag, 0.0)) != 1.0
+    ]
+    predictions_pass = not failed_flags
+    base.update(
+        {
+            "trajectory_falsification_ready": 1.0,
+            "trajectory_predictions_falsified": float(not predictions_pass),
+            "all_required_predictions_pass": float(predictions_pass),
+            "fit_only_overclaim_risk": 0.0,
+            "primary_blocker": "none" if predictions_pass else failed_flags[0],
+            "falsification_stage": "trajectory_prediction_falsification_passed"
+            if predictions_pass
+            else "heldout_prediction_failed",
+        }
+    )
+    return base
+
+
 def trajectory_observable_uncertainty_protocol(
     *,
     positions: np.ndarray,

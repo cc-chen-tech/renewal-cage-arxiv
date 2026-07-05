@@ -117,6 +117,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_observable_curve_bridge,
     trajectory_curve_persistence_exchange_gate,
     trajectory_pe_heldout_prediction_gate,
+    trajectory_prediction_falsification_gate,
     trajectory_table_csv_adapter,
     trajectory_table_adapter,
     trajectory_inversion_readiness_gate,
@@ -3668,6 +3669,49 @@ def write_trajectory_pe_heldout_predictions_csv(
     return rows
 
 
+def write_trajectory_prediction_falsification_csv(
+    path: Path,
+    heldout_prediction_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Classify trajectory held-out predictions as falsification-ready evidence."""
+
+    by_id = {str(row["benchmark_id"]): row for row in heldout_prediction_rows}
+    calibration_observables = [
+        "tau_alpha(k=0.7)",
+        "tau_alpha(k=1.1)",
+        "tau_alpha(k=1.6)",
+        "late_ngp",
+        "chi4_peak",
+    ]
+    heldout_observables = ["tau_alpha(k=1.35)", "late_ngp(t=120tau_p)"]
+    required_passes = ["heldout_tau_alpha_pass", "heldout_late_ngp_pass"]
+    rows = [
+        trajectory_prediction_falsification_gate(
+            protocol_id="synthetic_trajectory_pe_heldout_protocol",
+            prediction_row=by_id["synthetic_bridge_pe_protocol_ready"],
+            calibration_observables=calibration_observables,
+            heldout_observables=heldout_observables,
+            required_prediction_passes=required_passes,
+        ),
+        trajectory_prediction_falsification_gate(
+            protocol_id="short_trajectory_upstream_blocker",
+            prediction_row=by_id["synthetic_short_csv_bridge"],
+            calibration_observables=calibration_observables,
+            heldout_observables=heldout_observables,
+            required_prediction_passes=required_passes,
+        ),
+        trajectory_prediction_falsification_gate(
+            protocol_id="fit_only_negative_control",
+            prediction_row=by_id["synthetic_bridge_pe_protocol_ready"],
+            calibration_observables=calibration_observables,
+            heldout_observables=[],
+            required_prediction_passes=required_passes,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, float | str]]:
     """Estimate trajectory-observable uncertainties from time-origin jackknife blocks."""
 
@@ -6767,9 +6811,13 @@ def main() -> None:
         DATA_DIR / "renewal_cage_trajectory_curve_pe_gate.csv",
         trajectory_curve_bridge_rows,
     )
-    write_trajectory_pe_heldout_predictions_csv(
+    trajectory_heldout_prediction_rows = write_trajectory_pe_heldout_predictions_csv(
         DATA_DIR / "renewal_cage_trajectory_pe_heldout_predictions.csv",
         trajectory_curve_pe_gate_rows,
+    )
+    write_trajectory_prediction_falsification_csv(
+        DATA_DIR / "renewal_cage_trajectory_prediction_falsification.csv",
+        trajectory_heldout_prediction_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"
