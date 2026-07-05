@@ -356,10 +356,6 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_dimensionless.pdf", main_tex)
         self.assertIn("figures/renewal_cage_scattering.pdf", main_tex)
         self.assertIn("figures/renewal_cage_temperature.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_barrier.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_heterogeneity.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_heterogeneity_map.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_static_null.pdf", main_tex)
         self.assertIn("figures/renewal_cage_alpha_shape.pdf", main_tex)
         self.assertIn("figures/renewal_cage_facilitated_exchange.pdf", main_tex)
         self.assertIn("figures/renewal_cage_glass_audit.pdf", main_tex)
@@ -376,13 +372,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_raw_curve_ingestion_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_barrier_requirements.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange_protocol.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange_joint_protocol.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_inversion.pdf", main_tex)
         self.assertNotIn(".svg", main_tex)
 
     def test_readiness_figures_use_page_float_specifiers(self):
@@ -404,21 +397,27 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertNotEqual(preceding_begin, -1)
             self.assertIn("\\begin{figure}[p]", main_tex[preceding_begin:figure_index])
 
-    def test_readiness_page_float_batch_flushes_before_h_figures(self):
-        main_tex = (ROOT / "paper" / "main.tex").read_text()
-        raw_protocol_index = main_tex.index(
-            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
-        )
-        barrier_index = main_tex.index("figures/renewal_cage_barrier_requirements.pdf")
-        self.assertIn("\\clearpage", main_tex[raw_protocol_index:barrier_index])
-
-    def test_final_large_figures_are_page_floats_before_discussion(self):
+    def test_readiness_page_float_batch_flushes_before_discussion(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
         raw_protocol_index = main_tex.index(
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
         )
         discussion_index = main_tex.index("\\section{Discussion}")
-        self.assertNotIn("\\begin{figure}[h]", main_tex[raw_protocol_index:discussion_index])
+        self.assertIn("\\clearpage", main_tex[raw_protocol_index:discussion_index])
+
+    def test_supplemental_large_figures_are_packaged_not_embedded(self):
+        main_tex = (ROOT / "paper" / "main.tex").read_text()
+        supplemental_figures = [
+            "figures/renewal_cage_barrier_requirements.pdf",
+            "figures/renewal_cage_barrier.pdf",
+            "figures/renewal_cage_heterogeneity.pdf",
+            "figures/renewal_cage_heterogeneity_map.pdf",
+            "figures/renewal_cage_static_null.pdf",
+            "figures/renewal_cage_mechanism_selection.pdf",
+            "figures/renewal_cage_inversion.pdf",
+        ]
+        for figure in supplemental_figures:
+            self.assertNotIn(figure, main_tex)
 
     def test_final_comparison_table_is_not_a_late_float(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
