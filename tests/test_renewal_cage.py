@@ -112,6 +112,7 @@ from renewal_cage import (  # noqa: E402
     stokes_einstein_product,
     sota_claim_alignment,
     sota_data_accession_gate,
+    sota_readme_schema_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
@@ -1934,6 +1935,51 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["accession_stage"], "scope_boundary_accession")
         self.assertEqual(row["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
         self.assertEqual(row["scope_boundary"], 1.0)
+
+    def test_sota_readme_schema_gate_marks_glassbench_remote_schema_ready(self):
+        row = sota_readme_schema_gate(
+            schema_id="glassbench_readme_schema",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            systems=["KA", "KA2D"],
+            folder_tokens=["_trajectories", "_models", "_results"],
+            license_statement="Creative Commons Attribution 4.0 International",
+            required_citations=["10.1063/5.0129791", "10.1103/PhysRevLett.130.238202"],
+            intended_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+            local_archive_inspected=False,
+        )
+
+        self.assertEqual(row["schema_stage"], "remote_readme_schema_ready")
+        self.assertEqual(row["has_ka_system"], 1.0)
+        self.assertEqual(row["has_ka2d_system"], 1.0)
+        self.assertEqual(row["has_trajectory_folder"], 1.0)
+        self.assertEqual(row["has_model_folder"], 1.0)
+        self.assertEqual(row["has_results_folder"], 1.0)
+        self.assertEqual(row["citation_count"], 2.0)
+        self.assertEqual(row["schema_ready"], 1.0)
+        self.assertEqual(row["ready_for_local_adapter"], 0.0)
+        self.assertEqual(row["primary_blocker"], "local_archive_inspection")
+
+    def test_sota_readme_schema_gate_blocks_missing_trajectory_folder(self):
+        row = sota_readme_schema_gate(
+            schema_id="article_supplement_schema_missing_trajectories",
+            accession_id="hedges_jcp_article_no_archive",
+            source_id="hedges_persistence_exchange_jcp_article",
+            systems=["KA"],
+            folder_tokens=["_models", "_results"],
+            license_statement="article",
+            required_citations=["10.1063/1.2817607"],
+            intended_protocols=["trajectory_observable_protocol"],
+            local_archive_inspected=False,
+        )
+
+        self.assertEqual(row["schema_stage"], "metadata_incomplete_schema")
+        self.assertEqual(row["schema_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "trajectory_folder")
 
     def test_sota_claim_alignment_scores_supported_dynamic_claim(self):
         row = sota_claim_alignment(

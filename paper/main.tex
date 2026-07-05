@@ -1067,6 +1067,14 @@ step for those sources. For the public GlassBench Zenodo record it stores DOI
 README/schema availability. Because the archive is not locally cached in this
 repository, this row is marked as remote-accession ready but not yet a local
 real-data reanalysis.
+The README-schema gate
+\texttt{renewal\_cage\_sota\_readme\_schema.csv} then checks the next layer of
+metadata without downloading the full archive: the public README names the
+three-dimensional Kob-Andersen mixture, the two-dimensional KA2D mixture, the
+\texttt{\_trajectories}, \texttt{\_models}, and \texttt{\_results} folders,
+the Creative Commons Attribution 4.0 reuse condition, and the KA/KA2D
+supporting citations. This makes the remote schema ready for a future adapter,
+but the adapter remains blocked until the local archive contents are inspected.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the
@@ -1343,6 +1351,14 @@ rejected without refitting the clocks.
   \caption{SOTA data accession manifest. Remote data archives are separated
   from local reanalysis readiness by recording DOI, archive identity, checksum,
   size, license, schema/README status, and local-cache state.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_readme_schema.pdf}
+  \caption{SOTA README schema gate. The GlassBench README supplies system,
+  folder, license, and citation evidence for a future trajectory adapter, but
+  local archive inspection is still required before real-data reanalysis.}
 \end{figure}
 
 \begin{figure}[p]

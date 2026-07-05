@@ -132,6 +132,9 @@ raw trajectories or observable tables, protocol metadata, and reuse permission.
 The SOTA data-accession manifest records DOI, landing URL, archive name,
 checksum, size, license, schema/README status, and local-cache status before
 any public dataset is treated as a completed real-data reanalysis.
+The SOTA README-schema gate checks systems, folder tokens, reuse license, and
+citation guidance before claiming that a remote dataset can support a local
+trajectory adapter.
 The translation-rotation protocol adds an effective rotational renewal clock
 for Debye-Stokes-Einstein and near-Tg molecular-motion diagnostics without
 claiming a microscopic orientational potential theory.
@@ -213,6 +216,7 @@ figures/renewal_cage_inversion_identifiability_audit.svg
 figures/renewal_cage_frontier_benchmark_horizon.svg
 figures/renewal_cage_sota_source_provenance.svg
 figures/renewal_cage_sota_data_accession.svg
+figures/renewal_cage_sota_readme_schema.svg
 figures/renewal_cage_literature_inversion_readiness.svg
 figures/renewal_cage_observable_falsification_matrix.svg
 figures/renewal_cage_benchmark_fusion_readiness.svg
@@ -263,6 +267,7 @@ data/renewal_cage_inversion_identifiability_audit.csv
 data/renewal_cage_frontier_benchmark_horizon.csv
 data/renewal_cage_sota_source_provenance.csv
 data/renewal_cage_sota_data_accession.csv
+data/renewal_cage_sota_readme_schema.csv
 data/renewal_cage_literature_inversion_readiness.csv
 data/renewal_cage_observable_falsification_matrix.csv
 data/renewal_cage_benchmark_fusion_readiness.csv
@@ -310,6 +315,7 @@ paper/figures/renewal_cage_inversion_identifiability_audit.pdf
 paper/figures/renewal_cage_frontier_benchmark_horizon.pdf
 paper/figures/renewal_cage_sota_source_provenance.pdf
 paper/figures/renewal_cage_sota_data_accession.pdf
+paper/figures/renewal_cage_sota_readme_schema.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf
 paper/figures/renewal_cage_observable_falsification_matrix.pdf
 paper/figures/renewal_cage_benchmark_fusion_readiness.pdf

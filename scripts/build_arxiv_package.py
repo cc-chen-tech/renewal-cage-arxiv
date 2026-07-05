@@ -1909,6 +1909,55 @@ def write_sota_data_accession_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_readme_schema_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_readme_schema.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA README schema gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "README-level evidence checks systems, folder tokens, license, and citation guidance before local adapters are claimed.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "schema")
+    c.drawString(left + 230, top, "stage")
+    c.drawString(left + 445, top, "KA")
+    c.drawString(left + 480, top, "KA2D")
+    c.drawString(left + 525, top, "traj")
+    c.drawString(left + 565, top, "schema")
+    c.drawString(left + 620, top, "blocker")
+    palette = {
+        "remote_readme_schema_ready": colors.HexColor("#2f855a"),
+        "local_archive_schema_ready": colors.HexColor("#276749"),
+        "metadata_incomplete_schema": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 7.0)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 45
+        stage = row["schema_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["schema_id"].replace("_", " ")[:36])
+        c.setFillColor(palette[stage])
+        c.rect(left + 230, y - 4, 180, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 236, y, stage.replace("_", " ")[:28])
+        c.setFillColor(colors.black)
+        c.drawString(left + 450, y, str(int(float(row["has_ka_system"]))))
+        c.drawString(left + 490, y, str(int(float(row["has_ka2d_system"]))))
+        c.drawString(left + 532, y, str(int(float(row["has_trajectory_folder"]))))
+        c.drawString(left + 577, y, str(int(float(row["schema_ready"]))))
+        c.drawString(left + 620, y, row["primary_blocker"].replace("_", " ")[:26])
+        c.drawString(left + 72, y - 12, f"systems: {row['systems']}; folders: {row['folder_tokens']}; citations={row['citation_count']}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2632,6 +2681,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     frontier_benchmark_horizon_pdf = PAPER_FIGURE_DIR / "renewal_cage_frontier_benchmark_horizon.pdf"
     sota_source_provenance_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_source_provenance.pdf"
     sota_data_accession_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_data_accession.pdf"
+    sota_readme_schema_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_readme_schema.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2675,6 +2725,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_frontier_benchmark_horizon_pdf(frontier_benchmark_horizon_pdf)
     write_sota_source_provenance_pdf(sota_source_provenance_pdf)
     write_sota_data_accession_pdf(sota_data_accession_pdf)
+    write_sota_readme_schema_pdf(sota_readme_schema_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2736,6 +2787,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(frontier_benchmark_horizon_pdf, "figures/renewal_cage_frontier_benchmark_horizon.pdf")
         archive.write(sota_source_provenance_pdf, "figures/renewal_cage_sota_source_provenance.pdf")
         archive.write(sota_data_accession_pdf, "figures/renewal_cage_sota_data_accession.pdf")
+        archive.write(sota_readme_schema_pdf, "figures/renewal_cage_sota_readme_schema.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(
             observable_falsification_matrix_pdf,

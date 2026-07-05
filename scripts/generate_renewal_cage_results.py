@@ -99,6 +99,7 @@ from renewal_cage import (  # noqa: E402
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
     sota_data_accession_gate,
+    sota_readme_schema_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
     static_gamma_asymptotic_diagnostics,
@@ -2987,6 +2988,41 @@ def write_sota_data_accession_csv(path: Path) -> list[dict[str, float | str]]:
     return rows
 
 
+def write_sota_readme_schema_csv(path: Path) -> list[dict[str, float | str]]:
+    """Record README-level schema evidence for remote SOTA trajectory archives."""
+
+    rows = [
+        sota_readme_schema_gate(
+            schema_id="glassbench_readme_schema",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            systems=["KA", "KA2D"],
+            folder_tokens=["_trajectories", "_models", "_results"],
+            license_statement="Creative Commons Attribution 4.0 International",
+            required_citations=["10.1063/5.0129791", "10.1103/PhysRevLett.130.238202"],
+            intended_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+            local_archive_inspected=False,
+        ),
+        sota_readme_schema_gate(
+            schema_id="hedges_schema_missing_trajectories",
+            accession_id="hedges_jcp_article_no_archive",
+            source_id="hedges_persistence_exchange_jcp_article",
+            systems=["KA"],
+            folder_tokens=["_models", "_results"],
+            license_statement="article",
+            required_citations=["10.1063/1.2817607"],
+            intended_protocols=["trajectory_observable_protocol"],
+            local_archive_inspected=False,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -4650,6 +4686,53 @@ def write_sota_data_accession_svg(path: Path, rows: list[dict[str, float | str]]
     path.write_text(svg)
 
 
+def write_sota_readme_schema_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 380
+    left, top = 75, 105
+    row_h = 72
+    colors = {
+        "remote_readme_schema_ready": "#2f855a",
+        "local_archive_schema_ready": "#276749",
+        "metadata_incomplete_schema": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["schema_stage"])
+        color = colors[stage]
+        schema_ready = int(float(row["schema_ready"]))
+        local_ready = int(float(row["ready_for_local_adapter"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["schema_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 310}" y="{y - 4}" width="220" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 320}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:33]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 555}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">schema={schema_ready}; local adapter={local_ready}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 72}" y="{y + 38}" font-family="Arial, sans-serif" font-size="9" fill="#555">systems: {row["systems"]}; folders: {row["folder_tokens"]}; citations={int(float(row["citation_count"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA README schema gate</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">README-level evidence checks systems, folder tokens, license, and citation guidance before local archive adapters are claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">schema</text>
+  <text x="{left + 310}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 555}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="315" width="14" height="14" fill="#2f855a" /><text x="96" y="327" font-family="Arial, sans-serif" font-size="12">remote README schema ready</text>
+  <rect x="315" y="315" width="14" height="14" fill="#c05621" /><text x="336" y="327" font-family="Arial, sans-serif" font-size="12">metadata incomplete</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -5891,6 +5974,13 @@ def main() -> None:
     write_sota_data_accession_svg(
         FIGURE_DIR / "renewal_cage_sota_data_accession.svg",
         data_accession_rows,
+    )
+    readme_schema_rows = write_sota_readme_schema_csv(
+        DATA_DIR / "renewal_cage_sota_readme_schema.csv"
+    )
+    write_sota_readme_schema_svg(
+        FIGURE_DIR / "renewal_cage_sota_readme_schema.svg",
+        readme_schema_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"

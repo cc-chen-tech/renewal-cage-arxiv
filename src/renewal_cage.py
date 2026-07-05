@@ -1859,6 +1859,119 @@ def sota_data_accession_gate(
     }
 
 
+def sota_readme_schema_gate(
+    *,
+    schema_id: str,
+    accession_id: str,
+    source_id: str,
+    systems: Sequence[str],
+    folder_tokens: Sequence[str],
+    license_statement: str,
+    required_citations: Sequence[str],
+    intended_protocols: Sequence[str],
+    local_archive_inspected: bool,
+) -> dict[str, float | str]:
+    """Check README-level schema evidence before building a local data adapter."""
+
+    for name, value in {
+        "schema_id": schema_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "license_statement": license_statement,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if not systems:
+        raise ValueError("systems must be nonempty")
+    if not folder_tokens:
+        raise ValueError("folder_tokens must be nonempty")
+    if not intended_protocols:
+        raise ValueError("intended_protocols must be nonempty")
+    for name, values in {
+        "systems": systems,
+        "folder_tokens": folder_tokens,
+        "required_citations": required_citations,
+        "intended_protocols": intended_protocols,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    system_set = set(systems)
+    folder_set = set(folder_tokens)
+    protocols = list(dict.fromkeys(intended_protocols))
+    has_ka = "KA" in system_set
+    has_ka2d = "KA2D" in system_set
+    has_trajectory_folder = "_trajectories" in folder_set
+    has_model_folder = "_models" in folder_set
+    has_results_folder = "_results" in folder_set
+    license_lower = license_statement.lower()
+    reuse_license = "creative commons attribution" in license_lower or "cc-by" in license_lower
+    trajectory_protocol_requested = any(protocol.startswith("trajectory_") for protocol in protocols)
+    has_citation_guidance = bool(required_citations)
+    schema_ready = (
+        trajectory_protocol_requested
+        and has_ka
+        and has_ka2d
+        and has_trajectory_folder
+        and has_model_folder
+        and has_results_folder
+        and reuse_license
+        and has_citation_guidance
+    )
+    ready_for_local_adapter = schema_ready and local_archive_inspected
+
+    if ready_for_local_adapter:
+        stage = "local_archive_schema_ready"
+        blocker = "none"
+    elif schema_ready:
+        stage = "remote_readme_schema_ready"
+        blocker = "local_archive_inspection"
+    elif not has_trajectory_folder:
+        stage = "metadata_incomplete_schema"
+        blocker = "trajectory_folder"
+    elif not has_model_folder:
+        stage = "metadata_incomplete_schema"
+        blocker = "model_folder"
+    elif not has_results_folder:
+        stage = "metadata_incomplete_schema"
+        blocker = "results_folder"
+    elif not (has_ka and has_ka2d):
+        stage = "metadata_incomplete_schema"
+        blocker = "systems"
+    elif not reuse_license:
+        stage = "metadata_incomplete_schema"
+        blocker = "reuse_license"
+    elif not has_citation_guidance:
+        stage = "metadata_incomplete_schema"
+        blocker = "citation_guidance"
+    else:
+        stage = "metadata_incomplete_schema"
+        blocker = "trajectory_protocol"
+
+    return {
+        "schema_id": schema_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "systems": ";".join(dict.fromkeys(systems)),
+        "folder_tokens": ";".join(dict.fromkeys(folder_tokens)),
+        "license_statement": license_statement,
+        "required_citations": ";".join(dict.fromkeys(required_citations)) if required_citations else "none",
+        "intended_protocols": ";".join(protocols),
+        "has_ka_system": float(has_ka),
+        "has_ka2d_system": float(has_ka2d),
+        "has_trajectory_folder": float(has_trajectory_folder),
+        "has_model_folder": float(has_model_folder),
+        "has_results_folder": float(has_results_folder),
+        "reuse_license": float(reuse_license),
+        "citation_count": float(len(dict.fromkeys(required_citations))),
+        "local_archive_inspected": float(local_archive_inspected),
+        "schema_ready": float(schema_ready),
+        "ready_for_local_adapter": float(ready_for_local_adapter),
+        "primary_blocker": blocker,
+        "schema_stage": stage,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,
