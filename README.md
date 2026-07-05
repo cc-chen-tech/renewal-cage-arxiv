@@ -141,6 +141,7 @@ data/renewal_cage_sweeps.csv
 data/renewal_cage_dimensionless.csv
 data/renewal_cage_diagnostics.csv
 data/renewal_cage_consistency.csv
+data/renewal_cage_sota_comparison.csv
 data/renewal_cage_van_hove.csv
 data/renewal_cage_tail_ratios.csv
 data/renewal_cage_scattering.csv

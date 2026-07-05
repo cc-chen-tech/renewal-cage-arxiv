@@ -3,6 +3,7 @@ import tempfile
 import time
 import unittest
 import zipfile
+import csv
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,21 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_sota_comparison_table_keeps_scope_boundaries(self):
+        path = ROOT / "data" / "renewal_cage_sota_comparison.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        phenomena = {row["phenomenon"]: row for row in rows}
+        self.assertIn("thermodynamic_glass_transition", phenomena)
+        self.assertIn("spatial_chi4_length", phenomena)
+        self.assertIn("persistence_exchange_decoupling", phenomena)
+        self.assertEqual(phenomena["thermodynamic_glass_transition"]["model_status"], "unsupported")
+        self.assertEqual(phenomena["spatial_chi4_length"]["model_status"], "proxy_only")
+        self.assertEqual(phenomena["persistence_exchange_decoupling"]["model_status"], "supported")
+        self.assertGreaterEqual(len(rows), 10)
+
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             zip_path = build_arxiv_package(output_dir=Path(tmpdir))

@@ -1131,6 +1131,109 @@ def write_consistency_csv(
     write_sweep_csv(path, [row])
 
 
+def write_sota_comparison_csv(path: Path) -> list[dict[str, float | str]]:
+    rows: list[dict[str, float | str]] = [
+        {
+            "phenomenon": "msd_plateau_cage_localization",
+            "benchmark_observable": "MSD plateau and cage rearrangements in colloids and simulations",
+            "benchmark_source": "weeks2002cage;pastore2017cage",
+            "model_prediction": "local cage variance L(t) plus delayed cage-center renewal",
+            "model_status": "supported",
+            "next_gap": "calibrate A and tau_c against trajectory-level cage metrics",
+        },
+        {
+            "phenomenon": "transient_ngp_and_van_hove_tail",
+            "benchmark_observable": "transient NGP peak and broad self van Hove tails",
+            "benchmark_source": "kob1995vanhove;guan2014fickian;rusciano2022fickian",
+            "model_prediction": "variance mixture from delayed renewal count gives NGP peak and transient radial tail",
+            "model_status": "supported",
+            "next_gap": "fit public trajectory data rather than synthetic curves",
+        },
+        {
+            "phenomenon": "long_time_gaussian_recovery",
+            "benchmark_observable": "non-Gaussianity decays after many rearrangements",
+            "benchmark_source": "chubynsky2014diffusing;chechkin2017brownian;berthier2023comment",
+            "model_prediction": "alpha_2 decays as inverse renewal count for finite exchange",
+            "model_status": "supported",
+            "next_gap": "quantify finite observation-window corrections in published datasets",
+        },
+        {
+            "phenomenon": "alpha_relaxation_fs",
+            "benchmark_observable": "self-intermediate scattering alpha relaxation and KWW-like decay",
+            "benchmark_source": "kob1995intermediate",
+            "model_prediction": "F_s(k,t) factorizes into cage plateau and renewal PGF alpha decay",
+            "model_status": "supported",
+            "next_gap": "compare full F_s(k,t) curves across wave numbers",
+        },
+        {
+            "phenomenon": "stretched_alpha_relaxation",
+            "benchmark_observable": "stretched relaxation and broad distribution of local relaxation times",
+            "benchmark_source": "ediger2000spatial;kob1995intermediate",
+            "model_prediction": "finite-exchange gamma renewal heterogeneity gives beta_loc<1 with Gaussian recovery",
+            "model_status": "supported",
+            "next_gap": "infer exchange ratio from real multi-k alpha slopes",
+        },
+        {
+            "phenomenon": "stokes_einstein_violation",
+            "benchmark_observable": "diffusion and structural relaxation decouple on cooling",
+            "benchmark_source": "ediger2000spatial;berthier2011theoretical",
+            "model_prediction": "persistence/exchange decoupling increases D tau_alpha at fixed diffusion",
+            "model_status": "supported",
+            "next_gap": "calibrate tau_p/tau_x against simulation or experiment",
+        },
+        {
+            "phenomenon": "persistence_exchange_decoupling",
+            "benchmark_observable": "first persistence time separates from subsequent exchange time in glass formers",
+            "benchmark_source": "hedges2007persistence",
+            "model_prediction": "D fixes tau_x, alpha time fixes tau_p, late NGP is held out",
+            "model_status": "supported",
+            "next_gap": "apply inversion to published or newly simulated trajectory clocks",
+        },
+        {
+            "phenomenon": "tts_breakdown",
+            "benchmark_observable": "alpha-shape superposition can fail as relaxation slows",
+            "benchmark_source": "kob1995intermediate;berthier2011theoretical",
+            "model_prediction": "scaled alpha shape controlled by C_k=Gamma_k lambda tau_d",
+            "model_status": "partial",
+            "next_gap": "benchmark residual against temperature series of F_s(k,t)",
+        },
+        {
+            "phenomenon": "fragility_growth",
+            "benchmark_observable": "apparent activation energy grows in fragile liquids",
+            "benchmark_source": "berthier2011theoretical",
+            "model_prediction": "barrier law produces apparent activation and local fragility proxies",
+            "model_status": "partial",
+            "next_gap": "derive material-specific barriers from microscopic structure",
+        },
+        {
+            "phenomenon": "spatial_chi4_length",
+            "benchmark_observable": "four-point susceptibility and dynamic correlation length grow",
+            "benchmark_source": "lacevic2003fourpoint;berthier2011theoretical;berthier2024experimental",
+            "model_prediction": "renewal-count susceptibility maps to chi4 through external N_corr",
+            "model_status": "proxy_only",
+            "next_gap": "derive spatial facilitation fronts and chi4 length internally",
+        },
+        {
+            "phenomenon": "mct_beta_relaxation",
+            "benchmark_observable": "beta-relaxation scaling, von Schweidler law, and MCT exponents",
+            "benchmark_source": "kob1995intermediate;berthier2011theoretical",
+            "model_prediction": "cage plateau is present, but MCT beta exponent structure is absent",
+            "model_status": "unsupported",
+            "next_gap": "couple renewal clock to a beta-relaxation kernel or memory function",
+        },
+        {
+            "phenomenon": "thermodynamic_glass_transition",
+            "benchmark_observable": "configurational entropy, heat-capacity anomaly, ideal-glass/Kauzmann questions",
+            "benchmark_source": "berthier2011theoretical",
+            "model_prediction": "no equilibrium free-energy or entropy sector",
+            "model_status": "unsupported",
+            "next_gap": "add or explicitly exclude thermodynamic theory",
+        },
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -2226,6 +2329,7 @@ def main() -> None:
         late_ngp=late_ngp,
         params=params,
     )
+    write_sota_comparison_csv(DATA_DIR / "renewal_cage_sota_comparison.csv")
 
     delay_values = [1.2, 2.0, 3.0, 5.0]
     jump_values = [0.3, 0.6, 0.9, 1.3]
