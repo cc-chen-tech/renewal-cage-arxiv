@@ -1547,6 +1547,58 @@ def write_sota_claim_alignment_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_signed_constraints_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_signed_constraints.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA signed-constraint audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Representative literature conclusions are encoded as required signatures and forbidden overclaims.",
+    )
+    left, top = 45, page_h - 88
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top, "source")
+    c.drawString(left + 120, top, "scope")
+    c.drawString(left + 245, top, "constraint class")
+    c.drawString(left + 382, top, "closure")
+    c.drawString(left + 435, top, "publish")
+    c.drawString(left + 492, top, "missing")
+    c.drawString(left + 612, top, "forbidden made")
+    palette = {
+        "sota_consistent": colors.HexColor("#2f855a"),
+        "closure_assisted_consistent": colors.HexColor("#2b6cb0"),
+        "scope_boundary_consistent": colors.HexColor("#805ad5"),
+        "missing_signature": colors.HexColor("#c05621"),
+        "overclaimed_boundary": colors.HexColor("#b83280"),
+        "not_supported": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 20 - idx * 38
+        constraint_class = row["signed_constraint_class"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["source_key"][:22])
+        c.drawString(left + 120, y, row["model_scope"].replace("_", " ")[:20])
+        c.setFillColor(palette[constraint_class])
+        c.rect(left + 245, y - 4, 118, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 250, y, constraint_class.replace("_", " ")[:24])
+        c.setFillColor(colors.black)
+        c.drawString(left + 382, y, str(int(float(row["requires_external_closure"]))))
+        c.drawString(left + 435, y, str(int(float(row["publishable_alignment"]))))
+        c.drawString(left + 492, y, row["missing_expected_signatures"].replace("_", " ")[:22])
+        c.drawString(left + 612, y, row["forbidden_claims_made"].replace("_", " ")[:25])
+        c.drawString(left + 120, y - 10, row["source_observation"][:100])
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2295,6 +2347,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
     sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
     sota_claim_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_claim_alignment.pdf"
+    sota_signed_constraints_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_signed_constraints.pdf"
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -2338,6 +2391,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
     write_sota_claim_alignment_pdf(sota_claim_alignment_pdf)
+    write_sota_signed_constraints_pdf(sota_signed_constraints_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -2384,6 +2438,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
         archive.write(sota_benchmark_consistency_pdf, "figures/renewal_cage_sota_benchmark_consistency.pdf")
         archive.write(sota_claim_alignment_pdf, "figures/renewal_cage_sota_claim_alignment.pdf")
+        archive.write(sota_signed_constraints_pdf, "figures/renewal_cage_sota_signed_constraints.pdf")
         archive.write(
             real_benchmark_assimilation_gate_pdf,
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",

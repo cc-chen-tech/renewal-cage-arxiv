@@ -168,6 +168,34 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(thermodynamic["requires_external_closure"]), 1.0)
         self.assertEqual(float(thermodynamic["model_overclaims_source"]), 0.0)
 
+    def test_sota_signed_constraints_audit_preserves_required_trends_and_boundaries(self):
+        path = ROOT / "data" / "renewal_cage_sota_signed_constraints.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["constraint_id"]: row for row in rows}
+        self.assertEqual(
+            by_id["kob_andersen_van_hove_signed_constraints"]["signed_constraint_class"],
+            "sota_consistent",
+        )
+        self.assertEqual(
+            by_id["kob_andersen_van_hove_signed_constraints"]["missing_expected_signatures"],
+            "none",
+        )
+        self.assertEqual(
+            by_id["lacevic_four_point_signed_constraints"]["signed_constraint_class"],
+            "closure_assisted_consistent",
+        )
+        self.assertEqual(
+            float(by_id["lacevic_four_point_signed_constraints"]["requires_external_closure"]),
+            1.0,
+        )
+        thermodynamic = by_id["kauzmann_thermodynamic_signed_boundary"]
+        self.assertEqual(thermodynamic["signed_constraint_class"], "scope_boundary_consistent")
+        self.assertEqual(thermodynamic["forbidden_claims_made"], "none")
+        self.assertEqual(float(thermodynamic["publishable_alignment"]), 1.0)
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -423,6 +451,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", names)
             self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
             self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_signed_constraints.pdf", names)
             self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", names)
             self.assertIn("figures/renewal_cage_cross_observable_prediction_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_inversion_identifiability_audit.pdf", names)
@@ -504,6 +533,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_cross_observable_prediction_ledger.pdf",
             "figures/renewal_cage_inversion_identifiability_audit.pdf",
             "figures/renewal_cage_frontier_benchmark_horizon.pdf",
+            "figures/renewal_cage_sota_signed_constraints.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_barrier_requirements.pdf",
             "figures/renewal_cage_barrier.pdf",
@@ -555,6 +585,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_sota_claim_alignment = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_claim_alignment.pdf"
+            ).read_bytes()
+            first_sota_signed_constraints = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_signed_constraints.pdf"
             ).read_bytes()
             first_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
@@ -640,6 +673,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_claim_alignment = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_claim_alignment.pdf"
             ).read_bytes()
+            second_sota_signed_constraints = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_signed_constraints.pdf"
+            ).read_bytes()
             second_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
             ).read_bytes()
@@ -710,6 +746,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_mct_beta_closure, second_mct_beta_closure)
         self.assertEqual(first_sota_benchmark_consistency, second_sota_benchmark_consistency)
         self.assertEqual(first_sota_claim_alignment, second_sota_claim_alignment)
+        self.assertEqual(first_sota_signed_constraints, second_sota_signed_constraints)
         self.assertEqual(first_real_benchmark_assimilation_gate, second_real_benchmark_assimilation_gate)
         self.assertEqual(first_cross_observable_prediction_ledger, second_cross_observable_prediction_ledger)
         self.assertEqual(first_inversion_identifiability_audit, second_inversion_identifiability_audit)

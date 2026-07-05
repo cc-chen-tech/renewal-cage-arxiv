@@ -1653,6 +1653,111 @@ def sota_claim_alignment(
     }
 
 
+def sota_signed_constraint_audit(
+    *,
+    constraint_id: str,
+    source_key: str,
+    model_scope: str,
+    source_observation: str,
+    expected_signatures: Sequence[str],
+    passed_signatures: Sequence[str],
+    forbidden_claims: Sequence[str],
+    made_claims: Sequence[str],
+    support_level: str,
+    quantitative_fit_ready: bool,
+) -> dict[str, float | str]:
+    """Check source-level SOTA conclusions as signed constraints on the model."""
+
+    for name, value in {
+        "constraint_id": constraint_id,
+        "source_key": source_key,
+        "model_scope": model_scope,
+        "source_observation": source_observation,
+        "support_level": support_level,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    allowed_scopes = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    allowed_support = {"derived", "effective_closure", "closure_only", "not_supported"}
+    if model_scope not in allowed_scopes:
+        raise ValueError("model_scope is not recognized")
+    if support_level not in allowed_support:
+        raise ValueError("support_level is not recognized")
+    if not expected_signatures:
+        raise ValueError("expected_signatures must be nonempty")
+    for name, values in {
+        "expected_signatures": expected_signatures,
+        "passed_signatures": passed_signatures,
+        "forbidden_claims": forbidden_claims,
+        "made_claims": made_claims,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+    if model_scope == "thermodynamic_transition" and support_level == "derived":
+        raise ValueError("renewal dynamics cannot derive thermodynamic transition constraints")
+    if model_scope == "spatial_heterogeneity" and support_level == "derived":
+        raise ValueError("spatial heterogeneity must be marked as an effective closure")
+
+    expected = list(dict.fromkeys(expected_signatures))
+    passed = list(dict.fromkeys(passed_signatures))
+    forbidden = list(dict.fromkeys(forbidden_claims))
+    made = list(dict.fromkeys(made_claims))
+    passed_set = set(passed)
+    made_set = set(made)
+    missing = [signature for signature in expected if signature not in passed_set]
+    forbidden_made = [claim for claim in forbidden if claim in made_set]
+    requires_closure = support_level in {"effective_closure", "closure_only"}
+    all_required_pass = not missing
+    no_forbidden_claims = not forbidden_made
+
+    if forbidden_made:
+        constraint_class = "overclaimed_boundary"
+    elif missing:
+        constraint_class = "missing_signature"
+    elif support_level == "not_supported":
+        constraint_class = "not_supported"
+    elif model_scope == "thermodynamic_transition":
+        constraint_class = "scope_boundary_consistent"
+    elif requires_closure:
+        constraint_class = "closure_assisted_consistent"
+    else:
+        constraint_class = "sota_consistent"
+
+    publishable_alignment = (
+        constraint_class
+        in {
+            "sota_consistent",
+            "closure_assisted_consistent",
+            "scope_boundary_consistent",
+        }
+    )
+
+    return {
+        "constraint_id": constraint_id,
+        "source_key": source_key,
+        "model_scope": model_scope,
+        "source_observation": source_observation,
+        "expected_signatures": ";".join(expected),
+        "passed_signatures": ";".join(passed) if passed else "none",
+        "missing_expected_signatures": ";".join(missing) if missing else "none",
+        "forbidden_claims": ";".join(forbidden) if forbidden else "none",
+        "made_claims": ";".join(made) if made else "none",
+        "forbidden_claims_made": ";".join(forbidden_made) if forbidden_made else "none",
+        "support_level": support_level,
+        "requires_external_closure": float(requires_closure),
+        "all_required_signatures_pass": float(all_required_pass),
+        "no_forbidden_claims_made": float(no_forbidden_claims),
+        "quantitative_fit_ready": float(quantitative_fit_ready),
+        "publishable_alignment": float(publishable_alignment),
+        "signed_constraint_class": constraint_class,
+    }
+
+
 def observable_falsification_matrix(
     *,
     benchmark_id: str,

@@ -111,6 +111,7 @@ from renewal_cage import (  # noqa: E402
     stretched_alpha_benchmark_consistency,
     stokes_einstein_product,
     sota_claim_alignment,
+    sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
@@ -1824,6 +1825,83 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 data_readiness="qualitative",
                 primary_blocker="none",
             )
+
+    def test_sota_signed_constraint_audit_accepts_dynamic_signatures_without_forbidden_claims(self):
+        row = sota_signed_constraint_audit(
+            constraint_id="kob_andersen_van_hove_signed_constraints",
+            source_key="kob1995vanhove",
+            model_scope="dynamical_signature",
+            source_observation="KA cooling shows cage plateau, transient NGP, broad van-Hove tails, and recovery",
+            expected_signatures=[
+                "msd_plateau",
+                "transient_ngp_peak",
+                "van_hove_tail",
+                "late_gaussian_recovery",
+            ],
+            passed_signatures=[
+                "msd_plateau",
+                "transient_ngp_peak",
+                "van_hove_tail",
+                "late_gaussian_recovery",
+            ],
+            forbidden_claims=["thermodynamic_transition_derived"],
+            made_claims=["finite_exchange_dynamic_diagnostic"],
+            support_level="derived",
+            quantitative_fit_ready=False,
+        )
+
+        self.assertEqual(row["signed_constraint_class"], "sota_consistent")
+        self.assertEqual(row["missing_expected_signatures"], "none")
+        self.assertEqual(row["forbidden_claims_made"], "none")
+        self.assertEqual(row["all_required_signatures_pass"], 1.0)
+        self.assertEqual(row["publishable_alignment"], 1.0)
+
+    def test_sota_signed_constraint_audit_keeps_spatial_and_thermodynamic_boundaries(self):
+        spatial = sota_signed_constraint_audit(
+            constraint_id="lacevic_four_point_signed_constraints",
+            source_key="lacevic2003fourpoint",
+            model_scope="spatial_heterogeneity",
+            source_observation="four-point susceptibility and dynamic length grow on cooling",
+            expected_signatures=["chi4_peak_growth", "dynamic_length_growth"],
+            passed_signatures=["chi4_peak_growth", "dynamic_length_growth"],
+            forbidden_claims=["microscopic_dynamic_length_derived"],
+            made_claims=["chi4_proxy_closure"],
+            support_level="effective_closure",
+            quantitative_fit_ready=False,
+        )
+        thermodynamic = sota_signed_constraint_audit(
+            constraint_id="kauzmann_thermodynamic_signed_boundary",
+            source_key="kauzmann1948nature;adam1965temperature",
+            model_scope="thermodynamic_transition",
+            source_observation="entropy extrapolation and heat-capacity anomalies require thermodynamic input",
+            expected_signatures=["entropy_closure_required", "heat_capacity_not_derived"],
+            passed_signatures=["entropy_closure_required", "heat_capacity_not_derived"],
+            forbidden_claims=["ideal_glass_transition_derived", "heat_capacity_anomaly_derived"],
+            made_claims=["thermodynamic_scope_boundary"],
+            support_level="closure_only",
+            quantitative_fit_ready=False,
+        )
+        overclaim = sota_signed_constraint_audit(
+            constraint_id="bad_thermodynamic_overclaim",
+            source_key="kauzmann1948nature",
+            model_scope="thermodynamic_transition",
+            source_observation="entropy anomaly",
+            expected_signatures=["entropy_closure_required"],
+            passed_signatures=["entropy_closure_required"],
+            forbidden_claims=["ideal_glass_transition_derived"],
+            made_claims=["ideal_glass_transition_derived"],
+            support_level="closure_only",
+            quantitative_fit_ready=False,
+        )
+
+        self.assertEqual(spatial["signed_constraint_class"], "closure_assisted_consistent")
+        self.assertEqual(spatial["requires_external_closure"], 1.0)
+        self.assertEqual(spatial["publishable_alignment"], 1.0)
+        self.assertEqual(thermodynamic["signed_constraint_class"], "scope_boundary_consistent")
+        self.assertEqual(thermodynamic["requires_external_closure"], 1.0)
+        self.assertEqual(thermodynamic["publishable_alignment"], 1.0)
+        self.assertEqual(overclaim["signed_constraint_class"], "overclaimed_boundary")
+        self.assertEqual(overclaim["publishable_alignment"], 0.0)
 
     def test_observable_falsification_matrix_marks_diagnostic_blockers(self):
         rows = observable_falsification_matrix(

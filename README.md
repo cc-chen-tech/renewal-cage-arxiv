@@ -97,6 +97,11 @@ The SOTA claim-alignment audit then separates source claims into derived
 dynamical support, effective-closure support, and explicit scope boundaries so
 that spatial four-point claims and thermodynamic-transition claims are not
 overstated as consequences of the renewal dynamics alone.
+The SOTA signed-constraint audit goes one step further: each representative
+paper contributes required trend signatures and forbidden overclaims, so the
+repository can state which SOTA conclusions are matched, which are only
+closure-assisted, and which thermodynamic claims remain outside renewal
+dynamics.
 The real-benchmark assimilation gate adds a stricter pre-fit check: a source
 must have the required observables, a shared system/temperature grid,
 machine-readable curves, and uncertainty estimates before it is promoted from
@@ -183,6 +188,7 @@ figures/renewal_cage_thermodynamic_closure.svg
 figures/renewal_cage_mct_beta_closure.svg
 figures/renewal_cage_sota_benchmark_consistency.svg
 figures/renewal_cage_sota_claim_alignment.svg
+figures/renewal_cage_sota_signed_constraints.svg
 figures/renewal_cage_real_benchmark_assimilation_gate.svg
 figures/renewal_cage_cross_observable_prediction_ledger.svg
 figures/renewal_cage_inversion_identifiability_audit.svg
@@ -227,6 +233,7 @@ data/renewal_cage_thermodynamic_closure.csv
 data/renewal_cage_mct_beta_closure.csv
 data/renewal_cage_sota_benchmark_consistency.csv
 data/renewal_cage_sota_claim_alignment.csv
+data/renewal_cage_sota_signed_constraints.csv
 data/renewal_cage_real_benchmark_assimilation_gate.csv
 data/renewal_cage_cross_observable_prediction_ledger.csv
 data/renewal_cage_inversion_identifiability_audit.csv
@@ -268,6 +275,7 @@ paper/figures/renewal_cage_thermodynamic_closure.pdf
 paper/figures/renewal_cage_mct_beta_closure.pdf
 paper/figures/renewal_cage_sota_benchmark_consistency.pdf
 paper/figures/renewal_cage_sota_claim_alignment.pdf
+paper/figures/renewal_cage_sota_signed_constraints.pdf
 paper/figures/renewal_cage_real_benchmark_assimilation_gate.pdf
 paper/figures/renewal_cage_cross_observable_prediction_ledger.pdf
 paper/figures/renewal_cage_inversion_identifiability_audit.pdf

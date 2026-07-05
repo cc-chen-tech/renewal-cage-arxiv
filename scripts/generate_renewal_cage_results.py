@@ -98,6 +98,7 @@ from renewal_cage import (  # noqa: E402
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
+    sota_signed_constraint_audit,
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
@@ -2308,6 +2309,139 @@ def write_sota_claim_alignment_csv(path: Path) -> list[dict[str, float | str]]:
     return rows
 
 
+def write_sota_signed_constraints_csv(path: Path) -> list[dict[str, float | str]]:
+    """Encode representative SOTA conclusions as signed model constraints."""
+
+    rows = [
+        sota_signed_constraint_audit(
+            constraint_id="kob_andersen_van_hove_signed_constraints",
+            source_key="kob1995vanhove",
+            model_scope="dynamical_signature",
+            source_observation="KA cooling shows cage plateau, transient NGP, broad van-Hove tails, and recovery",
+            expected_signatures=[
+                "msd_plateau",
+                "transient_ngp_peak",
+                "van_hove_tail",
+                "late_gaussian_recovery",
+            ],
+            passed_signatures=[
+                "msd_plateau",
+                "transient_ngp_peak",
+                "van_hove_tail",
+                "late_gaussian_recovery",
+            ],
+            forbidden_claims=["thermodynamic_transition_derived"],
+            made_claims=["finite_exchange_dynamic_diagnostic"],
+            support_level="derived",
+            quantitative_fit_ready=False,
+        ),
+        sota_signed_constraint_audit(
+            constraint_id="kob_andersen_alpha_signed_constraints",
+            source_key="kob1995intermediate",
+            model_scope="dynamical_signature",
+            source_observation="KA self-intermediate scattering shows plateau, alpha slowing, and temperature-dependent shape",
+            expected_signatures=[
+                "self_intermediate_plateau",
+                "alpha_slowing",
+                "multi_k_alpha_shape",
+                "tts_breakdown_diagnostic",
+            ],
+            passed_signatures=[
+                "self_intermediate_plateau",
+                "alpha_slowing",
+                "multi_k_alpha_shape",
+                "tts_breakdown_diagnostic",
+            ],
+            forbidden_claims=["unique_mct_critical_law_derived"],
+            made_claims=["renewal_alpha_shape_diagnostic"],
+            support_level="derived",
+            quantitative_fit_ready=False,
+        ),
+        sota_signed_constraint_audit(
+            constraint_id="hedges_persistence_exchange_signed_constraints",
+            source_key="hedges2007persistence",
+            model_scope="transport_decoupling",
+            source_observation="persistence and exchange clocks decouple in atomistic glass formers",
+            expected_signatures=[
+                "persistence_exchange_ratio_growth",
+                "stokes_einstein_product_growth",
+                "late_ngp_recovery_constraint",
+            ],
+            passed_signatures=[
+                "persistence_exchange_ratio_growth",
+                "stokes_einstein_product_growth",
+                "late_ngp_recovery_constraint",
+            ],
+            forbidden_claims=["static_disorder_as_only_mechanism"],
+            made_claims=["finite_exchange_mechanism_selection"],
+            support_level="derived",
+            quantitative_fit_ready=False,
+        ),
+        sota_signed_constraint_audit(
+            constraint_id="lacevic_four_point_signed_constraints",
+            source_key="lacevic2003fourpoint",
+            model_scope="spatial_heterogeneity",
+            source_observation="four-point susceptibility and dynamic length grow on cooling",
+            expected_signatures=["chi4_peak_growth", "dynamic_length_growth"],
+            passed_signatures=["chi4_peak_growth", "dynamic_length_growth"],
+            forbidden_claims=["microscopic_dynamic_length_derived"],
+            made_claims=["chi4_proxy_closure"],
+            support_level="effective_closure",
+            quantitative_fit_ready=False,
+        ),
+        sota_signed_constraint_audit(
+            constraint_id="jung_berthier_experimental_signed_constraints",
+            source_key="berthier2024experimental",
+            model_scope="spatial_heterogeneity",
+            source_observation="experimental dynamic heterogeneity grows close to the laboratory glass transition",
+            expected_signatures=["dynamic_heterogeneity_growth", "near_tg_trajectory_reanalysis_target"],
+            passed_signatures=["dynamic_heterogeneity_growth", "near_tg_trajectory_reanalysis_target"],
+            forbidden_claims=["trajectory_level_chi4_derived_without_data"],
+            made_claims=["frontier_reanalysis_candidate"],
+            support_level="effective_closure",
+            quantitative_fit_ready=False,
+        ),
+        sota_signed_constraint_audit(
+            constraint_id="guan_granick_fickian_ngp_signed_constraints",
+            source_key="guan2014fickian",
+            model_scope="dynamical_signature",
+            source_observation="colloidal particles can be Fickian while displacement distributions remain non-Gaussian",
+            expected_signatures=["fickian_diffusion_with_transient_ngp", "late_gaussian_recovery"],
+            passed_signatures=["fickian_diffusion_with_transient_ngp", "late_gaussian_recovery"],
+            forbidden_claims=["fickian_diffusion_implies_gaussian_displacements"],
+            made_claims=["finite_exchange_fickian_non_gaussian_window"],
+            support_level="derived",
+            quantitative_fit_ready=False,
+        ),
+        sota_signed_constraint_audit(
+            constraint_id="fragility_signed_constraints",
+            source_key="angell1995formation;adam1965temperature",
+            model_scope="dynamical_signature",
+            source_observation="fragile liquids show growing apparent activation while Adam-Gibbs uses entropy input",
+            expected_signatures=["apparent_activation_growth", "material_origin_not_derived"],
+            passed_signatures=["apparent_activation_growth", "material_origin_not_derived"],
+            forbidden_claims=["material_specific_fragility_origin_derived"],
+            made_claims=["barrier_law_condition"],
+            support_level="effective_closure",
+            quantitative_fit_ready=False,
+        ),
+        sota_signed_constraint_audit(
+            constraint_id="kauzmann_thermodynamic_signed_boundary",
+            source_key="kauzmann1948nature;adam1965temperature",
+            model_scope="thermodynamic_transition",
+            source_observation="entropy extrapolation and heat-capacity anomalies require thermodynamic input",
+            expected_signatures=["entropy_closure_required", "heat_capacity_not_derived"],
+            passed_signatures=["entropy_closure_required", "heat_capacity_not_derived"],
+            forbidden_claims=["ideal_glass_transition_derived", "heat_capacity_anomaly_derived"],
+            made_claims=["thermodynamic_scope_boundary"],
+            support_level="closure_only",
+            quantitative_fit_ready=False,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_real_benchmark_assimilation_gate_csv(path: Path) -> list[dict[str, float | str]]:
     """Gate real benchmark sources before any quantitative inversion claim."""
 
@@ -3861,6 +3995,69 @@ def write_sota_claim_alignment_svg(path: Path, rows: list[dict[str, float | str]
     path.write_text(svg)
 
 
+def write_sota_signed_constraints_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 650
+    left, top = 75, 100
+    row_h = 54
+    colors_by_class = {
+        "sota_consistent": "#2f855a",
+        "closure_assisted_consistent": "#2b6cb0",
+        "scope_boundary_consistent": "#805ad5",
+        "missing_signature": "#c05621",
+        "overclaimed_boundary": "#b83280",
+        "not_supported": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        constraint_class = str(row["signed_constraint_class"])
+        color = colors_by_class[constraint_class]
+        missing = str(row["missing_expected_signatures"]).replace("_", " ")
+        forbidden = str(row["forbidden_claims_made"]).replace("_", " ")
+        closure = int(float(row["requires_external_closure"]))
+        publishable = int(float(row["publishable_alignment"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["source_key"])[:30]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 195}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["model_scope"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 380}" y="{y + 1}" width="150" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 390}" y="{y + 16}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{constraint_class.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 550}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">closure={closure}; publishable={publishable}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 735}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">missing: {missing[:30]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 930}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">forbidden made: {forbidden[:22]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 195}" y="{y + 36}" font-family="Arial, sans-serif" font-size="9" fill="#555">{str(row["source_observation"])[:118]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA signed-constraint audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Representative literature conclusions are converted into required signatures and forbidden overclaims.</text>
+  <text x="{left}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">source</text>
+  <text x="{left + 195}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">scope and observation</text>
+  <text x="{left + 380}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">constraint class</text>
+  <text x="{left + 550}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">status</text>
+  {"".join(marks)}
+  <rect x="75" y="580" width="14" height="14" fill="#2f855a" /><text x="96" y="592" font-family="Arial, sans-serif" font-size="12">direct dynamical constraint satisfied</text>
+  <rect x="300" y="580" width="14" height="14" fill="#2b6cb0" /><text x="321" y="592" font-family="Arial, sans-serif" font-size="12">closure-assisted constraint</text>
+  <rect x="505" y="580" width="14" height="14" fill="#805ad5" /><text x="526" y="592" font-family="Arial, sans-serif" font-size="12">thermodynamic scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_real_benchmark_assimilation_gate_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 590
@@ -5152,6 +5349,13 @@ def main() -> None:
     write_sota_claim_alignment_svg(
         FIGURE_DIR / "renewal_cage_sota_claim_alignment.svg",
         sota_claim_alignment_rows,
+    )
+    sota_signed_constraint_rows = write_sota_signed_constraints_csv(
+        DATA_DIR / "renewal_cage_sota_signed_constraints.csv"
+    )
+    write_sota_signed_constraints_svg(
+        FIGURE_DIR / "renewal_cage_sota_signed_constraints.svg",
+        sota_signed_constraint_rows,
     )
     real_assimilation_rows = write_real_benchmark_assimilation_gate_csv(
         DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv"
