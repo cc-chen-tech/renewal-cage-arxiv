@@ -121,6 +121,7 @@ from renewal_cage import (  # noqa: E402
     sota_readme_digest_gate,
     sota_glassbench_payload_index_gate,
     sota_remote_result_curve_cache_gate,
+    sota_remote_result_curve_fetch_gap_gate,
     sota_remote_result_curve_payload_adapter_gate,
     sota_remote_result_curve_observable_semantics_gate,
     sota_remote_zip_central_directory_gate,
@@ -2448,6 +2449,58 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(ka2d["curve_cache_ready"], 1.0)
         self.assertEqual(ka2d["temperature_grid"], "0.30")
         self.assertEqual(ka2d["primary_blocker"], "raw_curve_adapter")
+
+    def test_sota_remote_result_curve_fetch_gap_marks_chi4_target_missing_from_cache(self):
+        central_directory_manifest = {
+            "entries": [
+                "GlassBench/KA_results/times_0.44.dat",
+                "GlassBench/KA_results/chi4_KA_T0.44_update.dat",
+                "GlassBench/KA_results/rhomax_T0.44_MD.dat",
+            ]
+        }
+        range_cache_manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA_results/times_0.44.dat",
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "time_grid",
+                    "crc32_matches": True,
+                    "md5": "time-md5",
+                    "numeric_row_count": 10,
+                    "numeric_column_count": 1,
+                    "range_start": 100,
+                    "range_end": 150,
+                }
+            ]
+        }
+
+        rows = sota_remote_result_curve_fetch_gap_gate(
+            gap_id="glassbench_range_curve_fetch_gap",
+            accession_id="glassbench_zenodo_10118191",
+            central_directory_manifest=central_directory_manifest,
+            range_cache_manifest=range_cache_manifest,
+            target_curve_specs=[
+                {
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "chi4_proxy",
+                    "path": "GlassBench/KA_results/chi4_KA_T0.44_update.dat",
+                    "candidate_observable": "dynamic_heterogeneity_chi4_proxy",
+                }
+            ],
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["fetch_gap_stage"], "remote_target_present_range_cache_missing")
+        self.assertEqual(row["candidate_observable"], "dynamic_heterogeneity_chi4_proxy")
+        self.assertEqual(row["central_directory_present"], 1.0)
+        self.assertEqual(row["range_cache_present"], 0.0)
+        self.assertEqual(row["targeted_fetch_ready"], 1.0)
+        self.assertEqual(row["observable_comparison_ready"], 0.0)
+        self.assertEqual(row["real_inversion_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "range_result_curve_cache")
 
     def test_sota_remote_result_curve_payload_adapter_pairs_time_and_rhomax(self):
         manifest = {

@@ -2188,6 +2188,58 @@ def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_remote_result_curve_fetch_gap_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_remote_result_curve_fetch_gap.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA remote result-curve fetch gap")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Dynamic-heterogeneity targets visible in GlassBench are tracked before range-cached comparison is claimed.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "target")
+    c.drawString(left + 90, top, "stage")
+    c.drawString(left + 385, top, "central")
+    c.drawString(left + 435, top, "cache")
+    c.drawString(left + 485, top, "fetch")
+    c.drawString(left + 535, top, "compare")
+    c.drawString(left + 595, top, "invert")
+    c.drawString(left + 645, top, "blocker")
+    palette = {
+        "remote_target_missing": colors.HexColor("#c05621"),
+        "remote_target_present_range_cache_missing": colors.HexColor("#2b6cb0"),
+        "range_cache_target_parse_blocked": colors.HexColor("#c05621"),
+        "range_cache_target_ready_for_observable_comparison": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica", 6.9)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 42
+        stage = row["fetch_gap_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, f"{row['system_id']} T={row['temperature']} {row['curve_role']}")
+        c.setFillColor(palette[stage])
+        c.rect(left + 90, y - 4, 250, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 96, y, stage.replace("_", " ")[:38])
+        c.setFillColor(colors.black)
+        c.drawString(left + 400, y, str(int(float(row["central_directory_present"]))))
+        c.drawString(left + 450, y, str(int(float(row["range_cache_present"]))))
+        c.drawString(left + 500, y, str(int(float(row["targeted_fetch_ready"]))))
+        c.drawString(left + 555, y, str(int(float(row["observable_comparison_ready"]))))
+        c.drawString(left + 610, y, str(int(float(row["real_inversion_ready"]))))
+        c.drawString(left + 645, y, row["primary_blocker"].replace("_", " ")[:26])
+        c.drawString(left + 90, y - 13, row["target_path"][:100])
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_payload_adapter_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3185,6 +3237,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
+    sota_remote_result_curve_fetch_gap_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_fetch_gap.pdf"
+    )
     sota_remote_result_curve_payload_adapter_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
     )
@@ -3242,6 +3297,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_remote_zip_central_directory_pdf(sota_remote_zip_central_directory_pdf)
     write_sota_glassbench_payload_index_pdf(sota_glassbench_payload_index_pdf)
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
+    write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
     write_sota_remote_result_curve_payload_adapter_pdf(sota_remote_result_curve_payload_adapter_pdf)
     write_sota_remote_result_curve_observable_semantics_pdf(sota_remote_result_curve_observable_semantics_pdf)
     write_sota_readme_schema_pdf(sota_readme_schema_pdf)
@@ -3321,6 +3377,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_remote_result_curve_cache_pdf,
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
+        )
+        archive.write(
+            sota_remote_result_curve_fetch_gap_pdf,
+            "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
         )
         archive.write(
             sota_remote_result_curve_payload_adapter_pdf,

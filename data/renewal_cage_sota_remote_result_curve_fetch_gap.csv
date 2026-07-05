@@ -1,0 +1,2 @@
+gap_id,accession_id,system_id,temperature,curve_role,target_path,candidate_observable,central_directory_present,range_cache_present,range_cache_numeric_ready,targeted_fetch_ready,observable_comparison_ready,real_inversion_ready,primary_blocker,fetch_gap_stage
+glassbench_range_curve_fetch_gap_ka_0.44_chi4_proxy,glassbench_zenodo_10118191,KA,0.44,chi4_proxy,GlassBench/KA_results/chi4_KA_T0.44_update.dat,dynamic_heterogeneity_chi4_proxy,1.0,0.0,0.0,1.0,0.0,0.0,range_result_curve_cache,remote_target_present_range_cache_missing

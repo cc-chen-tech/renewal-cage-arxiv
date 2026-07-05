@@ -2797,6 +2797,104 @@ def sota_remote_result_curve_cache_gate(
     return rows
 
 
+def sota_remote_result_curve_fetch_gap_gate(
+    *,
+    gap_id: str,
+    accession_id: str,
+    central_directory_manifest: dict,
+    range_cache_manifest: dict,
+    target_curve_specs: Sequence[dict[str, str]],
+) -> list[dict[str, float | str]]:
+    """Mark SOTA result curves visible in the archive but absent from range cache."""
+
+    if not gap_id:
+        raise ValueError("gap_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not target_curve_specs:
+        raise ValueError("target_curve_specs must be nonempty")
+
+    central_entries_value = central_directory_manifest.get("entries", [])
+    if not isinstance(central_entries_value, list):
+        central_entries_value = []
+    central_paths = {
+        str(entry.get("path", "")) if isinstance(entry, dict) else str(entry)
+        for entry in central_entries_value
+    }
+
+    cache_entries_value = range_cache_manifest.get("entries", [])
+    cache_entries = (
+        [entry for entry in cache_entries_value if isinstance(entry, dict)]
+        if isinstance(cache_entries_value, list)
+        else []
+    )
+    cache_by_path = {str(entry.get("path", "")): entry for entry in cache_entries if entry.get("path")}
+
+    rows: list[dict[str, float | str]] = []
+    for spec in target_curve_specs:
+        target_path = str(spec.get("path", ""))
+        system_id = str(spec.get("system_id", ""))
+        temperature = str(spec.get("temperature", "none"))
+        curve_role = str(spec.get("curve_role", ""))
+        candidate_observable = str(spec.get("candidate_observable", "unmapped_result_curve"))
+        if not target_path or not system_id or not curve_role:
+            raise ValueError("target specs require path, system_id, and curve_role")
+
+        central_present = target_path in central_paths
+        cache_entry = cache_by_path.get(target_path)
+        cache_present = cache_entry is not None
+        numeric_ready = bool(
+            cache_entry
+            and bool(cache_entry.get("crc32_matches", False))
+            and int(cache_entry.get("numeric_row_count", 0) or 0) > 0
+            and int(cache_entry.get("numeric_column_count", 0) or 0) > 0
+            and int(cache_entry.get("range_start", -1) or -1) >= 0
+            and int(cache_entry.get("range_end", -1) or -1) >= int(cache_entry.get("range_start", 0) or 0)
+        )
+
+        if not central_present:
+            stage = "remote_target_missing"
+            blocker = "central_directory"
+            targeted_fetch_ready = False
+            comparison_ready = False
+        elif not cache_present:
+            stage = "remote_target_present_range_cache_missing"
+            blocker = "range_result_curve_cache"
+            targeted_fetch_ready = True
+            comparison_ready = False
+        elif not numeric_ready:
+            stage = "range_cache_target_parse_blocked"
+            blocker = "range_cache_numeric_payload"
+            targeted_fetch_ready = True
+            comparison_ready = False
+        else:
+            stage = "range_cache_target_ready_for_observable_comparison"
+            blocker = "joint_observable_protocol"
+            targeted_fetch_ready = False
+            comparison_ready = True
+
+        rows.append(
+            {
+                "gap_id": f"{gap_id}_{system_id.lower()}_{temperature}_{curve_role}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "curve_role": curve_role,
+                "target_path": target_path,
+                "candidate_observable": candidate_observable,
+                "central_directory_present": float(central_present),
+                "range_cache_present": float(cache_present),
+                "range_cache_numeric_ready": float(numeric_ready),
+                "targeted_fetch_ready": float(targeted_fetch_ready),
+                "observable_comparison_ready": float(comparison_ready),
+                "real_inversion_ready": 0.0,
+                "primary_blocker": blocker,
+                "fetch_gap_stage": stage,
+            }
+        )
+    return rows
+
+
 def _numeric_payload_rows(entry: dict) -> list[list[float]]:
     rows_value = entry.get("rows", [])
     if not isinstance(rows_value, list):

@@ -155,8 +155,13 @@ The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
 files by CRC32, md5, byte range, and numeric row/column counts. The
-checksum-valid KA `chi4` update file is not numeric-table-ready, so it remains
-a raw-curve adapter issue rather than a claimed inversion input.
+KA `chi4` update file is visible in the remote central directory but is not
+yet in the range cache, so it remains a targeted byte-range fetch issue rather
+than a claimed observable comparison or inversion input.
+The result-curve fetch-gap gate records this explicitly:
+`GlassBench/KA_results/chi4_KA_T0.44_update.dat` is a
+`dynamic_heterogeneity_chi4_proxy` target with `targeted_fetch_ready=1`,
+`observable_comparison_ready=0`, and `real_inversion_ready=0`.
 The companion payload adapter stores the actual numeric rows from those byte
 ranges and pairs time grids with same-temperature `rhomax` curves. KA2D at
 `T=0.30` has structurally adapter-ready `rhomax_md` and `rhomax_bb` rows; KA at
@@ -257,6 +262,7 @@ figures/renewal_cage_sota_zenodo_record_fingerprint.svg
 figures/renewal_cage_sota_remote_zip_central_directory.svg
 figures/renewal_cage_sota_glassbench_payload_index.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
+figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_payload_adapter.svg
 figures/renewal_cage_sota_remote_result_curve_observable_semantics.svg
 figures/renewal_cage_sota_readme_schema.svg
@@ -317,6 +323,7 @@ data/renewal_cage_sota_archive_preflight.csv
 data/renewal_cage_sota_remote_zip_central_directory.csv
 data/renewal_cage_sota_glassbench_payload_index.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
+data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_payload_adapter.csv
 data/renewal_cage_sota_remote_result_curve_observable_semantics.csv
 data/renewal_cage_sota_readme_digest.csv
@@ -389,6 +396,7 @@ paper/figures/renewal_cage_sota_zenodo_record_fingerprint.pdf
 paper/figures/renewal_cage_sota_remote_zip_central_directory.pdf
 paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
+paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf
