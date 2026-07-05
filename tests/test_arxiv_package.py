@@ -1253,6 +1253,13 @@ class ArxivPackageTests(unittest.TestCase):
         discussion_index = main_tex.index("\\section{Discussion}")
         self.assertIn("\\clearpage", main_tex[raw_protocol_index:discussion_index])
 
+    def test_sota_trajectory_payload_locator_flushes_float_batch(self):
+        main_tex = (ROOT / "paper" / "main.tex").read_text()
+        locator_index = main_tex.index("figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf")
+        reanalysis_index = main_tex.index("The reanalysis-state ledger")
+
+        self.assertIn("\\clearpage", main_tex[locator_index:reanalysis_index])
+
     def test_main_text_does_not_overclaim_complete_glass_transition_theory(self):
         text = (ROOT / "paper" / "main.tex").read_text().lower()
         normalized = " ".join(text.split())
