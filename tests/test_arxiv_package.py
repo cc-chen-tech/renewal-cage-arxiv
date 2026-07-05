@@ -516,6 +516,24 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(float(peak["ngp"]), 0.0)
         self.assertIn("1.1", peak["wave_numbers"])
 
+    def test_trajectory_adapter_demo_exports_observables_from_local_table(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_adapter_demo.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        self.assertGreaterEqual(len(rows), 4)
+        for row in rows:
+            self.assertEqual(row["adapter_source"], "synthetic_local_particle_table")
+            self.assertEqual(float(row["adapter_ready"]), 1.0)
+            self.assertEqual(float(row["frame_count"]), 9.0)
+            self.assertEqual(float(row["particle_count"]), 12.0)
+            self.assertEqual(float(row["dimension"]), 1.0)
+            self.assertIn("msd", row["structural_observable_set"])
+        peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+        self.assertGreater(float(peak["chi4_overlap"]), 0.1)
+        self.assertGreater(float(peak["ngp"]), 0.0)
+
     def test_trajectory_uncertainty_protocol_exports_jackknife_sigmas(self):
         path = ROOT / "data" / "renewal_cage_trajectory_uncertainty_protocol.csv"
         self.assertTrue(path.exists())

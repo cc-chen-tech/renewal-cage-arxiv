@@ -1085,6 +1085,14 @@ KA and KA2D rows are therefore kept at the remote-contract stage with
 \texttt{coordinate\_file} as the first blocker, while a synthetic local row
 demonstrates the positive ready state. This is an accession-to-adapter protocol,
 not a claim that real GlassBench trajectories have already been fitted.
+The companion dry-run file
+\texttt{renewal\_cage\_trajectory\_adapter\_demo.csv} then exercises the local
+adapter path on a deterministic particle table: rows with frame, time,
+particle identity, and coordinate columns are sorted into a
+frame--particle--coordinate tensor before the MSD, NGP, self-intermediate
+scattering, and overlap-$\chi_4$ extraction is run. This makes the remaining
+GlassBench step a concrete column/path mapping problem for an extracted archive,
+rather than an unspecified data-ingestion task.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the

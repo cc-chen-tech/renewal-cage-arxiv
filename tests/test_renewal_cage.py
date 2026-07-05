@@ -123,6 +123,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_inversion_readiness_gate,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
+    trajectory_table_adapter,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -2552,6 +2553,54 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 lag_indices=[1],
                 wave_numbers=[1.0],
                 overlap_radius=0.5,
+            )
+
+    def test_trajectory_table_adapter_orders_frames_particles_and_extracts_arrays(self):
+        records = [
+            {"frame": 1, "time": 1.0, "particle_id": "b", "x": 2.0, "y": 0.0},
+            {"frame": 0, "time": 0.0, "particle_id": "a", "x": 0.0, "y": 0.0},
+            {"frame": 1, "time": 1.0, "particle_id": "a", "x": 1.0, "y": 0.0},
+            {"frame": 0, "time": 0.0, "particle_id": "b", "x": 0.0, "y": 1.0},
+        ]
+
+        adapted = trajectory_table_adapter(
+            records=records,
+            frame_column="frame",
+            time_column="time",
+            particle_column="particle_id",
+            coordinate_columns=["x", "y"],
+        )
+
+        self.assertEqual(adapted["frame_ids"], "0;1")
+        self.assertEqual(adapted["particle_ids"], "a;b")
+        self.assertEqual(adapted["frame_count"], 2.0)
+        self.assertEqual(adapted["particle_count"], 2.0)
+        self.assertEqual(adapted["dimension"], 2.0)
+        np.testing.assert_allclose(adapted["times"], np.array([0.0, 1.0]))
+        np.testing.assert_allclose(
+            adapted["positions"],
+            np.array(
+                [
+                    [[0.0, 0.0], [0.0, 1.0]],
+                    [[1.0, 0.0], [2.0, 0.0]],
+                ]
+            ),
+        )
+
+    def test_trajectory_table_adapter_rejects_missing_frame_particle_rows(self):
+        records = [
+            {"frame": 0, "time": 0.0, "particle_id": "a", "x": 0.0},
+            {"frame": 0, "time": 0.0, "particle_id": "b", "x": 1.0},
+            {"frame": 1, "time": 1.0, "particle_id": "a", "x": 2.0},
+        ]
+
+        with self.assertRaisesRegex(ValueError, "complete rectangular"):
+            trajectory_table_adapter(
+                records=records,
+                frame_column="frame",
+                time_column="time",
+                particle_column="particle_id",
+                coordinate_columns=["x"],
             )
 
     def test_trajectory_observable_uncertainty_protocol_adds_jackknife_sigmas(self):

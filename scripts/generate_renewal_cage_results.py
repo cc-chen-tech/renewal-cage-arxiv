@@ -114,6 +114,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_adapter_contract,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
+    trajectory_table_adapter,
     trajectory_inversion_readiness_gate,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
@@ -3384,6 +3385,24 @@ def synthetic_intermittent_trajectory() -> tuple[np.ndarray, np.ndarray]:
     return positions, times
 
 
+def synthetic_intermittent_trajectory_table() -> list[dict[str, float | int | str]]:
+    """Serialize the deterministic intermittent trajectory as a local particle table."""
+
+    positions, times = synthetic_intermittent_trajectory()
+    records: list[dict[str, float | int | str]] = []
+    for frame_idx, time_value in enumerate(times):
+        for particle_idx in range(positions.shape[1]):
+            record: dict[str, float | int | str] = {
+                "frame": int(frame_idx),
+                "time": float(time_value),
+                "particle_id": f"p{particle_idx:02d}",
+                "x": float(positions[frame_idx, particle_idx, 0]),
+            }
+            records.append(record)
+    # Reverse the table to prove the adapter, not insertion order, defines arrays.
+    return list(reversed(records))
+
+
 def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float | str]]:
     """Extract raw observables from a deterministic intermittent trajectory."""
 
@@ -3401,6 +3420,37 @@ def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float
         row["machine_readable_trajectory"] = 1.0
         row["uncertainty_estimates"] = 0.0
         row["primary_blocker"] = "uncertainty_estimates"
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_trajectory_adapter_demo_csv(path: Path) -> list[dict[str, float | str]]:
+    """Extract trajectory observables through the local particle-table adapter."""
+
+    adapted = trajectory_table_adapter(
+        records=synthetic_intermittent_trajectory_table(),
+        frame_column="frame",
+        time_column="time",
+        particle_column="particle_id",
+        coordinate_columns=["x"],
+    )
+    rows = trajectory_observable_protocol(
+        positions=adapted["positions"],
+        times=adapted["times"],
+        lag_indices=[1, 2, 3, 4],
+        wave_numbers=[0.7, 1.1, 1.6],
+        overlap_radius=0.5,
+    )
+    for row in rows:
+        row["benchmark_id"] = "synthetic_intermittent_trajectory_table"
+        row["adapter_source"] = "synthetic_local_particle_table"
+        row["adapter_ready"] = adapted["adapter_ready"]
+        row["frame_count"] = adapted["frame_count"]
+        row["particle_count"] = adapted["particle_count"]
+        row["dimension"] = adapted["dimension"]
+        row["coordinate_columns"] = adapted["coordinate_columns"]
+        row["target_protocol"] = "local_table_adapter_to_observable_bridge"
+        row["primary_blocker"] = "none"
     write_sweep_csv(path, rows)
     return rows
 
@@ -6489,6 +6539,9 @@ def main() -> None:
     write_trajectory_observable_protocol_svg(
         FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.svg",
         trajectory_observable_rows,
+    )
+    write_trajectory_adapter_demo_csv(
+        DATA_DIR / "renewal_cage_trajectory_adapter_demo.csv"
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

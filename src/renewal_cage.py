@@ -2668,6 +2668,101 @@ def raw_curve_persistence_exchange_protocol(
     return out
 
 
+def _trajectory_adapter_sort_key(value: object) -> tuple[int, float | str]:
+    try:
+        return (0, float(value))
+    except (TypeError, ValueError):
+        return (1, str(value))
+
+
+def trajectory_table_adapter(
+    *,
+    records: Sequence[dict[str, object]],
+    frame_column: str,
+    time_column: str,
+    particle_column: str,
+    coordinate_columns: Sequence[str],
+) -> dict[str, object]:
+    """Convert a local particle table into protocol-ready trajectory arrays."""
+
+    if not records:
+        raise ValueError("records must be nonempty")
+    for name, value in {
+        "frame_column": frame_column,
+        "time_column": time_column,
+        "particle_column": particle_column,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if not coordinate_columns:
+        raise ValueError("coordinate_columns must be nonempty")
+    if any(not column for column in coordinate_columns):
+        raise ValueError("coordinate_columns must contain nonempty strings")
+
+    coordinate_names = list(dict.fromkeys(coordinate_columns))
+    required_columns = [frame_column, time_column, particle_column, *coordinate_names]
+    for idx, record in enumerate(records):
+        missing = [column for column in required_columns if column not in record]
+        if missing:
+            raise ValueError(f"record {idx} is missing required columns: {';'.join(missing)}")
+
+    frame_values = sorted(
+        dict.fromkeys(record[frame_column] for record in records),
+        key=_trajectory_adapter_sort_key,
+    )
+    particle_values = sorted(
+        dict.fromkeys(record[particle_column] for record in records),
+        key=_trajectory_adapter_sort_key,
+    )
+    if len(frame_values) < 2:
+        raise ValueError("at least two frames are required")
+    if not particle_values:
+        raise ValueError("at least one particle is required")
+
+    frame_index = {value: idx for idx, value in enumerate(frame_values)}
+    particle_index = {value: idx for idx, value in enumerate(particle_values)}
+    times_by_frame: dict[object, float] = {}
+    positions = np.empty((len(frame_values), len(particle_values), len(coordinate_names)), dtype=float)
+    seen: set[tuple[int, int]] = set()
+    for record in records:
+        frame_value = record[frame_column]
+        particle_value = record[particle_column]
+        frame_idx = frame_index[frame_value]
+        particle_idx = particle_index[particle_value]
+        key = (frame_idx, particle_idx)
+        if key in seen:
+            raise ValueError("records must contain at most one row per frame-particle pair")
+        seen.add(key)
+
+        time_value = float(record[time_column])
+        previous_time = times_by_frame.get(frame_value)
+        if previous_time is not None and not math.isclose(previous_time, time_value, rel_tol=1e-14, abs_tol=1e-14):
+            raise ValueError("all rows for a frame must share the same time")
+        times_by_frame[frame_value] = time_value
+        for dim_idx, column in enumerate(coordinate_names):
+            positions[frame_idx, particle_idx, dim_idx] = float(record[column])
+
+    expected_count = len(frame_values) * len(particle_values)
+    if len(seen) != expected_count:
+        raise ValueError("records must form a complete rectangular frame-particle table")
+
+    times = np.array([times_by_frame[frame_value] for frame_value in frame_values], dtype=float)
+    if np.any(np.diff(times) <= 0.0):
+        raise ValueError("frame times must be strictly increasing after sorting")
+
+    return {
+        "positions": positions,
+        "times": times,
+        "frame_ids": ";".join(str(value) for value in frame_values),
+        "particle_ids": ";".join(str(value) for value in particle_values),
+        "coordinate_columns": ";".join(coordinate_names),
+        "frame_count": float(len(frame_values)),
+        "particle_count": float(len(particle_values)),
+        "dimension": float(len(coordinate_names)),
+        "adapter_ready": 1.0,
+    }
+
+
 def trajectory_observable_protocol(
     *,
     positions: np.ndarray,
