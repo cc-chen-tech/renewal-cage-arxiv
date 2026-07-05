@@ -404,6 +404,14 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertNotEqual(preceding_begin, -1)
             self.assertIn("\\begin{figure}[p]", main_tex[preceding_begin:figure_index])
 
+    def test_readiness_page_float_batch_flushes_before_h_figures(self):
+        main_tex = (ROOT / "paper" / "main.tex").read_text()
+        raw_protocol_index = main_tex.index(
+            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
+        )
+        barrier_index = main_tex.index("figures/renewal_cage_barrier_requirements.pdf")
+        self.assertIn("\\clearpage", main_tex[raw_protocol_index:barrier_index])
+
     def test_final_comparison_table_is_not_a_late_float(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
         discussion_index = main_tex.index("Table~\\ref{tab:comparison}")
