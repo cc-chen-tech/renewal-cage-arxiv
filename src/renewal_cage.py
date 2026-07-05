@@ -765,6 +765,62 @@ def persistence_exchange_benchmark_consistency(
     }
 
 
+def van_hove_tail_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_transient_van_hove_tail: bool,
+    observed_late_gaussian_recovery: bool,
+    peak_tail_ratio: float,
+    late_tail_ratio: float,
+    peak_ngp: float,
+    min_peak_tail_ratio: float,
+    max_late_tail_deviation: float,
+    min_peak_ngp: float,
+) -> dict[str, float | str]:
+    """Check transient self-van-Hove tails together with late Gaussian recovery."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "peak_tail_ratio": peak_tail_ratio,
+        "late_tail_ratio": late_tail_ratio,
+        "min_peak_tail_ratio": min_peak_tail_ratio,
+        "max_late_tail_deviation": max_late_tail_deviation,
+        "min_peak_ngp": min_peak_ngp,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if peak_ngp < 0.0:
+        raise ValueError("peak_ngp must be nonnegative")
+
+    tail_flag = peak_tail_ratio >= min_peak_tail_ratio
+    late_deviation = abs(late_tail_ratio - 1.0)
+    recovery_flag = late_deviation <= max_late_tail_deviation
+    peak_ngp_flag = peak_ngp >= min_peak_ngp
+    model_tail_flag = tail_flag and peak_ngp_flag
+    tail_consistent = model_tail_flag == observed_transient_van_hove_tail
+    recovery_consistent = recovery_flag == observed_late_gaussian_recovery
+    peak_ngp_consistent = peak_ngp_flag == observed_transient_van_hove_tail
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_transient_van_hove_tail": float(observed_transient_van_hove_tail),
+        "observed_late_tail_gaussian_recovery": float(observed_late_gaussian_recovery),
+        "peak_tail_ratio": peak_tail_ratio,
+        "late_tail_ratio": late_tail_ratio,
+        "late_tail_abs_deviation": late_deviation,
+        "peak_ngp_benchmark": peak_ngp,
+        "min_peak_tail_ratio": min_peak_tail_ratio,
+        "max_late_tail_deviation": max_late_tail_deviation,
+        "min_peak_ngp": min_peak_ngp,
+        "model_predicts_transient_van_hove_tail": float(model_tail_flag),
+        "model_predicts_tail_gaussian_recovery": float(recovery_flag),
+        "van_hove_tail_consistent": float(tail_consistent),
+        "tail_recovery_consistent": float(recovery_consistent),
+        "peak_ngp_consistent": float(peak_ngp_consistent),
+        "overall_consistent": float(tail_consistent and recovery_consistent and peak_ngp_consistent),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

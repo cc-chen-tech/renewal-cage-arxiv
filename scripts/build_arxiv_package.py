@@ -919,6 +919,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
+    van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
@@ -1003,6 +1004,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(persistence_exchange_row['overall_consistent']))}; "
         f"tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}; "
         f"late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}",
+    )
+    c.drawString(
+        430,
+        48,
+        "van Hove row consistent = "
+        f"{int(float(van_hove_row['overall_consistent']))}; "
+        f"peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}; "
+        f"late tail = {float(van_hove_row['late_tail_ratio']):.2f}",
     )
     c.showPage()
     c.save()

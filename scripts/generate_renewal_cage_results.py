@@ -80,6 +80,7 @@ from renewal_cage import (  # noqa: E402
     stokes_einstein_benchmark_consistency,
     temperature_dependent_params,
     temperature_scan,
+    van_hove_tail_benchmark_consistency,
 )
 
 
@@ -749,6 +750,7 @@ def write_sota_benchmark_consistency_csv(
     temperature_law: TemperatureLawParams,
     spatial_chi4_rows: list[dict[str, float]],
     alpha_shape_rows: list[dict[str, float | str]],
+    tail_ratio_rows: list[dict[str, float | str]],
 ) -> list[dict[str, float | str]]:
     fieldnames = [
         "benchmark_id",
@@ -810,6 +812,20 @@ def write_sota_benchmark_consistency_csv(
         "persistence_exchange_ratio_consistent",
         "persistence_exchange_late_ngp_consistent",
         "persistence_exchange_rejection_consistent",
+        "observed_transient_van_hove_tail",
+        "observed_late_tail_gaussian_recovery",
+        "peak_tail_ratio",
+        "late_tail_ratio",
+        "late_tail_abs_deviation",
+        "peak_ngp_benchmark",
+        "min_peak_tail_ratio",
+        "max_late_tail_deviation",
+        "min_peak_ngp",
+        "model_predicts_transient_van_hove_tail",
+        "model_predicts_tail_gaussian_recovery",
+        "van_hove_tail_consistent",
+        "tail_recovery_consistent",
+        "peak_ngp_consistent",
         "overall_consistent",
     ]
 
@@ -925,6 +941,21 @@ def write_sota_benchmark_consistency_csv(
         min_persistence_exchange_ratio=2.0,
         max_late_ngp_abs_log_residual=0.1,
     )
+    tail_by_label = {str(row["time_label"]): row for row in tail_ratio_rows}
+    if "t=11.3" not in tail_by_label or "t=80.0" not in tail_by_label:
+        raise ValueError("tail_ratio_rows must include peak and late rows")
+    peak_ngp = float(np.max(ngp_1d(np.linspace(0.0, 80.0, 800), params)))
+    van_hove_row = van_hove_tail_benchmark_consistency(
+        benchmark_id="kob_andersen_van_hove_tail_recovery",
+        observed_transient_van_hove_tail=True,
+        observed_late_gaussian_recovery=True,
+        peak_tail_ratio=float(tail_by_label["t=11.3"]["tail_ratio"]),
+        late_tail_ratio=float(tail_by_label["t=80.0"]["tail_ratio"]),
+        peak_ngp=peak_ngp,
+        min_peak_tail_ratio=1.5,
+        max_late_tail_deviation=0.15,
+        min_peak_ngp=0.05,
+    )
     rows = [
         normalize(mct_row, "mct_beta_window"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
@@ -932,6 +963,7 @@ def write_sota_benchmark_consistency_csv(
         normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
         normalize(tts_row, "alpha_tts_breakdown"),
         normalize(persistence_exchange_row, "persistence_exchange_inversion"),
+        normalize(van_hove_row, "van_hove_tail_recovery"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -1332,7 +1364,7 @@ def write_tail_ratio_csv(
     gaussian_curves: list[tuple[str, np.ndarray]],
     *,
     tail_radius: float,
-) -> None:
+) -> list[dict[str, float | str]]:
     path.parent.mkdir(parents=True, exist_ok=True)
     mask = radius >= tail_radius
     rows = []
@@ -1349,6 +1381,7 @@ def write_tail_ratio_csv(
             }
         )
     write_sweep_csv(path, rows)
+    return rows
 
 
 def write_diagnostics_csv(
@@ -2220,7 +2253,7 @@ def write_mct_beta_closure_svg(path: Path, rows: list[dict[str, float]], base: M
 
 def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    width, height = 1120, 590
+    width, height = 1120, 610
     by_id = {str(row["benchmark_id"]): row for row in rows}
     mct_row = by_id["kob_andersen_1995_beta_window"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
@@ -2228,6 +2261,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
+    van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
@@ -2286,6 +2320,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_b}" y="{bottom + 92}" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = {int(float(heterogeneity_row['overall_consistent']))}; xi4 growth = {float(heterogeneity_row['length_growth']):.2f}, chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}</text>
   <text x="{left_b}" y="{bottom + 110}" font-family="Arial, sans-serif" font-size="12">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
   <text x="{left_b}" y="{bottom + 128}" font-family="Arial, sans-serif" font-size="12">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
+  <text x="{left_b}" y="{bottom + 146}" font-family="Arial, sans-serif" font-size="12">van Hove row consistent = {int(float(van_hove_row['overall_consistent']))}; peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}, late tail = {float(van_hove_row['late_tail_ratio']):.2f}</text>
 </svg>
 """
     path.write_text(svg)
@@ -2938,7 +2973,7 @@ def main() -> None:
         coordinate_variance = moments_1d(np.array([value]), params)["m2"][0]
         gaussian_curves.append((f"gaussian_t={value:.1f}", gaussian_radial_3d(radius, coordinate_variance=coordinate_variance)))
     write_van_hove_csv(DATA_DIR / "renewal_cage_van_hove.csv", radius, van_hove_curves + gaussian_curves)
-    write_tail_ratio_csv(
+    tail_ratio_rows = write_tail_ratio_csv(
         DATA_DIR / "renewal_cage_tail_ratios.csv",
         radius,
         van_hove_curves,
@@ -3098,6 +3133,7 @@ def main() -> None:
         temperature_law,
         spatial_chi4_rows,
         alpha_shape_rows,
+        tail_ratio_rows,
     )
     write_sota_benchmark_consistency_svg(
         FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.svg",

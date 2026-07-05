@@ -60,6 +60,7 @@ from renewal_cage import (  # noqa: E402
     observable_consistency_diagnostics,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
+    van_hove_tail_benchmark_consistency,
     local_cage_variance,
     moments_1d,
     moments_3d,
@@ -1240,6 +1241,28 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["overall_consistent"], 1.0)
         self.assertGreater(row["inferred_persistence_exchange_ratio"], row["min_persistence_exchange_ratio"])
         self.assertLess(abs(row["late_ngp_log_residual_benchmark"]), row["max_late_ngp_abs_log_residual"])
+
+    def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
+        row = van_hove_tail_benchmark_consistency(
+            benchmark_id="kob_andersen_van_hove_tail_recovery",
+            observed_transient_van_hove_tail=True,
+            observed_late_gaussian_recovery=True,
+            peak_tail_ratio=2.895,
+            late_tail_ratio=0.966,
+            peak_ngp=0.126,
+            min_peak_tail_ratio=1.5,
+            max_late_tail_deviation=0.15,
+            min_peak_ngp=0.05,
+        )
+
+        self.assertEqual(row["model_predicts_transient_van_hove_tail"], 1.0)
+        self.assertEqual(row["model_predicts_tail_gaussian_recovery"], 1.0)
+        self.assertEqual(row["van_hove_tail_consistent"], 1.0)
+        self.assertEqual(row["tail_recovery_consistent"], 1.0)
+        self.assertEqual(row["peak_ngp_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+        self.assertGreater(row["peak_tail_ratio"], row["min_peak_tail_ratio"])
+        self.assertLess(row["late_tail_abs_deviation"], row["max_late_tail_deviation"])
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

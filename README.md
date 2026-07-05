@@ -75,7 +75,8 @@ into checkable rows, currently covering Kob-Andersen beta-window visibility and
 Gaussian-recovery mechanism selection against the static-disorder null, plus
 fractional Stokes-Einstein decoupling, dynamic-heterogeneity chi4 growth, and
 alpha-shape time-temperature-superposition breakdown, plus a
-persistence/exchange transport inversion with held-out late-NGP validation.
+persistence/exchange transport inversion with held-out late-NGP validation and
+a van Hove tail/recovery consistency check.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 
