@@ -1080,6 +1080,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     joint_row = by_id["joint_persistence_exchange_multik_chi4_protocol"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
+    thermodynamic_scope_row = by_id["thermodynamic_transition_scope_boundary"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
@@ -1163,6 +1164,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(joint_row['overall_consistent']))}; "
         f"SE growth = {float(joint_row['joint_stokes_einstein_growth_over_poisson']):.2f}; "
         f"mismatch residual = {float(joint_row['rejected_mismatch_abs_log_residual']):.2f}",
+    )
+    c.drawString(
+        45,
+        48,
+        "thermo scope row consistent = "
+        f"{int(float(thermodynamic_scope_row['overall_consistent']))}; "
+        f"dynamic entropy = {int(float(thermodynamic_scope_row['dynamic_model_derives_entropy']))}; "
+        f"AG = {float(thermodynamic_scope_row['thermodynamic_adam_gibbs_slowdown']):.2g}",
     )
     c.drawString(430, 118, f"recovery row consistent = {int(float(recovery_row['overall_consistent']))}")
     c.drawString(

@@ -93,6 +93,7 @@ from renewal_cage import (  # noqa: E402
     static_gamma_normalized_alpha_decay,
     stokes_einstein_benchmark_consistency,
     stretched_alpha_benchmark_consistency,
+    thermodynamic_scope_benchmark_consistency,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
@@ -1212,6 +1213,19 @@ def write_sota_benchmark_consistency_csv(
         "fragility_index_consistent",
         "adam_gibbs_slowdown_consistent",
         "fragility_scope_boundary_consistent",
+        "observed_heat_capacity_anomaly",
+        "observed_kauzmann_extrapolation",
+        "dynamic_model_derives_entropy",
+        "entropy_closure_supplied",
+        "thermodynamic_adam_gibbs_slowdown",
+        "min_thermodynamic_adam_gibbs_slowdown",
+        "material_specific_entropy_origin_claimed",
+        "model_predicts_heat_capacity_anomaly_from_dynamics",
+        "model_predicts_kauzmann_transition_from_dynamics",
+        "entropy_closure_required",
+        "heat_capacity_scope_consistent",
+        "kauzmann_scope_consistent",
+        "thermodynamic_scope_boundary_consistent",
         "overall_consistent",
     ]
 
@@ -1449,6 +1463,16 @@ def write_sota_benchmark_consistency_csv(
         min_fragility_growth=1.5,
         min_adam_gibbs_slowdown=10.0,
     )
+    thermodynamic_scope_row = thermodynamic_scope_benchmark_consistency(
+        benchmark_id="thermodynamic_transition_scope_boundary",
+        observed_heat_capacity_anomaly=True,
+        observed_kauzmann_extrapolation=True,
+        dynamic_model_derives_entropy=False,
+        entropy_closure_supplied=True,
+        adam_gibbs_slowdown=thermodynamic_rows[-1]["thermodynamic_slowdown"],
+        min_adam_gibbs_slowdown=10.0,
+        material_specific_entropy_origin_claimed=False,
+    )
     rows = [
         normalize(cage_row, "cage_localization"),
         normalize(mct_row, "mct_beta_window"),
@@ -1464,6 +1488,7 @@ def write_sota_benchmark_consistency_csv(
         normalize(joint_row, "joint_inversion_falsification"),
         normalize(van_hove_row, "van_hove_tail_recovery"),
         normalize(fragility_row, "fragility_adam_gibbs"),
+        normalize(thermodynamic_scope_row, "thermodynamic_scope_boundary"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -2832,6 +2857,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     joint_row = by_id["joint_persistence_exchange_multik_chi4_protocol"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
+    thermodynamic_scope_row = by_id["thermodynamic_transition_scope_boundary"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
@@ -2898,6 +2924,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_b}" y="{bottom + 148}" font-family="Arial, sans-serif" font-size="11">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
   <text x="{left_b}" y="{bottom + 164}" font-family="Arial, sans-serif" font-size="11">van Hove row consistent = {int(float(van_hove_row['overall_consistent']))}; peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}, late tail = {float(van_hove_row['late_tail_ratio']):.2f}</text>
   <text x="{left_b}" y="{bottom + 180}" font-family="Arial, sans-serif" font-size="11">fragility row consistent = {int(float(fragility_row['overall_consistent']))}; m growth = {float(fragility_row['fragility_index_growth']):.2f}, AG slowdown = {float(fragility_row['adam_gibbs_slowdown']):.2g}</text>
+  <text x="{left_b}" y="{bottom + 196}" font-family="Arial, sans-serif" font-size="11">thermo scope row consistent = {int(float(thermodynamic_scope_row['overall_consistent']))}; dynamic entropy = {int(float(thermodynamic_scope_row['dynamic_model_derives_entropy']))}, AG = {float(thermodynamic_scope_row['thermodynamic_adam_gibbs_slowdown']):.2g}</text>
 </svg>
 """
     path.write_text(svg)

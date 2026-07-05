@@ -86,7 +86,8 @@ time-temperature-superposition breakdown, spatial facilitation-front
 growth-law inversion, KWW stretched-alpha window fitting, persistence/exchange
 transport inversion with held-out late-NGP validation, joint multi-k/chi4
 persistence-exchange falsification, a van Hove tail/recovery consistency
-check, and an Angell/Adam-Gibbs fragility-growth scope check.
+check, an Angell/Adam-Gibbs fragility-growth scope check, and a
+thermodynamic-transition no-go/scope-boundary row.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 

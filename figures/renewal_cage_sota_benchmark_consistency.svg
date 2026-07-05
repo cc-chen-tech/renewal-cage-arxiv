@@ -25,4 +25,5 @@
   <text x="660" y="578" font-family="Arial, sans-serif" font-size="11">persistence/exchange row consistent = 1; tau_p/tau_x = 9.0, late residual = 0</text>
   <text x="660" y="594" font-family="Arial, sans-serif" font-size="11">van Hove row consistent = 1; peak tail = 2.90, late tail = 0.97</text>
   <text x="660" y="610" font-family="Arial, sans-serif" font-size="11">fragility row consistent = 1; m growth = 2.06, AG slowdown = 1.5e+08</text>
+  <text x="660" y="626" font-family="Arial, sans-serif" font-size="11">thermo scope row consistent = 1; dynamic entropy = 0, AG = 1.5e+08</text>
 </svg>

@@ -948,6 +948,11 @@ diffusive-front closure rather than a full facilitation-field theory
 is an Adam-Gibbs/Kauzmann closure rather than a microscopic entropy derivation;
 and the MCT beta window is an effective two-exponent closure rather than a
 derived memory-kernel calculation.
+The benchmark-consistency table therefore includes a separate thermodynamic
+scope row: heat-capacity and Kauzmann signatures are treated as observed
+benchmarks, while the renewal dynamics sets
+\texttt{dynamic\_model\_derives\_entropy}=0; Adam-Gibbs slowdown is generated
+only after the explicit entropy closure is supplied.
 The companion file
 \texttt{renewal\_cage\_sota\_benchmark\_consistency.csv} begins converting
 these literature statements into explicit checks. The first row checks cage
@@ -1176,7 +1181,10 @@ agreement and a future raw-data fit.
   The fourteenth row checks Angell/Adam-Gibbs fragility growth
   \cite{angell1995formation,adam1965temperature} through apparent activation
   and local fragility growth while preserving the scope boundary that
-  material-specific fragility origins are not derived.}
+  material-specific fragility origins are not derived. The fifteenth row records
+  the thermodynamic-transition scope boundary: heat-capacity and Kauzmann
+  signatures require the explicit entropy closure and are not derived from
+  renewal dynamics alone.}
 \end{figure}
 
 \begin{figure}[h]

@@ -101,6 +101,7 @@ from renewal_cage import (  # noqa: E402
     stokes_einstein_benchmark_consistency,
     stretched_alpha_benchmark_consistency,
     stokes_einstein_product,
+    thermodynamic_scope_benchmark_consistency,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
@@ -1512,6 +1513,25 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["overall_consistent"], 1.0)
         self.assertGreater(row["activation_energy_growth"], row["min_activation_growth"])
         self.assertGreater(row["fragility_index_growth"], row["min_fragility_growth"])
+
+    def test_thermodynamic_scope_benchmark_consistency_keeps_entropy_closure_boundary(self):
+        row = thermodynamic_scope_benchmark_consistency(
+            benchmark_id="thermodynamic_transition_scope_boundary",
+            observed_heat_capacity_anomaly=True,
+            observed_kauzmann_extrapolation=True,
+            dynamic_model_derives_entropy=False,
+            entropy_closure_supplied=True,
+            adam_gibbs_slowdown=1.48e8,
+            min_adam_gibbs_slowdown=10.0,
+            material_specific_entropy_origin_claimed=False,
+        )
+
+        self.assertEqual(row["model_predicts_heat_capacity_anomaly_from_dynamics"], 0.0)
+        self.assertEqual(row["model_predicts_kauzmann_transition_from_dynamics"], 0.0)
+        self.assertEqual(row["entropy_closure_required"], 1.0)
+        self.assertEqual(row["adam_gibbs_slowdown_consistent"], 1.0)
+        self.assertEqual(row["thermodynamic_scope_boundary_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

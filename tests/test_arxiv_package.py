@@ -51,6 +51,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("joint_persistence_exchange_multik_chi4_protocol", by_id)
         self.assertIn("kob_andersen_van_hove_tail_recovery", by_id)
         self.assertIn("angell_adam_gibbs_fragility_growth", by_id)
+        self.assertIn("thermodynamic_transition_scope_boundary", by_id)
         self.assertEqual(float(by_id["debye_waller_cage_localization"]["overall_consistent"]), 1.0)
         self.assertLess(float(by_id["debye_waller_cage_localization"]["renewal_msd_fraction"]), 0.05)
         self.assertGreater(float(by_id["debye_waller_cage_localization"]["alpha_to_cage_time_ratio"]), 20.0)
@@ -111,6 +112,31 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             float(by_id["angell_adam_gibbs_fragility_growth"]["fragility_scope_boundary_consistent"]),
             1.0,
+        )
+        self.assertEqual(float(by_id["thermodynamic_transition_scope_boundary"]["overall_consistent"]), 1.0)
+        self.assertEqual(
+            float(
+                by_id["thermodynamic_transition_scope_boundary"][
+                    "model_predicts_heat_capacity_anomaly_from_dynamics"
+                ]
+            ),
+            0.0,
+        )
+        self.assertEqual(
+            float(
+                by_id["thermodynamic_transition_scope_boundary"][
+                    "model_predicts_kauzmann_transition_from_dynamics"
+                ]
+            ),
+            0.0,
+        )
+        self.assertEqual(
+            float(by_id["thermodynamic_transition_scope_boundary"]["entropy_closure_required"]),
+            1.0,
+        )
+        self.assertGreater(
+            float(by_id["thermodynamic_transition_scope_boundary"]["thermodynamic_adam_gibbs_slowdown"]),
+            10.0,
         )
 
     def test_literature_inversion_readiness_marks_public_benchmarks_as_not_yet_quantitative(self):

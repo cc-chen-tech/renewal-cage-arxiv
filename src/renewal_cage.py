@@ -1225,6 +1225,63 @@ def fragility_benchmark_consistency(
     }
 
 
+def thermodynamic_scope_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_heat_capacity_anomaly: bool,
+    observed_kauzmann_extrapolation: bool,
+    dynamic_model_derives_entropy: bool,
+    entropy_closure_supplied: bool,
+    adam_gibbs_slowdown: float,
+    min_adam_gibbs_slowdown: float,
+    material_specific_entropy_origin_claimed: bool,
+) -> dict[str, float | str]:
+    """Check the thermodynamic-transition boundary of the kinetic theory."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "adam_gibbs_slowdown": adam_gibbs_slowdown,
+        "min_adam_gibbs_slowdown": min_adam_gibbs_slowdown,
+    }.items():
+        if value <= 0.0 or not math.isfinite(value):
+            raise ValueError(f"{name} must be positive and finite")
+
+    predicts_heat_capacity_from_dynamics = bool(dynamic_model_derives_entropy)
+    predicts_kauzmann_from_dynamics = bool(dynamic_model_derives_entropy)
+    entropy_closure_required = not dynamic_model_derives_entropy
+    adam_gibbs_flag = bool(entropy_closure_supplied) and adam_gibbs_slowdown >= min_adam_gibbs_slowdown
+    heat_capacity_scope_flag = (
+        (not observed_heat_capacity_anomaly) or not predicts_heat_capacity_from_dynamics
+    )
+    kauzmann_scope_flag = (
+        (not observed_kauzmann_extrapolation) or not predicts_kauzmann_from_dynamics
+    )
+    boundary_flag = entropy_closure_required and not material_specific_entropy_origin_claimed
+    overall = heat_capacity_scope_flag and kauzmann_scope_flag and adam_gibbs_flag and boundary_flag
+
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_heat_capacity_anomaly": float(observed_heat_capacity_anomaly),
+        "observed_kauzmann_extrapolation": float(observed_kauzmann_extrapolation),
+        "dynamic_model_derives_entropy": float(dynamic_model_derives_entropy),
+        "entropy_closure_supplied": float(entropy_closure_supplied),
+        "thermodynamic_adam_gibbs_slowdown": adam_gibbs_slowdown,
+        "min_thermodynamic_adam_gibbs_slowdown": min_adam_gibbs_slowdown,
+        "material_specific_entropy_origin_claimed": float(material_specific_entropy_origin_claimed),
+        "model_predicts_heat_capacity_anomaly_from_dynamics": float(
+            predicts_heat_capacity_from_dynamics
+        ),
+        "model_predicts_kauzmann_transition_from_dynamics": float(predicts_kauzmann_from_dynamics),
+        "entropy_closure_required": float(entropy_closure_required),
+        "adam_gibbs_slowdown_consistent": float(adam_gibbs_flag),
+        "heat_capacity_scope_consistent": float(heat_capacity_scope_flag),
+        "kauzmann_scope_consistent": float(kauzmann_scope_flag),
+        "thermodynamic_scope_boundary_consistent": float(boundary_flag),
+        "overall_consistent": float(overall),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,
