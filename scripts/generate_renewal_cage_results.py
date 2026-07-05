@@ -114,6 +114,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_adapter_contract,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
+    trajectory_observable_curve_bridge,
     trajectory_table_csv_adapter,
     trajectory_table_adapter,
     trajectory_inversion_readiness_gate,
@@ -3500,6 +3501,59 @@ def write_trajectory_csv_adapter_demo_csv(path: Path) -> list[dict[str, float | 
     return rows
 
 
+def write_trajectory_curve_bridge_csv(
+    path: Path,
+    csv_adapter_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Summarize trajectory-observable rows into inversion-gate inputs."""
+
+    alpha_crossing_rows = [
+        {
+            "lag_time": 1.0,
+            "dimension": 1.0,
+            "msd": 1.0,
+            "ngp": 0.70,
+            "wave_numbers": "0.7;1.1;1.6",
+            "self_intermediate_scattering_by_k": "0.90;0.80;0.70",
+            "chi4_overlap": 0.2,
+        },
+        {
+            "lag_time": 2.0,
+            "dimension": 1.0,
+            "msd": 3.6,
+            "ngp": 0.35,
+            "wave_numbers": "0.7;1.1;1.6",
+            "self_intermediate_scattering_by_k": "0.50;0.30;0.18",
+            "chi4_overlap": 1.4,
+        },
+        {
+            "lag_time": 4.0,
+            "dimension": 1.0,
+            "msd": 8.0,
+            "ngp": 0.12,
+            "wave_numbers": "0.7;1.1;1.6",
+            "self_intermediate_scattering_by_k": "0.20;0.10;0.04",
+            "chi4_overlap": 0.6,
+        },
+    ]
+    rows = [
+        trajectory_observable_curve_bridge(
+            benchmark_id="synthetic_alpha_crossing_csv_bridge",
+            rows=alpha_crossing_rows,
+            required_wave_numbers=[0.7, 1.1, 1.6],
+            anchor_wave_number=1.1,
+        ),
+        trajectory_observable_curve_bridge(
+            benchmark_id="synthetic_short_csv_bridge",
+            rows=csv_adapter_rows,
+            required_wave_numbers=[0.7, 1.1, 1.6],
+            anchor_wave_number=1.1,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, float | str]]:
     """Estimate trajectory-observable uncertainties from time-origin jackknife blocks."""
 
@@ -6588,8 +6642,12 @@ def main() -> None:
     write_trajectory_adapter_demo_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_demo.csv"
     )
-    write_trajectory_csv_adapter_demo_csv(
+    trajectory_csv_adapter_rows = write_trajectory_csv_adapter_demo_csv(
         DATA_DIR / "renewal_cage_trajectory_csv_adapter_demo.csv"
+    )
+    write_trajectory_curve_bridge_csv(
+        DATA_DIR / "renewal_cage_trajectory_curve_bridge.csv",
+        trajectory_csv_adapter_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

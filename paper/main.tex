@@ -1099,6 +1099,14 @@ closer to that use case: the source table is first written as
 \texttt{renewal\_cage\_trajectory\_csv\_adapter\_source.csv}, then reloaded by
 path with explicit frame, time, particle, coordinate, box, state-point, species,
 and unit metadata checks before the same observable extraction is applied.
+The bridge file
+\texttt{renewal\_cage\_trajectory\_curve\_bridge.csv} then compresses
+trajectory lag rows into the raw-curve quantities required for inversion:
+diffusion from the late MSD slope proxy, late NGP, alpha-crossing times for
+each wave number, the anchor $D\tau_\alpha$ product, and the overlap-$\chi_4$
+peak. It also records a negative short-trajectory case where the observable
+rows exist but $F_s(k,t)$ has not crossed the alpha threshold, so the row is
+kept out of the inversion gate rather than overclaimed.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the

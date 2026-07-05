@@ -1,0 +1,3 @@
+benchmark_id,lag_count,wave_numbers,anchor_wave_number,tau_alpha_by_k,anchor_tau_alpha,diffusion_coefficient,d_tau_alpha_product,late_time,late_ngp,chi4_peak,alpha_curve_ready,ngp_curve_ready,chi4_curve_ready,diffusion_ready,curve_bridge_ready,primary_blocker,bridge_stage
+synthetic_alpha_crossing_csv_bridge,3.0,0.7;1.1;1.6,1.1,0.7:2.66977174114;1.1:1.79204045587;1.6:1.47368671816,1.792040455869746,1.0,1.792040455869746,4.0,0.12,1.4,1.0,1.0,1.0,1.0,1.0,none,trajectory_curve_bridge_ready
+synthetic_short_csv_bridge,4.0,0.7;1.1;1.6,1.1,0.7:2.13733262521;1.1:1.08068787769,1.0806878776932236,1.2625,1.3643684455876948,4.0,-0.5265986994739078,1.0,0.0,1.0,1.0,1.0,0.0,alpha_threshold_crossing,trajectory_curve_bridge_incomplete

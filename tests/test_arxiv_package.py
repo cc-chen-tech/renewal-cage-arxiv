@@ -553,6 +553,26 @@ class ArxivPackageTests(unittest.TestCase):
         peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
         self.assertGreater(float(peak["chi4_overlap"]), 0.1)
 
+    def test_trajectory_curve_bridge_summarizes_csv_observables_for_inversion_gate(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_curve_bridge.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["benchmark_id"]: row for row in rows}
+        ready = by_id["synthetic_alpha_crossing_csv_bridge"]
+        self.assertEqual(ready["bridge_stage"], "trajectory_curve_bridge_ready")
+        self.assertEqual(float(ready["curve_bridge_ready"]), 1.0)
+        self.assertEqual(ready["primary_blocker"], "none")
+        self.assertGreater(float(ready["diffusion_coefficient"]), 0.0)
+        self.assertGreater(float(ready["d_tau_alpha_product"]), 0.0)
+        self.assertIn("1.1:", ready["tau_alpha_by_k"])
+
+        short = by_id["synthetic_short_csv_bridge"]
+        self.assertEqual(short["bridge_stage"], "trajectory_curve_bridge_incomplete")
+        self.assertEqual(float(short["curve_bridge_ready"]), 0.0)
+        self.assertEqual(short["primary_blocker"], "alpha_threshold_crossing")
+
     def test_trajectory_uncertainty_protocol_exports_jackknife_sigmas(self):
         path = ROOT / "data" / "renewal_cage_trajectory_uncertainty_protocol.csv"
         self.assertTrue(path.exists())

@@ -2917,6 +2917,138 @@ def trajectory_observable_protocol(
     return rows
 
 
+def _parse_semicolon_float_values(value: object, *, name: str) -> list[float]:
+    parts = str(value).split(";")
+    if not parts or any(part == "" for part in parts):
+        raise ValueError(f"{name} must contain semicolon-separated numeric values")
+    return [float(part) for part in parts]
+
+
+def trajectory_observable_curve_bridge(
+    *,
+    benchmark_id: str,
+    rows: Sequence[dict[str, object]],
+    required_wave_numbers: Sequence[float],
+    anchor_wave_number: float,
+    threshold: float = math.exp(-1.0),
+) -> dict[str, float | str]:
+    """Summarize trajectory-observable rows into raw-curve inversion inputs."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not rows:
+        raise ValueError("rows must be nonempty")
+    if not required_wave_numbers:
+        raise ValueError("required_wave_numbers must be nonempty")
+    if anchor_wave_number <= 0.0:
+        raise ValueError("anchor_wave_number must be positive")
+    if threshold <= 0.0 or threshold >= 1.0:
+        raise ValueError("threshold must be between zero and one")
+    required = list(dict.fromkeys(float(wave_number) for wave_number in required_wave_numbers))
+    if any(wave_number <= 0.0 for wave_number in required):
+        raise ValueError("required_wave_numbers must be positive")
+    if float(anchor_wave_number) not in required:
+        raise ValueError("required_wave_numbers must include the anchor wave number")
+
+    required_columns = {
+        "lag_time",
+        "dimension",
+        "msd",
+        "ngp",
+        "wave_numbers",
+        "self_intermediate_scattering_by_k",
+        "chi4_overlap",
+    }
+    sorted_rows = sorted(rows, key=lambda row: float(row["lag_time"]))
+    lag_time = np.array([float(row["lag_time"]) for row in sorted_rows], dtype=float)
+    if np.any(np.diff(lag_time) <= 0.0):
+        raise ValueError("lag_time values must be strictly increasing")
+    missing_columns = sorted(required_columns.difference(sorted_rows[0]))
+    if missing_columns:
+        raise ValueError(f"trajectory rows are missing required columns: {';'.join(missing_columns)}")
+
+    dimension = float(sorted_rows[-1]["dimension"])
+    latest_msd = float(sorted_rows[-1]["msd"])
+    latest_time = float(sorted_rows[-1]["lag_time"])
+    if dimension <= 0.0 or latest_time <= 0.0 or latest_msd <= 0.0:
+        raise ValueError("dimension, latest lag_time, and latest msd must be positive")
+    diffusion_coefficient = latest_msd / (2.0 * dimension * latest_time)
+    ngp_values = np.array([float(row["ngp"]) for row in sorted_rows], dtype=float)
+    chi4_values = np.array([float(row["chi4_overlap"]) for row in sorted_rows], dtype=float)
+    if np.any(chi4_values < 0.0):
+        raise ValueError("chi4_overlap values must be nonnegative")
+
+    fs_by_k: dict[float, list[float]] = {wave_number: [] for wave_number in required}
+    missing_fs = False
+    for row in sorted_rows:
+        row_wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
+        row_fs = _parse_semicolon_float_values(
+            row["self_intermediate_scattering_by_k"],
+            name="self_intermediate_scattering_by_k",
+        )
+        if len(row_wave_numbers) != len(row_fs):
+            raise ValueError("wave_numbers and self_intermediate_scattering_by_k lengths must match")
+        fs_lookup = {float(wave_number): float(value) for wave_number, value in zip(row_wave_numbers, row_fs)}
+        for wave_number in required:
+            if wave_number not in fs_lookup:
+                missing_fs = True
+            else:
+                fs_by_k[wave_number].append(fs_lookup[wave_number])
+
+    tau_by_k: dict[float, float] = {}
+    alpha_crossing_missing = False
+    if not missing_fs:
+        for wave_number in required:
+            fs_values = np.array(fs_by_k[wave_number], dtype=float)
+            try:
+                tau_by_k[wave_number] = _first_log_threshold_crossing_time(
+                    lag_time,
+                    fs_values,
+                    threshold=threshold,
+                    name=f"trajectory F_s k={wave_number}",
+                )
+            except ValueError:
+                alpha_crossing_missing = True
+
+    if missing_fs:
+        stage = "trajectory_curve_bridge_incomplete"
+        blocker = "self_intermediate_scattering_by_k"
+        ready = False
+    elif alpha_crossing_missing:
+        stage = "trajectory_curve_bridge_incomplete"
+        blocker = "alpha_threshold_crossing"
+        ready = False
+    else:
+        stage = "trajectory_curve_bridge_ready"
+        blocker = "none"
+        ready = True
+
+    anchor_tau = tau_by_k.get(float(anchor_wave_number), float("nan"))
+    return {
+        "benchmark_id": benchmark_id,
+        "lag_count": float(len(sorted_rows)),
+        "wave_numbers": ";".join(f"{wave_number:g}" for wave_number in required),
+        "anchor_wave_number": float(anchor_wave_number),
+        "tau_alpha_by_k": ";".join(
+            f"{wave_number:g}:{tau_by_k[wave_number]:.12g}" for wave_number in required if wave_number in tau_by_k
+        )
+        or "none",
+        "anchor_tau_alpha": float(anchor_tau) if np.isfinite(anchor_tau) else 0.0,
+        "diffusion_coefficient": float(diffusion_coefficient),
+        "d_tau_alpha_product": float(diffusion_coefficient * anchor_tau) if np.isfinite(anchor_tau) else 0.0,
+        "late_time": float(latest_time),
+        "late_ngp": float(ngp_values[-1]),
+        "chi4_peak": float(np.max(chi4_values)),
+        "alpha_curve_ready": float(not missing_fs and not alpha_crossing_missing),
+        "ngp_curve_ready": 1.0,
+        "chi4_curve_ready": 1.0,
+        "diffusion_ready": 1.0,
+        "curve_bridge_ready": float(ready),
+        "primary_blocker": blocker,
+        "bridge_stage": stage,
+    }
+
+
 def trajectory_observable_uncertainty_protocol(
     *,
     positions: np.ndarray,

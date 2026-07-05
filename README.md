@@ -280,6 +280,7 @@ data/renewal_cage_trajectory_observable_protocol.csv
 data/renewal_cage_trajectory_adapter_demo.csv
 data/renewal_cage_trajectory_csv_adapter_source.csv
 data/renewal_cage_trajectory_csv_adapter_demo.csv
+data/renewal_cage_trajectory_curve_bridge.csv
 data/renewal_cage_trajectory_uncertainty_protocol.csv
 data/renewal_cage_trajectory_inversion_readiness.csv
 data/renewal_cage_barrier_requirements.csv

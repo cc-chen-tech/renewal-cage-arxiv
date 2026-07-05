@@ -127,6 +127,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_observable_uncertainty_protocol,
     trajectory_table_csv_adapter,
     trajectory_table_adapter,
+    trajectory_observable_curve_bridge,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -2557,6 +2558,89 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 wave_numbers=[1.0],
                 overlap_radius=0.5,
             )
+
+    def test_trajectory_observable_curve_bridge_extracts_inversion_inputs(self):
+        rows = [
+            {
+                "lag_time": 1.0,
+                "dimension": 1.0,
+                "msd": 1.0,
+                "ngp": 0.7,
+                "wave_numbers": "0.7;1.1",
+                "self_intermediate_scattering_by_k": "0.9;0.8",
+                "chi4_overlap": 0.2,
+            },
+            {
+                "lag_time": 2.0,
+                "dimension": 1.0,
+                "msd": 3.6,
+                "ngp": 0.35,
+                "wave_numbers": "0.7;1.1",
+                "self_intermediate_scattering_by_k": "0.5;0.3",
+                "chi4_overlap": 1.4,
+            },
+            {
+                "lag_time": 4.0,
+                "dimension": 1.0,
+                "msd": 8.0,
+                "ngp": 0.12,
+                "wave_numbers": "0.7;1.1",
+                "self_intermediate_scattering_by_k": "0.2;0.1",
+                "chi4_overlap": 0.6,
+            },
+        ]
+
+        bridge = trajectory_observable_curve_bridge(
+            benchmark_id="synthetic_csv_curve_bridge",
+            rows=rows,
+            required_wave_numbers=[0.7, 1.1],
+            anchor_wave_number=1.1,
+        )
+
+        self.assertEqual(bridge["bridge_stage"], "trajectory_curve_bridge_ready")
+        self.assertEqual(bridge["curve_bridge_ready"], 1.0)
+        self.assertEqual(bridge["primary_blocker"], "none")
+        self.assertAlmostEqual(bridge["diffusion_coefficient"], 1.0)
+        self.assertAlmostEqual(bridge["late_time"], 4.0)
+        self.assertAlmostEqual(bridge["late_ngp"], 0.12)
+        self.assertAlmostEqual(bridge["chi4_peak"], 1.4)
+        self.assertGreater(bridge["anchor_tau_alpha"], 1.0)
+        self.assertGreater(bridge["d_tau_alpha_product"], 1.0)
+        self.assertIn("1.1:", bridge["tau_alpha_by_k"])
+
+    def test_trajectory_observable_curve_bridge_blocks_without_alpha_crossing(self):
+        rows = [
+            {
+                "lag_time": 1.0,
+                "dimension": 1.0,
+                "msd": 1.0,
+                "ngp": 0.4,
+                "wave_numbers": "1.1",
+                "self_intermediate_scattering_by_k": "0.95",
+                "chi4_overlap": 0.2,
+            },
+            {
+                "lag_time": 2.0,
+                "dimension": 1.0,
+                "msd": 2.0,
+                "ngp": 0.3,
+                "wave_numbers": "1.1",
+                "self_intermediate_scattering_by_k": "0.8",
+                "chi4_overlap": 0.4,
+            },
+        ]
+
+        bridge = trajectory_observable_curve_bridge(
+            benchmark_id="short_csv_curve_bridge",
+            rows=rows,
+            required_wave_numbers=[1.1],
+            anchor_wave_number=1.1,
+        )
+
+        self.assertEqual(bridge["bridge_stage"], "trajectory_curve_bridge_incomplete")
+        self.assertEqual(bridge["curve_bridge_ready"], 0.0)
+        self.assertEqual(bridge["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(bridge["tau_alpha_by_k"], "none")
 
     def test_trajectory_table_adapter_orders_frames_particles_and_extracts_arrays(self):
         records = [
