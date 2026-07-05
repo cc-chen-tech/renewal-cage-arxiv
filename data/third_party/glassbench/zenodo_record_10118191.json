@@ -1,0 +1,30 @@
+{
+  "id": 10118191,
+  "doi": "10.5281/zenodo.10118191",
+  "links": {
+    "self": "https://zenodo.org/api/records/10118191"
+  },
+  "metadata": {
+    "license": {
+      "id": "cc-by-4.0"
+    }
+  },
+  "files": [
+    {
+      "key": "README",
+      "size": 2147,
+      "checksum": "md5:f1a192f54a2fa7a2b3533af0011b80dc",
+      "links": {
+        "self": "https://zenodo.org/api/records/10118191/files/README/content"
+      }
+    },
+    {
+      "key": "GlassBench.zip",
+      "size": 6042260027,
+      "checksum": "md5:82c83a7146eb749e13417e4350022417",
+      "links": {
+        "self": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content"
+      }
+    }
+  ]
+}

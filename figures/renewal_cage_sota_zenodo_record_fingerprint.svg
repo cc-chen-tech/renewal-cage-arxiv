@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="330" viewBox="0 0 1160 330">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA Zenodo record fingerprint</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached GlassBench Zenodo API record verifies DOI, license, file sizes, and md5 checksums before large-archive reanalysis is claimed.</text>
+  <text x="75" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="700">fingerprint</text>
+  <text x="395" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="645" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness</text>
+  <text x="75" y="128" font-family="Arial, sans-serif" font-size="11">glassbench zenodo record fingerprint</text><rect x="395" y="108" width="225" height="24" fill="#2f855a" opacity="0.92" /><text x="405" y="124" font-family="Arial, sans-serif" font-size="10" fill="#fff">zenodo record verified</text><text x="645" y="127" font-family="Arial, sans-serif" font-size="11">record=1; real fit=0; archive=6.04 GB; blocker=archive cache</text><text x="147" y="152" font-family="Arial, sans-serif" font-size="9" fill="#555">doi: 10.5281/zenodo.10118191; license: cc-by-4.0; archive md5: 82c83a7146eb749e13417e4350022417; README md5: f1a192f54a2fa7a2b3533af0011b80dc</text>
+  <rect x="75" y="265" width="14" height="14" fill="#2f855a" /><text x="96" y="277" font-family="Arial, sans-serif" font-size="12">Zenodo record metadata verified</text>
+  <rect x="335" y="265" width="14" height="14" fill="#c05621" /><text x="356" y="277" font-family="Arial, sans-serif" font-size="12">record mismatch</text>
+  <text x="535" y="277" font-family="Arial, sans-serif" font-size="12">real trajectory reanalysis remains blocked until the full archive is cached</text>
+</svg>

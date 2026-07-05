@@ -1077,6 +1077,15 @@ step for those sources. For the public GlassBench Zenodo record it stores DOI
 README/schema availability. Because the archive is not locally cached in this
 repository, this row is marked as remote-accession ready but not yet a local
 real-data reanalysis.
+The cached Zenodo record fingerprint
+\texttt{renewal\_cage\_sota\_zenodo\_record\_fingerprint.csv} verifies the same
+remote source one layer closer to reproducibility: record DOI
+\texttt{10.5281/zenodo.10118191}, CC-BY-4.0 license, the 2147-byte README md5
+\texttt{f1a192f54a2fa7a2b3533af0011b80dc}, and the 6042260027-byte
+\texttt{GlassBench.zip} md5
+\texttt{82c83a7146eb749e13417e4350022417}. The row is therefore marked
+Zenodo-record verified, but its primary blocker remains \texttt{archive\_cache}
+and \texttt{real\_reanalysis\_ready=0}.
 The archive-preflight table
 \texttt{renewal\_cage\_sota\_archive\_preflight.csv} makes this operational:
 the GlassBench README is small enough for schema caching and has its own md5
@@ -1468,6 +1477,15 @@ rejected without refitting the clocks.
   \caption{SOTA data accession manifest. Remote data archives are separated
   from local reanalysis readiness by recording DOI, archive identity, checksum,
   size, license, schema/README status, and local-cache state.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_zenodo_record_fingerprint.pdf}
+  \caption{SOTA Zenodo record fingerprint. The cached GlassBench Zenodo API
+  record verifies DOI, license, file sizes, and md5 checksums for the
+  lightweight README and full archive while keeping trajectory reanalysis
+  blocked until the full archive is locally cached.}
 \end{figure}
 
 \begin{figure}[p]

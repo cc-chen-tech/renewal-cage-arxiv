@@ -4,6 +4,7 @@ import time
 import unittest
 import zipfile
 import csv
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -361,6 +362,30 @@ class ArxivPackageTests(unittest.TestCase):
         thermo = by_id["kauzmann_entropy_scope_boundary"]
         self.assertEqual(thermo["accession_stage"], "scope_boundary_accession")
         self.assertEqual(float(thermo["scope_boundary"]), 1.0)
+
+    def test_sota_zenodo_record_fingerprint_verifies_cached_remote_record(self):
+        record_path = ROOT / "data" / "third_party" / "glassbench" / "zenodo_record_10118191.json"
+        path = ROOT / "data" / "renewal_cage_sota_zenodo_record_fingerprint.csv"
+        self.assertTrue(record_path.exists())
+        self.assertTrue(path.exists())
+        record = json.loads(record_path.read_text())
+        self.assertEqual(record["doi"], "10.5281/zenodo.10118191")
+        file_by_key = {entry["key"]: entry for entry in record["files"]}
+        self.assertEqual(file_by_key["GlassBench.zip"]["size"], 6042260027)
+        self.assertEqual(file_by_key["README"]["checksum"], "md5:f1a192f54a2fa7a2b3533af0011b80dc")
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["fingerprint_id"]: row for row in rows}
+        glassbench = by_id["glassbench_zenodo_record_fingerprint"]
+        self.assertEqual(glassbench["fingerprint_stage"], "zenodo_record_verified")
+        self.assertEqual(float(glassbench["zenodo_record_fingerprint_ready"]), 1.0)
+        self.assertEqual(float(glassbench["archive_md5_matches"]), 1.0)
+        self.assertEqual(float(glassbench["readme_md5_matches"]), 1.0)
+        self.assertEqual(float(glassbench["full_archive_download_required"]), 1.0)
+        self.assertEqual(float(glassbench["real_reanalysis_ready"]), 0.0)
+        self.assertEqual(glassbench["primary_blocker"], "archive_cache")
 
     def test_sota_archive_preflight_requires_policy_before_full_glassbench_download(self):
         path = ROOT / "data" / "renewal_cage_sota_archive_preflight.csv"
@@ -865,6 +890,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_frontier_benchmark_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", names)
             self.assertIn("figures/renewal_cage_sota_data_accession.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_zenodo_record_fingerprint.pdf", names)
             self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
@@ -906,6 +932,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_data_accession.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_zenodo_record_fingerprint.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", main_tex)
         self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
@@ -930,6 +957,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
             "figures/renewal_cage_sota_source_provenance.pdf",
             "figures/renewal_cage_sota_data_accession.pdf",
+            "figures/renewal_cage_sota_zenodo_record_fingerprint.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
@@ -1054,6 +1082,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_data_accession = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_data_accession.pdf"
             ).read_bytes()
+            first_sota_zenodo_record_fingerprint = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_zenodo_record_fingerprint.pdf"
+            ).read_bytes()
             first_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1165,6 +1196,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_data_accession = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_data_accession.pdf"
             ).read_bytes()
+            second_sota_zenodo_record_fingerprint = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_zenodo_record_fingerprint.pdf"
+            ).read_bytes()
             second_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1246,6 +1280,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_frontier_benchmark_horizon, second_frontier_benchmark_horizon)
         self.assertEqual(first_sota_source_provenance, second_sota_source_provenance)
         self.assertEqual(first_sota_data_accession, second_sota_data_accession)
+        self.assertEqual(first_sota_zenodo_record_fingerprint, second_sota_zenodo_record_fingerprint)
         self.assertEqual(first_sota_readme_schema, second_sota_readme_schema)
         self.assertEqual(first_trajectory_adapter_contract, second_trajectory_adapter_contract)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)

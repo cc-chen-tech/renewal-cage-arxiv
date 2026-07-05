@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import math
 import sys
 from pathlib import Path
@@ -108,6 +109,7 @@ from renewal_cage import (  # noqa: E402
     sota_readme_schema_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
+    sota_zenodo_record_fingerprint_gate,
     sota_zip_structure_gate,
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
@@ -3062,6 +3064,32 @@ def write_sota_data_accession_csv(path: Path) -> list[dict[str, float | str]]:
     return rows
 
 
+def write_sota_zenodo_record_fingerprint_csv(path: Path) -> list[dict[str, float | str]]:
+    """Verify cached Zenodo record metadata without downloading large archives."""
+
+    record_path = DATA_DIR / "third_party" / "glassbench" / "zenodo_record_10118191.json"
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    rows = [
+        sota_zenodo_record_fingerprint_gate(
+            fingerprint_id="glassbench_zenodo_record_fingerprint",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            record=record,
+            expected_doi="10.5281/zenodo.10118191",
+            expected_license_id="cc-by-4.0",
+            expected_archive_name="GlassBench.zip",
+            expected_archive_md5="82c83a7146eb749e13417e4350022417",
+            expected_archive_size_bytes=6042260027,
+            expected_readme_name="README",
+            expected_readme_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            expected_readme_size_bytes=2147,
+            large_archive_threshold_bytes=100_000_000,
+        )
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_archive_preflight_csv(path: Path) -> list[dict[str, float | str]]:
     """Preflight public trajectory archives before local SOTA reanalysis."""
 
@@ -5404,6 +5432,53 @@ def write_sota_data_accession_svg(path: Path, rows: list[dict[str, float | str]]
     path.write_text(svg)
 
 
+def write_sota_zenodo_record_fingerprint_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 75, 112
+    colors = {
+        "zenodo_record_verified": "#2f855a",
+        "zenodo_record_mismatch": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * 76
+        stage = str(row["fingerprint_stage"])
+        color = colors[stage]
+        record_ready = int(float(row["zenodo_record_fingerprint_ready"]))
+        real_ready = int(float(row["real_reanalysis_ready"]))
+        archive_gb = float(row["archive_size_bytes"]) / 1_000_000_000.0
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["fingerprint_id"]).replace("_", " ")[:44]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 320}" y="{y - 4}" width="225" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 330}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:32]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 570}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">record={record_ready}; real fit={real_ready}; archive={archive_gb:.2f} GB; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 72}" y="{y + 40}" font-family="Arial, sans-serif" font-size="9" fill="#555">doi: {row["doi"]}; license: {row["license_id"]}; archive md5: {str(row["archive_md5"])[:32]}; README md5: {str(row["readme_md5"])[:32]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA Zenodo record fingerprint</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached GlassBench Zenodo API record verifies DOI, license, file sizes, and md5 checksums before large-archive reanalysis is claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">fingerprint</text>
+  <text x="{left + 320}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 570}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="265" width="14" height="14" fill="#2f855a" /><text x="96" y="277" font-family="Arial, sans-serif" font-size="12">Zenodo record metadata verified</text>
+  <rect x="335" y="265" width="14" height="14" fill="#c05621" /><text x="356" y="277" font-family="Arial, sans-serif" font-size="12">record mismatch</text>
+  <text x="535" y="277" font-family="Arial, sans-serif" font-size="12">real trajectory reanalysis remains blocked until the full archive is cached</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_readme_schema_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 380
@@ -6800,6 +6875,13 @@ def main() -> None:
     write_sota_data_accession_svg(
         FIGURE_DIR / "renewal_cage_sota_data_accession.svg",
         data_accession_rows,
+    )
+    zenodo_record_fingerprint_rows = write_sota_zenodo_record_fingerprint_csv(
+        DATA_DIR / "renewal_cage_sota_zenodo_record_fingerprint.csv"
+    )
+    write_sota_zenodo_record_fingerprint_svg(
+        FIGURE_DIR / "renewal_cage_sota_zenodo_record_fingerprint.svg",
+        zenodo_record_fingerprint_rows,
     )
     write_sota_archive_preflight_csv(
         DATA_DIR / "renewal_cage_sota_archive_preflight.csv"

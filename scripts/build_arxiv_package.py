@@ -1959,6 +1959,57 @@ def write_sota_data_accession_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_zenodo_record_fingerprint_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_zenodo_record_fingerprint.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA Zenodo record fingerprint")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The cached GlassBench Zenodo API record verifies DOI, license, sizes, and md5 checksums before real reanalysis.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "fingerprint")
+    c.drawString(left + 230, top, "stage")
+    c.drawString(left + 438, top, "record")
+    c.drawString(left + 485, top, "real")
+    c.drawString(left + 525, top, "GB")
+    c.drawString(left + 570, top, "blocker")
+    palette = {
+        "zenodo_record_verified": colors.HexColor("#2f855a"),
+        "zenodo_record_mismatch": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 6.9)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 49
+        stage = row["fingerprint_stage"]
+        archive_gb = float(row["archive_size_bytes"]) / 1_000_000_000.0
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["fingerprint_id"].replace("_", " ")[:36])
+        c.setFillColor(palette[stage])
+        c.rect(left + 230, y - 4, 175, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 236, y, stage.replace("_", " ")[:28])
+        c.setFillColor(colors.black)
+        c.drawString(left + 450, y, str(int(float(row["zenodo_record_fingerprint_ready"]))))
+        c.drawString(left + 495, y, str(int(float(row["real_reanalysis_ready"]))))
+        c.drawString(left + 525, y, f"{archive_gb:.2f}")
+        c.drawString(left + 570, y, row["primary_blocker"].replace("_", " ")[:30])
+        c.drawString(
+            left + 72,
+            y - 12,
+            f"doi: {row['doi']}; license: {row['license_id']}; archive md5: {row['archive_md5'][:32]}; README md5: {row['readme_md5'][:32]}",
+        )
+    c.showPage()
+    c.save()
+
+
 def write_sota_readme_schema_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_readme_schema.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2836,6 +2887,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     frontier_benchmark_horizon_pdf = PAPER_FIGURE_DIR / "renewal_cage_frontier_benchmark_horizon.pdf"
     sota_source_provenance_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_source_provenance.pdf"
     sota_data_accession_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_data_accession.pdf"
+    sota_zenodo_record_fingerprint_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_zenodo_record_fingerprint.pdf"
+    )
     sota_readme_schema_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_readme_schema.pdf"
     trajectory_adapter_contract_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_adapter_contract.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
@@ -2883,6 +2937,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_frontier_benchmark_horizon_pdf(frontier_benchmark_horizon_pdf)
     write_sota_source_provenance_pdf(sota_source_provenance_pdf)
     write_sota_data_accession_pdf(sota_data_accession_pdf)
+    write_sota_zenodo_record_fingerprint_pdf(sota_zenodo_record_fingerprint_pdf)
     write_sota_readme_schema_pdf(sota_readme_schema_pdf)
     write_trajectory_adapter_contract_pdf(trajectory_adapter_contract_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
@@ -2948,6 +3003,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(frontier_benchmark_horizon_pdf, "figures/renewal_cage_frontier_benchmark_horizon.pdf")
         archive.write(sota_source_provenance_pdf, "figures/renewal_cage_sota_source_provenance.pdf")
         archive.write(sota_data_accession_pdf, "figures/renewal_cage_sota_data_accession.pdf")
+        archive.write(
+            sota_zenodo_record_fingerprint_pdf,
+            "figures/renewal_cage_sota_zenodo_record_fingerprint.pdf",
+        )
         archive.write(sota_readme_schema_pdf, "figures/renewal_cage_sota_readme_schema.pdf")
         archive.write(trajectory_adapter_contract_pdf, "figures/renewal_cage_trajectory_adapter_contract.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")

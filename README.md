@@ -136,6 +136,10 @@ raw trajectories or observable tables, protocol metadata, and reuse permission.
 The SOTA data-accession manifest records DOI, landing URL, archive name,
 checksum, size, license, schema/README status, and local-cache status before
 any public dataset is treated as a completed real-data reanalysis.
+The SOTA Zenodo-record fingerprint verifies the cached GlassBench API record
+against DOI, CC-BY-4.0 license, README size/md5, and full-archive size/md5,
+while still marking real trajectory reanalysis as blocked on the local
+`GlassBench.zip` cache.
 The SOTA README-schema gate checks systems, folder tokens, reuse license, and
 citation guidance before claiming that a remote dataset can support a local
 trajectory adapter.
@@ -220,6 +224,7 @@ figures/renewal_cage_inversion_identifiability_audit.svg
 figures/renewal_cage_frontier_benchmark_horizon.svg
 figures/renewal_cage_sota_source_provenance.svg
 figures/renewal_cage_sota_data_accession.svg
+figures/renewal_cage_sota_zenodo_record_fingerprint.svg
 figures/renewal_cage_sota_readme_schema.svg
 figures/renewal_cage_trajectory_adapter_contract.svg
 figures/renewal_cage_literature_inversion_readiness.svg
@@ -273,8 +278,10 @@ data/renewal_cage_inversion_identifiability_audit.csv
 data/renewal_cage_frontier_benchmark_horizon.csv
 data/renewal_cage_sota_source_provenance.csv
 data/renewal_cage_sota_data_accession.csv
+data/renewal_cage_sota_zenodo_record_fingerprint.csv
 data/renewal_cage_sota_archive_preflight.csv
 data/renewal_cage_sota_readme_digest.csv
+data/third_party/glassbench/zenodo_record_10118191.json
 data/renewal_cage_sota_local_cache_verification.csv
 data/renewal_cage_sota_zip_structure.csv
 data/renewal_cage_sota_reanalysis_state.csv
@@ -336,6 +343,7 @@ paper/figures/renewal_cage_inversion_identifiability_audit.pdf
 paper/figures/renewal_cage_frontier_benchmark_horizon.pdf
 paper/figures/renewal_cage_sota_source_provenance.pdf
 paper/figures/renewal_cage_sota_data_accession.pdf
+paper/figures/renewal_cage_sota_zenodo_record_fingerprint.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf
 paper/figures/renewal_cage_trajectory_adapter_contract.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf

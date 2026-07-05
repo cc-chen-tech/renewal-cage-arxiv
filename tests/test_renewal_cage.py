@@ -119,6 +119,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_verdict,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
+    sota_zenodo_record_fingerprint_gate,
     sota_readme_schema_gate,
     sota_reanalysis_state_gate,
     sota_source_provenance_gate,
@@ -1901,6 +1902,51 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["primary_blocker"], "local_cache")
         self.assertEqual(row["download_required"], 1.0)
         self.assertGreater(row["archive_size_gb"], 5.0)
+
+    def test_sota_zenodo_record_fingerprint_verifies_glassbench_files_without_reanalysis(self):
+        record = {
+            "id": 10118191,
+            "doi": "10.5281/zenodo.10118191",
+            "metadata": {"license": {"id": "cc-by-4.0"}},
+            "files": [
+                {
+                    "key": "README",
+                    "size": 2147,
+                    "checksum": "md5:f1a192f54a2fa7a2b3533af0011b80dc",
+                },
+                {
+                    "key": "GlassBench.zip",
+                    "size": 6042260027,
+                    "checksum": "md5:82c83a7146eb749e13417e4350022417",
+                },
+            ],
+        }
+
+        row = sota_zenodo_record_fingerprint_gate(
+            fingerprint_id="glassbench_zenodo_record_fingerprint",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            record=record,
+            expected_doi="10.5281/zenodo.10118191",
+            expected_license_id="cc-by-4.0",
+            expected_archive_name="GlassBench.zip",
+            expected_archive_md5="82c83a7146eb749e13417e4350022417",
+            expected_archive_size_bytes=6042260027,
+            expected_readme_name="README",
+            expected_readme_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            expected_readme_size_bytes=2147,
+            large_archive_threshold_bytes=100_000_000,
+        )
+
+        self.assertEqual(row["fingerprint_stage"], "zenodo_record_verified")
+        self.assertEqual(row["zenodo_record_fingerprint_ready"], 1.0)
+        self.assertEqual(row["archive_size_matches"], 1.0)
+        self.assertEqual(row["archive_md5_matches"], 1.0)
+        self.assertEqual(row["readme_size_matches"], 1.0)
+        self.assertEqual(row["license_matches"], 1.0)
+        self.assertEqual(row["full_archive_download_required"], 1.0)
+        self.assertEqual(row["real_reanalysis_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "archive_cache")
 
     def test_sota_data_accession_gate_blocks_article_without_archive(self):
         row = sota_data_accession_gate(

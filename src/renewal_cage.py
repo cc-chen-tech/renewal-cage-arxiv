@@ -1863,6 +1863,139 @@ def sota_data_accession_gate(
     }
 
 
+def _strip_md5_prefix(value: str) -> str:
+    return value[4:] if value.startswith("md5:") else value
+
+
+def sota_zenodo_record_fingerprint_gate(
+    *,
+    fingerprint_id: str,
+    accession_id: str,
+    source_id: str,
+    record: dict,
+    expected_doi: str,
+    expected_license_id: str,
+    expected_archive_name: str,
+    expected_archive_md5: str,
+    expected_archive_size_bytes: int,
+    expected_readme_name: str,
+    expected_readme_md5: str,
+    expected_readme_size_bytes: int,
+    large_archive_threshold_bytes: int,
+) -> dict[str, float | str]:
+    """Verify a cached Zenodo API record before any local archive reanalysis."""
+
+    for name, value in {
+        "fingerprint_id": fingerprint_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "expected_doi": expected_doi,
+        "expected_license_id": expected_license_id,
+        "expected_archive_name": expected_archive_name,
+        "expected_archive_md5": expected_archive_md5,
+        "expected_readme_name": expected_readme_name,
+        "expected_readme_md5": expected_readme_md5,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    for name, value in {
+        "expected_archive_size_bytes": expected_archive_size_bytes,
+        "expected_readme_size_bytes": expected_readme_size_bytes,
+        "large_archive_threshold_bytes": large_archive_threshold_bytes,
+    }.items():
+        if value < 0:
+            raise ValueError(f"{name} must be nonnegative")
+    if large_archive_threshold_bytes <= 0:
+        raise ValueError("large_archive_threshold_bytes must be positive")
+
+    metadata = record.get("metadata", {})
+    license_value = metadata.get("license", "none") if isinstance(metadata, dict) else "none"
+    if isinstance(license_value, dict):
+        observed_license = str(license_value.get("id", "none"))
+    else:
+        observed_license = str(license_value)
+    files = record.get("files", [])
+    if not isinstance(files, list):
+        files = []
+    file_by_key = {
+        str(entry.get("key", "")): entry
+        for entry in files
+        if isinstance(entry, dict) and entry.get("key")
+    }
+    archive = file_by_key.get(expected_archive_name, {})
+    readme = file_by_key.get(expected_readme_name, {})
+    observed_doi = str(record.get("doi", "none"))
+    observed_archive_size = int(archive.get("size", -1)) if archive else -1
+    observed_readme_size = int(readme.get("size", -1)) if readme else -1
+    observed_archive_md5 = _strip_md5_prefix(str(archive.get("checksum", "none"))) if archive else "none"
+    observed_readme_md5 = _strip_md5_prefix(str(readme.get("checksum", "none"))) if readme else "none"
+
+    doi_matches = observed_doi == expected_doi
+    license_matches = observed_license == expected_license_id
+    archive_file_present = bool(archive)
+    readme_file_present = bool(readme)
+    archive_size_matches = observed_archive_size == expected_archive_size_bytes
+    archive_md5_matches = observed_archive_md5 == _strip_md5_prefix(expected_archive_md5)
+    readme_size_matches = observed_readme_size == expected_readme_size_bytes
+    readme_md5_matches = observed_readme_md5 == _strip_md5_prefix(expected_readme_md5)
+    large_archive = expected_archive_size_bytes > large_archive_threshold_bytes
+    ready = (
+        doi_matches
+        and license_matches
+        and archive_file_present
+        and readme_file_present
+        and archive_size_matches
+        and archive_md5_matches
+        and readme_size_matches
+        and readme_md5_matches
+    )
+    if ready:
+        stage = "zenodo_record_verified"
+        blocker = "archive_cache" if large_archive else "local_reanalysis"
+    else:
+        stage = "zenodo_record_mismatch"
+        checks = [
+            ("doi", doi_matches),
+            ("license", license_matches),
+            ("archive_file", archive_file_present),
+            ("readme_file", readme_file_present),
+            ("archive_size", archive_size_matches),
+            ("archive_md5", archive_md5_matches),
+            ("readme_size", readme_size_matches),
+            ("readme_md5", readme_md5_matches),
+        ]
+        blocker = next(name for name, ok in checks if not ok)
+
+    return {
+        "fingerprint_id": fingerprint_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "record_id": float(record.get("id", 0) or 0),
+        "doi": observed_doi,
+        "license_id": observed_license,
+        "archive_name": expected_archive_name,
+        "archive_size_bytes": float(observed_archive_size),
+        "archive_md5": observed_archive_md5,
+        "readme_name": expected_readme_name,
+        "readme_size_bytes": float(observed_readme_size),
+        "readme_md5": observed_readme_md5,
+        "doi_matches": float(doi_matches),
+        "license_matches": float(license_matches),
+        "archive_file_present": float(archive_file_present),
+        "readme_file_present": float(readme_file_present),
+        "archive_size_matches": float(archive_size_matches),
+        "archive_md5_matches": float(archive_md5_matches),
+        "readme_size_matches": float(readme_size_matches),
+        "readme_md5_matches": float(readme_md5_matches),
+        "large_archive": float(large_archive),
+        "full_archive_download_required": float(large_archive),
+        "zenodo_record_fingerprint_ready": float(ready),
+        "real_reanalysis_ready": 0.0,
+        "primary_blocker": blocker,
+        "fingerprint_stage": stage,
+    }
+
+
 def sota_archive_preflight_gate(
     *,
     preflight_id: str,
