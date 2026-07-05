@@ -115,6 +115,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_claim_alignment,
     sota_data_accession_gate,
+    sota_readme_digest_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
@@ -2035,6 +2036,66 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["ready_for_local_reanalysis"], 0.0)
         self.assertEqual(row["primary_blocker"], "schema_tokens")
         self.assertIn("_trajectories", row["missing_schema_tokens"])
+
+    def test_sota_readme_digest_gate_verifies_cached_glassbench_readme(self):
+        readme_text = (
+            "GlassBench\n\n"
+            "This dataset contains two different systems, the three-dimensional "
+            "Kob-Andersen mixture (KA) and the two-dimensional ternary mixture "
+            "(KA2D). For each system, we provide the pure simulation data "
+            "(_trajectories), model predictions and derived structural properties "
+            "(_models), as well as scripts to evaluate the data and reproduce the "
+            "figures in the roadmap (_results).\n\n"
+            "The dataset is uploaded with the license \"Creative Commons Attribution "
+            "4.0 International\".\n\n"
+            "DOI: 10.1063/5.0129791\n"
+            "DOI: 10.1103/PhysRevLett.130.238202\n"
+        )
+        row = sota_readme_digest_gate(
+            digest_id="glassbench_readme_digest",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            readme_text=readme_text,
+            expected_size_bytes=len(readme_text.encode("utf-8")),
+            expected_md5="use-computed",
+            required_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            required_citation_dois=["10.1063/5.0129791", "10.1103/PhysRevLett.130.238202"],
+            required_license_phrase="Creative Commons Attribution 4.0 International",
+            local_cache_path="data/third_party/glassbench/README",
+        )
+
+        self.assertEqual(row["digest_stage"], "readme_digest_verified")
+        self.assertEqual(row["readme_digest_ready"], 1.0)
+        self.assertEqual(row["size_matches_expected"], 1.0)
+        self.assertEqual(row["md5_matches_expected"], 1.0)
+        self.assertEqual(row["schema_token_coverage"], 1.0)
+        self.assertEqual(row["citation_coverage"], 1.0)
+        self.assertEqual(row["license_phrase_present"], 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
+
+    def test_sota_readme_digest_gate_blocks_missing_citation_guidance(self):
+        readme_text = (
+            "GlassBench KA KA2D _trajectories _models _results "
+            "Creative Commons Attribution 4.0 International "
+            "DOI: 10.1063/5.0129791"
+        )
+        row = sota_readme_digest_gate(
+            digest_id="missing_citation_digest",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            readme_text=readme_text,
+            expected_size_bytes=len(readme_text.encode("utf-8")),
+            expected_md5="use-computed",
+            required_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            required_citation_dois=["10.1063/5.0129791", "10.1103/PhysRevLett.130.238202"],
+            required_license_phrase="Creative Commons Attribution 4.0 International",
+            local_cache_path="data/third_party/glassbench/README",
+        )
+
+        self.assertEqual(row["digest_stage"], "citation_guidance_incomplete")
+        self.assertEqual(row["readme_digest_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "citation_dois")
+        self.assertIn("10.1103/PhysRevLett.130.238202", row["missing_citation_dois"])
 
     def test_sota_readme_schema_gate_marks_glassbench_remote_schema_ready(self):
         row = sota_readme_schema_gate(

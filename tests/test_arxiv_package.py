@@ -361,6 +361,27 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(synthetic["ready_for_local_reanalysis"]), 1.0)
         self.assertEqual(synthetic["primary_blocker"], "none")
 
+    def test_sota_readme_digest_verifies_local_glassbench_cache(self):
+        cache_path = ROOT / "data" / "third_party" / "glassbench" / "README"
+        path = ROOT / "data" / "renewal_cage_sota_readme_digest.csv"
+        self.assertTrue(cache_path.exists())
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["digest_id"]: row for row in rows}
+        glassbench = by_id["glassbench_readme_digest"]
+        self.assertEqual(glassbench["digest_stage"], "readme_digest_verified")
+        self.assertEqual(glassbench["observed_md5"], "f1a192f54a2fa7a2b3533af0011b80dc")
+        self.assertEqual(glassbench["expected_md5"], "f1a192f54a2fa7a2b3533af0011b80dc")
+        self.assertEqual(float(glassbench["observed_size_bytes"]), 2147.0)
+        self.assertEqual(float(glassbench["readme_digest_ready"]), 1.0)
+        self.assertEqual(float(glassbench["schema_token_coverage"]), 1.0)
+        self.assertEqual(float(glassbench["citation_coverage"]), 1.0)
+        self.assertEqual(float(glassbench["license_phrase_present"]), 1.0)
+        self.assertIn("_trajectories", glassbench["required_tokens"])
+        self.assertIn("10.1103/PhysRevLett.130.238202", glassbench["required_citation_dois"])
+
     def test_sota_readme_schema_gate_records_remote_schema_without_archive_inspection(self):
         path = ROOT / "data" / "renewal_cage_sota_readme_schema.csv"
         self.assertTrue(path.exists())

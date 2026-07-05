@@ -1075,6 +1075,14 @@ and is blocked until a large-file download policy or local cache is supplied.
 The same table includes a synthetic positive-control archive and a
 missing-schema negative control, so remote metadata readiness is not confused
 with completed trajectory fitting.
+The lightweight local cache
+\texttt{data/third\_party/glassbench/README} is then checked by
+\texttt{renewal\_cage\_sota\_readme\_digest.csv}: the cached README has 2147
+bytes, md5 \texttt{f1a192f54a2fa7a2b3533af0011b80dc}, contains the KA/KA2D
+system tokens, the three folder tokens, the CC-BY-4.0 license phrase, and the
+two required dataset citations. This turns the first SOTA metadata layer into
+local evidence while leaving the full trajectory archive as the next explicit
+download/cache step.
 The README-schema gate
 \texttt{renewal\_cage\_sota\_readme\_schema.csv} then checks the next layer of
 metadata without downloading the full archive: the public README names the

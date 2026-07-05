@@ -100,6 +100,7 @@ from renewal_cage import (  # noqa: E402
     sota_claim_alignment,
     sota_archive_preflight_gate,
     sota_data_accession_gate,
+    sota_readme_digest_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
@@ -3065,6 +3066,52 @@ def write_sota_archive_preflight_csv(path: Path) -> list[dict[str, float | str]]
             observed_schema_tokens=["KA", "_models", "_results"],
             required_local_fields=glassbench_required_fields,
             available_local_fields=[],
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_readme_digest_csv(path: Path) -> list[dict[str, float | str]]:
+    """Verify the lightweight local GlassBench README cache."""
+
+    readme_path = DATA_DIR / "third_party" / "glassbench" / "README"
+    readme_text = readme_path.read_text(encoding="utf-8")
+    missing_citation_text = (
+        "GlassBench KA KA2D _trajectories _models _results "
+        "Creative Commons Attribution 4.0 International "
+        "DOI: 10.1063/5.0129791"
+    )
+    rows = [
+        sota_readme_digest_gate(
+            digest_id="glassbench_readme_digest",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            readme_text=readme_text,
+            expected_size_bytes=2147,
+            expected_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            required_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            required_citation_dois=[
+                "10.1063/5.0129791",
+                "10.1103/PhysRevLett.130.238202",
+            ],
+            required_license_phrase="Creative Commons Attribution 4.0 International",
+            local_cache_path="data/third_party/glassbench/README",
+        ),
+        sota_readme_digest_gate(
+            digest_id="missing_citation_negative_control",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            readme_text=missing_citation_text,
+            expected_size_bytes=len(missing_citation_text.encode("utf-8")),
+            expected_md5="use-computed",
+            required_tokens=["KA", "KA2D", "_trajectories", "_models", "_results"],
+            required_citation_dois=[
+                "10.1063/5.0129791",
+                "10.1103/PhysRevLett.130.238202",
+            ],
+            required_license_phrase="Creative Commons Attribution 4.0 International",
+            local_cache_path="synthetic_negative_control",
         ),
     ]
     write_sweep_csv(path, rows)
@@ -6467,6 +6514,9 @@ def main() -> None:
     )
     write_sota_archive_preflight_csv(
         DATA_DIR / "renewal_cage_sota_archive_preflight.csv"
+    )
+    write_sota_readme_digest_csv(
+        DATA_DIR / "renewal_cage_sota_readme_digest.csv"
     )
     readme_schema_rows = write_sota_readme_schema_csv(
         DATA_DIR / "renewal_cage_sota_readme_schema.csv"

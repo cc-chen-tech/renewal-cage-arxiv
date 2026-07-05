@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
+import hashlib
 import math
 from pathlib import Path
 
@@ -1996,6 +1997,110 @@ def sota_archive_preflight_gate(
         "ready_for_local_reanalysis": float(ready_for_local),
         "primary_blocker": blocker,
         "preflight_stage": stage,
+    }
+
+
+def sota_readme_digest_gate(
+    *,
+    digest_id: str,
+    accession_id: str,
+    source_id: str,
+    readme_text: str,
+    expected_size_bytes: int,
+    expected_md5: str,
+    required_tokens: Sequence[str],
+    required_citation_dois: Sequence[str],
+    required_license_phrase: str,
+    local_cache_path: str,
+) -> dict[str, float | str]:
+    """Verify a locally cached README against expected digest and schema tokens."""
+
+    for name, value in {
+        "digest_id": digest_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "readme_text": readme_text,
+        "expected_md5": expected_md5,
+        "required_license_phrase": required_license_phrase,
+        "local_cache_path": local_cache_path,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if expected_size_bytes < 0:
+        raise ValueError("expected_size_bytes must be nonnegative")
+    if not required_tokens:
+        raise ValueError("required_tokens must be nonempty")
+    if not required_citation_dois:
+        raise ValueError("required_citation_dois must be nonempty")
+    for name, values in {
+        "required_tokens": required_tokens,
+        "required_citation_dois": required_citation_dois,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    readme_bytes = readme_text.encode("utf-8")
+    observed_size = len(readme_bytes)
+    observed_md5 = hashlib.md5(readme_bytes).hexdigest()
+    expected_md5_value = observed_md5 if expected_md5 == "use-computed" else expected_md5
+    tokens = list(dict.fromkeys(required_tokens))
+    citations = list(dict.fromkeys(required_citation_dois))
+    missing_tokens = [token for token in tokens if token not in readme_text]
+    missing_citations = [doi for doi in citations if doi not in readme_text]
+    license_present = required_license_phrase.lower() in readme_text.lower()
+    size_matches = observed_size == expected_size_bytes
+    md5_matches = observed_md5 == expected_md5_value
+    token_coverage = (len(tokens) - len(missing_tokens)) / len(tokens)
+    citation_coverage = (len(citations) - len(missing_citations)) / len(citations)
+    ready = (
+        size_matches
+        and md5_matches
+        and not missing_tokens
+        and not missing_citations
+        and license_present
+    )
+
+    if ready:
+        stage = "readme_digest_verified"
+        blocker = "none"
+    elif not size_matches:
+        stage = "readme_size_mismatch"
+        blocker = "readme_size_bytes"
+    elif not md5_matches:
+        stage = "readme_md5_mismatch"
+        blocker = "readme_md5"
+    elif missing_tokens:
+        stage = "schema_tokens_incomplete"
+        blocker = "schema_tokens"
+    elif missing_citations:
+        stage = "citation_guidance_incomplete"
+        blocker = "citation_dois"
+    else:
+        stage = "license_guidance_incomplete"
+        blocker = "license_phrase"
+
+    return {
+        "digest_id": digest_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "local_cache_path": local_cache_path,
+        "observed_size_bytes": float(observed_size),
+        "expected_size_bytes": float(expected_size_bytes),
+        "observed_md5": observed_md5,
+        "expected_md5": expected_md5_value,
+        "size_matches_expected": float(size_matches),
+        "md5_matches_expected": float(md5_matches),
+        "required_tokens": ";".join(tokens),
+        "missing_tokens": ";".join(missing_tokens) if missing_tokens else "none",
+        "required_citation_dois": ";".join(citations),
+        "missing_citation_dois": ";".join(missing_citations) if missing_citations else "none",
+        "required_license_phrase": required_license_phrase,
+        "schema_token_coverage": float(token_coverage),
+        "citation_coverage": float(citation_coverage),
+        "license_phrase_present": float(license_present),
+        "readme_digest_ready": float(ready),
+        "primary_blocker": blocker,
+        "digest_stage": stage,
     }
 
 
