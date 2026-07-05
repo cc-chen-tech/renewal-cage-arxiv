@@ -2357,6 +2357,122 @@ def trajectory_observable_uncertainty_protocol(
     return out
 
 
+def trajectory_inversion_readiness_gate(
+    *,
+    benchmark_id: str,
+    source_key: str,
+    target_protocol: str,
+    trajectory_rows: Sequence[dict[str, float | str]],
+    required_observables: Sequence[str],
+    required_uncertainty_columns: Sequence[str],
+    has_shared_time_grid: bool,
+    has_shared_particle_identity: bool,
+) -> dict[str, float | str]:
+    """Gate trajectory-derived observables before uncertainty-weighted inversion."""
+
+    for name, value in {
+        "benchmark_id": benchmark_id,
+        "source_key": source_key,
+        "target_protocol": target_protocol,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if not trajectory_rows:
+        raise ValueError("trajectory_rows must be nonempty")
+    if not required_observables:
+        raise ValueError("required_observables must be nonempty")
+    if any(not observable for observable in required_observables):
+        raise ValueError("required_observables must contain nonempty strings")
+    if any(not column for column in required_uncertainty_columns):
+        raise ValueError("required_uncertainty_columns must contain nonempty strings")
+
+    required = list(dict.fromkeys(required_observables))
+    required_sigmas = list(dict.fromkeys(required_uncertainty_columns))
+    available: list[str] = []
+    available_sigmas: list[str] = []
+    positive_sigma_columns: set[str] = set()
+    for row in trajectory_rows:
+        structural_set = str(row.get("structural_observable_set", ""))
+        if structural_set and structural_set != "none":
+            available.extend(item for item in structural_set.split(";") if item)
+        for key, value in row.items():
+            if key.startswith("sigma_"):
+                available_sigmas.append(key)
+                try:
+                    if float(value) > 0.0:
+                        positive_sigma_columns.add(key)
+                except (TypeError, ValueError):
+                    pass
+        for observable in required:
+            if observable in row:
+                available.append(observable)
+    available_unique = list(dict.fromkeys(available))
+    sigma_unique = list(dict.fromkeys(available_sigmas))
+    available_set = set(available_unique)
+    sigma_set = set(sigma_unique)
+    missing_observables = [observable for observable in required if observable not in available_set]
+    missing_sigma_columns = [column for column in required_sigmas if column not in sigma_set]
+    nonpositive_sigma_columns = [
+        column
+        for column in required_sigmas
+        if column in sigma_set and column not in positive_sigma_columns
+    ]
+
+    structural_ready = (
+        not missing_observables
+        and has_shared_time_grid
+        and has_shared_particle_identity
+    )
+    uncertainty_ready = (
+        structural_ready
+        and not missing_sigma_columns
+        and not nonpositive_sigma_columns
+    )
+    if uncertainty_ready:
+        stage = "uncertainty_weighted_trajectory_inversion"
+        blocker = "none"
+    elif not has_shared_time_grid:
+        stage = "trajectory_blocked"
+        blocker = "shared_time_grid"
+    elif not has_shared_particle_identity:
+        stage = "trajectory_blocked"
+        blocker = "shared_particle_identity"
+    elif missing_observables:
+        stage = "trajectory_blocked"
+        blocker = missing_observables[0]
+    elif missing_sigma_columns:
+        stage = "structural_trajectory_only"
+        blocker = missing_sigma_columns[0]
+    elif nonpositive_sigma_columns:
+        stage = "structural_trajectory_only"
+        blocker = nonpositive_sigma_columns[0]
+    else:
+        stage = "structural_trajectory_only"
+        blocker = "uncertainty_columns"
+
+    return {
+        "benchmark_id": benchmark_id,
+        "source_key": source_key,
+        "target_protocol": target_protocol,
+        "required_observables": ";".join(required),
+        "available_observables": ";".join(available_unique) if available_unique else "none",
+        "missing_observables": ";".join(missing_observables) if missing_observables else "none",
+        "required_uncertainty_columns": ";".join(required_sigmas) if required_sigmas else "none",
+        "available_uncertainty_columns": ";".join(sigma_unique) if sigma_unique else "none",
+        "missing_uncertainty_columns": ";".join(missing_sigma_columns) if missing_sigma_columns else "none",
+        "nonpositive_uncertainty_columns": (
+            ";".join(nonpositive_sigma_columns) if nonpositive_sigma_columns else "none"
+        ),
+        "lag_count": float(len(trajectory_rows)),
+        "shared_time_grid": float(has_shared_time_grid),
+        "shared_particle_identity": float(has_shared_particle_identity),
+        "structural_trajectory_ready": float(structural_ready),
+        "uncertainty_weighted_ready": float(uncertainty_ready),
+        "primary_blocker": blocker,
+        "readiness_stage": stage,
+    }
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

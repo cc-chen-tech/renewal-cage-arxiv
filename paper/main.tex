@@ -1092,6 +1092,13 @@ trajectory-derived observables. Its columns
 \texttt{sigma\_msd}, \texttt{sigma\_ngp}, \texttt{sigma\_self\_intermediate\_scattering},
 and \texttt{sigma\_chi4\_overlap} are the uncertainty estimates required by the
 downstream raw-curve and persistence/exchange protocols.
+The gate
+\texttt{renewal\_cage\_trajectory\_inversion\_readiness.csv} then separates a
+trajectory source that is merely structurally usable from one that is ready for
+uncertainty-weighted inversion. Promotion requires the required observable set,
+a shared lag grid, shared particle identity, and positive uncertainty columns;
+the structural-only example is deliberately blocked by the missing
+\texttt{sigma\_*} fields.
 Finally,
 \texttt{renewal\_cage\_raw\_curve\_ingestion\_contract.csv} specifies the
 column-level contract for turning the structurally valid Kob-Andersen I/II

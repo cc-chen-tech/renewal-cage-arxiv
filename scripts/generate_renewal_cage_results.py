@@ -110,6 +110,7 @@ from renewal_cage import (  # noqa: E402
     temperature_scan,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
+    trajectory_inversion_readiness_gate,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -3199,6 +3200,47 @@ def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, floa
     return rows
 
 
+def write_trajectory_inversion_readiness_csv(
+    path: Path,
+    *,
+    observable_rows: list[dict[str, float | str]],
+    uncertainty_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Gate trajectory-derived observables before promoting them to inversion."""
+
+    required_observables = ["msd", "ngp", "self_intermediate_scattering", "overlap_chi4"]
+    required_uncertainty_columns = [
+        "sigma_msd",
+        "sigma_ngp",
+        "sigma_self_intermediate_scattering",
+        "sigma_chi4_overlap",
+    ]
+    rows = [
+        trajectory_inversion_readiness_gate(
+            benchmark_id="synthetic_intermittent_trajectory_uncertainty",
+            source_key="synthetic_trajectory_reanalysis",
+            target_protocol="trajectory_alpha_vanhove_chi4_transport",
+            trajectory_rows=uncertainty_rows,
+            required_observables=required_observables,
+            required_uncertainty_columns=required_uncertainty_columns,
+            has_shared_time_grid=True,
+            has_shared_particle_identity=True,
+        ),
+        trajectory_inversion_readiness_gate(
+            benchmark_id="synthetic_intermittent_trajectory_structural_only",
+            source_key="synthetic_trajectory_reanalysis",
+            target_protocol="trajectory_alpha_vanhove_chi4_transport",
+            trajectory_rows=observable_rows,
+            required_observables=required_observables,
+            required_uncertainty_columns=required_uncertainty_columns,
+            has_shared_time_grid=True,
+            has_shared_particle_identity=True,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -5159,6 +5201,58 @@ def write_trajectory_uncertainty_protocol_svg(
     path.write_text(svg)
 
 
+def write_trajectory_inversion_readiness_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1080, 430
+    left, top = 80, 110
+    row_h = 82
+    colors_by_stage = {
+        "uncertainty_weighted_trajectory_inversion": "#2f855a",
+        "structural_trajectory_only": "#2b6cb0",
+        "trajectory_blocked": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["readiness_stage"])
+        color = colors_by_stage[stage]
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["benchmark_id"]).replace("_", " ")[:44]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 330}" y="{y}" width="230" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 342}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:36]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 590}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">lags={int(float(row["lag_count"]))}; structural={int(float(row["structural_trajectory_ready"]))}; uncertainty={int(float(row["uncertainty_weighted_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 330}" y="{y + 44}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker: {str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 590}" y="{y + 44}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing sigma: {str(row["missing_uncertainty_columns"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="80" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Trajectory inversion readiness gate</text>
+  <text x="80" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Trajectory-derived observables are promoted only when structural observables and uncertainty columns are both present.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">benchmark</text>
+  <text x="{left + 330}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 590}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness details</text>
+  {"".join(marks)}
+  <rect x="80" y="335" width="14" height="14" fill="#2f855a" /><text x="102" y="347" font-family="Arial, sans-serif" font-size="12">uncertainty-weighted trajectory inversion</text>
+  <rect x="335" y="335" width="14" height="14" fill="#2b6cb0" /><text x="357" y="347" font-family="Arial, sans-serif" font-size="12">structural trajectory only</text>
+  <rect x="535" y="335" width="14" height="14" fill="#c05621" /><text x="557" y="347" font-family="Arial, sans-serif" font-size="12">blocked trajectory</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -5949,6 +6043,15 @@ def main() -> None:
     write_trajectory_uncertainty_protocol_svg(
         FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.svg",
         trajectory_uncertainty_rows,
+    )
+    trajectory_inversion_readiness_rows = write_trajectory_inversion_readiness_csv(
+        DATA_DIR / "renewal_cage_trajectory_inversion_readiness.csv",
+        observable_rows=trajectory_observable_rows,
+        uncertainty_rows=trajectory_uncertainty_rows,
+    )
+    write_trajectory_inversion_readiness_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_inversion_readiness.svg",
+        trajectory_inversion_readiness_rows,
     )
 
     barrier = ActivatedBarrierParams(

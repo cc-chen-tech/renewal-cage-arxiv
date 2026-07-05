@@ -2445,6 +2445,51 @@ def write_trajectory_uncertainty_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_inversion_readiness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_inversion_readiness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Trajectory inversion readiness gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Trajectory-derived observables are promoted only when structural observables and uncertainty columns are both present.",
+    )
+    left, top = 55, page_h - 95
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top, "benchmark")
+    c.drawString(left + 245, top, "stage")
+    c.drawString(left + 470, top, "struct")
+    c.drawString(left + 520, top, "unc")
+    c.drawString(left + 565, top, "blocker")
+    palette = {
+        "uncertainty_weighted_trajectory_inversion": colors.HexColor("#2f855a"),
+        "structural_trajectory_only": colors.HexColor("#2b6cb0"),
+        "trajectory_blocked": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 7.5)
+    for idx, row in enumerate(rows):
+        y = top - 28 - idx * 45
+        stage = row["readiness_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["benchmark_id"].replace("_", " ")[:34])
+        c.setFillColor(palette[stage])
+        c.rect(left + 245, y - 4, 195, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 250, y, stage.replace("_", " ")[:32])
+        c.setFillColor(colors.black)
+        c.drawString(left + 470, y, str(int(float(row["structural_trajectory_ready"]))))
+        c.drawString(left + 520, y, str(int(float(row["uncertainty_weighted_ready"]))))
+        c.drawString(left + 565, y, row["primary_blocker"].replace("_", " ")[:28])
+        c.drawString(left + 245, y - 13, f"missing sigma: {row['missing_uncertainty_columns'][:70]}")
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -2494,6 +2539,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     trajectory_observable_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.pdf"
     trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
+    trajectory_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_inversion_readiness.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -2532,6 +2578,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_raw_curve_persistence_exchange_protocol_pdf(raw_curve_persistence_exchange_protocol_pdf)
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
     write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
+    write_trajectory_inversion_readiness_pdf(trajectory_inversion_readiness_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -2596,6 +2643,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         )
         archive.write(trajectory_observable_protocol_pdf, "figures/renewal_cage_trajectory_observable_protocol.pdf")
         archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
+        archive.write(trajectory_inversion_readiness_pdf, "figures/renewal_cage_trajectory_inversion_readiness.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

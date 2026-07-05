@@ -28,7 +28,8 @@ The model combines:
   glass-dynamics phenomenon audit, barrier-facilitation signature phase
   diagrams, closed barrier-threshold requirements, finite-time consistency
   diagnostics, joint persistence/exchange inversion protocols, and observable
-  inversion/falsifiability criteria.
+  inversion/falsifiability criteria, including a trajectory inversion readiness
+  gate.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -113,6 +114,10 @@ The companion trajectory-uncertainty protocol uses time-origin block jackknife
 estimates to attach uncertainty columns to those trajectory-derived observables,
 turning the trajectory bridge into a quantitative pre-inversion input rather
 than only a structural observable extractor.
+The trajectory inversion readiness gate then promotes trajectory-derived rows
+only when the required structural observables, shared lag grid, shared particle
+identity, and positive uncertainty columns are all present; otherwise it keeps
+the source at the structural-trajectory-only stage.
 The cross-observable prediction ledger separates calibration inputs from
 held-out predictions and external closures, making fit-only overclaims visible.
 The inversion-identifiability audit then checks fit-rank margins, held-out
@@ -208,6 +213,7 @@ figures/renewal_cage_raw_curve_diagnostic_readiness.svg
 figures/renewal_cage_raw_curve_persistence_exchange_protocol.svg
 figures/renewal_cage_trajectory_observable_protocol.svg
 figures/renewal_cage_trajectory_uncertainty_protocol.svg
+figures/renewal_cage_trajectory_inversion_readiness.svg
 figures/renewal_cage_barrier_requirements.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
@@ -255,6 +261,7 @@ data/renewal_cage_raw_curve_diagnostic_readiness.csv
 data/renewal_cage_raw_curve_persistence_exchange_protocol.csv
 data/renewal_cage_trajectory_observable_protocol.csv
 data/renewal_cage_trajectory_uncertainty_protocol.csv
+data/renewal_cage_trajectory_inversion_readiness.csv
 data/renewal_cage_barrier_requirements.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
@@ -299,6 +306,7 @@ paper/figures/renewal_cage_raw_curve_diagnostic_readiness.pdf
 paper/figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf
 paper/figures/renewal_cage_trajectory_observable_protocol.pdf
 paper/figures/renewal_cage_trajectory_uncertainty_protocol.pdf
+paper/figures/renewal_cage_trajectory_inversion_readiness.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf

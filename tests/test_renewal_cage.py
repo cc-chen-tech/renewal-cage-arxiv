@@ -116,6 +116,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
+    trajectory_inversion_readiness_gate,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     TranslationRotationExchangeParams,
@@ -2335,6 +2336,85 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 overlap_radius=0.5,
                 block_count=1,
             )
+
+    def test_trajectory_inversion_readiness_gate_promotes_uncertainty_weighted_rows(self):
+        rows = [
+            {
+                "lag_time": 1.0,
+                "structural_observable_set": "msd;ngp;self_intermediate_scattering;overlap_chi4",
+                "msd": 1.0,
+                "ngp": 0.2,
+                "self_intermediate_scattering": 0.5,
+                "chi4_overlap": 0.3,
+                "sigma_msd": 0.1,
+                "sigma_ngp": 0.02,
+                "sigma_self_intermediate_scattering": 0.03,
+                "sigma_chi4_overlap": 0.04,
+            },
+            {
+                "lag_time": 2.0,
+                "structural_observable_set": "msd;ngp;self_intermediate_scattering;overlap_chi4",
+                "msd": 2.0,
+                "ngp": 0.1,
+                "self_intermediate_scattering": 0.2,
+                "chi4_overlap": 0.4,
+                "sigma_msd": 0.2,
+                "sigma_ngp": 0.03,
+                "sigma_self_intermediate_scattering": 0.04,
+                "sigma_chi4_overlap": 0.05,
+            },
+        ]
+
+        gate = trajectory_inversion_readiness_gate(
+            benchmark_id="glassbench_like_trajectory",
+            source_key="trajectory_reanalysis_candidate",
+            target_protocol="alpha_vanhove_chi4_transport",
+            trajectory_rows=rows,
+            required_observables=["msd", "ngp", "self_intermediate_scattering", "overlap_chi4"],
+            required_uncertainty_columns=[
+                "sigma_msd",
+                "sigma_ngp",
+                "sigma_self_intermediate_scattering",
+                "sigma_chi4_overlap",
+            ],
+            has_shared_time_grid=True,
+            has_shared_particle_identity=True,
+        )
+
+        self.assertEqual(gate["readiness_stage"], "uncertainty_weighted_trajectory_inversion")
+        self.assertEqual(gate["primary_blocker"], "none")
+        self.assertEqual(gate["structural_trajectory_ready"], 1.0)
+        self.assertEqual(gate["uncertainty_weighted_ready"], 1.0)
+        self.assertEqual(gate["lag_count"], 2.0)
+
+    def test_trajectory_inversion_readiness_gate_blocks_missing_uncertainty_columns(self):
+        rows = [
+            {
+                "lag_time": 1.0,
+                "structural_observable_set": "msd;ngp;self_intermediate_scattering;overlap_chi4",
+                "msd": 1.0,
+                "ngp": 0.2,
+                "self_intermediate_scattering": 0.5,
+                "chi4_overlap": 0.3,
+                "sigma_msd": 0.1,
+            }
+        ]
+
+        gate = trajectory_inversion_readiness_gate(
+            benchmark_id="structural_only_trajectory",
+            source_key="trajectory_reanalysis_candidate",
+            target_protocol="alpha_vanhove_chi4_transport",
+            trajectory_rows=rows,
+            required_observables=["msd", "ngp", "self_intermediate_scattering", "overlap_chi4"],
+            required_uncertainty_columns=["sigma_msd", "sigma_ngp"],
+            has_shared_time_grid=True,
+            has_shared_particle_identity=True,
+        )
+
+        self.assertEqual(gate["readiness_stage"], "structural_trajectory_only")
+        self.assertEqual(gate["primary_blocker"], "sigma_ngp")
+        self.assertEqual(gate["structural_trajectory_ready"], 1.0)
+        self.assertEqual(gate["uncertainty_weighted_ready"], 0.0)
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(

@@ -434,6 +434,21 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(float(peak["sigma_self_intermediate_scattering"]), 0.0)
         self.assertGreaterEqual(float(peak["sigma_chi4_overlap"]), 0.0)
 
+    def test_trajectory_inversion_readiness_gate_promotes_uncertainty_weighted_trajectory_rows(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_inversion_readiness.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["benchmark_id"]: row for row in rows}
+        ready = by_id["synthetic_intermittent_trajectory_uncertainty"]
+        self.assertEqual(ready["readiness_stage"], "uncertainty_weighted_trajectory_inversion")
+        self.assertEqual(ready["primary_blocker"], "none")
+        self.assertEqual(float(ready["uncertainty_weighted_ready"]), 1.0)
+        structural = by_id["synthetic_intermittent_trajectory_structural_only"]
+        self.assertEqual(structural["readiness_stage"], "structural_trajectory_only")
+        self.assertEqual(structural["primary_blocker"], "sigma_msd")
+
     def test_translation_rotation_protocol_detects_rotational_decoupling_gap(self):
         path = ROOT / "data" / "renewal_cage_translation_rotation_protocol.csv"
         self.assertTrue(path.exists())
@@ -492,6 +507,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_uncertainty_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -567,6 +583,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
+            "figures/renewal_cage_trajectory_inversion_readiness.pdf",
             "figures/renewal_cage_barrier_requirements.pdf",
             "figures/renewal_cage_barrier.pdf",
             "figures/renewal_cage_heterogeneity.pdf",
@@ -656,6 +673,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
+            ).read_bytes()
+            first_trajectory_inversion_readiness = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_inversion_readiness.pdf"
             ).read_bytes()
             first_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
@@ -750,6 +770,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
             ).read_bytes()
+            second_trajectory_inversion_readiness = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_inversion_readiness.pdf"
+            ).read_bytes()
             second_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
             ).read_bytes()
@@ -806,6 +829,7 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(first_trajectory_observable_protocol, second_trajectory_observable_protocol)
         self.assertEqual(first_trajectory_uncertainty_protocol, second_trajectory_uncertainty_protocol)
+        self.assertEqual(first_trajectory_inversion_readiness, second_trajectory_inversion_readiness)
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)
