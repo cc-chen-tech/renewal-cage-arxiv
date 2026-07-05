@@ -271,6 +271,7 @@ data/renewal_cage_sota_data_accession.csv
 data/renewal_cage_sota_archive_preflight.csv
 data/renewal_cage_sota_readme_digest.csv
 data/renewal_cage_sota_local_cache_verification.csv
+data/renewal_cage_sota_zip_structure.csv
 data/renewal_cage_sota_readme_schema.csv
 data/renewal_cage_trajectory_adapter_contract.csv
 data/renewal_cage_literature_inversion_readiness.csv

@@ -1090,6 +1090,13 @@ size and md5, but records \texttt{archive\_cache\_missing} for
 \texttt{data/third\_party/glassbench/GlassBench.zip}; therefore the
 trajectory-level GlassBench comparison remains gated on obtaining and
 checksum-validating the full archive, not on metadata alone.
+The zip-structure gate
+\texttt{renewal\_cage\_sota\_zip\_structure.csv} is the next non-extractive
+step: it reads only the archive central directory and requires
+\texttt{KA/\_trajectories}, \texttt{KA/\_models}, \texttt{KA/\_results},
+\texttt{KA2D/\_trajectories}, \texttt{KA2D/\_models}, and
+\texttt{KA2D/\_results}. With the full zip absent, the current row remains at
+\texttt{zip\_archive\_missing}.
 The README-schema gate
 \texttt{renewal\_cage\_sota\_readme\_schema.csv} then checks the next layer of
 metadata without downloading the full archive: the public README names the

@@ -105,6 +105,7 @@ from renewal_cage import (  # noqa: E402
     sota_readme_schema_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
+    sota_zip_structure_gate,
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
@@ -3133,6 +3134,29 @@ def write_sota_local_cache_verification_csv(path: Path) -> list[dict[str, float 
             archive_path=Path("data/third_party/glassbench/GlassBench.zip"),
             expected_archive_size_bytes=6042260027,
             expected_archive_md5="82c83a7146eb749e13417e4350022417",
+        )
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_zip_structure_csv(path: Path) -> list[dict[str, float | str]]:
+    """Inspect cached SOTA zip archive roots without extracting trajectories."""
+
+    rows = [
+        sota_zip_structure_gate(
+            structure_id="glassbench_zip_structure",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            archive_path=Path("data/third_party/glassbench/GlassBench.zip"),
+            required_roots=[
+                "KA/_trajectories",
+                "KA/_models",
+                "KA/_results",
+                "KA2D/_trajectories",
+                "KA2D/_models",
+                "KA2D/_results",
+            ],
         )
     ]
     write_sweep_csv(path, rows)
@@ -6541,6 +6565,9 @@ def main() -> None:
     )
     write_sota_local_cache_verification_csv(
         DATA_DIR / "renewal_cage_sota_local_cache_verification.csv"
+    )
+    write_sota_zip_structure_csv(
+        DATA_DIR / "renewal_cage_sota_zip_structure.csv"
     )
     readme_schema_rows = write_sota_readme_schema_csv(
         DATA_DIR / "renewal_cage_sota_readme_schema.csv"

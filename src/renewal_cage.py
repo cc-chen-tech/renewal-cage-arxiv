@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
+import zipfile
 
 import numpy as np
 
@@ -2215,6 +2216,96 @@ def sota_local_cache_verification_gate(
         "ready_for_local_reanalysis": float(local_verified),
         "primary_blocker": blocker,
         "cache_stage": stage,
+    }
+
+
+def sota_zip_structure_gate(
+    *,
+    structure_id: str,
+    accession_id: str,
+    source_id: str,
+    archive_path: str | Path,
+    required_roots: Sequence[str],
+) -> dict[str, float | str]:
+    """Inspect a zip central directory for required dataset roots without extraction."""
+
+    for name, value in {
+        "structure_id": structure_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if not required_roots:
+        raise ValueError("required_roots must be nonempty")
+    if any(not root for root in required_roots):
+        raise ValueError("required_roots must contain nonempty strings")
+
+    archive = Path(archive_path)
+    roots = [root.strip("/") for root in dict.fromkeys(required_roots)]
+    if not archive.exists():
+        return {
+            "structure_id": structure_id,
+            "accession_id": accession_id,
+            "source_id": source_id,
+            "archive_path": str(archive),
+            "zip_present": 0.0,
+            "zip_readable": 0.0,
+            "entry_count": 0.0,
+            "required_roots": ";".join(roots),
+            "present_roots": "none",
+            "missing_roots": ";".join(roots),
+            "root_coverage": 0.0,
+            "zip_structure_ready": 0.0,
+            "primary_blocker": "archive_path",
+            "zip_structure_stage": "zip_archive_missing",
+        }
+
+    try:
+        with zipfile.ZipFile(archive) as zf:
+            entries = [name.strip("/") for name in zf.namelist() if name.strip("/")]
+    except zipfile.BadZipFile:
+        return {
+            "structure_id": structure_id,
+            "accession_id": accession_id,
+            "source_id": source_id,
+            "archive_path": str(archive),
+            "zip_present": 1.0,
+            "zip_readable": 0.0,
+            "entry_count": 0.0,
+            "required_roots": ";".join(roots),
+            "present_roots": "none",
+            "missing_roots": ";".join(roots),
+            "root_coverage": 0.0,
+            "zip_structure_ready": 0.0,
+            "primary_blocker": "zipfile",
+            "zip_structure_stage": "zip_unreadable",
+        }
+
+    present_roots = [
+        root
+        for root in roots
+        if any(entry == root or entry.startswith(f"{root}/") for entry in entries)
+    ]
+    missing_roots = [root for root in roots if root not in set(present_roots)]
+    ready = not missing_roots
+    return {
+        "structure_id": structure_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "archive_path": str(archive),
+        "zip_present": 1.0,
+        "zip_readable": 1.0,
+        "entry_count": float(len(entries)),
+        "required_roots": ";".join(roots),
+        "present_roots": ";".join(present_roots) if present_roots else "none",
+        "missing_roots": ";".join(missing_roots) if missing_roots else "none",
+        "root_coverage": (len(roots) - len(missing_roots)) / len(roots),
+        "zip_structure_ready": float(ready),
+        "primary_blocker": "none" if ready else "archive_roots",
+        "zip_structure_stage": "zip_structure_ready"
+        if ready
+        else "zip_structure_incomplete",
     }
 
 

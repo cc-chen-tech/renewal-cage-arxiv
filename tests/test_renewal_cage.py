@@ -3,6 +3,7 @@ import math
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -119,6 +120,7 @@ from renewal_cage import (  # noqa: E402
     sota_readme_digest_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
+    sota_zip_structure_gate,
     sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
     temperature_dependent_params,
@@ -2146,6 +2148,64 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["cache_stage"], "local_archive_cache_verified")
         self.assertEqual(row["local_cache_verified"], 1.0)
         self.assertEqual(row["ready_for_local_reanalysis"], 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
+
+    def test_sota_zip_structure_gate_blocks_missing_glassbench_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "GlassBench.zip"
+            row = sota_zip_structure_gate(
+                structure_id="glassbench_zip_structure",
+                accession_id="glassbench_zenodo_10118191",
+                source_id="glassbench_zenodo_trajectory_release",
+                archive_path=archive,
+                required_roots=[
+                    "KA/_trajectories",
+                    "KA/_models",
+                    "KA/_results",
+                    "KA2D/_trajectories",
+                    "KA2D/_models",
+                    "KA2D/_results",
+                ],
+            )
+
+        self.assertEqual(row["zip_structure_stage"], "zip_archive_missing")
+        self.assertEqual(row["zip_structure_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "archive_path")
+        self.assertIn("KA/_trajectories", row["missing_roots"])
+
+    def test_sota_zip_structure_gate_reads_synthetic_central_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / "synthetic_glassbench.zip"
+            with zipfile.ZipFile(archive, "w") as zf:
+                for name in [
+                    "KA/_trajectories/traj_a.csv",
+                    "KA/_models/model.json",
+                    "KA/_results/figure.csv",
+                    "KA2D/_trajectories/traj_a.csv",
+                    "KA2D/_models/model.json",
+                    "KA2D/_results/figure.csv",
+                ]:
+                    zf.writestr(name, "fixture\n")
+
+            row = sota_zip_structure_gate(
+                structure_id="synthetic_zip_structure",
+                accession_id="synthetic_local_cache",
+                source_id="synthetic_fixture",
+                archive_path=archive,
+                required_roots=[
+                    "KA/_trajectories",
+                    "KA/_models",
+                    "KA/_results",
+                    "KA2D/_trajectories",
+                    "KA2D/_models",
+                    "KA2D/_results",
+                ],
+            )
+
+        self.assertEqual(row["zip_structure_stage"], "zip_structure_ready")
+        self.assertEqual(row["zip_structure_ready"], 1.0)
+        self.assertEqual(row["root_coverage"], 1.0)
+        self.assertEqual(row["entry_count"], 6.0)
         self.assertEqual(row["primary_blocker"], "none")
 
     def test_sota_readme_schema_gate_marks_glassbench_remote_schema_ready(self):

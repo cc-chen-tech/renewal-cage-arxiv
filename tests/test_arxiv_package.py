@@ -398,6 +398,21 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(glassbench["expected_archive_md5"], "82c83a7146eb749e13417e4350022417")
         self.assertEqual(glassbench["primary_blocker"], "archive_path")
 
+    def test_sota_zip_structure_gate_waits_for_cached_glassbench_archive(self):
+        path = ROOT / "data" / "renewal_cage_sota_zip_structure.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["structure_id"]: row for row in rows}
+        glassbench = by_id["glassbench_zip_structure"]
+        self.assertEqual(glassbench["zip_structure_stage"], "zip_archive_missing")
+        self.assertEqual(float(glassbench["zip_structure_ready"]), 0.0)
+        self.assertEqual(float(glassbench["zip_present"]), 0.0)
+        self.assertEqual(glassbench["primary_blocker"], "archive_path")
+        self.assertIn("KA/_trajectories", glassbench["required_roots"])
+        self.assertIn("KA2D/_results", glassbench["missing_roots"])
+
     def test_sota_readme_schema_gate_records_remote_schema_without_archive_inspection(self):
         path = ROOT / "data" / "renewal_cage_sota_readme_schema.csv"
         self.assertTrue(path.exists())

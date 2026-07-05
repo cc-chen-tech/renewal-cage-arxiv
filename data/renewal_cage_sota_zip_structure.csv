@@ -1,0 +1,2 @@
+structure_id,accession_id,source_id,archive_path,zip_present,zip_readable,entry_count,required_roots,present_roots,missing_roots,root_coverage,zip_structure_ready,primary_blocker,zip_structure_stage
+glassbench_zip_structure,glassbench_zenodo_10118191,glassbench_zenodo_trajectory_release,data/third_party/glassbench/GlassBench.zip,0.0,0.0,0.0,KA/_trajectories;KA/_models;KA/_results;KA2D/_trajectories;KA2D/_models;KA2D/_results,none,KA/_trajectories;KA/_models;KA/_results;KA2D/_trajectories;KA2D/_models;KA2D/_results,0.0,0.0,archive_path,zip_archive_missing
