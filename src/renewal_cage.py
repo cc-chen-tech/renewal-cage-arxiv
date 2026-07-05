@@ -672,6 +672,47 @@ def dynamic_heterogeneity_benchmark_consistency(
     }
 
 
+def alpha_tts_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_tts_breakdown: bool,
+    cold_shape_residual: float,
+    alpha_shape_control_growth: float,
+    residual_threshold: float,
+    min_control_growth: float,
+) -> dict[str, float | str]:
+    """Check alpha time-temperature-superposition breakdown against shape diagnostics."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "cold_shape_residual": cold_shape_residual,
+        "alpha_shape_control_growth": alpha_shape_control_growth,
+        "residual_threshold": residual_threshold,
+        "min_control_growth": min_control_growth,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+
+    residual_flag = cold_shape_residual >= residual_threshold
+    control_flag = alpha_shape_control_growth >= min_control_growth
+    model_flag = residual_flag and control_flag
+    residual_consistent = residual_flag == observed_tts_breakdown
+    control_consistent = control_flag == observed_tts_breakdown
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_tts_breakdown": float(observed_tts_breakdown),
+        "cold_shape_residual": cold_shape_residual,
+        "alpha_shape_control_growth": alpha_shape_control_growth,
+        "residual_threshold": residual_threshold,
+        "min_control_growth": min_control_growth,
+        "model_predicts_tts_breakdown": float(model_flag),
+        "tts_residual_consistent": float(residual_consistent),
+        "tts_control_consistent": float(control_consistent),
+        "overall_consistent": float(model_flag == observed_tts_breakdown and residual_consistent and control_consistent),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

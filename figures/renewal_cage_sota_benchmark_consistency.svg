@@ -15,4 +15,5 @@
   <text x="660" y="486" font-family="Arial, sans-serif" font-size="12">recovery row consistent = 1</text>
   <text x="660" y="504" font-family="Arial, sans-serif" font-size="12">SE row consistent = 1; D tau growth = 2.03, xi_SE = 0.581</text>
   <text x="660" y="522" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = 1; xi4 growth = 3.09, chi4 growth = 34.7</text>
+  <text x="660" y="540" font-family="Arial, sans-serif" font-size="12">TTS row consistent = 1; residual = 0.611, C growth = 6.44</text>
 </svg>

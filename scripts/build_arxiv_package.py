@@ -917,6 +917,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
+    tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
@@ -985,6 +986,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(heterogeneity_row['overall_consistent']))}; "
         f"xi4 growth = {float(heterogeneity_row['length_growth']):.2f}; "
         f"chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}",
+    )
+    c.drawString(
+        430,
+        76,
+        "TTS row consistent = "
+        f"{int(float(tts_row['overall_consistent']))}; "
+        f"residual = {float(tts_row['cold_shape_residual']):.3f}; "
+        f"C growth = {float(tts_row['alpha_shape_control_growth']):.2f}",
     )
     c.showPage()
     c.save()

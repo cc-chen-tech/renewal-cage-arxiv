@@ -24,6 +24,7 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_shape_curve,
     alpha_relaxation_time,
     alpha_shape_superposition_residual,
+    alpha_tts_benchmark_consistency,
     activated_barrier_temperature_law,
     adam_gibbs_thermodynamic_scan,
     barrier_amplification_laws,
@@ -746,6 +747,7 @@ def write_sota_benchmark_consistency_csv(
     heterogeneity: GammaExchangeParams,
     temperature_law: TemperatureLawParams,
     spatial_chi4_rows: list[dict[str, float]],
+    alpha_shape_rows: list[dict[str, float | str]],
 ) -> list[dict[str, float | str]]:
     fieldnames = [
         "benchmark_id",
@@ -789,6 +791,14 @@ def write_sota_benchmark_consistency_csv(
         "length_growth_consistent",
         "correlation_size_growth_consistent",
         "chi4_peak_growth_consistent",
+        "observed_tts_breakdown",
+        "cold_shape_residual",
+        "alpha_shape_control_growth",
+        "residual_threshold",
+        "min_control_growth",
+        "model_predicts_tts_breakdown",
+        "tts_residual_consistent",
+        "tts_control_consistent",
         "overall_consistent",
     ]
 
@@ -839,11 +849,27 @@ def write_sota_benchmark_consistency_csv(
         min_correlation_size_growth=2.0,
         min_chi4_peak_growth=2.0,
     )
+    alpha_summary_by_temperature: dict[float, dict[str, float | str]] = {}
+    for row in alpha_shape_rows:
+        alpha_summary_by_temperature.setdefault(float(row["temperature"]), row)
+    if not alpha_summary_by_temperature:
+        raise ValueError("alpha_shape_rows must be nonempty")
+    hot_alpha = alpha_summary_by_temperature[max(alpha_summary_by_temperature)]
+    cold_alpha = alpha_summary_by_temperature[min(alpha_summary_by_temperature)]
+    tts_row = alpha_tts_benchmark_consistency(
+        benchmark_id="alpha_tts_breakdown_shape_residual",
+        observed_tts_breakdown=True,
+        cold_shape_residual=float(cold_alpha["rms_log_shape_residual"]),
+        alpha_shape_control_growth=float(cold_alpha["shape_control"]) / float(hot_alpha["shape_control"]),
+        residual_threshold=0.25,
+        min_control_growth=2.0,
+    )
     rows = [
         normalize(mct_row, "mct_beta_window"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
         normalize(se_row, "stokes_einstein_fractional_decoupling"),
         normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
+        normalize(tts_row, "alpha_tts_breakdown"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -2138,6 +2164,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
+    tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
@@ -2194,6 +2221,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_b}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">recovery row consistent = {int(float(recovery_row['overall_consistent']))}</text>
   <text x="{left_b}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">SE row consistent = {int(float(se_row['overall_consistent']))}; D tau growth = {float(se_row['se_product_growth']):.2f}, xi_SE = {float(se_row['cold_fractional_exponent']):.3f}</text>
   <text x="{left_b}" y="{bottom + 92}" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = {int(float(heterogeneity_row['overall_consistent']))}; xi4 growth = {float(heterogeneity_row['length_growth']):.2f}, chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}</text>
+  <text x="{left_b}" y="{bottom + 110}" font-family="Arial, sans-serif" font-size="12">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
 </svg>
 """
     path.write_text(svg)
@@ -3005,6 +3033,7 @@ def main() -> None:
         GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0),
         temperature_law,
         spatial_chi4_rows,
+        alpha_shape_rows,
     )
     write_sota_benchmark_consistency_svg(
         FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.svg",

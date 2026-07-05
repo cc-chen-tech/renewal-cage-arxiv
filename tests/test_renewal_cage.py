@@ -17,6 +17,7 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_time,
     apparent_alpha_activation_energies,
     activated_barrier_temperature_law,
+    alpha_tts_benchmark_consistency,
     alpha_relaxation_shape_curve,
     alpha_shape_superposition_residual,
     barrier_amplification_laws,
@@ -1202,6 +1203,23 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["correlation_size_growth_consistent"], 1.0)
         self.assertEqual(row["chi4_peak_growth_consistent"], 1.0)
         self.assertEqual(row["overall_consistent"], 1.0)
+
+    def test_alpha_tts_benchmark_consistency_detects_shape_breakdown(self):
+        row = alpha_tts_benchmark_consistency(
+            benchmark_id="alpha_tts_breakdown_shape_residual",
+            observed_tts_breakdown=True,
+            cold_shape_residual=0.611,
+            alpha_shape_control_growth=6.44,
+            residual_threshold=0.25,
+            min_control_growth=2.0,
+        )
+
+        self.assertEqual(row["model_predicts_tts_breakdown"], 1.0)
+        self.assertEqual(row["tts_residual_consistent"], 1.0)
+        self.assertEqual(row["tts_control_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+        self.assertGreater(row["cold_shape_residual"], row["residual_threshold"])
+        self.assertGreater(row["alpha_shape_control_growth"], row["min_control_growth"])
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(
