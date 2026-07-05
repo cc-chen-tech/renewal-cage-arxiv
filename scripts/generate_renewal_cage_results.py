@@ -111,6 +111,7 @@ from renewal_cage import (  # noqa: E402
     sota_remote_result_curve_observable_semantics_gate,
     sota_remote_result_curve_cache_gate,
     sota_remote_result_curve_payload_adapter_gate,
+    sota_remote_result_curve_target_fetch_gate,
     sota_reanalysis_state_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
@@ -3348,6 +3349,22 @@ def write_sota_remote_result_curve_fetch_gap_csv(path: Path) -> list[dict[str, f
     return rows
 
 
+def write_sota_remote_result_curve_target_fetch_csv(path: Path) -> list[dict[str, float | str]]:
+    """Classify targeted GlassBench result-curve fetches before comparison."""
+
+    central_directory_path = DATA_DIR / "third_party" / "glassbench" / "remote_zip_central_directory_10118191.json"
+    target_fetch_path = DATA_DIR / "third_party" / "glassbench" / "range_result_curve_target_fetch_10118191.json"
+    rows = sota_remote_result_curve_target_fetch_gate(
+        target_fetch_id="glassbench_range_curve_target_fetch",
+        accession_id="glassbench_zenodo_10118191",
+        central_directory_manifest=json.loads(central_directory_path.read_text(encoding="utf-8")),
+        target_fetch_manifest=json.loads(target_fetch_path.read_text(encoding="utf-8")),
+        target_paths=["GlassBench/KA_results/chi4_KA_T0.44_update.dat"],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_payload_adapter_csv(path: Path) -> list[dict[str, float | str]]:
     """Pair cached GlassBench numeric result curves into structural adapter rows."""
 
@@ -5844,6 +5861,54 @@ def write_sota_remote_result_curve_fetch_gap_svg(path: Path, rows: list[dict[str
     path.write_text(svg)
 
 
+def write_sota_remote_result_curve_target_fetch_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 280
+    left, top = 75, 112
+    colors = {
+        "remote_target_missing": "#c05621",
+        "target_fetch_missing": "#c05621",
+        "target_fetch_checksum_blocked": "#c05621",
+        "target_fetch_header_only_parse_blocked": "#2b6cb0",
+        "target_fetch_numeric_parse_blocked": "#c05621",
+        "target_fetch_numeric_ready_for_observable_comparison": "#2f855a",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * 58
+        stage = str(row["target_fetch_stage"])
+        color = colors[stage]
+        label = f'{row["system_id"]} T={row["temperature"]} {row["curve_role"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 15}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{label}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 145}" y="{y - 4}" width="315" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 154}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:46]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 485}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">fetch={int(float(row["target_fetch_present"]))}; checksum={int(float(row["target_fetch_checksum_ready"]))}; header={int(float(row["header_only_payload"]))}; numeric={int(float(row["numeric_payload_ready"]))}; compare={int(float(row["observable_comparison_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 145}" y="{y + 33}" font-family="Arial, sans-serif" font-size="9" fill="#555">{row["target_path"]}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA remote result-curve target fetch</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The targeted GlassBench chi4 byte range is fetched and checksum-ready, but the payload is header-only and cannot support numeric comparison.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 145}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target-fetch stage</text>
+  <text x="{left + 485}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">payload readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="224" width="14" height="14" fill="#2b6cb0" /><text x="96" y="236" font-family="Arial, sans-serif" font-size="12">target fetched but header-only numeric parse blocked</text>
+  <rect x="520" y="224" width="14" height="14" fill="#2f855a" /><text x="541" y="236" font-family="Arial, sans-serif" font-size="12">target fetched and numeric payload ready</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_payload_adapter_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 510
@@ -7376,6 +7441,13 @@ def main() -> None:
     write_sota_remote_result_curve_fetch_gap_svg(
         FIGURE_DIR / "renewal_cage_sota_remote_result_curve_fetch_gap.svg",
         remote_result_curve_fetch_gap_rows,
+    )
+    remote_result_curve_target_fetch_rows = write_sota_remote_result_curve_target_fetch_csv(
+        DATA_DIR / "renewal_cage_sota_remote_result_curve_target_fetch.csv"
+    )
+    write_sota_remote_result_curve_target_fetch_svg(
+        FIGURE_DIR / "renewal_cage_sota_remote_result_curve_target_fetch.svg",
+        remote_result_curve_target_fetch_rows,
     )
     remote_result_curve_payload_adapter_rows = write_sota_remote_result_curve_payload_adapter_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.csv"

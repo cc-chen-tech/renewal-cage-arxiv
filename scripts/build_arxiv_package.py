@@ -2240,6 +2240,60 @@ def write_sota_remote_result_curve_fetch_gap_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_remote_result_curve_target_fetch_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_remote_result_curve_target_fetch.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA remote result-curve target fetch")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Targeted GlassBench chi4 bytes are fetched, but header-only payloads cannot support numeric comparison.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "target")
+    c.drawString(left + 90, top, "stage")
+    c.drawString(left + 385, top, "fetch")
+    c.drawString(left + 430, top, "crc")
+    c.drawString(left + 475, top, "header")
+    c.drawString(left + 525, top, "numeric")
+    c.drawString(left + 580, top, "compare")
+    c.drawString(left + 640, top, "blocker")
+    palette = {
+        "remote_target_missing": colors.HexColor("#c05621"),
+        "target_fetch_missing": colors.HexColor("#c05621"),
+        "target_fetch_checksum_blocked": colors.HexColor("#c05621"),
+        "target_fetch_header_only_parse_blocked": colors.HexColor("#2b6cb0"),
+        "target_fetch_numeric_parse_blocked": colors.HexColor("#c05621"),
+        "target_fetch_numeric_ready_for_observable_comparison": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica", 6.9)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 42
+        stage = row["target_fetch_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, f"{row['system_id']} T={row['temperature']} {row['curve_role']}")
+        c.setFillColor(palette[stage])
+        c.rect(left + 90, y - 4, 250, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 96, y, stage.replace("_", " ")[:38])
+        c.setFillColor(colors.black)
+        c.drawString(left + 400, y, str(int(float(row["target_fetch_present"]))))
+        c.drawString(left + 445, y, str(int(float(row["target_fetch_checksum_ready"]))))
+        c.drawString(left + 492, y, str(int(float(row["header_only_payload"]))))
+        c.drawString(left + 545, y, str(int(float(row["numeric_payload_ready"]))))
+        c.drawString(left + 602, y, str(int(float(row["observable_comparison_ready"]))))
+        c.drawString(left + 640, y, row["primary_blocker"].replace("_", " ")[:26])
+        c.drawString(left + 90, y - 13, row["target_path"][:100])
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_payload_adapter_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3240,6 +3294,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_remote_result_curve_fetch_gap_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_fetch_gap.pdf"
     )
+    sota_remote_result_curve_target_fetch_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_target_fetch.pdf"
+    )
     sota_remote_result_curve_payload_adapter_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
     )
@@ -3298,6 +3355,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_glassbench_payload_index_pdf(sota_glassbench_payload_index_pdf)
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
+    write_sota_remote_result_curve_target_fetch_pdf(sota_remote_result_curve_target_fetch_pdf)
     write_sota_remote_result_curve_payload_adapter_pdf(sota_remote_result_curve_payload_adapter_pdf)
     write_sota_remote_result_curve_observable_semantics_pdf(sota_remote_result_curve_observable_semantics_pdf)
     write_sota_readme_schema_pdf(sota_readme_schema_pdf)
@@ -3381,6 +3439,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_remote_result_curve_fetch_gap_pdf,
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
+        )
+        archive.write(
+            sota_remote_result_curve_target_fetch_pdf,
+            "figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf",
         )
         archive.write(
             sota_remote_result_curve_payload_adapter_pdf,

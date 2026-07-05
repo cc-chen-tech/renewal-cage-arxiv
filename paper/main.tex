@@ -1547,6 +1547,27 @@ that target.
   comparison or persistence/exchange inversion input.}
 \end{figure}
 
+The target-fetch manifest closes this file-level gap without downloading the
+full archive. A byte-range read of
+\texttt{GlassBench/KA\_results/chi4\_KA\_T0.44\_update.dat} recovers a
+36-byte payload with md5 \texttt{2def7c42b63e7c347b8c4747974d8323}. The
+payload text is \texttt{t True Shiba Alkemade Jung Francois}: it is a
+header-only marker with no numeric rows. The corresponding gate is therefore
+\texttt{target\_fetch\_header\_only\_parse\_blocked}; checksum readiness is
+positive, but \texttt{numeric\_payload\_ready=0},
+\texttt{observable\_comparison\_ready=0}, and
+\texttt{real\_inversion\_ready=0}. This negative result is useful: it prevents
+the archive filename alone from being treated as a quantitative \(\chi_4\)
+benchmark.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf}
+  \caption{SOTA remote result-curve target fetch. The GlassBench \(\chi_4\)
+  target is byte-range fetched and checksum-ready, but its payload is
+  header-only rather than a numeric \(\chi_4(t)\) table.}
+\end{figure}
+
 The companion payload cache,
 \texttt{range\_result\_curve\_values\_10118191.json}, stores the numeric rows
 reconstructed from those verified ranges. The payload-adapter gate then pairs

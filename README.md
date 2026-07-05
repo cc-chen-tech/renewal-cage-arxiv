@@ -162,6 +162,10 @@ The result-curve fetch-gap gate records this explicitly:
 `GlassBench/KA_results/chi4_KA_T0.44_update.dat` is a
 `dynamic_heterogeneity_chi4_proxy` target with `targeted_fetch_ready=1`,
 `observable_comparison_ready=0`, and `real_inversion_ready=0`.
+The target-fetch gate then records the actual 36-byte range payload for that
+file. The payload is checksum-ready, but it contains only the header
+`t True Shiba Alkemade Jung Francois` and no numeric rows, so the status is
+`target_fetch_header_only_parse_blocked`, not a `chi4` comparison.
 The companion payload adapter stores the actual numeric rows from those byte
 ranges and pairs time grids with same-temperature `rhomax` curves. KA2D at
 `T=0.30` has structurally adapter-ready `rhomax_md` and `rhomax_bb` rows; KA at
@@ -263,6 +267,7 @@ figures/renewal_cage_sota_remote_zip_central_directory.svg
 figures/renewal_cage_sota_glassbench_payload_index.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
+figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
 figures/renewal_cage_sota_remote_result_curve_payload_adapter.svg
 figures/renewal_cage_sota_remote_result_curve_observable_semantics.svg
 figures/renewal_cage_sota_readme_schema.svg
@@ -324,6 +329,7 @@ data/renewal_cage_sota_remote_zip_central_directory.csv
 data/renewal_cage_sota_glassbench_payload_index.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
+data/renewal_cage_sota_remote_result_curve_target_fetch.csv
 data/renewal_cage_sota_remote_result_curve_payload_adapter.csv
 data/renewal_cage_sota_remote_result_curve_observable_semantics.csv
 data/renewal_cage_sota_readme_digest.csv
@@ -331,6 +337,7 @@ data/third_party/glassbench/zenodo_record_10118191.json
 data/third_party/glassbench/remote_zip_central_directory_10118191.json
 data/third_party/glassbench/range_result_curve_cache_10118191.json
 data/third_party/glassbench/range_result_curve_values_10118191.json
+data/third_party/glassbench/range_result_curve_target_fetch_10118191.json
 data/renewal_cage_sota_local_cache_verification.csv
 data/renewal_cage_sota_zip_structure.csv
 data/renewal_cage_sota_reanalysis_state.csv
@@ -397,6 +404,7 @@ paper/figures/renewal_cage_sota_remote_zip_central_directory.pdf
 paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
+paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf

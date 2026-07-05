@@ -572,6 +572,33 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(chi4["real_inversion_ready"]), 0.0)
         self.assertEqual(chi4["primary_blocker"], "range_result_curve_cache")
 
+    def test_sota_remote_result_curve_target_fetch_marks_chi4_header_only_payload(self):
+        target_fetch_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_target_fetch_10118191.json"
+        path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_target_fetch.csv"
+        self.assertTrue(target_fetch_path.exists())
+        self.assertTrue(path.exists())
+
+        manifest = json.loads(target_fetch_path.read_text())
+        by_path = {entry["path"]: entry for entry in manifest["entries"]}
+        target = by_path["GlassBench/KA_results/chi4_KA_T0.44_update.dat"]
+        self.assertEqual(target["md5"], "2def7c42b63e7c347b8c4747974d8323")
+        self.assertEqual(target["content_preview"], "t True Shiba Alkemade Jung Francois")
+        self.assertEqual(target["numeric_row_count"], 0)
+        self.assertEqual(target["header"], ["t", "True", "Shiba", "Alkemade", "Jung", "Francois"])
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_target = {row["target_path"]: row for row in rows}
+        chi4 = by_target["GlassBench/KA_results/chi4_KA_T0.44_update.dat"]
+        self.assertEqual(chi4["target_fetch_stage"], "target_fetch_header_only_parse_blocked")
+        self.assertEqual(float(chi4["target_fetch_present"]), 1.0)
+        self.assertEqual(float(chi4["header_only_payload"]), 1.0)
+        self.assertEqual(float(chi4["numeric_payload_ready"]), 0.0)
+        self.assertEqual(float(chi4["observable_comparison_ready"]), 0.0)
+        self.assertEqual(float(chi4["real_inversion_ready"]), 0.0)
+        self.assertEqual(chi4["primary_blocker"], "numeric_rows")
+
     def test_sota_remote_result_curve_payload_adapter_pairs_cached_values(self):
         payload_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_values_10118191.json"
         path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_payload_adapter.csv"
@@ -1070,6 +1097,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf", names)
             self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", names)
@@ -1118,6 +1146,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", main_tex)
@@ -1149,6 +1178,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_payload_index.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
+            "figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf",
             "figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf",
             "figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
@@ -1290,6 +1320,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_remote_result_curve_fetch_gap = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_fetch_gap.pdf"
             ).read_bytes()
+            first_sota_remote_result_curve_target_fetch = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_target_fetch.pdf"
+            ).read_bytes()
             first_sota_remote_result_curve_payload_adapter = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
             ).read_bytes()
@@ -1422,6 +1455,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_remote_result_curve_fetch_gap = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_fetch_gap.pdf"
             ).read_bytes()
+            second_sota_remote_result_curve_target_fetch = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_target_fetch.pdf"
+            ).read_bytes()
             second_sota_remote_result_curve_payload_adapter = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
             ).read_bytes()
@@ -1514,6 +1550,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_glassbench_payload_index, second_sota_glassbench_payload_index)
         self.assertEqual(first_sota_remote_result_curve_cache, second_sota_remote_result_curve_cache)
         self.assertEqual(first_sota_remote_result_curve_fetch_gap, second_sota_remote_result_curve_fetch_gap)
+        self.assertEqual(first_sota_remote_result_curve_target_fetch, second_sota_remote_result_curve_target_fetch)
         self.assertEqual(
             first_sota_remote_result_curve_payload_adapter,
             second_sota_remote_result_curve_payload_adapter,

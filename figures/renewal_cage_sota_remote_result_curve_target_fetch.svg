@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="280" viewBox="0 0 1160 280">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA remote result-curve target fetch</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The targeted GlassBench chi4 byte range is fetched and checksum-ready, but the payload is header-only and cannot support numeric comparison.</text>
+  <text x="75" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="220" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="700">target-fetch stage</text>
+  <text x="560" y="88" font-family="Arial, sans-serif" font-size="12" font-weight="700">payload readiness</text>
+  <text x="75" y="127" font-family="Arial, sans-serif" font-size="12" font-weight="700">KA T=0.44 chi4_proxy</text><rect x="220" y="108" width="315" height="24" fill="#2b6cb0" opacity="0.92" /><text x="229" y="124" font-family="Arial, sans-serif" font-size="10" fill="#fff">target fetch header only parse blocked</text><text x="560" y="124" font-family="Arial, sans-serif" font-size="11">fetch=1; checksum=1; header=1; numeric=0; compare=0</text><text x="220" y="145" font-family="Arial, sans-serif" font-size="9" fill="#555">GlassBench/KA_results/chi4_KA_T0.44_update.dat; blocker=numeric rows</text>
+  <rect x="75" y="224" width="14" height="14" fill="#2b6cb0" /><text x="96" y="236" font-family="Arial, sans-serif" font-size="12">target fetched but header-only numeric parse blocked</text>
+  <rect x="520" y="224" width="14" height="14" fill="#2f855a" /><text x="541" y="236" font-family="Arial, sans-serif" font-size="12">target fetched and numeric payload ready</text>
+</svg>

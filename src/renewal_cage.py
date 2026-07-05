@@ -2895,6 +2895,100 @@ def sota_remote_result_curve_fetch_gap_gate(
     return rows
 
 
+def sota_remote_result_curve_target_fetch_gate(
+    *,
+    target_fetch_id: str,
+    accession_id: str,
+    central_directory_manifest: dict,
+    target_fetch_manifest: dict,
+    target_paths: Sequence[str],
+) -> list[dict[str, float | str]]:
+    """Classify targeted result-curve range fetches before observable comparison."""
+
+    if not target_fetch_id:
+        raise ValueError("target_fetch_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    targets = list(dict.fromkeys(target_paths))
+    if not targets or any(not path for path in targets):
+        raise ValueError("target_paths must contain nonempty strings")
+
+    central_entries_value = central_directory_manifest.get("entries", [])
+    if not isinstance(central_entries_value, list):
+        central_entries_value = []
+    central_paths = {
+        str(entry.get("path", "")) if isinstance(entry, dict) else str(entry)
+        for entry in central_entries_value
+    }
+
+    fetch_entries_value = target_fetch_manifest.get("entries", [])
+    fetch_entries = (
+        [entry for entry in fetch_entries_value if isinstance(entry, dict)]
+        if isinstance(fetch_entries_value, list)
+        else []
+    )
+    fetch_by_path = {str(entry.get("path", "")): entry for entry in fetch_entries if entry.get("path")}
+
+    rows: list[dict[str, float | str]] = []
+    for target_path in targets:
+        entry = fetch_by_path.get(target_path)
+        central_present = target_path in central_paths
+        fetch_present = entry is not None
+        checksum_ready = bool(
+            entry
+            and bool(entry.get("crc32_matches", False))
+            and bool(str(entry.get("md5", "")))
+            and int(entry.get("uncompressed_size_bytes", 0) or 0) > 0
+        )
+        header = entry.get("header", []) if entry else []
+        header_ready = isinstance(header, list) and len(header) > 0
+        numeric_rows = int(entry.get("numeric_row_count", 0) or 0) if entry else 0
+        numeric_columns = int(entry.get("numeric_column_count", 0) or 0) if entry else 0
+        numeric_ready = fetch_present and checksum_ready and numeric_rows > 0 and numeric_columns > 0
+        header_only = fetch_present and checksum_ready and header_ready and not numeric_ready
+
+        if not central_present:
+            stage = "remote_target_missing"
+            blocker = "central_directory"
+        elif not fetch_present:
+            stage = "target_fetch_missing"
+            blocker = "target_range_fetch"
+        elif not checksum_ready:
+            stage = "target_fetch_checksum_blocked"
+            blocker = "checksum"
+        elif header_only:
+            stage = "target_fetch_header_only_parse_blocked"
+            blocker = "numeric_rows"
+        elif not numeric_ready:
+            stage = "target_fetch_numeric_parse_blocked"
+            blocker = "numeric_payload"
+        else:
+            stage = "target_fetch_numeric_ready_for_observable_comparison"
+            blocker = "joint_observable_protocol"
+
+        rows.append(
+            {
+                "target_fetch_id": f"{target_fetch_id}_{str(entry.get('system_id', 'unknown') if entry else 'unknown').lower()}_{str(entry.get('temperature', 'none') if entry else 'none')}_{str(entry.get('curve_role', 'unknown') if entry else 'unknown')}",
+                "accession_id": accession_id,
+                "system_id": str(entry.get("system_id", "unknown")) if entry else "unknown",
+                "temperature": str(entry.get("temperature", "none")) if entry else "none",
+                "curve_role": str(entry.get("curve_role", "unknown")) if entry else "unknown",
+                "target_path": target_path,
+                "candidate_observable": str(entry.get("candidate_observable", "unmapped_result_curve")) if entry else "unmapped_result_curve",
+                "central_directory_present": float(central_present),
+                "target_fetch_present": float(fetch_present),
+                "target_fetch_checksum_ready": float(checksum_ready),
+                "header_only_payload": float(header_only),
+                "numeric_payload_ready": float(numeric_ready),
+                "observable_comparison_ready": float(numeric_ready),
+                "real_inversion_ready": 0.0,
+                "primary_blocker": blocker,
+                "target_fetch_stage": stage,
+            }
+        )
+    return rows
+
+
 def _numeric_payload_rows(entry: dict) -> list[list[float]]:
     rows_value = entry.get("rows", [])
     if not isinstance(rows_value, list):
