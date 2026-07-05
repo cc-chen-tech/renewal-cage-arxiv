@@ -3362,6 +3362,168 @@ def sota_glassbench_trajectory_npz_schema_probe_gate(
     return rows
 
 
+def sota_glassbench_trajectory_first_npz_observable_smoke_gate(
+    *,
+    smoke_id: str,
+    accession_id: str,
+    schema_probe_rows: Sequence[dict[str, float | str]],
+    observable_manifest: dict,
+    required_method: str,
+) -> list[dict[str, float | str]]:
+    """Verify minimal MSD/NGP observables from first streamed trajectory NPZ members."""
+
+    if not smoke_id:
+        raise ValueError("smoke_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not required_method:
+        raise ValueError("required_method must be nonempty")
+
+    entries_value = observable_manifest.get("entries", [])
+    observable_entries = (
+        [entry for entry in entries_value if isinstance(entry, dict)]
+        if isinstance(entries_value, list)
+        else []
+    )
+    observable_by_key = {
+        (str(entry.get("path", "")), str(entry.get("first_npz_member", ""))): entry
+        for entry in observable_entries
+        if entry.get("path") and entry.get("first_npz_member")
+    }
+
+    rows: list[dict[str, float | str]] = []
+    for schema_row in schema_probe_rows:
+        system_id = str(schema_row.get("system_id", "unknown"))
+        temperature = str(schema_row.get("temperature", "none"))
+        source_path = str(schema_row.get("source_path", "none"))
+        first_npz_member = str(schema_row.get("first_npz_member", "none"))
+        schema_ready = bool(float(schema_row.get("npz_schema_ready", 0.0)))
+        coords_ready = bool(float(schema_row.get("coordinate_array_ready", 0.0)))
+        row_id = f"{smoke_id}_{system_id.lower()}_t{temperature.replace('.', '_')}"
+        if not schema_ready or not coords_ready or source_path == "none" or first_npz_member == "none":
+            rows.append(
+                {
+                    "smoke_id": row_id,
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "observable_method": "none",
+                    "positions_md5": "none",
+                    "box_length": 0.0,
+                    "frame_count": 0.0,
+                    "particle_count": 0.0,
+                    "spatial_dimension": 0.0,
+                    "final_frame_index": -1.0,
+                    "final_msd": 0.0,
+                    "final_ngp_2d": 0.0,
+                    "peak_ngp_frame_index": -1.0,
+                    "peak_ngp_2d": 0.0,
+                    "msd_at_peak_ngp": 0.0,
+                    "max_abs_min_image_displacement": 0.0,
+                    "observable_smoke_ready": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": str(schema_row.get("primary_blocker", "npz_schema")),
+                    "smoke_stage": "trajectory_npz_schema_incomplete",
+                }
+            )
+            continue
+
+        entry = observable_by_key.get((source_path, first_npz_member))
+        if entry is None:
+            rows.append(
+                {
+                    "smoke_id": row_id,
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "observable_method": "none",
+                    "positions_md5": "none",
+                    "box_length": 0.0,
+                    "frame_count": 0.0,
+                    "particle_count": 0.0,
+                    "spatial_dimension": 0.0,
+                    "final_frame_index": -1.0,
+                    "final_msd": 0.0,
+                    "final_ngp_2d": 0.0,
+                    "peak_ngp_frame_index": -1.0,
+                    "peak_ngp_2d": 0.0,
+                    "msd_at_peak_ngp": 0.0,
+                    "max_abs_min_image_displacement": 0.0,
+                    "observable_smoke_ready": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "first_npz_observable_smoke",
+                    "smoke_stage": "first_npz_observable_smoke_missing",
+                }
+            )
+            continue
+
+        method = str(entry.get("observable_method", "none"))
+        frame_count = int(entry.get("frame_count", 0) or 0)
+        particle_count = int(entry.get("particle_count", 0) or 0)
+        dimension = int(entry.get("spatial_dimension", 0) or 0)
+        final_frame = int(entry.get("final_frame_index", -1) or -1)
+        final_msd = float(entry.get("final_msd", 0.0) or 0.0)
+        final_ngp = float(entry.get("final_ngp_2d", 0.0) or 0.0)
+        peak_frame = int(entry.get("peak_ngp_frame_index", -1) or -1)
+        peak_ngp = float(entry.get("peak_ngp_2d", 0.0) or 0.0)
+        msd_at_peak = float(entry.get("msd_at_peak_ngp", 0.0) or 0.0)
+        max_disp = float(entry.get("max_abs_min_image_displacement", 0.0) or 0.0)
+        smoke_ready = (
+            method == required_method
+            and frame_count >= 2
+            and particle_count > 0
+            and dimension == 2
+            and 0 <= final_frame < frame_count
+            and 0 <= peak_frame < frame_count
+            and final_msd > 0.0
+            and peak_ngp >= 0.0
+            and msd_at_peak > 0.0
+            and max_disp > 0.0
+        )
+        if smoke_ready:
+            stage = "first_npz_msd_ngp_smoke_ready_reanalysis_blocked"
+            blocker = "single_npz_no_time_or_uncertainty"
+        else:
+            stage = "first_npz_observable_smoke_failed"
+            blocker = "first_npz_msd_ngp"
+
+        rows.append(
+            {
+                "smoke_id": row_id,
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "first_npz_member": first_npz_member,
+                "observable_method": method,
+                "positions_md5": str(entry.get("positions_md5", "none")),
+                "box_length": float(entry.get("box_length", 0.0) or 0.0),
+                "frame_count": float(frame_count),
+                "particle_count": float(particle_count),
+                "spatial_dimension": float(dimension),
+                "final_frame_index": float(final_frame),
+                "final_msd": final_msd,
+                "final_ngp_2d": final_ngp,
+                "peak_ngp_frame_index": float(peak_frame),
+                "peak_ngp_2d": peak_ngp,
+                "msd_at_peak_ngp": msd_at_peak,
+                "max_abs_min_image_displacement": max_disp,
+                "observable_smoke_ready": float(smoke_ready),
+                "trajectory_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": blocker,
+                "smoke_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

@@ -184,6 +184,13 @@ coordinate arrays. Both KA2D temperatures expose `positions.npy` with shape
 `20x1290x2`, `types.npy` with length `1290`, and scalar `box.npy` metadata.
 This is coordinate-schema evidence for real trajectory ingestion, but not a
 full ensemble extraction or uncertainty-weighted model comparison.
+The first-NPZ observable smoke test then reduces those streamed coordinates to
+minimal-image frame-index MSD and two-dimensional NGP summaries. The first
+`T=0.23` member has final MSD `3.98e-3` and peak NGP `0.150`; the first
+`T=0.30` member has final MSD `5.41e-3` and peak NGP `0.179`. This proves
+coordinate-to-observable ingestion, while still blocking physical time-series
+comparison until time semantics, full ensemble extraction, and uncertainty
+weights are available.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
@@ -307,6 +314,7 @@ figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.svg
 figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.svg
 figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.svg
+figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
@@ -375,6 +383,7 @@ data/renewal_cage_sota_glassbench_trajectory_entry_metadata.csv
 data/renewal_cage_sota_glassbench_trajectory_member_stream_probe.csv
 data/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.csv
+data/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
@@ -388,6 +397,7 @@ data/third_party/glassbench/trajectory_entry_metadata_10118191.json
 data/third_party/glassbench/trajectory_member_stream_probe_10118191.json
 data/third_party/glassbench/trajectory_inner_tar_header_probe_10118191.json
 data/third_party/glassbench/trajectory_npz_schema_probe_10118191.json
+data/third_party/glassbench/trajectory_first_npz_observable_smoke_10118191.json
 data/third_party/glassbench/range_result_curve_cache_10118191.json
 data/third_party/glassbench/range_result_curve_values_10118191.json
 data/third_party/glassbench/range_result_curve_target_fetch_10118191.json
@@ -460,6 +470,7 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf
+paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf

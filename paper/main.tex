@@ -1248,6 +1248,29 @@ normalization, or uncertainty weighting has been performed.
   uncertainty-weighted renewal-cage inversion remain later gates.}
 \end{figure}
 
+The observable-smoke gate performs the first coordinate-level reduction from
+those streamed arrays. Using minimal-image displacements from the first frame
+and the two-dimensional definition
+\(\alpha_2=\langle r^4\rangle/(2\langle r^2\rangle^2)-1\), the first
+\texttt{T=0.23} member gives final-frame MSD \(3.98\times10^{-3}\) and a peak
+frame-index NGP \(0.150\). The first \texttt{T=0.30} member gives final-frame
+MSD \(5.41\times10^{-3}\) and peak NGP \(0.179\). This is not yet a physical
+time-series comparison to the renewal-cage theory: it uses only one
+\texttt{npz} member per temperature, frame indices rather than calibrated
+times, and no ensemble uncertainty. It does, however, prove that the public
+GlassBench trajectory payload can be streamed into the MSD/NGP diagnostic
+pipeline rather than stopping at metadata or schema validation.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf}
+  \caption{GlassBench first-\texttt{npz} observable smoke test. Single streamed
+  trajectory members are reduced to minimal-image MSD and two-dimensional NGP
+  summaries, demonstrating coordinate-to-observable ingestion while keeping
+  time semantics, full ensemble extraction, and uncertainty-weighted inversion
+  as explicit blockers.}
+\end{figure}
+
 \clearpage
 
 The reanalysis-state ledger

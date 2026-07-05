@@ -120,6 +120,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
+    sota_glassbench_trajectory_first_npz_observable_smoke_gate,
     sota_glassbench_trajectory_npz_schema_probe_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_local_cache_verification_gate,
@@ -2653,6 +2654,77 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         ka = by_system["KA"]
         self.assertEqual(ka["schema_probe_stage"], "trajectory_inner_tar_layout_incomplete")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_first_npz_observable_smoke_computes_msd_ngp(self):
+        schema_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "npz_schema_ready": 1.0,
+                "coordinate_array_ready": 1.0,
+                "particle_count": 1290.0,
+                "frame_count": 20.0,
+                "spatial_dimension": 2.0,
+                "primary_blocker": "full_npz_ensemble_extraction_policy",
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "first_npz_member": "none",
+                "npz_schema_ready": 0.0,
+                "coordinate_array_ready": 0.0,
+                "primary_blocker": "trajectory_payload",
+            },
+        ]
+        observable_manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                    "observable_method": "minimal_image_displacement_from_first_frame",
+                    "box_length": 32.8962,
+                    "positions_md5": "2fd3bc6e386a636f893ca513234edc72",
+                    "frame_count": 20,
+                    "particle_count": 1290,
+                    "spatial_dimension": 2,
+                    "final_frame_index": 19,
+                    "final_msd": 0.005414723094117662,
+                    "final_ngp_2d": 0.05197783140666812,
+                    "peak_ngp_frame_index": 11,
+                    "peak_ngp_2d": 0.17874626903381952,
+                    "msd_at_peak_ngp": 0.005117245595512797,
+                    "max_abs_min_image_displacement": 0.26752539804661485,
+                }
+            ]
+        }
+
+        rows = sota_glassbench_trajectory_first_npz_observable_smoke_gate(
+            smoke_id="glassbench_trajectory_first_npz_observable_smoke",
+            accession_id="glassbench_zenodo_10118191",
+            schema_probe_rows=schema_rows,
+            observable_manifest=observable_manifest,
+            required_method="minimal_image_displacement_from_first_frame",
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["smoke_stage"], "first_npz_msd_ngp_smoke_ready_reanalysis_blocked")
+        self.assertEqual(ka2d["observable_method"], "minimal_image_displacement_from_first_frame")
+        self.assertEqual(ka2d["observable_smoke_ready"], 1.0)
+        self.assertAlmostEqual(ka2d["final_msd"], 0.005414723094117662)
+        self.assertAlmostEqual(ka2d["final_ngp_2d"], 0.05197783140666812)
+        self.assertEqual(ka2d["peak_ngp_frame_index"], 11.0)
+        self.assertAlmostEqual(ka2d["peak_ngp_2d"], 0.17874626903381952)
+        self.assertEqual(ka2d["trajectory_extraction_ready"], 0.0)
+        self.assertEqual(ka2d["real_reanalysis_ready"], 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "single_npz_no_time_or_uncertainty")
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["smoke_stage"], "trajectory_npz_schema_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):

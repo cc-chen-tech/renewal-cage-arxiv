@@ -1,0 +1,57 @@
+{
+  "source": "remote_zip_member_first_npz_minimal_image_observable_smoke",
+  "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+  "observable_method": "minimal_image_displacement_from_first_frame",
+  "ngp_definition": "alpha2_2d=<r4>/(2<r2>^2)-1",
+  "scope_note": "single first NPZ member per temperature; frame index only; no ensemble uncertainty or time-step semantics",
+  "entries": [
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.23",
+      "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+      "observable_method": "minimal_image_displacement_from_first_frame",
+      "positions_md5": "1ec4acbe22828a30ea530d4738909d1f",
+      "box_length": 32.8962,
+      "frame_count": 20,
+      "particle_count": 1290,
+      "spatial_dimension": 2,
+      "type_counts": {
+        "1": 600,
+        "2": 330,
+        "3": 360
+      },
+      "final_frame_index": 19,
+      "final_msd": 0.003978401814837833,
+      "final_ngp_2d": 0.055230788264799324,
+      "peak_ngp_frame_index": 16,
+      "peak_ngp_2d": 0.14952084405895438,
+      "msd_at_peak_ngp": 0.004005540826375166,
+      "max_abs_min_image_displacement": 0.23344816683795147
+    },
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.30",
+      "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+      "observable_method": "minimal_image_displacement_from_first_frame",
+      "positions_md5": "2fd3bc6e386a636f893ca513234edc72",
+      "box_length": 32.8962,
+      "frame_count": 20,
+      "particle_count": 1290,
+      "spatial_dimension": 2,
+      "type_counts": {
+        "1": 600,
+        "2": 330,
+        "3": 360
+      },
+      "final_frame_index": 19,
+      "final_msd": 0.005414723094117662,
+      "final_ngp_2d": 0.05197783140666812,
+      "peak_ngp_frame_index": 11,
+      "peak_ngp_2d": 0.17874626903381952,
+      "msd_at_peak_ngp": 0.005117245595512797,
+      "max_abs_min_image_displacement": 0.26752539804661485
+    }
+  ]
+}

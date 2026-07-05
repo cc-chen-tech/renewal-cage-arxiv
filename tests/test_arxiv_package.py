@@ -655,6 +655,34 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_030["real_reanalysis_ready"]), 0.0)
         self.assertEqual(ka2d_030["primary_blocker"], "full_npz_ensemble_extraction_policy")
 
+    def test_sota_glassbench_trajectory_first_npz_observable_smoke_records_msd_ngp(self):
+        manifest_path = (
+            ROOT / "data" / "third_party" / "glassbench" / "trajectory_first_npz_observable_smoke_10118191.json"
+        )
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.csv"
+        self.assertTrue(manifest_path.exists())
+        self.assertTrue(path.exists())
+
+        manifest = json.loads(manifest_path.read_text())
+        self.assertEqual(manifest["source"], "remote_zip_member_first_npz_minimal_image_observable_smoke")
+        self.assertEqual(manifest["observable_method"], "minimal_image_displacement_from_first_frame")
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["smoke_stage"], "first_npz_msd_ngp_smoke_ready_reanalysis_blocked")
+        self.assertEqual(ka2d_030["observable_method"], "minimal_image_displacement_from_first_frame")
+        self.assertEqual(float(ka2d_030["observable_smoke_ready"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_030["final_msd"]), 0.005414723094117662)
+        self.assertAlmostEqual(float(ka2d_030["final_ngp_2d"]), 0.05197783140666812)
+        self.assertEqual(float(ka2d_030["peak_ngp_frame_index"]), 11.0)
+        self.assertAlmostEqual(float(ka2d_030["peak_ngp_2d"]), 0.17874626903381952)
+        self.assertEqual(float(ka2d_030["trajectory_extraction_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["real_reanalysis_ready"]), 0.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "single_npz_no_time_or_uncertainty")
+
     def test_sota_remote_result_curve_cache_records_range_cached_numeric_curves(self):
         manifest_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
         path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_cache.csv"
@@ -1259,6 +1287,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)
@@ -1314,6 +1343,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", main_tex)
@@ -1352,6 +1382,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf",
+            "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
             "figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf",
@@ -1513,6 +1544,12 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_glassbench_trajectory_npz_schema_probe = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf"
             ).read_bytes()
+            first_sota_glassbench_trajectory_first_npz_observable_smoke = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf"
+            ).read_bytes()
             first_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1666,6 +1703,12 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_glassbench_trajectory_npz_schema_probe = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf"
             ).read_bytes()
+            second_sota_glassbench_trajectory_first_npz_observable_smoke = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf"
+            ).read_bytes()
             second_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1787,6 +1830,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_glassbench_trajectory_npz_schema_probe,
             second_sota_glassbench_trajectory_npz_schema_probe,
+        )
+        self.assertEqual(
+            first_sota_glassbench_trajectory_first_npz_observable_smoke,
+            second_sota_glassbench_trajectory_first_npz_observable_smoke,
         )
         self.assertEqual(first_sota_remote_result_curve_cache, second_sota_remote_result_curve_cache)
         self.assertEqual(first_sota_remote_result_curve_fetch_gap, second_sota_remote_result_curve_fetch_gap)
