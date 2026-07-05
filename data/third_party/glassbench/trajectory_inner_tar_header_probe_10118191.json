@@ -1,0 +1,46 @@
+{
+  "source": "remote_zip_member_to_xz_to_tar_header_range_reads",
+  "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+  "compressed_probe_bytes": 4194304,
+  "tar_probe_limit_bytes": 1048576,
+  "entries": [
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.23",
+      "compressed_probe_range_start": 2980602255,
+      "compressed_probe_range_end": 2984796558,
+      "compressed_probe_bytes": 4194304,
+      "compressed_probe_md5": "86e045d3d69cd8ff36da8c14021bec6a",
+      "xz_prefix_bytes": 4193024,
+      "tar_probe_bytes": 1048576,
+      "tar_magic_verified": true,
+      "root_directory": "T0.23/",
+      "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+      "first_npz_size_bytes": 465710,
+      "npz_member_count_in_probe": 3,
+      "split_labels_in_probe": [
+        "test"
+      ]
+    },
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.30",
+      "compressed_probe_range_start": 464175,
+      "compressed_probe_range_end": 4658478,
+      "compressed_probe_bytes": 4194304,
+      "compressed_probe_md5": "15e9eb42e58fc4563eee392fd58e6be5",
+      "xz_prefix_bytes": 4193024,
+      "tar_probe_bytes": 1048576,
+      "tar_magic_verified": true,
+      "root_directory": "T0.30/",
+      "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+      "first_npz_size_bytes": 444786,
+      "npz_member_count_in_probe": 3,
+      "split_labels_in_probe": [
+        "train"
+      ]
+    }
+  ]
+}

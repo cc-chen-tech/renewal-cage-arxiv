@@ -1201,6 +1201,29 @@ keeps \texttt{trajectory\_extraction\_ready=0} and
   extraction and uncertainty-weighted renewal-cage inversion as later gates.}
 \end{figure}
 
+The inner-tar probe verifies the next structural layer. A 4 MB range read from
+each compressed KA2D member is raw-deflate inflated and then streamed through
+the XZ decoder until a 1 MB tar prefix is available. Both prefixes expose
+\texttt{ustar} headers. The \texttt{T=0.23} archive begins with
+\texttt{T0.23/} and then \texttt{T0.23/test/N1290T0.23\_202\_tc05.npz};
+the \texttt{T=0.30} archive begins with \texttt{T0.30/} and then
+\texttt{T0.30/train/N1290T0.30\_3\_tc01.npz}. This promotes the GlassBench
+trajectory chain from payload-type evidence to trajectory-layout evidence:
+there are real \texttt{npz} trajectory members behind the public range reads.
+The gate still keeps \texttt{trajectory\_extraction\_ready=0} and
+\texttt{real\_reanalysis\_ready=0} because full \texttt{npz} extraction,
+coordinate-schema detection, and uncertainty propagation remain separate
+requirements.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf}
+  \caption{GlassBench inner tar header probe. Small remote byte-range reads are
+  streamed through ZIP deflate and XZ layers to verify tar headers, root
+  directories, and first \texttt{npz} trajectory members for the KA2D
+  trajectory archives.}
+\end{figure}
+
 \clearpage
 
 The reanalysis-state ledger

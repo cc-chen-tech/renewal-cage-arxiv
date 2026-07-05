@@ -172,6 +172,13 @@ the XZ magic `fd377a585a00`, so the payload type is verified as streamable
 entry metadata to payload-prefix evidence, while still keeping
 `trajectory_extraction_ready=0` until a streaming extraction and uncertainty
 policy is implemented.
+The inner-tar header probe pushes the same evidence chain one layer deeper with
+4 MB range reads: after raw-deflate and XZ streaming, both KA2D members expose
+`ustar` headers, root directories, and first `.npz` trajectory members
+(`T0.23/test/N1290T0.23_202_tc05.npz` and
+`T0.30/train/N1290T0.30_3_tc01.npz`). This verifies trajectory-layout evidence
+without claiming full coordinate extraction or real persistence/exchange
+inversion.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
@@ -293,6 +300,7 @@ figures/renewal_cage_sota_glassbench_payload_index.svg
 figures/renewal_cage_sota_glassbench_trajectory_payload_locator.svg
 figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.svg
 figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.svg
+figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
@@ -359,6 +367,7 @@ data/renewal_cage_sota_glassbench_payload_index.csv
 data/renewal_cage_sota_glassbench_trajectory_payload_locator.csv
 data/renewal_cage_sota_glassbench_trajectory_entry_metadata.csv
 data/renewal_cage_sota_glassbench_trajectory_member_stream_probe.csv
+data/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
@@ -370,6 +379,7 @@ data/third_party/glassbench/zenodo_record_10118191.json
 data/third_party/glassbench/remote_zip_central_directory_10118191.json
 data/third_party/glassbench/trajectory_entry_metadata_10118191.json
 data/third_party/glassbench/trajectory_member_stream_probe_10118191.json
+data/third_party/glassbench/trajectory_inner_tar_header_probe_10118191.json
 data/third_party/glassbench/range_result_curve_cache_10118191.json
 data/third_party/glassbench/range_result_curve_values_10118191.json
 data/third_party/glassbench/range_result_curve_target_fetch_10118191.json
@@ -440,6 +450,7 @@ paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.pdf
+paper/figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf

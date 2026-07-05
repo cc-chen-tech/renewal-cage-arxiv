@@ -118,6 +118,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_verdict,
     sota_glassbench_trajectory_entry_metadata_gate,
+    sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_local_cache_verification_gate,
@@ -2528,6 +2529,65 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         ka = by_system["KA"]
         self.assertEqual(ka["probe_stage"], "trajectory_entry_metadata_incomplete")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_inner_tar_header_probe_verifies_npz_members(self):
+        member_probe_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "member_prefix_verified": 1.0,
+                "primary_blocker": "streaming_member_extraction_policy",
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "member_prefix_verified": 0.0,
+                "primary_blocker": "trajectory_payload",
+            },
+        ]
+        tar_probe_manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "compressed_probe_bytes": 4_194_304,
+                    "xz_prefix_bytes": 4_193_024,
+                    "tar_probe_bytes": 1_048_576,
+                    "tar_magic_verified": True,
+                    "root_directory": "T0.30/",
+                    "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                    "first_npz_size_bytes": 444_786,
+                    "npz_member_count_in_probe": 3,
+                    "split_labels_in_probe": ["train"],
+                }
+            ]
+        }
+
+        rows = sota_glassbench_trajectory_inner_tar_header_probe_gate(
+            tar_probe_id="glassbench_trajectory_inner_tar_header_probe",
+            accession_id="glassbench_zenodo_10118191",
+            member_probe_rows=member_probe_rows,
+            tar_probe_manifest=tar_probe_manifest,
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["tar_probe_stage"], "trajectory_inner_tar_layout_verified_extraction_blocked")
+        self.assertEqual(ka2d["source_path"], "GlassBench/KA2D_trajectories/T0.30.tar.xz")
+        self.assertEqual(ka2d["root_directory"], "T0.30/")
+        self.assertEqual(ka2d["first_npz_member"], "T0.30/train/N1290T0.30_3_tc01.npz")
+        self.assertEqual(ka2d["split_labels_in_probe"], "train")
+        self.assertEqual(ka2d["tar_magic_verified"], 1.0)
+        self.assertEqual(ka2d["npz_member_header_verified"], 1.0)
+        self.assertEqual(ka2d["trajectory_layout_ready"], 1.0)
+        self.assertEqual(ka2d["trajectory_extraction_ready"], 0.0)
+        self.assertEqual(ka2d["real_reanalysis_ready"], 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "streaming_npz_extraction_policy")
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["tar_probe_stage"], "trajectory_member_prefix_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):

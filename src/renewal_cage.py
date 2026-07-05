@@ -3054,6 +3054,146 @@ def sota_glassbench_trajectory_member_stream_probe_gate(
     return rows
 
 
+def sota_glassbench_trajectory_inner_tar_header_probe_gate(
+    *,
+    tar_probe_id: str,
+    accession_id: str,
+    member_probe_rows: Sequence[dict[str, float | str]],
+    tar_probe_manifest: dict,
+) -> list[dict[str, float | str]]:
+    """Verify inner tar headers after ZIP-member and XZ-prefix streaming probes."""
+
+    if not tar_probe_id:
+        raise ValueError("tar_probe_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+
+    entries_value = tar_probe_manifest.get("entries", [])
+    tar_entries = (
+        [entry for entry in entries_value if isinstance(entry, dict)]
+        if isinstance(entries_value, list)
+        else []
+    )
+    tar_by_path = {str(entry.get("path", "")): entry for entry in tar_entries if entry.get("path")}
+
+    rows: list[dict[str, float | str]] = []
+    for member_probe in member_probe_rows:
+        system_id = str(member_probe.get("system_id", "unknown"))
+        temperature = str(member_probe.get("temperature", "none"))
+        source_path = str(member_probe.get("source_path", "none"))
+        prefix_verified = bool(float(member_probe.get("member_prefix_verified", 0.0)))
+        row_id = f"{tar_probe_id}_{system_id.lower()}_t{temperature.replace('.', '_')}"
+        if not prefix_verified or source_path == "none":
+            rows.append(
+                {
+                    "tar_probe_id": row_id,
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "compressed_probe_bytes": 0.0,
+                    "xz_prefix_bytes": 0.0,
+                    "tar_probe_bytes": 0.0,
+                    "root_directory": "none",
+                    "first_npz_member": "none",
+                    "first_npz_size_bytes": 0.0,
+                    "npz_member_count_in_probe": 0.0,
+                    "split_labels_in_probe": "none",
+                    "tar_magic_verified": 0.0,
+                    "npz_member_header_verified": 0.0,
+                    "trajectory_layout_ready": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": str(member_probe.get("primary_blocker", "member_prefix")),
+                    "tar_probe_stage": "trajectory_member_prefix_incomplete",
+                }
+            )
+            continue
+
+        entry = tar_by_path.get(source_path)
+        if entry is None:
+            rows.append(
+                {
+                    "tar_probe_id": row_id,
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "compressed_probe_bytes": 0.0,
+                    "xz_prefix_bytes": 0.0,
+                    "tar_probe_bytes": 0.0,
+                    "root_directory": "none",
+                    "first_npz_member": "none",
+                    "first_npz_size_bytes": 0.0,
+                    "npz_member_count_in_probe": 0.0,
+                    "split_labels_in_probe": "none",
+                    "tar_magic_verified": 0.0,
+                    "npz_member_header_verified": 0.0,
+                    "trajectory_layout_ready": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "inner_tar_header_probe",
+                    "tar_probe_stage": "trajectory_inner_tar_header_probe_missing",
+                }
+            )
+            continue
+
+        root_directory = str(entry.get("root_directory", "none"))
+        first_npz_member = str(entry.get("first_npz_member", "none"))
+        split_labels_value = entry.get("split_labels_in_probe", [])
+        if isinstance(split_labels_value, list):
+            split_labels = ";".join(str(label) for label in split_labels_value) or "none"
+        else:
+            split_labels = str(split_labels_value or "none")
+        compressed_probe_bytes = int(entry.get("compressed_probe_bytes", 0) or 0)
+        xz_prefix_bytes = int(entry.get("xz_prefix_bytes", 0) or 0)
+        tar_probe_bytes = int(entry.get("tar_probe_bytes", 0) or 0)
+        first_npz_size = int(entry.get("first_npz_size_bytes", 0) or 0)
+        npz_count = int(entry.get("npz_member_count_in_probe", 0) or 0)
+        tar_magic_verified = bool(entry.get("tar_magic_verified", False))
+        npz_verified = first_npz_member.endswith(".npz") and first_npz_size > 0 and npz_count > 0
+        layout_ready = (
+            compressed_probe_bytes > 0
+            and xz_prefix_bytes > 0
+            and tar_probe_bytes >= 512
+            and root_directory.endswith("/")
+            and tar_magic_verified
+            and npz_verified
+        )
+        if layout_ready:
+            stage = "trajectory_inner_tar_layout_verified_extraction_blocked"
+            blocker = "streaming_npz_extraction_policy"
+        else:
+            stage = "trajectory_inner_tar_header_probe_failed"
+            blocker = "inner_tar_layout"
+
+        rows.append(
+            {
+                "tar_probe_id": row_id,
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "compressed_probe_bytes": float(compressed_probe_bytes),
+                "xz_prefix_bytes": float(xz_prefix_bytes),
+                "tar_probe_bytes": float(tar_probe_bytes),
+                "root_directory": root_directory,
+                "first_npz_member": first_npz_member,
+                "first_npz_size_bytes": float(first_npz_size),
+                "npz_member_count_in_probe": float(npz_count),
+                "split_labels_in_probe": split_labels,
+                "tar_magic_verified": float(tar_magic_verified),
+                "npz_member_header_verified": float(npz_verified),
+                "trajectory_layout_ready": float(layout_ready),
+                "trajectory_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": blocker,
+                "tar_probe_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

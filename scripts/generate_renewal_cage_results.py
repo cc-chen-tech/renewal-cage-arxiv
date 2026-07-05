@@ -104,6 +104,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_verdict,
     sota_glassbench_trajectory_entry_metadata_gate,
+    sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_glassbench_payload_index_gate,
@@ -3364,6 +3365,24 @@ def write_sota_glassbench_trajectory_member_stream_probe_csv(
     return rows
 
 
+def write_sota_glassbench_trajectory_inner_tar_header_probe_csv(
+    path: Path,
+    *,
+    member_probe_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Verify inner tar headers and first trajectory member names."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "trajectory_inner_tar_header_probe_10118191.json"
+    rows = sota_glassbench_trajectory_inner_tar_header_probe_gate(
+        tar_probe_id="glassbench_trajectory_inner_tar_header_probe",
+        accession_id="glassbench_zenodo_10118191",
+        member_probe_rows=member_probe_rows,
+        tar_probe_manifest=json.loads(manifest_path.read_text(encoding="utf-8")),
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -6006,6 +6025,63 @@ def write_sota_glassbench_trajectory_member_stream_probe_svg(path: Path, rows: l
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_inner_tar_header_probe_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 430
+    left, top = 75, 112
+    row_h = 72
+    colors = {
+        "trajectory_inner_tar_layout_verified_extraction_blocked": "#2b6cb0",
+        "trajectory_inner_tar_header_probe_missing": "#c05621",
+        "trajectory_inner_tar_header_probe_failed": "#c05621",
+        "trajectory_member_prefix_incomplete": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["tar_probe_stage"])
+        color = colors[stage]
+        tar_magic = int(float(row["tar_magic_verified"]))
+        npz_header = int(float(row["npz_member_header_verified"]))
+        layout = int(float(row["trajectory_layout_ready"]))
+        extract = int(float(row["trajectory_extraction_ready"]))
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 4}" width="330" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:47]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 470}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">tar={tar_magic}; npz={npz_header}; layout={layout}; extract={extract}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">root: {row["root_directory"]}; first member: {str(row["first_npz_member"])[:90]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 56}" font-family="Arial, sans-serif" font-size="9" fill="#555">probe={int(float(row["compressed_probe_bytes"]))} bytes; tar={int(float(row["tar_probe_bytes"]))} bytes; npz count in prefix={int(float(row["npz_member_count_in_probe"]))}; splits={row["split_labels_in_probe"]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA GlassBench inner tar header probe</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Compressed ZIP-member prefixes are streamed through raw deflate and XZ to verify tar directories and first NPZ trajectory headers.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 470}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness and blocker</text>
+  {"".join(marks)}
+  <rect x="75" y="382" width="14" height="14" fill="#2b6cb0" /><text x="96" y="394" font-family="Arial, sans-serif" font-size="12">tar layout and first NPZ header verified</text>
+  <rect x="390" y="382" width="14" height="14" fill="#c05621" /><text x="411" y="394" font-family="Arial, sans-serif" font-size="12">prefix, tar, or NPZ header missing</text>
+  <text x="690" y="394" font-family="Arial, sans-serif" font-size="12">full NPZ extraction and diagnostic inversion remain separate gates</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -7745,6 +7821,16 @@ def main() -> None:
     write_sota_glassbench_trajectory_member_stream_probe_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_member_stream_probe.svg",
         glassbench_trajectory_member_stream_probe_rows,
+    )
+    glassbench_trajectory_inner_tar_header_probe_rows = (
+        write_sota_glassbench_trajectory_inner_tar_header_probe_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.csv",
+            member_probe_rows=glassbench_trajectory_member_stream_probe_rows,
+        )
+    )
+    write_sota_glassbench_trajectory_inner_tar_header_probe_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.svg",
+        glassbench_trajectory_inner_tar_header_probe_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"
