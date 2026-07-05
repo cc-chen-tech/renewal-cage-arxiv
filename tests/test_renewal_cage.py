@@ -19,6 +19,7 @@ from renewal_cage import (  # noqa: E402
     activated_barrier_temperature_law,
     alpha_relaxation_shape_curve,
     alpha_shape_superposition_residual,
+    barrier_amplification_laws,
     correlated_domain_susceptibility,
     classify_delay_exponent,
     delayed_poisson_mean,
@@ -48,6 +49,7 @@ from renewal_cage import (  # noqa: E402
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
     late_mechanism_selection,
+    minimal_barrier_requirements,
     observable_consistency_diagnostics,
     radial_van_hove_3d,
     local_cage_variance,
@@ -1127,6 +1129,41 @@ class DelayedRenewalCageTests(unittest.TestCase):
             same_delay_stronger_exchange["cold_heterogeneity_growth_ratio"],
             weak["cold_heterogeneity_growth_ratio"],
         )
+
+    def test_barrier_amplification_laws_give_closed_cooling_factors(self):
+        laws = barrier_amplification_laws(
+            hot_temperature=1.0,
+            cold_temperature=0.62,
+            delay_barrier_gap=3.0,
+            exchange_barrier_sum=4.0,
+        )
+        delta = 1.0 / 0.62 - 1.0
+
+        self.assertAlmostEqual(laws["inverse_temperature_interval"], delta)
+        self.assertAlmostEqual(laws["lambda_tau_delay_growth"], math.exp(3.0 * delta))
+        self.assertAlmostEqual(laws["heterogeneity_ratio_growth"], math.exp(4.0 * delta))
+        self.assertAlmostEqual(laws["combined_slowing_growth"], math.exp(7.0 * delta))
+
+    def test_minimal_barrier_requirements_invert_target_growth_factors(self):
+        requirements = minimal_barrier_requirements(
+            hot_temperature=1.0,
+            cold_temperature=0.62,
+            target_lambda_tau_delay_growth=math.exp(3.0 * (1.0 / 0.62 - 1.0)),
+            target_heterogeneity_ratio_growth=math.exp(4.0 * (1.0 / 0.62 - 1.0)),
+        )
+
+        self.assertAlmostEqual(requirements["required_delay_barrier_gap"], 3.0)
+        self.assertAlmostEqual(requirements["required_exchange_barrier_sum"], 4.0)
+        self.assertAlmostEqual(requirements["target_combined_growth"], requirements["target_lambda_tau_delay_growth"] * requirements["target_heterogeneity_ratio_growth"])
+
+    def test_minimal_barrier_requirements_validate_temperature_order(self):
+        with self.assertRaises(ValueError):
+            minimal_barrier_requirements(
+                hot_temperature=0.62,
+                cold_temperature=1.0,
+                target_lambda_tau_delay_growth=2.0,
+                target_heterogeneity_ratio_growth=3.0,
+            )
 
     def test_fractional_stokes_einstein_exponents_recover_power_law_slope(self):
         tau_alpha = np.array([2.0, 4.0, 8.0, 16.0, 32.0])

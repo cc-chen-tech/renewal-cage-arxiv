@@ -33,6 +33,10 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_static_null.pdf", names)
             self.assertIn("figures/renewal_cage_alpha_shape.pdf", names)
             self.assertIn("figures/renewal_cage_facilitated_exchange.pdf", names)
+            self.assertIn("figures/renewal_cage_glass_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_glass_phase_diagram.pdf", names)
+            self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
+            self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -48,6 +52,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_static_null.pdf", main_tex)
         self.assertIn("figures/renewal_cage_alpha_shape.pdf", main_tex)
         self.assertIn("figures/renewal_cage_facilitated_exchange.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_glass_audit.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_glass_phase_diagram.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_barrier_requirements.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_inversion.pdf", main_tex)
         self.assertNotIn(".svg", main_tex)
 
@@ -66,6 +74,16 @@ class ArxivPackageTests(unittest.TestCase):
             first_facilitated_exchange = (
                 ROOT / "paper" / "figures" / "renewal_cage_facilitated_exchange.pdf"
             ).read_bytes()
+            first_glass_audit = (ROOT / "paper" / "figures" / "renewal_cage_glass_audit.pdf").read_bytes()
+            first_glass_phase_diagram = (
+                ROOT / "paper" / "figures" / "renewal_cage_glass_phase_diagram.pdf"
+            ).read_bytes()
+            first_barrier_requirements = (
+                ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
+            ).read_bytes()
+            first_mechanism_selection = (
+                ROOT / "paper" / "figures" / "renewal_cage_mechanism_selection.pdf"
+            ).read_bytes()
             first_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
             time.sleep(1.1)
@@ -82,6 +100,16 @@ class ArxivPackageTests(unittest.TestCase):
             second_facilitated_exchange = (
                 ROOT / "paper" / "figures" / "renewal_cage_facilitated_exchange.pdf"
             ).read_bytes()
+            second_glass_audit = (ROOT / "paper" / "figures" / "renewal_cage_glass_audit.pdf").read_bytes()
+            second_glass_phase_diagram = (
+                ROOT / "paper" / "figures" / "renewal_cage_glass_phase_diagram.pdf"
+            ).read_bytes()
+            second_barrier_requirements = (
+                ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
+            ).read_bytes()
+            second_mechanism_selection = (
+                ROOT / "paper" / "figures" / "renewal_cage_mechanism_selection.pdf"
+            ).read_bytes()
             second_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
         self.assertEqual(first_results, second_results)
@@ -94,6 +122,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_static_null, second_static_null)
         self.assertEqual(first_alpha_shape, second_alpha_shape)
         self.assertEqual(first_facilitated_exchange, second_facilitated_exchange)
+        self.assertEqual(first_glass_audit, second_glass_audit)
+        self.assertEqual(first_glass_phase_diagram, second_glass_phase_diagram)
+        self.assertEqual(first_barrier_requirements, second_barrier_requirements)
+        self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_inversion, second_inversion)
 
 

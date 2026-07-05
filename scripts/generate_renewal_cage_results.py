@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import sys
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_time,
     alpha_shape_superposition_residual,
     activated_barrier_temperature_law,
+    barrier_amplification_laws,
     correlated_domain_susceptibility,
     delayed_poisson_mean,
     delayed_renewal_shape,
@@ -43,6 +45,7 @@ from renewal_cage import (  # noqa: E402
     infer_parameters_from_scattering_transport,
     infer_renewal_correlation_size,
     late_mechanism_selection,
+    minimal_barrier_requirements,
     local_alpha_stretching_exponent,
     moments_1d,
     ngp_1d,
@@ -340,6 +343,58 @@ def write_glass_phase_diagram_csv(
         wave_number=wave_number,
         delay_barrier_gaps=delay_barrier_gaps,
         exchange_barrier_sums=exchange_barrier_sums,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_barrier_requirements_csv(
+    path: Path,
+    *,
+    hot_temperature: float,
+    cold_temperature: float,
+    delay_barrier_gaps: list[float],
+    exchange_barrier_sums: list[float],
+    target_lambda_tau_delay_growth: float,
+    target_heterogeneity_ratio_growth: float,
+) -> list[dict[str, float | str]]:
+    rows: list[dict[str, float | str]] = []
+    for gap in delay_barrier_gaps:
+        for exchange_sum in exchange_barrier_sums:
+            laws = barrier_amplification_laws(
+                hot_temperature=hot_temperature,
+                cold_temperature=cold_temperature,
+                delay_barrier_gap=gap,
+                exchange_barrier_sum=exchange_sum,
+            )
+            rows.append(
+                {
+                    "record_type": "amplification",
+                    **laws,
+                    "target_lambda_tau_delay_growth": np.nan,
+                    "target_heterogeneity_ratio_growth": np.nan,
+                    "target_combined_growth": np.nan,
+                    "required_delay_barrier_gap": np.nan,
+                    "required_exchange_barrier_sum": np.nan,
+                    "required_combined_barrier": np.nan,
+                }
+            )
+    requirements = minimal_barrier_requirements(
+        hot_temperature=hot_temperature,
+        cold_temperature=cold_temperature,
+        target_lambda_tau_delay_growth=target_lambda_tau_delay_growth,
+        target_heterogeneity_ratio_growth=target_heterogeneity_ratio_growth,
+    )
+    rows.append(
+        {
+            "record_type": "requirements",
+            "delay_barrier_gap": np.nan,
+            "exchange_barrier_sum": np.nan,
+            "lambda_tau_delay_growth": np.nan,
+            "heterogeneity_ratio_growth": np.nan,
+            "combined_slowing_growth": np.nan,
+            **requirements,
+        }
     )
     write_sweep_csv(path, rows)
     return rows
@@ -1459,6 +1514,88 @@ def write_glass_phase_diagram_svg(path: Path, rows: list[dict[str, float]]) -> N
     path.write_text(svg)
 
 
+def write_barrier_requirements_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left_a, top, right_a, bottom = 80, 90, 520, 430
+    left_b, right_b = 670, 1040
+    amplification_rows = [row for row in rows if row["record_type"] == "amplification"]
+    requirement = next(row for row in rows if row["record_type"] == "requirements")
+    gaps = sorted({float(row["delay_barrier_gap"]) for row in amplification_rows})
+    exchange_sums = sorted({float(row["exchange_barrier_sum"]) for row in amplification_rows})
+    max_growth = max(float(row["combined_slowing_growth"]) for row in amplification_rows)
+    cell_w = (right_a - left_a) / len(exchange_sums)
+    cell_h = (bottom - top) / len(gaps)
+    cells = []
+    for i, gap in enumerate(gaps):
+        y = bottom - (i + 1) * cell_h
+        cells.append(
+            f'<text x="24" y="{y + cell_h / 2 + 4:.2f}" font-family="Arial, sans-serif" font-size="12">gap={gap:g}</text>'
+        )
+        for j, exchange_sum in enumerate(exchange_sums):
+            row = next(
+                item
+                for item in amplification_rows
+                if float(item["delay_barrier_gap"]) == gap and float(item["exchange_barrier_sum"]) == exchange_sum
+            )
+            growth = float(row["combined_slowing_growth"])
+            shade = int(235 - 120 * math.log(growth) / math.log(max_growth)) if max_growth > 1.0 else 235
+            x = left_a + j * cell_w
+            cells.append(
+                f'<rect x="{x:.2f}" y="{y:.2f}" width="{cell_w - 3:.2f}" height="{cell_h - 3:.2f}" fill="rgb({shade},210,150)" stroke="#fff" />'
+            )
+            cells.append(
+                f'<text x="{x + 10:.2f}" y="{y + cell_h / 2 + 4:.2f}" font-family="Arial, sans-serif" font-size="11">{growth:.1f}x</text>'
+            )
+    labels = []
+    for j, exchange_sum in enumerate(exchange_sums):
+        labels.append(
+            f'<text x="{left_a + j * cell_w + 12:.2f}" y="{bottom + 28}" font-family="Arial, sans-serif" font-size="12">{exchange_sum:g}</text>'
+        )
+
+    target_values = [
+        ("lambda tau_d", float(requirement["target_lambda_tau_delay_growth"]), float(requirement["required_delay_barrier_gap"]), "#2b6cb0"),
+        ("heterogeneity c", float(requirement["target_heterogeneity_ratio_growth"]), float(requirement["required_exchange_barrier_sum"]), "#c05621"),
+        ("combined", float(requirement["target_combined_growth"]), float(requirement["required_combined_barrier"]), "#805ad5"),
+    ]
+    max_required = max(value[2] for value in target_values)
+    bars = []
+    bar_w = 70
+    for idx, (label, target, required, color) in enumerate(target_values):
+        x = left_b + idx * 105
+        h = 260.0 * required / max_required if max_required > 0.0 else 0.0
+        bars.append(
+            f'<rect x="{x}" y="{bottom - h:.2f}" width="{bar_w}" height="{h:.2f}" fill="{color}" opacity="0.88" />'
+        )
+        bars.append(
+            f'<text x="{x}" y="{bottom + 22}" font-family="Arial, sans-serif" font-size="11">{label}</text>'
+        )
+        bars.append(
+            f'<text x="{x}" y="{bottom - h - 8:.2f}" font-family="Arial, sans-serif" font-size="11" fill="{color}">E={required:.2f}</text>'
+        )
+        bars.append(
+            f'<text x="{x}" y="{bottom + 39}" font-family="Arial, sans-serif" font-size="10" fill="#555">target {target:.1f}x</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="80" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Closed barrier requirements</text>
+  <text x="80" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Amplification over the cooling interval is exp(E Delta(1/T)); target growth inverts to E=log(target)/Delta(1/T).</text>
+  <line x1="{left_a}" y1="{bottom}" x2="{right_a}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_a}" y1="{bottom}" x2="{left_a}" y2="{top}" stroke="#222" />
+  <text x="{left_a}" y="{top - 22}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Combined slowing amplification</text>
+  {"".join(cells)}
+  {"".join(labels)}
+  <text x="{left_a + 120}" y="{bottom + 55}" font-family="Arial, sans-serif" font-size="13">exchange barrier sum</text>
+  <text x="18" y="280" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 18 280)">delay barrier gap</text>
+  <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
+  <text x="{left_b}" y="{top - 22}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Minimum barriers for target growth</text>
+  {"".join(bars)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -1994,6 +2131,20 @@ def main() -> None:
     write_glass_phase_diagram_svg(
         FIGURE_DIR / "renewal_cage_glass_phase_diagram.svg",
         glass_phase_rows,
+    )
+    cooling_interval = 1.0 / temperatures[-1] - 1.0 / temperatures[0]
+    barrier_requirement_rows = write_barrier_requirements_csv(
+        DATA_DIR / "renewal_cage_barrier_requirements.csv",
+        hot_temperature=float(temperatures[0]),
+        cold_temperature=float(temperatures[-1]),
+        delay_barrier_gaps=[0.0, 1.5, 3.0],
+        exchange_barrier_sums=[0.0, 2.0, 4.0],
+        target_lambda_tau_delay_growth=math.exp(3.0 * cooling_interval),
+        target_heterogeneity_ratio_growth=math.exp(4.0 * cooling_interval),
+    )
+    write_barrier_requirements_svg(
+        FIGURE_DIR / "renewal_cage_barrier_requirements.svg",
+        barrier_requirement_rows,
     )
 
     barrier = ActivatedBarrierParams(

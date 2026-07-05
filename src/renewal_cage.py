@@ -1895,6 +1895,72 @@ def glass_signature_phase_diagram(
     return rows
 
 
+def _cooling_inverse_temperature_interval(hot_temperature: float, cold_temperature: float) -> float:
+    if hot_temperature <= 0.0 or cold_temperature <= 0.0:
+        raise ValueError("temperatures must be positive")
+    interval = 1.0 / cold_temperature - 1.0 / hot_temperature
+    if interval <= 0.0:
+        raise ValueError("cold_temperature must be lower than hot_temperature")
+    return interval
+
+
+def barrier_amplification_laws(
+    *,
+    hot_temperature: float,
+    cold_temperature: float,
+    delay_barrier_gap: float,
+    exchange_barrier_sum: float,
+) -> dict[str, float]:
+    """Closed cooling amplification laws for barrier-controlled diagnostics."""
+
+    if delay_barrier_gap < 0.0:
+        raise ValueError("delay_barrier_gap must be nonnegative")
+    if exchange_barrier_sum < 0.0:
+        raise ValueError("exchange_barrier_sum must be nonnegative")
+    interval = _cooling_inverse_temperature_interval(hot_temperature, cold_temperature)
+    lambda_tau_growth = math.exp(delay_barrier_gap * interval)
+    heterogeneity_growth = math.exp(exchange_barrier_sum * interval)
+    return {
+        "hot_temperature": hot_temperature,
+        "cold_temperature": cold_temperature,
+        "inverse_temperature_interval": interval,
+        "delay_barrier_gap": delay_barrier_gap,
+        "exchange_barrier_sum": exchange_barrier_sum,
+        "lambda_tau_delay_growth": lambda_tau_growth,
+        "heterogeneity_ratio_growth": heterogeneity_growth,
+        "combined_slowing_growth": lambda_tau_growth * heterogeneity_growth,
+    }
+
+
+def minimal_barrier_requirements(
+    *,
+    hot_temperature: float,
+    cold_temperature: float,
+    target_lambda_tau_delay_growth: float,
+    target_heterogeneity_ratio_growth: float,
+) -> dict[str, float]:
+    """Invert target cooling amplifications into minimum barrier controls."""
+
+    if target_lambda_tau_delay_growth < 1.0:
+        raise ValueError("target_lambda_tau_delay_growth must be at least one")
+    if target_heterogeneity_ratio_growth < 1.0:
+        raise ValueError("target_heterogeneity_ratio_growth must be at least one")
+    interval = _cooling_inverse_temperature_interval(hot_temperature, cold_temperature)
+    required_delay_gap = math.log(target_lambda_tau_delay_growth) / interval
+    required_exchange_sum = math.log(target_heterogeneity_ratio_growth) / interval
+    return {
+        "hot_temperature": hot_temperature,
+        "cold_temperature": cold_temperature,
+        "inverse_temperature_interval": interval,
+        "target_lambda_tau_delay_growth": target_lambda_tau_delay_growth,
+        "target_heterogeneity_ratio_growth": target_heterogeneity_ratio_growth,
+        "target_combined_growth": target_lambda_tau_delay_growth * target_heterogeneity_ratio_growth,
+        "required_delay_barrier_gap": required_delay_gap,
+        "required_exchange_barrier_sum": required_exchange_sum,
+        "required_combined_barrier": required_delay_gap + required_exchange_sum,
+    }
+
+
 def poisson_weights(mean: float, *, max_count: int) -> np.ndarray:
     """Stable Poisson weights from n=0 to max_count with tail folded into max_count."""
 

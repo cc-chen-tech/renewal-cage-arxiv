@@ -20,8 +20,8 @@ The model combines:
   heterogeneity diagnostics, a temperature-dependent facilitated-exchange law,
   a static-gamma mobility-disorder null model, late-time mechanism-selection
   diagnostics, a glass-dynamics phenomenon audit, barrier-facilitation
-  signature phase diagrams, finite-time consistency diagnostics, and observable
-  inversion/falsifiability criteria.
+  signature phase diagrams, closed barrier-threshold requirements, finite-time
+  consistency diagnostics, and observable inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -122,6 +122,7 @@ figures/renewal_cage_alpha_shape.svg
 figures/renewal_cage_facilitated_exchange.svg
 figures/renewal_cage_glass_audit.svg
 figures/renewal_cage_glass_phase_diagram.svg
+figures/renewal_cage_barrier_requirements.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
 figures/renewal_cage_heterogeneity_map.svg
@@ -142,6 +143,7 @@ data/renewal_cage_alpha_shape.csv
 data/renewal_cage_facilitated_exchange.csv
 data/renewal_cage_glass_audit.csv
 data/renewal_cage_glass_phase_diagram.csv
+data/renewal_cage_barrier_requirements.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv
@@ -160,10 +162,14 @@ paper/figures/renewal_cage_scattering.pdf
 paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_alpha_shape.pdf
 paper/figures/renewal_cage_facilitated_exchange.pdf
+paper/figures/renewal_cage_glass_audit.pdf
+paper/figures/renewal_cage_glass_phase_diagram.pdf
+paper/figures/renewal_cage_barrier_requirements.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf
 paper/figures/renewal_cage_heterogeneity_map.pdf
 paper/figures/renewal_cage_static_null.pdf
+paper/figures/renewal_cage_mechanism_selection.pdf
 paper/figures/renewal_cage_inversion.pdf
 dist/renewal-cage-arxiv-source.zip
 ```

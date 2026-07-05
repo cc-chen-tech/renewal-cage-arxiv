@@ -487,6 +487,283 @@ def write_facilitated_exchange_pdf(path: Path) -> None:
     c.save()
 
 
+def write_glass_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_glass_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    temperature_rows = [row for row in rows if row["record_type"] == "temperature_row"]
+    summary_rows = [row for row in rows if row["record_type"] == "summary_flag"]
+
+    inverse_shift = np.array([float(row["inverse_temperature_shift"]) for row in temperature_rows])
+    tau_alpha = np.array([float(row["tau_alpha_exchange"]) for row in temperature_rows])
+    diffusion = np.array([float(row["diffusion_coefficient"]) for row in temperature_rows])
+    se_product = np.array([float(row["normalized_stokes_einstein_product"]) for row in temperature_rows])
+    heterogeneity = np.array([float(row["heterogeneity_ratio"]) for row in temperature_rows])
+    chi4 = np.array([float(row["chi4_peak"]) for row in temperature_rows])
+    beta = np.array([float(row["median_alpha_window_beta"]) for row in temperature_rows])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Glass-dynamics phenomenon audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "Dynamical signatures are checked from one delayed-renewal law; no thermodynamic transition is claimed.")
+
+    draw_panel(
+        c,
+        45,
+        300,
+        320,
+        175,
+        inverse_shift,
+        [
+            ("tau_alpha exchange / hot", tau_alpha / tau_alpha[0], colors.HexColor("#2b6cb0")),
+            ("1 / diffusion / hot", diffusion[0] / diffusion, colors.HexColor("#c05621")),
+            ("D tau_alpha / hot", se_product, colors.HexColor("#805ad5")),
+        ],
+        "A. Transport and alpha slowdown",
+        xlabel="inverse-temperature shift",
+    )
+    draw_panel(
+        c,
+        430,
+        300,
+        320,
+        175,
+        inverse_shift,
+        [
+            ("exchange ratio / hot", heterogeneity / heterogeneity[0], colors.HexColor("#2f855a")),
+            ("chi4 peak / hot", chi4 / chi4[0], colors.HexColor("#d69e2e")),
+            ("alpha-window beta", beta, colors.HexColor("#805ad5")),
+        ],
+        "B. Dynamic heterogeneity signatures",
+        xlabel="inverse-temperature shift",
+    )
+
+    flags = [(row["signature"], float(row["flag_value"])) for row in summary_rows]
+    chart_left, chart_bottom, chart_width, chart_height = 45, 72, 705, 145
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(chart_left, chart_bottom + chart_height + 16, "C. Supported signatures")
+    c.line(chart_left, chart_bottom, chart_left + chart_width, chart_bottom)
+    c.line(chart_left, chart_bottom, chart_left, chart_bottom + chart_height)
+    bar_gap = 4
+    bar_width = chart_width / len(flags) - bar_gap
+    for idx, (label, value) in enumerate(flags):
+        x = chart_left + idx * (bar_width + bar_gap)
+        h = value * (chart_height - 20)
+        color = colors.HexColor("#2f855a") if value >= 1.0 else colors.lightgrey
+        c.setFillColor(color)
+        c.rect(x, chart_bottom, bar_width, h, fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 5.5)
+        c.saveState()
+        c.translate(x + 3, chart_bottom - 4)
+        c.rotate(-45)
+        c.drawRightString(0, 0, label.replace("_", " "))
+        c.restoreState()
+    c.showPage()
+    c.save()
+
+
+def write_glass_phase_diagram_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_glass_phase_diagram.csv")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Barrier-facilitation glass signature phase diagram")
+
+    gaps = sorted(set(data["delay_barrier_gap"]))
+    exchange_sums = sorted(set(data["exchange_barrier_sum"]))
+    left, bottom, width, height = 65, 165, 310, 230
+    cell_w = width / len(exchange_sums)
+    cell_h = height / len(gaps)
+    scores = data["supported_dynamic_signatures"]
+    score_min = float(np.nanmin(scores))
+    score_max = float(np.nanmax(scores))
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(left, bottom + height + 18, "A. Supported dynamic signatures")
+    for row_idx, gap in enumerate(gaps):
+        y = bottom + row_idx * cell_h
+        c.setFont("Helvetica", 7)
+        c.drawRightString(left - 8, y + cell_h / 2.0, f"{gap:g}")
+        for col_idx, exchange_sum in enumerate(exchange_sums):
+            mask = (data["delay_barrier_gap"] == gap) & (data["exchange_barrier_sum"] == exchange_sum)
+            value = float(scores[mask][0])
+            shade = 0.25 + 0.65 * (value - score_min) / (score_max - score_min)
+            c.setFillColor(colors.Color(0.95 - 0.25 * shade, 0.86 - 0.10 * shade, 0.58))
+            x = left + col_idx * cell_w
+            c.rect(x, y, cell_w - 3, cell_h - 3, fill=1, stroke=0)
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica", 8)
+            c.drawString(x + 8, y + cell_h / 2.0, f"{value:.0f}/9")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    for col_idx, exchange_sum in enumerate(exchange_sums):
+        c.drawCentredString(left + col_idx * cell_w + cell_w / 2.0, bottom - 14, f"{exchange_sum:g}")
+    c.drawCentredString(left + width / 2.0, bottom - 30, "exchange barrier sum")
+    c.saveState()
+    c.translate(left - 40, bottom + height / 2.0)
+    c.rotate(90)
+    c.drawCentredString(0, 0, "delay barrier gap")
+    c.restoreState()
+
+    x = np.array([gap + 0.08 * exchange_sum for gap, exchange_sum in zip(data["delay_barrier_gap"], data["exchange_barrier_sum"])])
+    draw_panel(
+        c,
+        450,
+        165,
+        285,
+        230,
+        x,
+        [
+            ("cold D tau_alpha / hot", data["cold_se_product_ratio"], colors.HexColor("#805ad5")),
+            ("cold heterogeneity / hot", data["cold_heterogeneity_growth_ratio"], colors.HexColor("#2f855a")),
+            ("closure flag", data["complete_dynamic_closure"], colors.HexColor("#c05621")),
+        ],
+        "B. Cold-end diagnostic growth",
+        xlabel="delay gap plus exchange offset",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_barrier_requirements_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    amplification_rows = [row for row in rows if row["record_type"] == "amplification"]
+    requirement = next(row for row in rows if row["record_type"] == "requirements")
+
+    gaps = sorted({float(row["delay_barrier_gap"]) for row in amplification_rows})
+    exchange_sums = sorted({float(row["exchange_barrier_sum"]) for row in amplification_rows})
+    max_growth = max(float(row["combined_slowing_growth"]) for row in amplification_rows)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Closed barrier-threshold requirements")
+
+    left, bottom, width, height = 70, 165, 310, 230
+    cell_w = width / len(exchange_sums)
+    cell_h = height / len(gaps)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(left, bottom + height + 18, "A. Combined slowing amplification")
+    for row_idx, gap in enumerate(gaps):
+        y = bottom + row_idx * cell_h
+        c.setFont("Helvetica", 7)
+        c.drawRightString(left - 8, y + cell_h / 2.0, f"{gap:g}")
+        for col_idx, exchange_sum in enumerate(exchange_sums):
+            row = next(
+                item
+                for item in amplification_rows
+                if float(item["delay_barrier_gap"]) == gap and float(item["exchange_barrier_sum"]) == exchange_sum
+            )
+            growth = float(row["combined_slowing_growth"])
+            shade = math.log(growth) / math.log(max_growth) if max_growth > 1.0 else 0.0
+            c.setFillColor(colors.Color(0.92 - 0.28 * shade, 0.82 - 0.12 * shade, 0.52))
+            x0 = left + col_idx * cell_w
+            c.rect(x0, y, cell_w - 3, cell_h - 3, fill=1, stroke=0)
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica", 8)
+            c.drawString(x0 + 8, y + cell_h / 2.0, f"{growth:.1f}x")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    for col_idx, exchange_sum in enumerate(exchange_sums):
+        c.drawCentredString(left + col_idx * cell_w + cell_w / 2.0, bottom - 14, f"{exchange_sum:g}")
+    c.drawCentredString(left + width / 2.0, bottom - 30, "exchange barrier sum")
+    c.saveState()
+    c.translate(left - 42, bottom + height / 2.0)
+    c.rotate(90)
+    c.drawCentredString(0, 0, "delay barrier gap")
+    c.restoreState()
+
+    labels = ["lambda tau_d", "heterogeneity c", "combined"]
+    targets = [
+        float(requirement["target_lambda_tau_delay_growth"]),
+        float(requirement["target_heterogeneity_ratio_growth"]),
+        float(requirement["target_combined_growth"]),
+    ]
+    barriers = [
+        float(requirement["required_delay_barrier_gap"]),
+        float(requirement["required_exchange_barrier_sum"]),
+        float(requirement["required_combined_barrier"]),
+    ]
+    chart_left, chart_bottom, chart_width, chart_height = 455, 165, 270, 230
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(chart_left, chart_bottom + chart_height + 18, "B. Minimum barriers for target growth")
+    c.line(chart_left, chart_bottom, chart_left + chart_width, chart_bottom)
+    c.line(chart_left, chart_bottom, chart_left, chart_bottom + chart_height)
+    colors_list = [colors.HexColor("#2b6cb0"), colors.HexColor("#c05621"), colors.HexColor("#805ad5")]
+    for idx, (label, target, barrier) in enumerate(zip(labels, targets, barriers)):
+        x = chart_left + 32 + idx * 78
+        h = barrier / max(barriers) * (chart_height - 30)
+        c.setFillColor(colors_list[idx])
+        c.rect(x, chart_bottom, 52, h, fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(x + 26, chart_bottom - 13, label)
+        c.drawCentredString(x + 26, chart_bottom + h + 8, f"E={barrier:.1f}")
+        c.drawCentredString(x + 26, chart_bottom - 25, f"{target:.1f}x")
+    c.showPage()
+    c.save()
+
+
+def write_mechanism_selection_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_mechanism_selection.csv").open() as f:
+        rows = list(csv.DictReader(f))
+
+    cases = list(dict.fromkeys(row["case"] for row in rows))
+    candidates = list(dict.fromkeys(row["candidate_model"] for row in rows))
+    capped_scores = []
+    for row in rows:
+        score = float(row["score"])
+        capped_scores.append(4.0 if not math.isfinite(score) else min(math.log10(1.0 + score), 4.0))
+    max_score = max(capped_scores)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Late mechanism-selection diagnostic")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "Two late NGP points and one alpha slope select among Poisson, static-gamma, and finite-exchange mechanisms.")
+
+    left, bottom, width, height = 58, 125, 675, 285
+    c.line(left, bottom, left + width, bottom)
+    c.line(left, bottom, left, bottom + height)
+    group_w = width / len(cases)
+    bar_w = group_w / (len(candidates) + 1)
+    colors_list = [colors.HexColor("#2b6cb0"), colors.HexColor("#c05621"), colors.HexColor("#2f855a")]
+    for case_idx, case in enumerate(cases):
+        x_group = left + case_idx * group_w
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(x_group + group_w / 2.0, bottom - 18, case.replace("_", " "))
+        for cand_idx, candidate in enumerate(candidates):
+            row = next(item for item in rows if item["case"] == case and item["candidate_model"] == candidate)
+            score = float(row["score"])
+            plotted = 4.0 if not math.isfinite(score) else min(math.log10(1.0 + score), 4.0)
+            x = x_group + (cand_idx + 0.5) * bar_w
+            h = plotted / max_score * (height - 22)
+            c.setFillColor(colors_list[cand_idx % len(colors_list)])
+            c.rect(x, bottom, bar_w * 0.75, h, fill=1, stroke=0)
+            if float(row["passes"]) >= 1.0:
+                c.setFillColor(colors.black)
+                c.setFont("Helvetica-Bold", 7)
+                c.drawCentredString(x + bar_w * 0.38, bottom + h + 7, "best")
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(left, bottom + height + 16, "A. log10(1 + candidate score), capped")
+    c.setFont("Helvetica", 7)
+    for idx, candidate in enumerate(candidates):
+        c.setFillColor(colors_list[idx % len(colors_list)])
+        c.drawString(left + 8 + idx * 115, bottom + height - 12, candidate)
+    c.setFillColor(colors.black)
+    c.showPage()
+    c.save()
+
+
 def write_barrier_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_susceptibility.csv").open() as f:
         susceptibility_rows = list(csv.DictReader(f))
@@ -749,6 +1026,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
     alpha_shape_pdf = PAPER_FIGURE_DIR / "renewal_cage_alpha_shape.pdf"
     facilitated_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_facilitated_exchange.pdf"
+    glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
+    glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
+    barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
+    mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
     heterogeneity_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity.pdf"
     heterogeneity_map_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity_map.pdf"
@@ -760,6 +1041,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_temperature_pdf(temperature_pdf)
     write_alpha_shape_pdf(alpha_shape_pdf)
     write_facilitated_exchange_pdf(facilitated_exchange_pdf)
+    write_glass_audit_pdf(glass_audit_pdf)
+    write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
+    write_barrier_requirements_pdf(barrier_requirements_pdf)
+    write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
     write_heterogeneity_pdf(heterogeneity_pdf)
     write_heterogeneity_map_pdf(heterogeneity_map_pdf)
@@ -776,6 +1061,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
         archive.write(alpha_shape_pdf, "figures/renewal_cage_alpha_shape.pdf")
         archive.write(facilitated_exchange_pdf, "figures/renewal_cage_facilitated_exchange.pdf")
+        archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
+        archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
+        archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
+        archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
         archive.write(heterogeneity_pdf, "figures/renewal_cage_heterogeneity.pdf")
         archive.write(heterogeneity_map_pdf, "figures/renewal_cage_heterogeneity_map.pdf")

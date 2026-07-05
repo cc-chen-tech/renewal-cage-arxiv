@@ -1,0 +1,11 @@
+record_type,hot_temperature,cold_temperature,inverse_temperature_interval,delay_barrier_gap,exchange_barrier_sum,lambda_tau_delay_growth,heterogeneity_ratio_growth,combined_slowing_growth,target_lambda_tau_delay_growth,target_heterogeneity_ratio_growth,target_combined_growth,required_delay_barrier_gap,required_exchange_barrier_sum,required_combined_barrier
+amplification,1.0,0.62,0.6129032258064517,0.0,0.0,1.0,1.0,1.0,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,0.0,2.0,1.0,3.406912485290393,3.406912485290393,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,0.0,4.0,1.0,11.607052682427561,11.607052682427561,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,1.5,0.0,2.5076720150230916,1.0,2.5076720150230916,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,1.5,2.0,2.5076720150230916,3.406912485290393,8.543419096995489,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,1.5,4.0,2.5076720150230916,11.607052682427561,29.106681188622304,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,3.0,0.0,6.288418934929972,1.0,6.288418934929972,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,3.0,2.0,6.288418934929972,3.406912485290393,21.424092982149435,nan,nan,nan,nan,nan,nan
+amplification,1.0,0.62,0.6129032258064517,3.0,4.0,6.288418934929972,11.607052682427561,72.9900098669072,nan,nan,nan,nan,nan,nan
+requirements,1.0,0.62,0.6129032258064517,nan,nan,nan,nan,nan,6.288418934929972,11.607052682427561,72.9900098669072,3.0,4.0,7.0
