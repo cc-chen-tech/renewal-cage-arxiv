@@ -997,6 +997,17 @@ corrupted multi-$k$ case is rejected with residual $0.223$. These are still
 not fits to raw trajectory data; they are
 reproducible bridges from the SOTA comparison table to checkable
 model-versus-benchmark rows.
+The separate file
+\texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
+data-readiness of representative benchmark papers. It marks the
+Kob-Andersen van-Hove and intermediate-scattering papers
+\cite{kob1995vanhove,kob1995intermediate}, Hedges persistence/exchange
+\cite{hedges2007persistence}, Weeks-Weitz cage rearrangements
+\cite{weeks2002cage}, four-point data \cite{lacevic2003fourpoint}, and
+Fickian non-Gaussian colloid data \cite{guan2014fickian} as qualitatively
+useful but not yet machine-readable, uncertainty-weighted inversion inputs in
+this repository. This is the current boundary between literature-level SOTA
+agreement and a future raw-data fit.
 
 \begin{figure}[h]
   \centering
@@ -1166,6 +1177,15 @@ model-versus-benchmark rows.
   \cite{angell1995formation,adam1965temperature} through apparent activation
   and local fragility growth while preserving the scope boundary that
   material-specific fragility origins are not derived.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_literature_inversion_readiness.pdf}
+  \caption{Literature inversion readiness audit. The bars measure the fraction
+  of model-required observables available from representative benchmark
+  papers, while the flags separate qualitative comparison readiness from
+  quantitative and uncertainty-weighted inversion readiness.}
 \end{figure}
 
 \begin{figure}[h]

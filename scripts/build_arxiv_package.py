@@ -1234,6 +1234,50 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     c.save()
 
 
+def write_literature_inversion_readiness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_literature_inversion_readiness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Literature inversion readiness")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Coverage checks separate qualitative benchmark support from quantitative, uncertainty-weighted inversion readiness.",
+    )
+    left, top = 70, page_h - 95
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top, "benchmark")
+    c.drawString(left + 250, top, "coverage")
+    c.drawString(left + 335, top, "qual")
+    c.drawString(left + 380, top, "quant")
+    c.drawString(left + 430, top, "unc")
+    c.drawString(left + 475, top, "next action")
+    c.setFont("Helvetica", 7)
+    for idx, row in enumerate(rows):
+        y = top - 18 - idx * 24
+        coverage = float(row["observable_coverage_fraction"])
+        quantitative = int(float(row["quantitative_inversion_ready"]))
+        color = colors.HexColor("#2b6cb0") if quantitative else colors.HexColor("#d69e2e")
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["benchmark_id"][:42])
+        c.setStrokeColor(colors.HexColor("#cbd5e0"))
+        c.rect(left + 250, y - 3, 65, 8, stroke=1, fill=0)
+        c.setFillColor(color)
+        c.rect(left + 250, y - 3, 65 * coverage, 8, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.drawString(left + 320, y, f"{coverage:.2f}")
+        c.drawString(left + 342, y, str(int(float(row["qualitative_comparison_ready"]))))
+        c.drawString(left + 392, y, str(quantitative))
+        c.drawString(left + 440, y, str(int(float(row["uncertainty_weighted_ready"]))))
+        c.drawString(left + 475, y, row["next_action"][:70])
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1646,6 +1690,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     thermodynamic_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_closure.pdf"
     mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
     sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
+    literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1669,6 +1714,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_thermodynamic_closure_pdf(thermodynamic_closure_pdf)
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
+    write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1703,6 +1749,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(thermodynamic_closure_pdf, "figures/renewal_cage_thermodynamic_closure.pdf")
         archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
         archive.write(sota_benchmark_consistency_pdf, "figures/renewal_cage_sota_benchmark_consistency.pdf")
+        archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

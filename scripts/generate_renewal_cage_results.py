@@ -59,6 +59,7 @@ from renewal_cage import (  # noqa: E402
     joint_inversion_benchmark_consistency,
     kww_alpha_fit,
     late_mechanism_selection,
+    literature_inversion_readiness,
     minimal_barrier_requirements,
     local_alpha_stretching_exponent,
     mct_beta_benchmark_consistency,
@@ -2044,6 +2045,69 @@ def write_sota_comparison_csv(path: Path) -> list[dict[str, float | str]]:
     return rows
 
 
+def write_literature_inversion_readiness_csv(path: Path) -> list[dict[str, float | str]]:
+    """Record whether benchmark papers are ready for quantitative inversion."""
+
+    rows = [
+        literature_inversion_readiness(
+            benchmark_id="kob_andersen_van_hove_1995",
+            benchmark_source="kob1995vanhove",
+            required_observables=["time_grid", "van_hove_tail", "ngp", "diffusion"],
+            available_observables=["time_grid", "van_hove_tail", "ngp"],
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+            next_action="digitize van-Hove/NGP curves or rerun a KA trajectory simulation",
+        ),
+        literature_inversion_readiness(
+            benchmark_id="kob_andersen_intermediate_scattering_1995",
+            benchmark_source="kob1995intermediate",
+            required_observables=["time_grid", "self_intermediate_scattering", "tau_alpha", "wave_numbers"],
+            available_observables=["time_grid", "self_intermediate_scattering", "tau_alpha", "wave_numbers"],
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+            next_action="digitize multi-k F_s curves and attach temperature-dependent uncertainty estimates",
+        ),
+        literature_inversion_readiness(
+            benchmark_id="hedges_persistence_exchange_2007",
+            benchmark_source="hedges2007persistence",
+            required_observables=["diffusion", "tau_alpha", "persistence_time", "exchange_time", "late_ngp"],
+            available_observables=["persistence_time", "exchange_time", "tau_alpha"],
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+            next_action="combine trajectory-clock extraction with diffusion and late-NGP measurements",
+        ),
+        literature_inversion_readiness(
+            benchmark_id="weeks_weitz_cage_2002",
+            benchmark_source="weeks2002cage",
+            required_observables=["particle_trajectories", "msd_plateau", "cage_jump_events", "cage_time"],
+            available_observables=["particle_trajectories", "msd_plateau", "cage_jump_events"],
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+            next_action="recover trajectory-level cage metrics in the renewal-cage observable schema",
+        ),
+        literature_inversion_readiness(
+            benchmark_id="lacevic_four_point_2003",
+            benchmark_source="lacevic2003fourpoint",
+            required_observables=["tau_alpha", "chi4_peak", "dynamic_length", "diffusion"],
+            available_observables=["tau_alpha", "chi4_peak", "dynamic_length"],
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+            next_action="combine four-point data with transport to test the facilitation-front closure",
+        ),
+        literature_inversion_readiness(
+            benchmark_id="guan_granick_fickian_ngp_2014",
+            benchmark_source="guan2014fickian",
+            required_observables=["time_grid", "msd", "ngp", "van_hove_tail"],
+            available_observables=["time_grid", "msd", "ngp", "van_hove_tail"],
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+            next_action="digitize colloid MSD/NGP/van-Hove curves for Brownian-non-Gaussian comparison",
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -2839,6 +2903,43 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     path.write_text(svg)
 
 
+def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 520
+    left, top, right, bottom = 150, 95, 1030, 365
+    row_h = (bottom - top) / len(rows)
+    bars = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        coverage = float(row["observable_coverage_fraction"])
+        qualitative = int(float(row["qualitative_comparison_ready"]))
+        quantitative = int(float(row["quantitative_inversion_ready"]))
+        uncertainty = int(float(row["uncertainty_weighted_ready"]))
+        bar_w = coverage * 360.0
+        color = "#2b6cb0" if quantitative else "#d69e2e"
+        label = str(row["benchmark_id"]).replace("_", " ")
+        bars.append(
+            f'<text x="35" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="11">{label}</text>'
+        )
+        bars.append(
+            f'<rect x="{left}" y="{y + 5:.2f}" width="360" height="14" fill="#edf2f7" stroke="#cbd5e0" />'
+        )
+        bars.append(f'<rect x="{left}" y="{y + 5:.2f}" width="{bar_w:.2f}" height="14" fill="{color}" />')
+        bars.append(
+            f'<text x="{left + 375}" y="{y + 17:.2f}" font-family="Arial, sans-serif" font-size="11">coverage={coverage:.2f}; qualitative={qualitative}; quantitative={quantitative}; uncertainty={uncertainty}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Literature inversion readiness</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Coverage checks distinguish qualitative benchmark support from quantitative, uncertainty-weighted inversion readiness.</text>
+  {"".join(bars)}
+  <text x="150" y="430" font-family="Arial, sans-serif" font-size="12" fill="#444">Orange bars: literature figures support comparison but still need digitization, machine-readable data, or uncertainty estimates.</text>
+  <text x="150" y="450" font-family="Arial, sans-serif" font-size="12" fill="#444">Blue bars would indicate a benchmark row ready for direct quantitative inversion.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_requirements_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 560
@@ -3530,6 +3631,13 @@ def main() -> None:
         params=params,
     )
     write_sota_comparison_csv(DATA_DIR / "renewal_cage_sota_comparison.csv")
+    literature_readiness_rows = write_literature_inversion_readiness_csv(
+        DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"
+    )
+    write_literature_inversion_readiness_svg(
+        FIGURE_DIR / "renewal_cage_literature_inversion_readiness.svg",
+        literature_readiness_rows,
+    )
 
     delay_values = [1.2, 2.0, 3.0, 5.0]
     jump_values = [0.3, 0.6, 0.9, 1.3]

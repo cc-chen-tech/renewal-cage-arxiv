@@ -113,6 +113,21 @@ class ArxivPackageTests(unittest.TestCase):
             1.0,
         )
 
+    def test_literature_inversion_readiness_marks_public_benchmarks_as_not_yet_quantitative(self):
+        path = ROOT / "data" / "renewal_cage_literature_inversion_readiness.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["benchmark_id"]: row for row in rows}
+        self.assertIn("kob_andersen_van_hove_1995", by_id)
+        self.assertIn("kob_andersen_intermediate_scattering_1995", by_id)
+        self.assertIn("hedges_persistence_exchange_2007", by_id)
+        self.assertGreaterEqual(float(by_id["kob_andersen_van_hove_1995"]["observable_coverage_fraction"]), 0.5)
+        self.assertEqual(float(by_id["kob_andersen_van_hove_1995"]["qualitative_comparison_ready"]), 1.0)
+        self.assertEqual(float(by_id["kob_andersen_van_hove_1995"]["quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(float(by_id["hedges_persistence_exchange_2007"]["uncertainty_weighted_ready"]), 0.0)
+
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             zip_path = build_arxiv_package(output_dir=Path(tmpdir))
@@ -140,6 +155,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", names)
             self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", names)
             self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
+            self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -167,6 +183,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_barrier_requirements.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
@@ -204,6 +221,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_sota_benchmark_consistency = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_benchmark_consistency.pdf"
+            ).read_bytes()
+            first_literature_inversion_readiness = (
+                ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
             first_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
@@ -253,6 +273,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_benchmark_consistency = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_benchmark_consistency.pdf"
             ).read_bytes()
+            second_literature_inversion_readiness = (
+                ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
+            ).read_bytes()
             second_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
             ).read_bytes()
@@ -289,6 +312,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_thermodynamic_closure, second_thermodynamic_closure)
         self.assertEqual(first_mct_beta_closure, second_mct_beta_closure)
         self.assertEqual(first_sota_benchmark_consistency, second_sota_benchmark_consistency)
+        self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)

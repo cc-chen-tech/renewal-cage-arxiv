@@ -37,6 +37,7 @@ from renewal_cage import (  # noqa: E402
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
     joint_inversion_benchmark_consistency,
+    literature_inversion_readiness,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
     gamma_exchange_alpha_relaxation_time,
@@ -1447,6 +1448,23 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["joint_chi4_consistent"], 1.0)
         self.assertEqual(row["joint_mismatch_rejected"], 1.0)
         self.assertEqual(row["overall_consistent"], 1.0)
+
+    def test_literature_inversion_readiness_separates_qualitative_from_quantitative_data(self):
+        row = literature_inversion_readiness(
+            benchmark_id="kob_andersen_van_hove_1995",
+            benchmark_source="kob1995vanhove",
+            required_observables=["time_grid", "van_hove_tail", "ngp", "diffusion"],
+            available_observables=["time_grid", "van_hove_tail", "ngp"],
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+            next_action="digitize curves or rerun public simulation",
+        )
+
+        self.assertAlmostEqual(row["observable_coverage_fraction"], 0.75)
+        self.assertEqual(row["missing_observables"], "diffusion")
+        self.assertEqual(row["qualitative_comparison_ready"], 1.0)
+        self.assertEqual(row["quantitative_inversion_ready"], 0.0)
+        self.assertEqual(row["uncertainty_weighted_ready"], 0.0)
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(

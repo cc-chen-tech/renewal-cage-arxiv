@@ -1047,6 +1047,60 @@ def joint_inversion_benchmark_consistency(
     }
 
 
+def literature_inversion_readiness(
+    *,
+    benchmark_id: str,
+    benchmark_source: str,
+    required_observables: list[str],
+    available_observables: list[str],
+    has_machine_readable_data: bool,
+    has_uncertainty_estimates: bool,
+    next_action: str,
+    min_qualitative_coverage: float = 0.5,
+) -> dict[str, float | str]:
+    """Score whether a literature benchmark can support qualitative or quantitative inversion."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not benchmark_source:
+        raise ValueError("benchmark_source must be nonempty")
+    if not required_observables:
+        raise ValueError("required_observables must be nonempty")
+    if not next_action:
+        raise ValueError("next_action must be nonempty")
+    if not (0.0 < min_qualitative_coverage <= 1.0):
+        raise ValueError("min_qualitative_coverage must lie in (0, 1]")
+
+    required = list(dict.fromkeys(required_observables))
+    available = list(dict.fromkeys(available_observables))
+    if any(not item for item in required):
+        raise ValueError("required_observables must be nonempty strings")
+    if any(not item for item in available):
+        raise ValueError("available_observables must be nonempty strings")
+
+    available_set = set(available)
+    missing = [item for item in required if item not in available_set]
+    coverage = (len(required) - len(missing)) / len(required)
+    all_observables_available = len(missing) == 0
+    qualitative_ready = coverage >= min_qualitative_coverage
+    quantitative_ready = all_observables_available and has_machine_readable_data
+    uncertainty_ready = quantitative_ready and has_uncertainty_estimates
+    return {
+        "benchmark_id": benchmark_id,
+        "benchmark_source": benchmark_source,
+        "required_observables": ";".join(required),
+        "available_observables": ";".join(available),
+        "missing_observables": ";".join(missing) if missing else "none",
+        "observable_coverage_fraction": coverage,
+        "has_machine_readable_data": float(has_machine_readable_data),
+        "has_uncertainty_estimates": float(has_uncertainty_estimates),
+        "qualitative_comparison_ready": float(qualitative_ready),
+        "quantitative_inversion_ready": float(quantitative_ready),
+        "uncertainty_weighted_ready": float(uncertainty_ready),
+        "next_action": next_action,
+    }
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

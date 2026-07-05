@@ -156,6 +156,7 @@ figures/renewal_cage_spatial_chi4.svg
 figures/renewal_cage_thermodynamic_closure.svg
 figures/renewal_cage_mct_beta_closure.svg
 figures/renewal_cage_sota_benchmark_consistency.svg
+figures/renewal_cage_literature_inversion_readiness.svg
 figures/renewal_cage_barrier_requirements.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
@@ -188,6 +189,7 @@ data/renewal_cage_spatial_facilitation_inversion.csv
 data/renewal_cage_thermodynamic_closure.csv
 data/renewal_cage_mct_beta_closure.csv
 data/renewal_cage_sota_benchmark_consistency.csv
+data/renewal_cage_literature_inversion_readiness.csv
 data/renewal_cage_barrier_requirements.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
@@ -217,6 +219,7 @@ paper/figures/renewal_cage_spatial_chi4.pdf
 paper/figures/renewal_cage_thermodynamic_closure.pdf
 paper/figures/renewal_cage_mct_beta_closure.pdf
 paper/figures/renewal_cage_sota_benchmark_consistency.pdf
+paper/figures/renewal_cage_literature_inversion_readiness.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf
