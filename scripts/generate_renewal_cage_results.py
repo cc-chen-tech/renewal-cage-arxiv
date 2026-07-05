@@ -100,6 +100,7 @@ from renewal_cage import (  # noqa: E402
     sota_claim_alignment,
     sota_archive_preflight_gate,
     sota_data_accession_gate,
+    sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
@@ -3113,6 +3114,26 @@ def write_sota_readme_digest_csv(path: Path) -> list[dict[str, float | str]]:
             required_license_phrase="Creative Commons Attribution 4.0 International",
             local_cache_path="synthetic_negative_control",
         ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_local_cache_verification_csv(path: Path) -> list[dict[str, float | str]]:
+    """Verify local SOTA cache files before claiming trajectory reanalysis."""
+
+    rows = [
+        sota_local_cache_verification_gate(
+            cache_id="glassbench_local_cache",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            readme_path=Path("data/third_party/glassbench/README"),
+            expected_readme_size_bytes=2147,
+            expected_readme_md5="f1a192f54a2fa7a2b3533af0011b80dc",
+            archive_path=Path("data/third_party/glassbench/GlassBench.zip"),
+            expected_archive_size_bytes=6042260027,
+            expected_archive_md5="82c83a7146eb749e13417e4350022417",
+        )
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -6517,6 +6538,9 @@ def main() -> None:
     )
     write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"
+    )
+    write_sota_local_cache_verification_csv(
+        DATA_DIR / "renewal_cage_sota_local_cache_verification.csv"
     )
     readme_schema_rows = write_sota_readme_schema_csv(
         DATA_DIR / "renewal_cage_sota_readme_schema.csv"

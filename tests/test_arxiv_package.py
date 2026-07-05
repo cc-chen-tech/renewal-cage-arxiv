@@ -382,6 +382,22 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("_trajectories", glassbench["required_tokens"])
         self.assertIn("10.1103/PhysRevLett.130.238202", glassbench["required_citation_dois"])
 
+    def test_sota_local_cache_verification_marks_readme_verified_archive_missing(self):
+        path = ROOT / "data" / "renewal_cage_sota_local_cache_verification.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["cache_id"]: row for row in rows}
+        glassbench = by_id["glassbench_local_cache"]
+        self.assertEqual(glassbench["cache_stage"], "archive_cache_missing")
+        self.assertEqual(float(glassbench["readme_cache_verified"]), 1.0)
+        self.assertEqual(float(glassbench["archive_cache_verified"]), 0.0)
+        self.assertEqual(float(glassbench["ready_for_local_reanalysis"]), 0.0)
+        self.assertEqual(glassbench["observed_readme_md5"], "f1a192f54a2fa7a2b3533af0011b80dc")
+        self.assertEqual(glassbench["expected_archive_md5"], "82c83a7146eb749e13417e4350022417")
+        self.assertEqual(glassbench["primary_blocker"], "archive_path")
+
     def test_sota_readme_schema_gate_records_remote_schema_without_archive_inspection(self):
         path = ROOT / "data" / "renewal_cage_sota_readme_schema.csv"
         self.assertTrue(path.exists())

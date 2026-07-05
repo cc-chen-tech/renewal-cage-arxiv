@@ -2104,6 +2104,120 @@ def sota_readme_digest_gate(
     }
 
 
+def sota_local_cache_verification_gate(
+    *,
+    cache_id: str,
+    accession_id: str,
+    source_id: str,
+    readme_path: str | Path,
+    expected_readme_size_bytes: int,
+    expected_readme_md5: str,
+    archive_path: str | Path,
+    expected_archive_size_bytes: int,
+    expected_archive_md5: str,
+) -> dict[str, float | str]:
+    """Verify local README and archive cache files before trajectory reanalysis."""
+
+    for name, value in {
+        "cache_id": cache_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "expected_readme_md5": expected_readme_md5,
+        "expected_archive_md5": expected_archive_md5,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    for name, value in {
+        "expected_readme_size_bytes": expected_readme_size_bytes,
+        "expected_archive_size_bytes": expected_archive_size_bytes,
+    }.items():
+        if value < 0:
+            raise ValueError(f"{name} must be nonnegative")
+
+    readme = Path(readme_path)
+    archive = Path(archive_path)
+
+    def file_status(path: Path, expected_size: int, expected_md5: str) -> dict[str, float | str]:
+        if not path.exists():
+            expected_md5_value = "missing" if expected_md5 == "use-computed" else expected_md5
+            return {
+                "present": 0.0,
+                "observed_size_bytes": 0.0,
+                "expected_size_bytes": float(expected_size),
+                "observed_md5": "missing",
+                "expected_md5": expected_md5_value,
+                "size_matches": 0.0,
+                "md5_matches": 0.0,
+                "verified": 0.0,
+            }
+        file_bytes = path.read_bytes()
+        observed_size = len(file_bytes)
+        observed_md5 = hashlib.md5(file_bytes).hexdigest()
+        expected_md5_value = observed_md5 if expected_md5 == "use-computed" else expected_md5
+        size_matches = observed_size == expected_size
+        md5_matches = observed_md5 == expected_md5_value
+        return {
+            "present": 1.0,
+            "observed_size_bytes": float(observed_size),
+            "expected_size_bytes": float(expected_size),
+            "observed_md5": observed_md5,
+            "expected_md5": expected_md5_value,
+            "size_matches": float(size_matches),
+            "md5_matches": float(md5_matches),
+            "verified": float(size_matches and md5_matches),
+        }
+
+    readme_status = file_status(readme, expected_readme_size_bytes, expected_readme_md5)
+    archive_status = file_status(archive, expected_archive_size_bytes, expected_archive_md5)
+    readme_verified = readme_status["verified"] == 1.0
+    archive_verified = archive_status["verified"] == 1.0
+    local_verified = readme_verified and archive_verified
+
+    if not bool(readme_status["present"]):
+        stage = "readme_cache_missing"
+        blocker = "readme_path"
+    elif not readme_verified:
+        stage = "readme_cache_mismatch"
+        blocker = "readme_md5" if readme_status["md5_matches"] == 0.0 else "readme_size_bytes"
+    elif not bool(archive_status["present"]):
+        stage = "archive_cache_missing"
+        blocker = "archive_path"
+    elif not archive_verified:
+        stage = "archive_cache_mismatch"
+        blocker = "archive_md5" if archive_status["md5_matches"] == 0.0 else "archive_size_bytes"
+    else:
+        stage = "local_archive_cache_verified"
+        blocker = "none"
+
+    return {
+        "cache_id": cache_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "readme_path": str(readme),
+        "archive_path": str(archive),
+        "readme_present": readme_status["present"],
+        "archive_present": archive_status["present"],
+        "observed_readme_size_bytes": readme_status["observed_size_bytes"],
+        "expected_readme_size_bytes": readme_status["expected_size_bytes"],
+        "observed_readme_md5": readme_status["observed_md5"],
+        "expected_readme_md5": readme_status["expected_md5"],
+        "readme_size_matches": readme_status["size_matches"],
+        "readme_md5_matches": readme_status["md5_matches"],
+        "readme_cache_verified": readme_status["verified"],
+        "observed_archive_size_bytes": archive_status["observed_size_bytes"],
+        "expected_archive_size_bytes": archive_status["expected_size_bytes"],
+        "observed_archive_md5": archive_status["observed_md5"],
+        "expected_archive_md5": archive_status["expected_md5"],
+        "archive_size_matches": archive_status["size_matches"],
+        "archive_md5_matches": archive_status["md5_matches"],
+        "archive_cache_verified": archive_status["verified"],
+        "local_cache_verified": float(local_verified),
+        "ready_for_local_reanalysis": float(local_verified),
+        "primary_blocker": blocker,
+        "cache_stage": stage,
+    }
+
+
 def sota_readme_schema_gate(
     *,
     schema_id: str,

@@ -1083,6 +1083,13 @@ system tokens, the three folder tokens, the CC-BY-4.0 license phrase, and the
 two required dataset citations. This turns the first SOTA metadata layer into
 local evidence while leaving the full trajectory archive as the next explicit
 download/cache step.
+The file-system cache verifier
+\texttt{renewal\_cage\_sota\_local\_cache\_verification.csv} then reads the
+local cache paths directly. In the present repository it verifies the README
+size and md5, but records \texttt{archive\_cache\_missing} for
+\texttt{data/third\_party/glassbench/GlassBench.zip}; therefore the
+trajectory-level GlassBench comparison remains gated on obtaining and
+checksum-validating the full archive, not on metadata alone.
 The README-schema gate
 \texttt{renewal\_cage\_sota\_readme\_schema.csv} then checks the next layer of
 metadata without downloading the full archive: the public README names the

@@ -115,6 +115,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_claim_alignment,
     sota_data_accession_gate,
+    sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
@@ -2096,6 +2097,56 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["readme_digest_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "citation_dois")
         self.assertIn("10.1103/PhysRevLett.130.238202", row["missing_citation_dois"])
+
+    def test_sota_local_cache_verification_gate_marks_missing_archive_after_readme(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            readme = root / "README"
+            archive = root / "GlassBench.zip"
+            readme.write_text("GlassBench KA KA2D _trajectories\n", encoding="utf-8")
+
+            row = sota_local_cache_verification_gate(
+                cache_id="glassbench_local_cache",
+                accession_id="glassbench_zenodo_10118191",
+                source_id="glassbench_zenodo_trajectory_release",
+                readme_path=readme,
+                expected_readme_size_bytes=readme.stat().st_size,
+                expected_readme_md5="use-computed",
+                archive_path=archive,
+                expected_archive_size_bytes=6042260027,
+                expected_archive_md5="82c83a7146eb749e13417e4350022417",
+            )
+
+        self.assertEqual(row["cache_stage"], "archive_cache_missing")
+        self.assertEqual(row["readme_cache_verified"], 1.0)
+        self.assertEqual(row["archive_cache_verified"], 0.0)
+        self.assertEqual(row["ready_for_local_reanalysis"], 0.0)
+        self.assertEqual(row["primary_blocker"], "archive_path")
+
+    def test_sota_local_cache_verification_gate_marks_complete_local_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            readme = root / "README"
+            archive = root / "synthetic.zip"
+            readme.write_text("README\n", encoding="utf-8")
+            archive.write_bytes(b"synthetic archive bytes")
+
+            row = sota_local_cache_verification_gate(
+                cache_id="synthetic_local_cache",
+                accession_id="synthetic_local_cache",
+                source_id="synthetic_fixture",
+                readme_path=readme,
+                expected_readme_size_bytes=readme.stat().st_size,
+                expected_readme_md5="use-computed",
+                archive_path=archive,
+                expected_archive_size_bytes=archive.stat().st_size,
+                expected_archive_md5="use-computed",
+            )
+
+        self.assertEqual(row["cache_stage"], "local_archive_cache_verified")
+        self.assertEqual(row["local_cache_verified"], 1.0)
+        self.assertEqual(row["ready_for_local_reanalysis"], 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
 
     def test_sota_readme_schema_gate_marks_glassbench_remote_schema_ready(self):
         row = sota_readme_schema_gate(
