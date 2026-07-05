@@ -1530,6 +1530,29 @@ rejected without refitting the clocks.
   remains blocked by the missing remote trajectory payload.}
 \end{figure}
 
+A second byte-range layer,
+\texttt{renewal\_cage\_sota\_remote\_result\_curve\_cache.csv}, verifies small
+numeric GlassBench result curves without downloading the full archive. For KA,
+the range cache verifies time-grid files at \texttt{0.44}, \texttt{0.50},
+\texttt{0.56}, and \texttt{0.64}, plus a \texttt{rhomax\_md} curve at
+\texttt{0.44}. For KA2D, it verifies time-grid files at \texttt{0.23} and
+\texttt{0.30}, plus \texttt{rhomax\_md} and \texttt{rhomax\_bb} curves at
+\texttt{0.30}. CRC32, md5, byte ranges, and numeric row/column counts are
+recorded. The \texttt{chi4} update file is checksum-valid but not
+numeric-table-ready, so it remains a raw-curve adapter issue rather than an
+accepted \texttt{chi4} input. These rows remain
+\texttt{real\_inversion\_ready=0} until model-observable column mapping and
+uncertainties are supplied.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_remote_result_curve_cache.pdf}
+  \caption{SOTA remote result-curve cache. Small GlassBench result curves are
+  byte-range fetched from the public ZIP archive, verified by CRC32 and md5,
+  and checked for numeric rows and columns. They are cache-ready inputs for a
+  future raw-curve adapter, not completed model inversions.}
+\end{figure}
+
 \begin{figure}[p]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_readme_schema.pdf}

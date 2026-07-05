@@ -107,6 +107,7 @@ from renewal_cage import (  # noqa: E402
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_remote_zip_central_directory_gate,
+    sota_remote_result_curve_cache_gate,
     sota_reanalysis_state_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
@@ -3300,6 +3301,26 @@ def write_sota_glassbench_payload_index_csv(path: Path) -> list[dict[str, float 
     return rows
 
 
+def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
+    """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = sota_remote_result_curve_cache_gate(
+        curve_cache_id="glassbench_range_result_curves",
+        accession_id="glassbench_zenodo_10118191",
+        source_id="glassbench_zenodo_trajectory_release",
+        manifest=manifest,
+        required_roles_by_system={
+            "KA": ["time_grid", "rhomax_md"],
+            "KA2D": ["time_grid", "rhomax_md", "rhomax_bb"],
+        },
+        max_uncompressed_size_bytes=10_000,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_reanalysis_state_csv(
     path: Path,
     *,
@@ -5638,6 +5659,64 @@ def write_sota_glassbench_payload_index_svg(path: Path, rows: list[dict[str, flo
     path.write_text(svg)
 
 
+def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 390
+    left, top = 75, 112
+    row_h = 76
+    colors = {
+        "range_result_curves_verified": "#2f855a",
+        "range_result_curves_missing": "#c05621",
+        "range_result_curve_roles_incomplete": "#c05621",
+        "range_result_curve_crc_mismatch": "#c05621",
+        "range_result_curve_digest_missing": "#c05621",
+        "range_result_curve_size_blocked": "#c05621",
+        "range_result_curve_parse_blocked": "#c05621",
+        "range_result_curve_range_missing": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["curve_cache_stage"])
+        color = colors[stage]
+        cache_ready = int(float(row["curve_cache_ready"]))
+        inversion_ready = int(float(row["real_inversion_ready"]))
+        file_count = int(float(row["curve_file_count"]))
+        temp_count = int(float(row["temperature_count"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{row["system_id"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 90}" y="{y - 4}" width="230" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 100}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:33]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 345}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">files={file_count}; temps={temp_count}; cache={cache_ready}; inversion={inversion_ready}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 90}" y="{y + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">roles: {row["available_roles"]}; temperatures: {row["temperature_grid"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 90}" y="{y + 56}" font-family="Arial, sans-serif" font-size="9" fill="#555">CRC={int(float(row["crc32_verified"]))}; md5={int(float(row["md5_available"]))}; numeric={int(float(row["numeric_parse_ready"]))}; range={int(float(row["range_fetch_ready"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA remote result-curve cache</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Small GlassBench result curves are byte-range fetched, CRC/md5 verified, and numerically parsed before raw-curve adapters are claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">system</text>
+  <text x="{left + 90}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 345}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cache and inversion readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="320" width="14" height="14" fill="#2f855a" /><text x="96" y="332" font-family="Arial, sans-serif" font-size="12">range-cached numeric result curves verified</text>
+  <rect x="385" y="320" width="14" height="14" fill="#c05621" /><text x="406" y="332" font-family="Arial, sans-serif" font-size="12">curve cache incomplete</text>
+  <text x="610" y="332" font-family="Arial, sans-serif" font-size="12">raw-curve adapter and uncertainties still required for model fitting</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_readme_schema_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 380
@@ -7058,6 +7137,13 @@ def main() -> None:
     write_sota_glassbench_payload_index_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_payload_index.svg",
         glassbench_payload_index_rows,
+    )
+    remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
+        DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"
+    )
+    write_sota_remote_result_curve_cache_svg(
+        FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.svg",
+        remote_result_curve_cache_rows,
     )
     readme_digest_rows = write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"

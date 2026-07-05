@@ -151,6 +151,12 @@ targets: KA2D has common trajectory/model/result payload temperatures
 `0.23;0.30`, while KA has model/result temperatures `0.44;0.50;0.56;0.64`
 but no remote trajectory payload beyond the README in the central-directory
 cache.
+The SOTA remote result-curve cache adds the first byte-range verified numeric
+curve layer from the public GlassBench archive. It verifies small KA time-grid
+and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
+files by CRC32, md5, byte range, and numeric row/column counts. The
+checksum-valid KA `chi4` update file is not numeric-table-ready, so it remains
+a raw-curve adapter issue rather than a claimed inversion input.
 The SOTA README-schema gate checks systems, folder tokens, reuse license, and
 citation guidance before claiming that a remote dataset can support a local
 trajectory adapter.
@@ -238,6 +244,7 @@ figures/renewal_cage_sota_data_accession.svg
 figures/renewal_cage_sota_zenodo_record_fingerprint.svg
 figures/renewal_cage_sota_remote_zip_central_directory.svg
 figures/renewal_cage_sota_glassbench_payload_index.svg
+figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_readme_schema.svg
 figures/renewal_cage_trajectory_adapter_contract.svg
 figures/renewal_cage_literature_inversion_readiness.svg
@@ -295,9 +302,11 @@ data/renewal_cage_sota_zenodo_record_fingerprint.csv
 data/renewal_cage_sota_archive_preflight.csv
 data/renewal_cage_sota_remote_zip_central_directory.csv
 data/renewal_cage_sota_glassbench_payload_index.csv
+data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_readme_digest.csv
 data/third_party/glassbench/zenodo_record_10118191.json
 data/third_party/glassbench/remote_zip_central_directory_10118191.json
+data/third_party/glassbench/range_result_curve_cache_10118191.json
 data/renewal_cage_sota_local_cache_verification.csv
 data/renewal_cage_sota_zip_structure.csv
 data/renewal_cage_sota_reanalysis_state.csv
@@ -362,6 +371,7 @@ paper/figures/renewal_cage_sota_data_accession.pdf
 paper/figures/renewal_cage_sota_zenodo_record_fingerprint.pdf
 paper/figures/renewal_cage_sota_remote_zip_central_directory.pdf
 paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
+paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf
 paper/figures/renewal_cage_trajectory_adapter_contract.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf

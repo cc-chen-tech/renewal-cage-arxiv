@@ -2683,6 +2683,120 @@ def sota_glassbench_payload_index_gate(
     return rows
 
 
+def sota_remote_result_curve_cache_gate(
+    *,
+    curve_cache_id: str,
+    accession_id: str,
+    source_id: str,
+    manifest: dict,
+    required_roles_by_system: dict[str, Sequence[str]],
+    max_uncompressed_size_bytes: int,
+) -> list[dict[str, float | str]]:
+    """Verify small result curves extracted by remote byte-range reads."""
+
+    for name, value in {
+        "curve_cache_id": curve_cache_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if max_uncompressed_size_bytes <= 0:
+        raise ValueError("max_uncompressed_size_bytes must be positive")
+    if not required_roles_by_system:
+        raise ValueError("required_roles_by_system must be nonempty")
+
+    entries_value = manifest.get("entries", [])
+    entries = [entry for entry in entries_value if isinstance(entry, dict)] if isinstance(entries_value, list) else []
+    systems = sorted(
+        set(required_roles_by_system)
+        | {str(entry.get("system_id", "")) for entry in entries if entry.get("system_id")}
+    )
+    rows: list[dict[str, float | str]] = []
+    for system in systems:
+        system_entries = [entry for entry in entries if str(entry.get("system_id", "")) == system]
+        required_roles = list(dict.fromkeys(required_roles_by_system.get(system, [])))
+        available_roles = sorted(
+            {str(entry.get("curve_role", "")) for entry in system_entries if entry.get("curve_role")}
+        )
+        temperatures = []
+        for temperature in {str(entry.get("temperature", "")) for entry in system_entries if entry.get("temperature")}:
+            try:
+                float(temperature)
+            except ValueError:
+                continue
+            temperatures.append(temperature)
+        temperatures = sorted(temperatures, key=float)
+        missing_roles = [role for role in required_roles if role not in set(available_roles)]
+        crc_ok = bool(system_entries) and all(bool(entry.get("crc32_matches", False)) for entry in system_entries)
+        md5_ok = bool(system_entries) and all(bool(entry.get("md5", "")) for entry in system_entries)
+        size_ok = bool(system_entries) and all(
+            0 < int(entry.get("uncompressed_size_bytes", 0) or 0) <= max_uncompressed_size_bytes
+            for entry in system_entries
+        )
+        numeric_ok = bool(system_entries) and all(
+            int(entry.get("numeric_row_count", 0) or 0) > 0
+            and int(entry.get("numeric_column_count", 0) or 0) > 0
+            for entry in system_entries
+        )
+        range_ok = bool(system_entries) and all(
+            int(entry.get("range_start", -1) or -1) >= 0
+            and int(entry.get("range_end", -1) or -1) >= int(entry.get("range_start", 0) or 0)
+            for entry in system_entries
+        )
+        ready = not missing_roles and crc_ok and md5_ok and size_ok and numeric_ok and range_ok
+
+        if ready:
+            stage = "range_result_curves_verified"
+            blocker = "raw_curve_adapter"
+        elif not system_entries:
+            stage = "range_result_curves_missing"
+            blocker = "curve_entries"
+        elif missing_roles:
+            stage = "range_result_curve_roles_incomplete"
+            blocker = "curve_roles"
+        elif not crc_ok:
+            stage = "range_result_curve_crc_mismatch"
+            blocker = "crc32"
+        elif not md5_ok:
+            stage = "range_result_curve_digest_missing"
+            blocker = "md5"
+        elif not size_ok:
+            stage = "range_result_curve_size_blocked"
+            blocker = "curve_size"
+        elif not numeric_ok:
+            stage = "range_result_curve_parse_blocked"
+            blocker = "numeric_rows"
+        else:
+            stage = "range_result_curve_range_missing"
+            blocker = "byte_range"
+
+        rows.append(
+            {
+                "curve_cache_id": f"{curve_cache_id}_{system.lower()}",
+                "accession_id": accession_id,
+                "source_id": source_id,
+                "system_id": system,
+                "curve_file_count": float(len(system_entries)),
+                "required_roles": ";".join(required_roles) if required_roles else "none",
+                "available_roles": ";".join(available_roles) if available_roles else "none",
+                "missing_roles": ";".join(missing_roles) if missing_roles else "none",
+                "temperature_grid": ";".join(temperatures) if temperatures else "none",
+                "temperature_count": float(len(temperatures)),
+                "crc32_verified": float(crc_ok),
+                "md5_available": float(md5_ok),
+                "size_within_limit": float(size_ok),
+                "numeric_parse_ready": float(numeric_ok),
+                "range_fetch_ready": float(range_ok),
+                "curve_cache_ready": float(ready),
+                "real_inversion_ready": 0.0,
+                "primary_blocker": blocker,
+                "curve_cache_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_reanalysis_state_gate(
     *,
     state_id: str,

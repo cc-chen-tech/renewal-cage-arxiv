@@ -120,6 +120,7 @@ from renewal_cage import (  # noqa: E402
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_glassbench_payload_index_gate,
+    sota_remote_result_curve_cache_gate,
     sota_remote_zip_central_directory_gate,
     sota_zenodo_record_fingerprint_gate,
     sota_readme_schema_gate,
@@ -2359,6 +2360,92 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(ka["model_result_index_ready"], 1.0)
         self.assertEqual(ka["common_model_result_temperatures"], "0.44;0.50;0.56;0.64")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):
+        manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA_results/times_0.44.dat",
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "time_grid",
+                    "crc32_matches": True,
+                    "md5": "aaaabbbbccccdddd",
+                    "uncompressed_size_bytes": 59,
+                    "numeric_row_count": 4,
+                    "numeric_column_count": 1,
+                    "range_start": 11340,
+                    "range_end": 11428,
+                },
+                {
+                    "path": "GlassBench/KA_results/chi4_KA_T0.44_update.dat",
+                    "system_id": "KA",
+                    "temperature": "0.44",
+                    "curve_role": "chi4_proxy",
+                    "crc32_matches": True,
+                    "md5": "eeeeffff00001111",
+                    "uncompressed_size_bytes": 36,
+                    "numeric_row_count": 2,
+                    "numeric_column_count": 2,
+                    "range_start": 18780,
+                    "range_end": 18850,
+                },
+                {
+                    "path": "GlassBench/KA2D_results/times_0.30.dat",
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "curve_role": "time_grid",
+                    "crc32_matches": True,
+                    "md5": "2222333344445555",
+                    "uncompressed_size_bytes": 37,
+                    "numeric_row_count": 3,
+                    "numeric_column_count": 1,
+                    "range_start": 3600,
+                    "range_end": 3700,
+                },
+                {
+                    "path": "GlassBench/KA2D_results/rhomax_T0.30_MD.dat",
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "curve_role": "rhomax_md",
+                    "crc32_matches": True,
+                    "md5": "6666777788889999",
+                    "uncompressed_size_bytes": 152,
+                    "numeric_row_count": 5,
+                    "numeric_column_count": 2,
+                    "range_start": 5300,
+                    "range_end": 5420,
+                },
+            ]
+        }
+
+        rows = sota_remote_result_curve_cache_gate(
+            curve_cache_id="glassbench_range_result_curves",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            manifest=manifest,
+            required_roles_by_system={
+                "KA": ["time_grid", "chi4_proxy"],
+                "KA2D": ["time_grid", "rhomax_md"],
+            },
+            max_uncompressed_size_bytes=10_000,
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka = by_system["KA"]
+        self.assertEqual(ka["curve_cache_stage"], "range_result_curves_verified")
+        self.assertEqual(ka["curve_cache_ready"], 1.0)
+        self.assertEqual(ka["curve_file_count"], 2.0)
+        self.assertEqual(ka["temperature_count"], 1.0)
+        self.assertEqual(ka["available_roles"], "chi4_proxy;time_grid")
+        self.assertEqual(ka["real_inversion_ready"], 0.0)
+        self.assertEqual(ka["primary_blocker"], "raw_curve_adapter")
+
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["curve_cache_stage"], "range_result_curves_verified")
+        self.assertEqual(ka2d["curve_cache_ready"], 1.0)
+        self.assertEqual(ka2d["temperature_grid"], "0.30")
+        self.assertEqual(ka2d["primary_blocker"], "raw_curve_adapter")
 
     def test_sota_reanalysis_state_gate_marks_metadata_verified_not_reanalysis(self):
         row = sota_reanalysis_state_gate(
