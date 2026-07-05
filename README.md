@@ -84,8 +84,9 @@ cooling-induced NGP peak shift with late Gaussian recovery, fractional
 Stokes-Einstein decoupling, dynamic-heterogeneity chi4 growth, alpha-shape
 time-temperature-superposition breakdown, spatial facilitation-front
 growth-law inversion, KWW stretched-alpha window fitting, persistence/exchange
-transport inversion with held-out late-NGP validation, a van Hove tail/recovery
-consistency check, and an Angell/Adam-Gibbs fragility-growth scope check.
+transport inversion with held-out late-NGP validation, joint multi-k/chi4
+persistence-exchange falsification, a van Hove tail/recovery consistency
+check, and an Angell/Adam-Gibbs fragility-growth scope check.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 

@@ -10,6 +10,7 @@
   <text x="90" y="498" font-family="Arial, sans-serif" font-size="11">MCT row consistent = 1</text>
   <text x="90" y="514" font-family="Arial, sans-serif" font-size="11">exponent row consistent = 1; lambda_a = 0.716, lambda_b = 0.725</text>
   <text x="90" y="530" font-family="Arial, sans-serif" font-size="11">NGP peak row consistent = 1; t_peak growth = 7.47, peak growth = 1.17</text>
+  <text x="90" y="546" font-family="Arial, sans-serif" font-size="11">joint row consistent = 1; SE growth = 3.56, mismatch residual = 0.22</text>
   <line x1="660" y1="430" x2="1040" y2="430" stroke="#222" />
   <line x1="660" y1="430" x2="660" y2="105" stroke="#222" />
   <text x="660" y="81" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>

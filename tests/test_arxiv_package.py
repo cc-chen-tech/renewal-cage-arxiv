@@ -48,6 +48,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("alpha_tts_breakdown_shape_residual", by_id)
         self.assertIn("kww_alpha_stretching_on_cooling", by_id)
         self.assertIn("persistence_exchange_transport_inversion", by_id)
+        self.assertIn("joint_persistence_exchange_multik_chi4_protocol", by_id)
         self.assertIn("kob_andersen_van_hove_tail_recovery", by_id)
         self.assertIn("angell_adam_gibbs_fragility_growth", by_id)
         self.assertEqual(float(by_id["debye_waller_cage_localization"]["overall_consistent"]), 1.0)
@@ -87,6 +88,19 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertLess(
             abs(float(by_id["persistence_exchange_transport_inversion"]["late_ngp_log_residual_benchmark"])),
+            0.1,
+        )
+        self.assertEqual(float(by_id["joint_persistence_exchange_multik_chi4_protocol"]["overall_consistent"]), 1.0)
+        self.assertGreater(
+            float(by_id["joint_persistence_exchange_multik_chi4_protocol"]["joint_stokes_einstein_growth_over_poisson"]),
+            2.0,
+        )
+        self.assertLess(
+            float(by_id["joint_persistence_exchange_multik_chi4_protocol"]["joint_multik_tau_alpha_abs_log_residual"]),
+            0.02,
+        )
+        self.assertGreater(
+            float(by_id["joint_persistence_exchange_multik_chi4_protocol"]["rejected_mismatch_abs_log_residual"]),
             0.1,
         )
         self.assertEqual(float(by_id["kob_andersen_van_hove_tail_recovery"]["overall_consistent"]), 1.0)

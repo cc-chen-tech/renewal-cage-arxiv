@@ -957,6 +957,96 @@ def persistence_exchange_benchmark_consistency(
     }
 
 
+def joint_inversion_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_joint_inversion_closure: bool,
+    inferred_persistence_exchange_ratio: float,
+    stokes_einstein_growth_over_poisson: float,
+    max_multik_tau_alpha_abs_log_residual: float,
+    late_ngp_log_residual: float,
+    chi4_peak_growth_over_poisson: float,
+    rejected_mismatch_abs_log_residual: float,
+    min_persistence_exchange_ratio: float,
+    min_stokes_einstein_growth: float,
+    max_multik_abs_log_residual: float,
+    max_late_ngp_abs_log_residual: float,
+    min_chi4_peak_growth: float,
+    min_rejected_mismatch_abs_log_residual: float,
+) -> dict[str, float | str]:
+    """Check the joint inversion protocol against held-out dynamics and rejection."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "inferred_persistence_exchange_ratio": inferred_persistence_exchange_ratio,
+        "stokes_einstein_growth_over_poisson": stokes_einstein_growth_over_poisson,
+        "chi4_peak_growth_over_poisson": chi4_peak_growth_over_poisson,
+        "rejected_mismatch_abs_log_residual": rejected_mismatch_abs_log_residual,
+        "min_persistence_exchange_ratio": min_persistence_exchange_ratio,
+        "min_stokes_einstein_growth": min_stokes_einstein_growth,
+        "min_chi4_peak_growth": min_chi4_peak_growth,
+        "min_rejected_mismatch_abs_log_residual": min_rejected_mismatch_abs_log_residual,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    for name, value in {
+        "max_multik_tau_alpha_abs_log_residual": max_multik_tau_alpha_abs_log_residual,
+        "max_multik_abs_log_residual": max_multik_abs_log_residual,
+        "max_late_ngp_abs_log_residual": max_late_ngp_abs_log_residual,
+    }.items():
+        if value < 0.0:
+            raise ValueError(f"{name} must be nonnegative")
+    if not math.isfinite(late_ngp_log_residual):
+        raise ValueError("late_ngp_log_residual must be finite")
+
+    ratio_flag = inferred_persistence_exchange_ratio >= min_persistence_exchange_ratio
+    se_flag = stokes_einstein_growth_over_poisson >= min_stokes_einstein_growth
+    multik_flag = max_multik_tau_alpha_abs_log_residual <= max_multik_abs_log_residual
+    late_ngp_abs_log_residual = abs(late_ngp_log_residual)
+    late_ngp_flag = late_ngp_abs_log_residual <= max_late_ngp_abs_log_residual
+    chi4_flag = chi4_peak_growth_over_poisson >= min_chi4_peak_growth
+    mismatch_flag = rejected_mismatch_abs_log_residual >= min_rejected_mismatch_abs_log_residual
+    model_flag = ratio_flag and se_flag and multik_flag and late_ngp_flag and chi4_flag
+    ratio_consistent = ratio_flag == observed_joint_inversion_closure
+    se_consistent = se_flag == observed_joint_inversion_closure
+    multik_consistent = multik_flag == observed_joint_inversion_closure
+    late_ngp_consistent = late_ngp_flag == observed_joint_inversion_closure
+    chi4_consistent = chi4_flag == observed_joint_inversion_closure
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_joint_inversion_closure": float(observed_joint_inversion_closure),
+        "joint_inferred_persistence_exchange_ratio": inferred_persistence_exchange_ratio,
+        "min_joint_persistence_exchange_ratio": min_persistence_exchange_ratio,
+        "joint_stokes_einstein_growth_over_poisson": stokes_einstein_growth_over_poisson,
+        "min_joint_stokes_einstein_growth": min_stokes_einstein_growth,
+        "joint_multik_tau_alpha_abs_log_residual": max_multik_tau_alpha_abs_log_residual,
+        "max_joint_multik_abs_log_residual": max_multik_abs_log_residual,
+        "joint_late_ngp_abs_log_residual": late_ngp_abs_log_residual,
+        "max_joint_late_ngp_abs_log_residual": max_late_ngp_abs_log_residual,
+        "joint_chi4_peak_growth_over_poisson": chi4_peak_growth_over_poisson,
+        "min_joint_chi4_peak_growth": min_chi4_peak_growth,
+        "rejected_mismatch_abs_log_residual": rejected_mismatch_abs_log_residual,
+        "min_rejected_mismatch_abs_log_residual": min_rejected_mismatch_abs_log_residual,
+        "model_predicts_joint_inversion_closure": float(model_flag),
+        "joint_ratio_consistent": float(ratio_consistent),
+        "joint_se_consistent": float(se_consistent),
+        "joint_multik_consistent": float(multik_consistent),
+        "joint_late_ngp_consistent": float(late_ngp_consistent),
+        "joint_chi4_consistent": float(chi4_consistent),
+        "joint_mismatch_rejected": float(mismatch_flag),
+        "overall_consistent": float(
+            model_flag == observed_joint_inversion_closure
+            and ratio_consistent
+            and se_consistent
+            and multik_consistent
+            and late_ngp_consistent
+            and chi4_consistent
+            and mismatch_flag
+        ),
+    }
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

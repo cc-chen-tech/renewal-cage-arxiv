@@ -36,6 +36,7 @@ from renewal_cage import (  # noqa: E402
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
+    joint_inversion_benchmark_consistency,
     generalized_delay_ngp_short_time,
     gaussian_radial_3d,
     gamma_exchange_alpha_relaxation_time,
@@ -1419,6 +1420,33 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["overall_consistent"], 1.0)
         self.assertGreater(row["inferred_persistence_exchange_ratio"], row["min_persistence_exchange_ratio"])
         self.assertLess(abs(row["late_ngp_log_residual_benchmark"]), row["max_late_ngp_abs_log_residual"])
+
+    def test_joint_inversion_benchmark_consistency_checks_multik_chi4_and_rejection(self):
+        row = joint_inversion_benchmark_consistency(
+            benchmark_id="joint_persistence_exchange_multik_chi4_protocol",
+            observed_joint_inversion_closure=True,
+            inferred_persistence_exchange_ratio=8.0,
+            stokes_einstein_growth_over_poisson=3.56,
+            max_multik_tau_alpha_abs_log_residual=0.0,
+            late_ngp_log_residual=0.0,
+            chi4_peak_growth_over_poisson=2.58,
+            rejected_mismatch_abs_log_residual=0.223,
+            min_persistence_exchange_ratio=2.0,
+            min_stokes_einstein_growth=2.0,
+            max_multik_abs_log_residual=0.02,
+            max_late_ngp_abs_log_residual=0.02,
+            min_chi4_peak_growth=1.5,
+            min_rejected_mismatch_abs_log_residual=0.1,
+        )
+
+        self.assertEqual(row["model_predicts_joint_inversion_closure"], 1.0)
+        self.assertEqual(row["joint_ratio_consistent"], 1.0)
+        self.assertEqual(row["joint_se_consistent"], 1.0)
+        self.assertEqual(row["joint_multik_consistent"], 1.0)
+        self.assertEqual(row["joint_late_ngp_consistent"], 1.0)
+        self.assertEqual(row["joint_chi4_consistent"], 1.0)
+        self.assertEqual(row["joint_mismatch_rejected"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(

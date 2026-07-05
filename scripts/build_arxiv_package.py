@@ -1077,6 +1077,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     stretched_row = by_id["kww_alpha_stretching_on_cooling"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
+    joint_row = by_id["joint_persistence_exchange_multik_chi4_protocol"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1154,6 +1155,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(ngp_peak_row['overall_consistent']))}; "
         f"t_peak growth = {float(ngp_peak_row['peak_time_growth']):.2f}; "
         f"peak growth = {float(ngp_peak_row['peak_height_growth']):.2f}",
+    )
+    c.drawString(
+        45,
+        62,
+        "joint row consistent = "
+        f"{int(float(joint_row['overall_consistent']))}; "
+        f"SE growth = {float(joint_row['joint_stokes_einstein_growth_over_poisson']):.2f}; "
+        f"mismatch residual = {float(joint_row['rejected_mismatch_abs_log_residual']):.2f}",
     )
     c.drawString(430, 118, f"recovery row consistent = {int(float(recovery_row['overall_consistent']))}")
     c.drawString(

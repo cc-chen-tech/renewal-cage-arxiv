@@ -56,6 +56,7 @@ from renewal_cage import (  # noqa: E402
     infer_persistence_exchange_from_alpha_transport,
     infer_renewal_correlation_size,
     infer_spatial_facilitation_diffusivity,
+    joint_inversion_benchmark_consistency,
     kww_alpha_fit,
     late_mechanism_selection,
     minimal_barrier_requirements,
@@ -1032,6 +1033,7 @@ def write_sota_benchmark_consistency_csv(
     spatial_chi4_rows: list[dict[str, float]],
     alpha_shape_rows: list[dict[str, float | str]],
     kww_alpha_rows: list[dict[str, float]],
+    persistence_exchange_joint_protocol_rows: list[dict[str, float | str]],
     tail_ratio_rows: list[dict[str, float | str]],
     thermodynamic_rows: list[dict[str, float]],
 ) -> list[dict[str, float | str]]:
@@ -1156,6 +1158,26 @@ def write_sota_benchmark_consistency_csv(
         "persistence_exchange_ratio_consistent",
         "persistence_exchange_late_ngp_consistent",
         "persistence_exchange_rejection_consistent",
+        "observed_joint_inversion_closure",
+        "joint_inferred_persistence_exchange_ratio",
+        "min_joint_persistence_exchange_ratio",
+        "joint_stokes_einstein_growth_over_poisson",
+        "min_joint_stokes_einstein_growth",
+        "joint_multik_tau_alpha_abs_log_residual",
+        "max_joint_multik_abs_log_residual",
+        "joint_late_ngp_abs_log_residual",
+        "max_joint_late_ngp_abs_log_residual",
+        "joint_chi4_peak_growth_over_poisson",
+        "min_joint_chi4_peak_growth",
+        "rejected_mismatch_abs_log_residual",
+        "min_rejected_mismatch_abs_log_residual",
+        "model_predicts_joint_inversion_closure",
+        "joint_ratio_consistent",
+        "joint_se_consistent",
+        "joint_multik_consistent",
+        "joint_late_ngp_consistent",
+        "joint_chi4_consistent",
+        "joint_mismatch_rejected",
         "observed_transient_van_hove_tail",
         "observed_late_tail_gaussian_recovery",
         "peak_tail_ratio",
@@ -1372,6 +1394,31 @@ def write_sota_benchmark_consistency_csv(
         min_persistence_exchange_ratio=2.0,
         max_late_ngp_abs_log_residual=0.1,
     )
+    joint_summaries = {
+        str(row["scenario"]): row
+        for row in persistence_exchange_joint_protocol_rows
+        if str(row["record_type"]) == "summary"
+    }
+    if "consistent" not in joint_summaries or "multik_alpha_mismatch" not in joint_summaries:
+        raise ValueError("persistence_exchange_joint_protocol_rows must include consistent and mismatch summaries")
+    joint_consistent = joint_summaries["consistent"]
+    joint_mismatch = joint_summaries["multik_alpha_mismatch"]
+    joint_row = joint_inversion_benchmark_consistency(
+        benchmark_id="joint_persistence_exchange_multik_chi4_protocol",
+        observed_joint_inversion_closure=True,
+        inferred_persistence_exchange_ratio=float(joint_consistent["inferred_persistence_exchange_ratio"]),
+        stokes_einstein_growth_over_poisson=float(joint_consistent["stokes_einstein_growth_over_poisson"]),
+        max_multik_tau_alpha_abs_log_residual=float(joint_consistent["max_multik_tau_alpha_abs_log_residual"]),
+        late_ngp_log_residual=float(joint_consistent["late_ngp_log_residual"]),
+        chi4_peak_growth_over_poisson=float(joint_consistent["chi4_peak_growth_over_poisson"]),
+        rejected_mismatch_abs_log_residual=float(joint_mismatch["max_multik_tau_alpha_abs_log_residual"]),
+        min_persistence_exchange_ratio=2.0,
+        min_stokes_einstein_growth=2.0,
+        max_multik_abs_log_residual=0.02,
+        max_late_ngp_abs_log_residual=0.02,
+        min_chi4_peak_growth=1.5,
+        min_rejected_mismatch_abs_log_residual=0.1,
+    )
     tail_by_label = {str(row["time_label"]): row for row in tail_ratio_rows}
     if "t=11.3" not in tail_by_label or "t=80.0" not in tail_by_label:
         raise ValueError("tail_ratio_rows must include peak and late rows")
@@ -1413,6 +1460,7 @@ def write_sota_benchmark_consistency_csv(
         normalize(tts_row, "alpha_tts_breakdown"),
         normalize(stretched_row, "stretched_alpha_kww"),
         normalize(persistence_exchange_row, "persistence_exchange_inversion"),
+        normalize(joint_row, "joint_inversion_falsification"),
         normalize(van_hove_row, "van_hove_tail_recovery"),
         normalize(fragility_row, "fragility_adam_gibbs"),
     ]
@@ -2717,6 +2765,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     stretched_row = by_id["kww_alpha_stretching_on_cooling"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
+    joint_row = by_id["joint_persistence_exchange_multik_chi4_protocol"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
@@ -2770,6 +2819,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_a}" y="{bottom + 68}" font-family="Arial, sans-serif" font-size="11">MCT row consistent = {int(float(mct_row['overall_consistent']))}</text>
   <text x="{left_a}" y="{bottom + 84}" font-family="Arial, sans-serif" font-size="11">exponent row consistent = {int(float(mct_exponent_row['overall_consistent']))}; lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}, lambda_b = {float(mct_exponent_row['lambda_from_b']):.3f}</text>
   <text x="{left_a}" y="{bottom + 100}" font-family="Arial, sans-serif" font-size="11">NGP peak row consistent = {int(float(ngp_peak_row['overall_consistent']))}; t_peak growth = {float(ngp_peak_row['peak_time_growth']):.2f}, peak growth = {float(ngp_peak_row['peak_height_growth']):.2f}</text>
+  <text x="{left_a}" y="{bottom + 116}" font-family="Arial, sans-serif" font-size="11">joint row consistent = {int(float(joint_row['overall_consistent']))}; SE growth = {float(joint_row['joint_stokes_einstein_growth_over_poisson']):.2f}, mismatch residual = {float(joint_row['rejected_mismatch_abs_log_residual']):.2f}</text>
   <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
   <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
   <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>
@@ -3738,6 +3788,18 @@ def main() -> None:
         mct_beta_rows,
         mct_beta,
     )
+    persistence_exchange_joint_protocol_rows = write_persistence_exchange_joint_protocol_csv(
+        DATA_DIR / "renewal_cage_persistence_exchange_joint_protocol.csv",
+        anchor_wave_number=1.1,
+        wave_numbers=[0.7, 1.1, 1.6],
+        jump_variance=0.7,
+        exchange_mean=1.0,
+        true_ratio=8.0,
+    )
+    write_persistence_exchange_joint_protocol_svg(
+        FIGURE_DIR / "renewal_cage_persistence_exchange_joint_protocol.svg",
+        persistence_exchange_joint_protocol_rows,
+    )
     sota_benchmark_rows = write_sota_benchmark_consistency_csv(
         DATA_DIR / "renewal_cage_sota_benchmark_consistency.csv",
         mct_beta,
@@ -3748,6 +3810,7 @@ def main() -> None:
         spatial_chi4_rows,
         alpha_shape_rows,
         kww_alpha_rows,
+        persistence_exchange_joint_protocol_rows,
         tail_ratio_rows,
         thermodynamic_rows,
     )
@@ -3789,18 +3852,6 @@ def main() -> None:
     write_persistence_exchange_protocol_svg(
         FIGURE_DIR / "renewal_cage_persistence_exchange_protocol.svg",
         persistence_exchange_protocol_rows,
-    )
-    persistence_exchange_joint_protocol_rows = write_persistence_exchange_joint_protocol_csv(
-        DATA_DIR / "renewal_cage_persistence_exchange_joint_protocol.csv",
-        anchor_wave_number=1.1,
-        wave_numbers=[0.7, 1.1, 1.6],
-        jump_variance=0.7,
-        exchange_mean=1.0,
-        true_ratio=8.0,
-    )
-    write_persistence_exchange_joint_protocol_svg(
-        FIGURE_DIR / "renewal_cage_persistence_exchange_joint_protocol.svg",
-        persistence_exchange_joint_protocol_rows,
     )
     persistence_exchange_uncertainty_protocol_rows = write_persistence_exchange_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.csv",
