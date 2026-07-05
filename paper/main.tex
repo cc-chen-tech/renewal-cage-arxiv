@@ -1085,6 +1085,13 @@ intermittent-trajectory example is not a real-data fit; it verifies that the
 repository now has a direct trajectory-to-diagnostic bridge before any
 machine-readable simulation or experimental trajectory is promoted to an
 uncertainty-weighted benchmark.
+The companion
+\texttt{renewal\_cage\_trajectory\_uncertainty\_protocol.csv} supplies that
+missing uncertainty layer by applying a time-origin block jackknife to the same
+trajectory-derived observables. Its columns
+\texttt{sigma\_msd}, \texttt{sigma\_ngp}, \texttt{sigma\_self\_intermediate\_scattering},
+and \texttt{sigma\_chi4\_overlap} are the uncertainty estimates required by the
+downstream raw-curve and persistence/exchange protocols.
 Finally,
 \texttt{renewal\_cage\_raw\_curve\_ingestion\_contract.csv} specifies the
 column-level contract for turning the structurally valid Kob-Andersen I/II

@@ -117,6 +117,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_gamma_exchange,
     temperature_scan,
     trajectory_observable_protocol,
+    trajectory_observable_uncertainty_protocol,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -2279,6 +2280,60 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 lag_indices=[1],
                 wave_numbers=[1.0],
                 overlap_radius=0.5,
+            )
+
+    def test_trajectory_observable_uncertainty_protocol_adds_jackknife_sigmas(self):
+        times = np.arange(6.0)
+        increments = np.array(
+            [
+                [[0.0], [0.0], [2.0], [2.0]],
+                [[0.0], [2.0], [0.0], [2.0]],
+                [[0.0], [0.0], [0.0], [2.0]],
+                [[2.0], [0.0], [2.0], [0.0]],
+                [[0.0], [2.0], [0.0], [0.0]],
+            ]
+        )
+        positions = np.concatenate([np.zeros((1, 4, 1)), np.cumsum(increments, axis=0)])
+
+        full = trajectory_observable_protocol(
+            positions=positions,
+            times=times,
+            lag_indices=[1],
+            wave_numbers=[1.1],
+            overlap_radius=0.5,
+        )[0]
+        uncertain = trajectory_observable_uncertainty_protocol(
+            positions=positions,
+            times=times,
+            lag_indices=[1],
+            wave_numbers=[1.1],
+            overlap_radius=0.5,
+            block_count=3,
+        )[0]
+
+        self.assertAlmostEqual(uncertain["msd"], full["msd"])
+        self.assertAlmostEqual(uncertain["ngp"], full["ngp"])
+        self.assertAlmostEqual(
+            uncertain["self_intermediate_scattering"],
+            full["self_intermediate_scattering"],
+        )
+        self.assertEqual(uncertain["uncertainty_method"], "time_origin_block_jackknife")
+        self.assertEqual(uncertain["uncertainty_estimates"], 1.0)
+        self.assertEqual(uncertain["primary_blocker"], "none")
+        self.assertGreater(uncertain["sigma_msd"], 0.0)
+        self.assertGreater(uncertain["sigma_ngp"], 0.0)
+        self.assertGreater(uncertain["sigma_self_intermediate_scattering"], 0.0)
+        self.assertGreaterEqual(uncertain["sigma_chi4_overlap"], 0.0)
+
+    def test_trajectory_observable_uncertainty_protocol_requires_multiple_blocks(self):
+        with self.assertRaises(ValueError):
+            trajectory_observable_uncertainty_protocol(
+                positions=np.zeros((3, 2, 1)),
+                times=np.array([0.0, 1.0, 2.0]),
+                lag_indices=[1],
+                wave_numbers=[1.0],
+                overlap_radius=0.5,
+                block_count=1,
             )
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):

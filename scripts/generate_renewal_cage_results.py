@@ -109,6 +109,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_gamma_exchange,
     temperature_scan,
     trajectory_observable_protocol,
+    trajectory_observable_uncertainty_protocol,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -3136,9 +3137,8 @@ def write_raw_curve_persistence_exchange_protocol_csv(path: Path) -> list[dict[s
     return rows
 
 
-def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float | str]]:
-    """Extract raw observables from a deterministic intermittent trajectory."""
-
+def synthetic_intermittent_trajectory() -> tuple[np.ndarray, np.ndarray]:
+    """Return a deterministic trajectory with intermittent mobile domains."""
     frame_count = 9
     particle_count = 12
     times = np.arange(frame_count, dtype=float)
@@ -3155,6 +3155,13 @@ def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float
         ],
         axis=0,
     )
+    return positions, times
+
+
+def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float | str]]:
+    """Extract raw observables from a deterministic intermittent trajectory."""
+
+    positions, times = synthetic_intermittent_trajectory()
     rows = trajectory_observable_protocol(
         positions=positions,
         times=times,
@@ -3168,6 +3175,26 @@ def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float
         row["machine_readable_trajectory"] = 1.0
         row["uncertainty_estimates"] = 0.0
         row["primary_blocker"] = "uncertainty_estimates"
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, float | str]]:
+    """Estimate trajectory-observable uncertainties from time-origin jackknife blocks."""
+
+    positions, times = synthetic_intermittent_trajectory()
+    rows = trajectory_observable_uncertainty_protocol(
+        positions=positions,
+        times=times,
+        lag_indices=[1, 2, 3, 4],
+        wave_numbers=[0.7, 1.1, 1.6],
+        overlap_radius=0.5,
+        block_count=4,
+    )
+    for row in rows:
+        row["benchmark_id"] = "synthetic_intermittent_trajectory"
+        row["target_protocol"] = "trajectory_uncertainty_to_raw_curve_bridge"
+        row["machine_readable_trajectory"] = 1.0
     write_sweep_csv(path, rows)
     return rows
 
@@ -5082,6 +5109,56 @@ def write_trajectory_observable_protocol_svg(
     path.write_text(svg)
 
 
+def write_trajectory_uncertainty_protocol_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left, top, right, bottom = 90, 95, 1035, 420
+    lag = np.array([float(row["lag_time"]) for row in rows])
+    sigma_msd = np.array([float(row["sigma_msd"]) for row in rows])
+    sigma_ngp = np.array([float(row["sigma_ngp"]) for row in rows])
+    sigma_fs = np.array([float(row["sigma_self_intermediate_scattering"]) for row in rows])
+    sigma_chi4 = np.array([float(row["sigma_chi4_overlap"]) for row in rows])
+
+    def x(values: np.ndarray) -> np.ndarray:
+        return scale(values, left, right)
+
+    def y(values: np.ndarray) -> np.ndarray:
+        return scale(values, bottom, top)
+
+    curves = [
+        ("sigma MSD", sigma_msd, "#2b6cb0"),
+        ("sigma NGP", sigma_ngp, "#c05621"),
+        ("sigma F_s", sigma_fs, "#2f855a"),
+        ("sigma chi4", sigma_chi4, "#805ad5"),
+    ]
+    marks = []
+    for idx, (label, values, color) in enumerate(curves):
+        marks.append(polyline(x(lag), y(values), color, width=2.5))
+        marks.append(
+            f'<text x="{left + 18 + idx * 190}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
+        )
+        for xx, yy in zip(x(lag), y(values)):
+            marks.append(f'<circle cx="{xx:.1f}" cy="{yy:.1f}" r="4" fill="{color}" />')
+    peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Trajectory uncertainty bridge</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Time-origin block jackknife supplies uncertainty columns for trajectory-derived observables.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{(left + right) / 2 - 42}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">lag time</text>
+  <text x="38" y="300" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 38 300)">scaled uncertainty</text>
+  {"".join(marks)}
+  <text x="{left}" y="{bottom + 90}" font-family="Arial, sans-serif" font-size="11">method: {peak["uncertainty_method"]}; blocks = {int(float(peak["jackknife_block_count"]))}; primary blocker = {peak["primary_blocker"]}</text>
+  <text x="{left}" y="{bottom + 108}" font-family="Arial, sans-serif" font-size="11">peak chi4 row: sigma_MSD = {float(peak["sigma_msd"]):.3f}, sigma_Fs = {float(peak["sigma_self_intermediate_scattering"]):.3f}, sigma_chi4 = {float(peak["sigma_chi4_overlap"]):.3f}</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -5865,6 +5942,13 @@ def main() -> None:
     write_trajectory_observable_protocol_svg(
         FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.svg",
         trajectory_observable_rows,
+    )
+    trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
+        DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"
+    )
+    write_trajectory_uncertainty_protocol_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.svg",
+        trajectory_uncertainty_rows,
     )
 
     barrier = ActivatedBarrierParams(

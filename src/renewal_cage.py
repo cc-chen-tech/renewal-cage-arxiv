@@ -2273,6 +2273,90 @@ def trajectory_observable_protocol(
     return rows
 
 
+def trajectory_observable_uncertainty_protocol(
+    *,
+    positions: np.ndarray,
+    times: np.ndarray,
+    lag_indices: Sequence[int],
+    wave_numbers: Sequence[float],
+    overlap_radius: float,
+    block_count: int,
+) -> list[dict[str, float | str]]:
+    """Add time-origin block-jackknife uncertainties to trajectory observables."""
+
+    if int(block_count) != block_count or block_count < 2:
+        raise ValueError("block_count must be an integer at least two")
+    full_rows = trajectory_observable_protocol(
+        positions=positions,
+        times=times,
+        lag_indices=lag_indices,
+        wave_numbers=wave_numbers,
+        overlap_radius=overlap_radius,
+    )
+    position_array = np.asarray(positions, dtype=float)
+    unique_wave_numbers = list(dict.fromkeys(float(wave_number) for wave_number in wave_numbers))
+    dimension = position_array.shape[2]
+    particle_count = position_array.shape[1]
+
+    def observables_for_subset(squared_radius: np.ndarray, displacements: np.ndarray) -> dict[str, float]:
+        flat_squared_radius = squared_radius.reshape(-1)
+        msd = float(np.mean(flat_squared_radius))
+        fourth_moment = float(np.mean(flat_squared_radius * flat_squared_radius))
+        ngp = 0.0 if msd == 0.0 else float(dimension / (dimension + 2.0) * fourth_moment / (msd * msd) - 1.0)
+        projected_displacements = displacements[:, :, 0].reshape(-1)
+        fs_values = [
+            float(np.mean(np.cos(wave_number * projected_displacements)))
+            for wave_number in unique_wave_numbers
+        ]
+        overlap_by_origin = np.mean(np.sqrt(squared_radius) <= overlap_radius, axis=1)
+        return {
+            "msd": msd,
+            "ngp": ngp,
+            "self_intermediate_scattering": fs_values[0],
+            "overlap_mean": float(np.mean(overlap_by_origin)),
+            "chi4_overlap": float(particle_count * np.var(overlap_by_origin)),
+        }
+
+    out: list[dict[str, float | str]] = []
+    for full_row in full_rows:
+        lag = int(float(full_row["lag_index"]))
+        displacements = position_array[lag:, :, :] - position_array[:-lag, :, :]
+        origin_count = displacements.shape[0]
+        if origin_count < 2:
+            raise ValueError("each lag must have at least two time origins for jackknife uncertainty")
+        actual_block_count = min(int(block_count), origin_count)
+        if actual_block_count < 2:
+            raise ValueError("block_count leaves fewer than two jackknife blocks")
+        origin_blocks = np.array_split(np.arange(origin_count), actual_block_count)
+        jackknife_rows: list[dict[str, float]] = []
+        squared_radius = np.sum(displacements * displacements, axis=2)
+        for block in origin_blocks:
+            mask = np.ones(origin_count, dtype=bool)
+            mask[block] = False
+            if not np.any(mask):
+                raise ValueError("jackknife block removes all time origins")
+            jackknife_rows.append(observables_for_subset(squared_radius[mask], displacements[mask]))
+
+        row = dict(full_row)
+        for key in [
+            "msd",
+            "ngp",
+            "self_intermediate_scattering",
+            "overlap_mean",
+            "chi4_overlap",
+        ]:
+            values = np.array([float(jackknife_row[key]) for jackknife_row in jackknife_rows])
+            mean = float(np.mean(values))
+            sigma = math.sqrt((actual_block_count - 1.0) / actual_block_count * float(np.sum((values - mean) ** 2)))
+            row[f"sigma_{key}"] = sigma
+        row["uncertainty_method"] = "time_origin_block_jackknife"
+        row["jackknife_block_count"] = float(actual_block_count)
+        row["uncertainty_estimates"] = 1.0
+        row["primary_blocker"] = "none"
+        out.append(row)
+    return out
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

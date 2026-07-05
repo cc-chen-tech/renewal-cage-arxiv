@@ -2380,6 +2380,71 @@ def write_trajectory_observable_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_uncertainty_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Trajectory uncertainty bridge")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Time-origin block jackknife supplies uncertainty columns for trajectory-derived observables.",
+    )
+    left, bottom = 80, 105
+    plot_w, plot_h = 640, 300
+    lag = np.array([float(row["lag_time"]) for row in rows])
+    series = [
+        ("sigma MSD", np.array([float(row["sigma_msd"]) for row in rows]), colors.HexColor("#2b6cb0")),
+        ("sigma NGP", np.array([float(row["sigma_ngp"]) for row in rows]), colors.HexColor("#c05621")),
+        (
+            "sigma F_s",
+            np.array([float(row["sigma_self_intermediate_scattering"]) for row in rows]),
+            colors.HexColor("#2f855a"),
+        ),
+        ("sigma chi4", np.array([float(row["sigma_chi4_overlap"]) for row in rows]), colors.HexColor("#805ad5")),
+    ]
+
+    def scaled_x(values: np.ndarray) -> np.ndarray:
+        return left + (values - np.min(values)) * plot_w / max(float(np.max(values) - np.min(values)), 1e-12)
+
+    def scaled_y(values: np.ndarray) -> np.ndarray:
+        span = max(float(np.max(values) - np.min(values)), 1e-12)
+        return bottom + (values - np.min(values)) * plot_h / span
+
+    c.setStrokeColor(colors.black)
+    c.line(left, bottom, left + plot_w, bottom)
+    c.line(left, bottom, left, bottom + plot_h)
+    c.setFont("Helvetica", 7.5)
+    for idx, (label, values, color) in enumerate(series):
+        xs = scaled_x(lag)
+        ys = scaled_y(values)
+        c.setStrokeColor(color)
+        c.setFillColor(color)
+        for j in range(len(xs) - 1):
+            c.line(float(xs[j]), float(ys[j]), float(xs[j + 1]), float(ys[j + 1]))
+        for x, y in zip(xs, ys):
+            c.circle(float(x), float(y), 2.6, stroke=0, fill=1)
+        c.drawString(left + idx * 105, bottom - 35, label)
+    peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+    c.setFillColor(colors.black)
+    c.drawString(
+        left,
+        bottom - 58,
+        f"method={peak['uncertainty_method']}; blocks={int(float(peak['jackknife_block_count']))}; blocker={peak['primary_blocker']}",
+    )
+    c.drawString(
+        left,
+        bottom - 72,
+        f"peak chi4 row sigmas: MSD={float(peak['sigma_msd']):.3f}, Fs={float(peak['sigma_self_intermediate_scattering']):.3f}, chi4={float(peak['sigma_chi4_overlap']):.3f}",
+    )
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -2428,6 +2493,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         PAPER_FIGURE_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
     )
     trajectory_observable_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.pdf"
+    trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -2465,6 +2531,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_raw_curve_diagnostic_readiness_pdf(raw_curve_diagnostic_readiness_pdf)
     write_raw_curve_persistence_exchange_protocol_pdf(raw_curve_persistence_exchange_protocol_pdf)
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
+    write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -2528,6 +2595,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
         )
         archive.write(trajectory_observable_protocol_pdf, "figures/renewal_cage_trajectory_observable_protocol.pdf")
+        archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
