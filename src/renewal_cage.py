@@ -622,6 +622,56 @@ def stokes_einstein_benchmark_consistency(
     }
 
 
+def dynamic_heterogeneity_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_dynamic_heterogeneity_growth: bool,
+    length_growth: float,
+    correlation_size_growth: float,
+    chi4_peak_growth: float,
+    min_length_growth: float,
+    min_correlation_size_growth: float,
+    min_chi4_peak_growth: float,
+) -> dict[str, float | str]:
+    """Check dynamic-heterogeneity growth against xi4, Ncorr, and chi4 peak growth."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "length_growth": length_growth,
+        "correlation_size_growth": correlation_size_growth,
+        "chi4_peak_growth": chi4_peak_growth,
+        "min_length_growth": min_length_growth,
+        "min_correlation_size_growth": min_correlation_size_growth,
+        "min_chi4_peak_growth": min_chi4_peak_growth,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+
+    length_flag = length_growth >= min_length_growth
+    size_flag = correlation_size_growth >= min_correlation_size_growth
+    chi4_flag = chi4_peak_growth >= min_chi4_peak_growth
+    model_flag = length_flag and size_flag and chi4_flag
+    length_consistent = length_flag == observed_dynamic_heterogeneity_growth
+    size_consistent = size_flag == observed_dynamic_heterogeneity_growth
+    chi4_consistent = chi4_flag == observed_dynamic_heterogeneity_growth
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_dynamic_heterogeneity_growth": float(observed_dynamic_heterogeneity_growth),
+        "length_growth": length_growth,
+        "correlation_size_growth": correlation_size_growth,
+        "chi4_peak_growth_benchmark": chi4_peak_growth,
+        "min_length_growth": min_length_growth,
+        "min_correlation_size_growth": min_correlation_size_growth,
+        "min_chi4_peak_growth": min_chi4_peak_growth,
+        "model_predicts_dynamic_heterogeneity_growth": float(model_flag),
+        "length_growth_consistent": float(length_consistent),
+        "correlation_size_growth_consistent": float(size_consistent),
+        "chi4_peak_growth_consistent": float(chi4_consistent),
+        "overall_consistent": float(model_flag == observed_dynamic_heterogeneity_growth and length_consistent and size_consistent and chi4_consistent),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

@@ -29,6 +29,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_temperature_scan,
     glass_phenomenon_audit,
     glass_signature_phase_diagram,
+    dynamic_heterogeneity_benchmark_consistency,
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
@@ -1183,6 +1184,24 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["overall_consistent"], 1.0)
         self.assertGreater(row["se_product_growth"], 2.0)
         self.assertLess(row["cold_fractional_exponent"], 1.0)
+
+    def test_dynamic_heterogeneity_benchmark_consistency_detects_chi4_growth(self):
+        row = dynamic_heterogeneity_benchmark_consistency(
+            benchmark_id="dynamic_heterogeneity_chi4_growth",
+            observed_dynamic_heterogeneity_growth=True,
+            length_growth=3.09,
+            correlation_size_growth=29.5,
+            chi4_peak_growth=34.7,
+            min_length_growth=1.5,
+            min_correlation_size_growth=2.0,
+            min_chi4_peak_growth=2.0,
+        )
+
+        self.assertEqual(row["model_predicts_dynamic_heterogeneity_growth"], 1.0)
+        self.assertEqual(row["length_growth_consistent"], 1.0)
+        self.assertEqual(row["correlation_size_growth_consistent"], 1.0)
+        self.assertEqual(row["chi4_peak_growth_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

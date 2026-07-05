@@ -916,6 +916,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     mct_row = by_id["kob_andersen_1995_beta_window"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
+    heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
@@ -976,6 +977,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(se_row['overall_consistent']))}; "
         f"D tau growth = {float(se_row['se_product_growth']):.2f}; "
         f"xi_SE = {float(se_row['cold_fractional_exponent']):.3f}",
+    )
+    c.drawString(
+        430,
+        90,
+        "chi4 row consistent = "
+        f"{int(float(heterogeneity_row['overall_consistent']))}; "
+        f"xi4 growth = {float(heterogeneity_row['length_growth']):.2f}; "
+        f"chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}",
     )
     c.showPage()
     c.save()

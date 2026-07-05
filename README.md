@@ -73,7 +73,7 @@ relaxation but fails long-time Gaussian recovery.
 The SOTA benchmark consistency table turns selected literature-level claims
 into checkable rows, currently covering Kob-Andersen beta-window visibility and
 Gaussian-recovery mechanism selection against the static-disorder null, plus
-fractional Stokes-Einstein decoupling.
+fractional Stokes-Einstein decoupling and dynamic-heterogeneity chi4 growth.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 

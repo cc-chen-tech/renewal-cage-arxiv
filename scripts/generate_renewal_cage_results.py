@@ -31,6 +31,7 @@ from renewal_cage import (  # noqa: E402
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
+    dynamic_heterogeneity_benchmark_consistency,
     gaussian_radial_3d,
     gaussian_recovery_benchmark_consistency,
     gamma_exchange_asymptotic_diagnostics,
@@ -744,6 +745,7 @@ def write_sota_benchmark_consistency_csv(
     params: DelayedRenewalCageParams,
     heterogeneity: GammaExchangeParams,
     temperature_law: TemperatureLawParams,
+    spatial_chi4_rows: list[dict[str, float]],
 ) -> list[dict[str, float | str]]:
     fieldnames = [
         "benchmark_id",
@@ -776,6 +778,17 @@ def write_sota_benchmark_consistency_csv(
         "model_predicts_stokes_einstein_violation",
         "se_product_growth_consistent",
         "fractional_exponent_consistent",
+        "observed_dynamic_heterogeneity_growth",
+        "length_growth",
+        "correlation_size_growth",
+        "chi4_peak_growth_benchmark",
+        "min_length_growth",
+        "min_correlation_size_growth",
+        "min_chi4_peak_growth",
+        "model_predicts_dynamic_heterogeneity_growth",
+        "length_growth_consistent",
+        "correlation_size_growth_consistent",
+        "chi4_peak_growth_consistent",
         "overall_consistent",
     ]
 
@@ -815,10 +828,22 @@ def write_sota_benchmark_consistency_csv(
         min_product_growth=1.5,
         max_fractional_exponent=0.9,
     )
+    cold_spatial = spatial_chi4_rows[-1]
+    heterogeneity_row = dynamic_heterogeneity_benchmark_consistency(
+        benchmark_id="dynamic_heterogeneity_chi4_growth",
+        observed_dynamic_heterogeneity_growth=True,
+        length_growth=cold_spatial["length_growth"],
+        correlation_size_growth=cold_spatial["correlation_size_growth"],
+        chi4_peak_growth=cold_spatial["chi4_peak_growth"],
+        min_length_growth=1.5,
+        min_correlation_size_growth=2.0,
+        min_chi4_peak_growth=2.0,
+    )
     rows = [
         normalize(mct_row, "mct_beta_window"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
         normalize(se_row, "stokes_einstein_fractional_decoupling"),
+        normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -2112,6 +2137,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     mct_row = by_id["kob_andersen_1995_beta_window"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
+    heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
@@ -2167,6 +2193,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   {"".join(points)}
   <text x="{left_b}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">recovery row consistent = {int(float(recovery_row['overall_consistent']))}</text>
   <text x="{left_b}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">SE row consistent = {int(float(se_row['overall_consistent']))}; D tau growth = {float(se_row['se_product_growth']):.2f}, xi_SE = {float(se_row['cold_fractional_exponent']):.3f}</text>
+  <text x="{left_b}" y="{bottom + 92}" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = {int(float(heterogeneity_row['overall_consistent']))}; xi4 growth = {float(heterogeneity_row['length_growth']):.2f}, chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}</text>
 </svg>
 """
     path.write_text(svg)
@@ -2977,6 +3004,7 @@ def main() -> None:
         params,
         GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0),
         temperature_law,
+        spatial_chi4_rows,
     )
     write_sota_benchmark_consistency_svg(
         FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.svg",
