@@ -915,6 +915,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     by_id = {row["benchmark_id"]: row for row in rows}
     mct_row = by_id["kob_andersen_1995_beta_window"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
+    se_row = by_id["stokes_einstein_fractional_decoupling"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
@@ -968,6 +969,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     c.setFont("Helvetica", 9)
     c.drawString(45, 118, f"MCT row consistent = {int(float(mct_row['overall_consistent']))}")
     c.drawString(430, 118, f"recovery row consistent = {int(float(recovery_row['overall_consistent']))}")
+    c.drawString(
+        430,
+        104,
+        "SE row consistent = "
+        f"{int(float(se_row['overall_consistent']))}; "
+        f"D tau growth = {float(se_row['se_product_growth']):.2f}; "
+        f"xi_SE = {float(se_row['cold_fractional_exponent']):.3f}",
+    )
     c.showPage()
     c.save()
 

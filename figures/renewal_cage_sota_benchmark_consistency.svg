@@ -13,4 +13,5 @@
   <polyline points="660.00,430.00 850.00,105.00 1040.00,308.27" fill="none" stroke="#222222" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" />
   <circle cx="660.00" cy="430.00" r="5" fill="#2f855a" /><text x="672" y="130" font-family="Arial, sans-serif" font-size="12" fill="#2f855a">finite exchange: 0.0048</text><circle cx="850.00" cy="105.00" r="5" fill="#805ad5" /><text x="672" y="148" font-family="Arial, sans-serif" font-size="12" fill="#805ad5">static disorder: 2.5</text><circle cx="1040.00" cy="308.27" r="5" fill="#555555" /><text x="672" y="166" font-family="Arial, sans-serif" font-size="12" fill="#555555">recovery threshold: 0.05</text>
   <text x="660" y="486" font-family="Arial, sans-serif" font-size="12">recovery row consistent = 1</text>
+  <text x="660" y="504" font-family="Arial, sans-serif" font-size="12">SE row consistent = 1; D tau growth = 2.03, xi_SE = 0.581</text>
 </svg>

@@ -575,6 +575,53 @@ def gaussian_recovery_benchmark_consistency(
     }
 
 
+def stokes_einstein_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_stokes_einstein_violation: bool,
+    hot_se_product: float,
+    cold_se_product: float,
+    cold_fractional_exponent: float,
+    min_product_growth: float,
+    max_fractional_exponent: float,
+) -> dict[str, float | str]:
+    """Check Stokes-Einstein decoupling against product growth and fractional exponent."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "hot_se_product": hot_se_product,
+        "cold_se_product": cold_se_product,
+        "min_product_growth": min_product_growth,
+        "max_fractional_exponent": max_fractional_exponent,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if not (0.0 < cold_fractional_exponent):
+        raise ValueError("cold_fractional_exponent must be positive")
+
+    se_product_growth = cold_se_product / hot_se_product
+    product_flag = se_product_growth >= min_product_growth
+    fractional_flag = cold_fractional_exponent <= max_fractional_exponent
+    model_flag = product_flag and fractional_flag
+    product_consistent = product_flag == observed_stokes_einstein_violation
+    fractional_consistent = fractional_flag == observed_stokes_einstein_violation
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_stokes_einstein_violation": float(observed_stokes_einstein_violation),
+        "hot_se_product": hot_se_product,
+        "cold_se_product": cold_se_product,
+        "se_product_growth": se_product_growth,
+        "cold_fractional_exponent": cold_fractional_exponent,
+        "min_product_growth": min_product_growth,
+        "max_fractional_exponent": max_fractional_exponent,
+        "model_predicts_stokes_einstein_violation": float(model_flag),
+        "se_product_growth_consistent": float(product_consistent),
+        "fractional_exponent_consistent": float(fractional_consistent),
+        "overall_consistent": float(model_flag == observed_stokes_einstein_violation and product_consistent and fractional_consistent),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

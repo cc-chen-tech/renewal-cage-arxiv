@@ -81,6 +81,7 @@ from renewal_cage import (  # noqa: E402
     static_gamma_count_moments,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
+    stokes_einstein_benchmark_consistency,
     stokes_einstein_product,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
@@ -1164,6 +1165,24 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["static_null_recovery_consistent"], 0.0)
         self.assertEqual(row["mechanism_selection_consistent"], 1.0)
         self.assertEqual(row["overall_consistent"], 1.0)
+
+    def test_stokes_einstein_benchmark_consistency_detects_fractional_decoupling(self):
+        row = stokes_einstein_benchmark_consistency(
+            benchmark_id="stokes_einstein_fractional_decoupling",
+            observed_stokes_einstein_violation=True,
+            hot_se_product=1.0,
+            cold_se_product=2.03,
+            cold_fractional_exponent=0.568,
+            min_product_growth=1.5,
+            max_fractional_exponent=0.9,
+        )
+
+        self.assertEqual(row["model_predicts_stokes_einstein_violation"], 1.0)
+        self.assertEqual(row["se_product_growth_consistent"], 1.0)
+        self.assertEqual(row["fractional_exponent_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+        self.assertGreater(row["se_product_growth"], 2.0)
+        self.assertLess(row["cold_fractional_exponent"], 1.0)
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

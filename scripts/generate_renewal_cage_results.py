@@ -74,6 +74,7 @@ from renewal_cage import (  # noqa: E402
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
+    stokes_einstein_benchmark_consistency,
     temperature_dependent_params,
     temperature_scan,
 )
@@ -742,6 +743,7 @@ def write_sota_benchmark_consistency_csv(
     beta: MCTBetaParams,
     params: DelayedRenewalCageParams,
     heterogeneity: GammaExchangeParams,
+    temperature_law: TemperatureLawParams,
 ) -> list[dict[str, float | str]]:
     fieldnames = [
         "benchmark_id",
@@ -764,6 +766,16 @@ def write_sota_benchmark_consistency_csv(
         "finite_exchange_recovery_consistent",
         "static_null_recovery_consistent",
         "mechanism_selection_consistent",
+        "observed_stokes_einstein_violation",
+        "hot_se_product",
+        "cold_se_product",
+        "se_product_growth",
+        "cold_fractional_exponent",
+        "min_product_growth",
+        "max_fractional_exponent",
+        "model_predicts_stokes_einstein_violation",
+        "se_product_growth_consistent",
+        "fractional_exponent_consistent",
         "overall_consistent",
     ]
 
@@ -793,9 +805,20 @@ def write_sota_benchmark_consistency_csv(
         static_gamma_late_ngp=static_gamma_late_ngp,
         recovery_threshold=0.05,
     )
+    se_scan = temperature_scan(np.array([1.0, 0.82, 0.72, 0.62]), temperature_law, wave_number=1.1)
+    se_row = stokes_einstein_benchmark_consistency(
+        benchmark_id="stokes_einstein_fractional_decoupling",
+        observed_stokes_einstein_violation=True,
+        hot_se_product=se_scan[0]["stokes_einstein_product"],
+        cold_se_product=se_scan[-1]["stokes_einstein_product"],
+        cold_fractional_exponent=se_scan[-1]["fractional_stokes_einstein_exponent"],
+        min_product_growth=1.5,
+        max_fractional_exponent=0.9,
+    )
     rows = [
         normalize(mct_row, "mct_beta_window"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
+        normalize(se_row, "stokes_einstein_fractional_decoupling"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -2088,6 +2111,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     by_id = {str(row["benchmark_id"]): row for row in rows}
     mct_row = by_id["kob_andersen_1995_beta_window"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
+    se_row = by_id["stokes_einstein_fractional_decoupling"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
@@ -2142,6 +2166,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   {polyline(x, y, "#222222", width=1.2)}
   {"".join(points)}
   <text x="{left_b}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">recovery row consistent = {int(float(recovery_row['overall_consistent']))}</text>
+  <text x="{left_b}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">SE row consistent = {int(float(se_row['overall_consistent']))}; D tau growth = {float(se_row['se_product_growth']):.2f}, xi_SE = {float(se_row['cold_fractional_exponent']):.3f}</text>
 </svg>
 """
     path.write_text(svg)
@@ -2951,6 +2976,7 @@ def main() -> None:
         mct_beta,
         params,
         GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0),
+        temperature_law,
     )
     write_sota_benchmark_consistency_svg(
         FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.svg",
