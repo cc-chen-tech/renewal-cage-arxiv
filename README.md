@@ -80,12 +80,12 @@ The SOTA benchmark consistency table turns selected literature-level claims
 into checkable rows, currently covering Debye-Waller cage localization,
 Kob-Andersen beta-window visibility and MCT exponent-parameter consistency,
 Gaussian-recovery mechanism selection against the static-disorder null,
-fractional Stokes-Einstein decoupling, dynamic-heterogeneity chi4 growth,
-alpha-shape time-temperature-superposition breakdown, spatial
-facilitation-front growth-law inversion, KWW stretched-alpha window fitting,
-persistence/exchange transport inversion with held-out late-NGP validation, a
-van Hove tail/recovery consistency check, and an Angell/Adam-Gibbs
-fragility-growth scope check.
+cooling-induced NGP peak shift with late Gaussian recovery, fractional
+Stokes-Einstein decoupling, dynamic-heterogeneity chi4 growth, alpha-shape
+time-temperature-superposition breakdown, spatial facilitation-front
+growth-law inversion, KWW stretched-alpha window fitting, persistence/exchange
+transport inversion with held-out late-NGP validation, a van Hove tail/recovery
+consistency check, and an Angell/Adam-Gibbs fragility-growth scope check.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 

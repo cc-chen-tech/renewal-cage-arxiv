@@ -694,6 +694,79 @@ def gaussian_recovery_benchmark_consistency(
     }
 
 
+def ngp_peak_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_transient_ngp_peak: bool,
+    hot_peak_time: float,
+    cold_peak_time: float,
+    hot_peak_ngp: float,
+    cold_peak_ngp: float,
+    late_ngp: float,
+    min_peak_time_growth: float,
+    min_peak_height: float,
+    min_peak_height_growth: float,
+    max_late_ngp: float,
+) -> dict[str, float | str]:
+    """Check that cooling shifts the transient NGP peak while preserving recovery."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "hot_peak_time": hot_peak_time,
+        "cold_peak_time": cold_peak_time,
+        "hot_peak_ngp": hot_peak_ngp,
+        "cold_peak_ngp": cold_peak_ngp,
+        "min_peak_time_growth": min_peak_time_growth,
+        "min_peak_height": min_peak_height,
+        "min_peak_height_growth": min_peak_height_growth,
+        "max_late_ngp": max_late_ngp,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if late_ngp < 0.0:
+        raise ValueError("late_ngp must be nonnegative")
+
+    peak_time_growth = cold_peak_time / hot_peak_time
+    peak_height_growth = cold_peak_ngp / hot_peak_ngp
+    time_flag = peak_time_growth >= min_peak_time_growth
+    height_flag = hot_peak_ngp >= min_peak_height and cold_peak_ngp >= min_peak_height
+    height_growth_flag = peak_height_growth >= min_peak_height_growth
+    late_recovery_flag = late_ngp <= max_late_ngp
+    model_flag = time_flag and height_flag and height_growth_flag and late_recovery_flag
+    time_consistent = time_flag == observed_transient_ngp_peak
+    height_consistent = height_flag == observed_transient_ngp_peak
+    height_growth_consistent = height_growth_flag == observed_transient_ngp_peak
+    late_recovery_consistent = late_recovery_flag == observed_transient_ngp_peak
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_transient_ngp_peak": float(observed_transient_ngp_peak),
+        "hot_peak_time": hot_peak_time,
+        "cold_peak_time": cold_peak_time,
+        "peak_time_growth": peak_time_growth,
+        "hot_peak_ngp": hot_peak_ngp,
+        "cold_peak_ngp": cold_peak_ngp,
+        "peak_height_growth": peak_height_growth,
+        "late_ngp": late_ngp,
+        "min_peak_time_growth": min_peak_time_growth,
+        "min_peak_height": min_peak_height,
+        "min_peak_height_growth": min_peak_height_growth,
+        "max_late_ngp": max_late_ngp,
+        "model_predicts_transient_ngp_peak": float(model_flag),
+        "peak_time_growth_consistent": float(time_consistent),
+        "peak_height_consistent": float(height_consistent),
+        "peak_height_growth_consistent": float(height_growth_consistent),
+        "late_recovery_consistent": float(late_recovery_consistent),
+        "overall_consistent": float(
+            model_flag == observed_transient_ngp_peak
+            and time_consistent
+            and height_consistent
+            and height_growth_consistent
+            and late_recovery_consistent
+        ),
+    }
+
+
 def stokes_einstein_benchmark_consistency(
     *,
     benchmark_id: str,

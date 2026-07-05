@@ -63,6 +63,7 @@ from renewal_cage import (  # noqa: E402
     mct_beta_benchmark_consistency,
     mct_exponent_benchmark_consistency,
     mct_beta_temperature_scan,
+    ngp_peak_benchmark_consistency,
     observable_consistency_diagnostics,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
@@ -1285,6 +1286,30 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["static_null_recovery_consistent"], 0.0)
         self.assertEqual(row["mechanism_selection_consistent"], 1.0)
         self.assertEqual(row["overall_consistent"], 1.0)
+
+    def test_ngp_peak_benchmark_consistency_detects_cooling_peak_shift(self):
+        row = ngp_peak_benchmark_consistency(
+            benchmark_id="ngp_peak_shift_on_cooling",
+            observed_transient_ngp_peak=True,
+            hot_peak_time=11.0,
+            cold_peak_time=70.0,
+            hot_peak_ngp=0.12,
+            cold_peak_ngp=0.28,
+            late_ngp=0.0048,
+            min_peak_time_growth=2.0,
+            min_peak_height=0.05,
+            min_peak_height_growth=1.2,
+            max_late_ngp=0.05,
+        )
+
+        self.assertEqual(row["model_predicts_transient_ngp_peak"], 1.0)
+        self.assertEqual(row["peak_time_growth_consistent"], 1.0)
+        self.assertEqual(row["peak_height_consistent"], 1.0)
+        self.assertEqual(row["peak_height_growth_consistent"], 1.0)
+        self.assertEqual(row["late_recovery_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+        self.assertGreater(row["peak_time_growth"], row["min_peak_time_growth"])
+        self.assertGreater(row["peak_height_growth"], row["min_peak_height_growth"])
 
     def test_stokes_einstein_benchmark_consistency_detects_fractional_decoupling(self):
         row = stokes_einstein_benchmark_consistency(

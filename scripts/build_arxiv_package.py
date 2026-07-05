@@ -1070,6 +1070,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     mct_row = by_id["kob_andersen_1995_beta_window"]
     mct_exponent_row = by_id["kob_andersen_1995_mct_exponent_parameter"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
+    ngp_peak_row = by_id["ngp_peak_shift_on_cooling"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     spatial_front_row = by_id["spatial_facilitation_constant_front_law"]
@@ -1145,6 +1146,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(mct_exponent_row['overall_consistent']))}; "
         f"lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}; "
         f"lambda_b = {float(mct_exponent_row['lambda_from_b']):.3f}",
+    )
+    c.drawString(
+        45,
+        76,
+        "NGP peak row consistent = "
+        f"{int(float(ngp_peak_row['overall_consistent']))}; "
+        f"t_peak growth = {float(ngp_peak_row['peak_time_growth']):.2f}; "
+        f"peak growth = {float(ngp_peak_row['peak_height_growth']):.2f}",
     )
     c.drawString(430, 118, f"recovery row consistent = {int(float(recovery_row['overall_consistent']))}")
     c.drawString(

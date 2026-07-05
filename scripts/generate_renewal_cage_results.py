@@ -65,6 +65,7 @@ from renewal_cage import (  # noqa: E402
     mct_exponent_benchmark_consistency,
     mct_beta_temperature_scan,
     moments_1d,
+    ngp_peak_benchmark_consistency,
     ngp_1d,
     normalized_alpha_decay,
     observable_consistency_diagnostics,
@@ -1077,6 +1078,23 @@ def write_sota_benchmark_consistency_csv(
         "finite_exchange_recovery_consistent",
         "static_null_recovery_consistent",
         "mechanism_selection_consistent",
+        "observed_transient_ngp_peak",
+        "hot_peak_time",
+        "cold_peak_time",
+        "peak_time_growth",
+        "hot_peak_ngp",
+        "cold_peak_ngp",
+        "peak_height_growth",
+        "late_ngp",
+        "min_peak_time_growth",
+        "min_peak_height",
+        "min_peak_height_growth",
+        "max_late_ngp",
+        "model_predicts_transient_ngp_peak",
+        "peak_time_growth_consistent",
+        "peak_height_consistent",
+        "peak_height_growth_consistent",
+        "late_recovery_consistent",
         "observed_stokes_einstein_violation",
         "hot_se_product",
         "cold_se_product",
@@ -1222,6 +1240,19 @@ def write_sota_benchmark_consistency_csv(
         finite_exchange_late_ngp=finite_exchange_late_ngp,
         static_gamma_late_ngp=static_gamma_late_ngp,
         recovery_threshold=0.05,
+    )
+    ngp_peak_row = ngp_peak_benchmark_consistency(
+        benchmark_id="ngp_peak_shift_on_cooling",
+        observed_transient_ngp_peak=True,
+        hot_peak_time=temperature_rows[0]["predicted_ngp_peak_time"],
+        cold_peak_time=temperature_rows[-1]["predicted_ngp_peak_time"],
+        hot_peak_ngp=temperature_rows[0]["predicted_ngp_peak"],
+        cold_peak_ngp=temperature_rows[-1]["predicted_ngp_peak"],
+        late_ngp=finite_exchange_late_ngp,
+        min_peak_time_growth=2.0,
+        min_peak_height=0.05,
+        min_peak_height_growth=1.1,
+        max_late_ngp=0.05,
     )
     se_scan = temperature_scan(np.array([1.0, 0.82, 0.72, 0.62]), temperature_law, wave_number=1.1)
     se_row = stokes_einstein_benchmark_consistency(
@@ -1375,6 +1406,7 @@ def write_sota_benchmark_consistency_csv(
         normalize(mct_row, "mct_beta_window"),
         normalize(mct_exponent_row, "mct_exponent_parameter"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
+        normalize(ngp_peak_row, "ngp_peak_shift"),
         normalize(se_row, "stokes_einstein_fractional_decoupling"),
         normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
         normalize(spatial_front_row, "spatial_facilitation_growth_law"),
@@ -2678,6 +2710,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     mct_row = by_id["kob_andersen_1995_beta_window"]
     mct_exponent_row = by_id["kob_andersen_1995_mct_exponent_parameter"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
+    ngp_peak_row = by_id["ngp_peak_shift_on_cooling"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     spatial_front_row = by_id["spatial_facilitation_constant_front_law"]
@@ -2736,6 +2769,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_a}" y="{bottom + 52}" font-family="Arial, sans-serif" font-size="11">cage row consistent = {int(float(cage_row['overall_consistent']))}; f_DW = {float(cage_row['debye_waller_plateau']):.3f}, renewal MSD frac = {float(cage_row['renewal_msd_fraction']):.3f}</text>
   <text x="{left_a}" y="{bottom + 68}" font-family="Arial, sans-serif" font-size="11">MCT row consistent = {int(float(mct_row['overall_consistent']))}</text>
   <text x="{left_a}" y="{bottom + 84}" font-family="Arial, sans-serif" font-size="11">exponent row consistent = {int(float(mct_exponent_row['overall_consistent']))}; lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}, lambda_b = {float(mct_exponent_row['lambda_from_b']):.3f}</text>
+  <text x="{left_a}" y="{bottom + 100}" font-family="Arial, sans-serif" font-size="11">NGP peak row consistent = {int(float(ngp_peak_row['overall_consistent']))}; t_peak growth = {float(ngp_peak_row['peak_time_growth']):.2f}, peak growth = {float(ngp_peak_row['peak_height_growth']):.2f}</text>
   <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
   <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
   <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>

@@ -41,6 +41,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("kob_andersen_1995_beta_window", by_id)
         self.assertIn("kob_andersen_1995_mct_exponent_parameter", by_id)
         self.assertIn("gaussian_recovery_finite_exchange_vs_static_disorder", by_id)
+        self.assertIn("ngp_peak_shift_on_cooling", by_id)
         self.assertIn("stokes_einstein_fractional_decoupling", by_id)
         self.assertIn("dynamic_heterogeneity_chi4_growth", by_id)
         self.assertIn("spatial_facilitation_constant_front_law", by_id)
@@ -62,6 +63,10 @@ class ArxivPackageTests(unittest.TestCase):
             float(by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]["mechanism_selection_consistent"]),
             1.0,
         )
+        self.assertEqual(float(by_id["ngp_peak_shift_on_cooling"]["overall_consistent"]), 1.0)
+        self.assertGreater(float(by_id["ngp_peak_shift_on_cooling"]["peak_time_growth"]), 2.0)
+        self.assertGreater(float(by_id["ngp_peak_shift_on_cooling"]["peak_height_growth"]), 1.1)
+        self.assertLess(float(by_id["ngp_peak_shift_on_cooling"]["late_ngp"]), 0.05)
         self.assertEqual(float(by_id["stokes_einstein_fractional_decoupling"]["overall_consistent"]), 1.0)
         self.assertEqual(float(by_id["dynamic_heterogeneity_chi4_growth"]["overall_consistent"]), 1.0)
         self.assertEqual(float(by_id["spatial_facilitation_constant_front_law"]["overall_consistent"]), 1.0)
