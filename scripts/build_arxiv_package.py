@@ -1067,6 +1067,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         rows = list(csv.DictReader(f))
     by_id = {row["benchmark_id"]: row for row in rows}
     mct_row = by_id["kob_andersen_1995_beta_window"]
+    mct_exponent_row = by_id["kob_andersen_1995_mct_exponent_parameter"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
@@ -1126,6 +1127,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     )
     c.setFont("Helvetica", 9)
     c.drawString(45, 118, f"MCT row consistent = {int(float(mct_row['overall_consistent']))}")
+    c.drawString(
+        45,
+        104,
+        "exponent row consistent = "
+        f"{int(float(mct_exponent_row['overall_consistent']))}; "
+        f"lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}; "
+        f"lambda_b = {float(mct_exponent_row['lambda_from_b']):.3f}",
+    )
     c.drawString(430, 118, f"recovery row consistent = {int(float(recovery_row['overall_consistent']))}")
     c.drawString(
         430,

@@ -38,6 +38,7 @@ class ArxivPackageTests(unittest.TestCase):
 
         by_id = {row["benchmark_id"]: row for row in rows}
         self.assertIn("kob_andersen_1995_beta_window", by_id)
+        self.assertIn("kob_andersen_1995_mct_exponent_parameter", by_id)
         self.assertIn("gaussian_recovery_finite_exchange_vs_static_disorder", by_id)
         self.assertIn("stokes_einstein_fractional_decoupling", by_id)
         self.assertIn("dynamic_heterogeneity_chi4_growth", by_id)
@@ -46,6 +47,11 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("kob_andersen_van_hove_tail_recovery", by_id)
         self.assertIn("angell_adam_gibbs_fragility_growth", by_id)
         self.assertEqual(float(by_id["kob_andersen_1995_beta_window"]["overall_consistent"]), 1.0)
+        self.assertEqual(float(by_id["kob_andersen_1995_mct_exponent_parameter"]["overall_consistent"]), 1.0)
+        self.assertLess(
+            float(by_id["kob_andersen_1995_mct_exponent_parameter"]["lambda_relative_mismatch"]),
+            0.05,
+        )
         self.assertEqual(
             float(by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]["mechanism_selection_consistent"]),
             1.0,

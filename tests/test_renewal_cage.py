@@ -57,6 +57,7 @@ from renewal_cage import (  # noqa: E402
     MCTBetaParams,
     mct_beta_correlator,
     mct_beta_benchmark_consistency,
+    mct_exponent_benchmark_consistency,
     mct_beta_temperature_scan,
     observable_consistency_diagnostics,
     persistence_exchange_benchmark_consistency,
@@ -1156,6 +1157,22 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["model_predicts_visible_von_schweidler"], 1.0)
         self.assertEqual(row["critical_decay_consistent"], 1.0)
         self.assertEqual(row["von_schweidler_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+
+    def test_mct_exponent_benchmark_consistency_checks_common_lambda_relation(self):
+        row = mct_exponent_benchmark_consistency(
+            benchmark_id="kob_andersen_1995_mct_exponent_parameter",
+            observed_common_exponent_parameter=True,
+            critical_exponent=0.32,
+            von_schweidler_exponent=0.60,
+            max_lambda_relative_mismatch=0.05,
+        )
+
+        self.assertEqual(row["model_predicts_common_exponent_parameter"], 1.0)
+        self.assertLess(row["lambda_relative_mismatch"], 0.05)
+        self.assertAlmostEqual(row["lambda_from_a"], 0.716312910468668, places=12)
+        self.assertAlmostEqual(row["lambda_from_b"], 0.7246032624007417, places=12)
+        self.assertEqual(row["mct_exponent_parameter_consistent"], 1.0)
         self.assertEqual(row["overall_consistent"], 1.0)
 
     def test_gaussian_recovery_benchmark_consistency_rejects_static_disorder(self):

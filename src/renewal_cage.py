@@ -535,6 +535,40 @@ def mct_beta_benchmark_consistency(
     }
 
 
+def mct_exponent_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_common_exponent_parameter: bool,
+    critical_exponent: float,
+    von_schweidler_exponent: float,
+    max_lambda_relative_mismatch: float,
+) -> dict[str, float | str]:
+    """Check whether fitted beta exponents share one MCT exponent parameter."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if max_lambda_relative_mismatch < 0.0:
+        raise ValueError("max_lambda_relative_mismatch must be nonnegative")
+
+    exponent = mct_exponent_parameter_from_exponents(critical_exponent, von_schweidler_exponent)
+    model_flag = exponent["lambda_relative_mismatch"] <= max_lambda_relative_mismatch
+    consistent = model_flag == observed_common_exponent_parameter
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_common_exponent_parameter": float(observed_common_exponent_parameter),
+        "critical_exponent_benchmark": critical_exponent,
+        "von_schweidler_exponent_benchmark": von_schweidler_exponent,
+        "lambda_from_a": exponent["lambda_from_a"],
+        "lambda_from_b": exponent["lambda_from_b"],
+        "lambda_mismatch": exponent["lambda_mismatch"],
+        "lambda_relative_mismatch": exponent["lambda_relative_mismatch"],
+        "max_lambda_relative_mismatch": max_lambda_relative_mismatch,
+        "model_predicts_common_exponent_parameter": float(model_flag),
+        "mct_exponent_parameter_consistent": float(consistent),
+        "overall_consistent": float(consistent),
+    }
+
+
 def gaussian_recovery_benchmark_consistency(
     *,
     benchmark_id: str,

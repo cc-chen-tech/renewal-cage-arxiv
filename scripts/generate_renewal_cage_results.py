@@ -57,6 +57,7 @@ from renewal_cage import (  # noqa: E402
     local_alpha_stretching_exponent,
     mct_beta_benchmark_consistency,
     mct_beta_correlator,
+    mct_exponent_benchmark_consistency,
     mct_beta_temperature_scan,
     moments_1d,
     ngp_1d,
@@ -948,6 +949,16 @@ def write_sota_benchmark_consistency_csv(
         "model_predicts_visible_von_schweidler",
         "critical_decay_consistent",
         "von_schweidler_consistent",
+        "observed_common_exponent_parameter",
+        "critical_exponent_benchmark",
+        "von_schweidler_exponent_benchmark",
+        "lambda_from_a",
+        "lambda_from_b",
+        "lambda_mismatch",
+        "lambda_relative_mismatch",
+        "max_lambda_relative_mismatch",
+        "model_predicts_common_exponent_parameter",
+        "mct_exponent_parameter_consistent",
         "observed_gaussian_recovery",
         "finite_exchange_late_ngp",
         "static_gamma_late_ngp",
@@ -1047,6 +1058,13 @@ def write_sota_benchmark_consistency_csv(
         observation_max_time=500.0 * beta.beta_time,
         alpha_time=80.0 * beta.beta_time,
         required_decades=0.5,
+    )
+    mct_exponent_row = mct_exponent_benchmark_consistency(
+        benchmark_id="kob_andersen_1995_mct_exponent_parameter",
+        observed_common_exponent_parameter=True,
+        critical_exponent=beta.critical_exponent,
+        von_schweidler_exponent=beta.von_schweidler_exponent,
+        max_lambda_relative_mismatch=0.05,
     )
     late_time = 30000.0
     finite_exchange_late_ngp = float(gamma_exchange_ngp_1d(np.array([late_time]), params, heterogeneity)[0])
@@ -1177,6 +1195,7 @@ def write_sota_benchmark_consistency_csv(
     )
     rows = [
         normalize(mct_row, "mct_beta_window"),
+        normalize(mct_exponent_row, "mct_exponent_parameter"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
         normalize(se_row, "stokes_einstein_fractional_decoupling"),
         normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
@@ -2476,6 +2495,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     width, height = 1120, 630
     by_id = {str(row["benchmark_id"]): row for row in rows}
     mct_row = by_id["kob_andersen_1995_beta_window"]
+    mct_exponent_row = by_id["kob_andersen_1995_mct_exponent_parameter"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
@@ -2531,6 +2551,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_a}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. MCT beta visibility</text>
   {"".join(bars)}
   <text x="{left_a}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">MCT row consistent = {int(float(mct_row['overall_consistent']))}</text>
+  <text x="{left_a}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">exponent row consistent = {int(float(mct_exponent_row['overall_consistent']))}; lambda_a = {float(mct_exponent_row['lambda_from_a']):.3f}, lambda_b = {float(mct_exponent_row['lambda_from_b']):.3f}</text>
   <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
   <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
   <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>
