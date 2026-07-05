@@ -345,14 +345,13 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertNotEqual(preceding_begin, -1)
             self.assertIn("\\begin{figure}[p]", main_tex[preceding_begin:figure_index])
 
-    def test_final_comparison_table_flushes_before_bibliography(self):
+    def test_final_comparison_table_is_not_a_late_float(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
+        discussion_index = main_tex.index("Table~\\ref{tab:comparison}")
         table_index = main_tex.index("\\label{tab:comparison}")
-        preceding_begin = main_tex.rfind("\\begin{table}", 0, table_index)
-        self.assertNotEqual(preceding_begin, -1)
-        self.assertIn("\\begin{table}[tbp]", main_tex[preceding_begin:table_index])
+        self.assertIn("\\refstepcounter{table}", main_tex[table_index - 40:table_index])
         bibliography_index = main_tex.index("\\bibliographystyle")
-        self.assertIn("\\clearpage", main_tex[table_index:bibliography_index])
+        self.assertNotIn("\\begin{table}", main_tex[discussion_index:bibliography_index])
 
     def test_build_arxiv_package_generates_deterministic_pdf_figures(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
