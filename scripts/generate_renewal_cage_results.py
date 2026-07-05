@@ -100,6 +100,7 @@ from renewal_cage import (  # noqa: E402
     sota_claim_alignment,
     sota_archive_preflight_gate,
     sota_data_accession_gate,
+    sota_evidence_verdict,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_reanalysis_state_gate,
@@ -2456,6 +2457,66 @@ def write_sota_signed_constraints_csv(path: Path) -> list[dict[str, float | str]
             quantitative_fit_ready=False,
         ),
     ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_evidence_verdict_csv(
+    path: Path,
+    *,
+    claim_alignment_rows: list[dict[str, float | str]],
+    signed_constraint_rows: list[dict[str, float | str]],
+    reanalysis_state_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Aggregate SOTA claim, constraint, and reanalysis state into safe verdicts."""
+
+    constraint_id_by_claim_id = {
+        "kob_andersen_van_hove_caging_ngp": "kob_andersen_van_hove_signed_constraints",
+        "kob_andersen_intermediate_scattering_alpha": "kob_andersen_alpha_signed_constraints",
+        "hedges_persistence_exchange_decoupling": "hedges_persistence_exchange_signed_constraints",
+        "lacevic_four_point_dynamic_length": "lacevic_four_point_signed_constraints",
+        "jung_berthier_experimental_dynamic_heterogeneity": "jung_berthier_experimental_signed_constraints",
+        "guan_granick_fickian_non_gaussian": "guan_granick_fickian_ngp_signed_constraints",
+        "angell_fragility_growth": "fragility_signed_constraints",
+        "kauzmann_adam_gibbs_entropy_boundary": "kauzmann_thermodynamic_signed_boundary",
+    }
+    constraints = {str(row["constraint_id"]): row for row in signed_constraint_rows}
+    rows = []
+    for claim in claim_alignment_rows:
+        claim_id = str(claim["claim_id"])
+        constraint = constraints[constraint_id_by_claim_id[claim_id]]
+        rows.append(
+            sota_evidence_verdict(
+                verdict_id=f"{claim_id}_verdict",
+                source_key=str(claim["source_key"]),
+                phenomenon=str(claim["phenomenon"]),
+                claim_alignment=str(claim["claim_alignment"]),
+                signed_constraint_class=str(constraint["signed_constraint_class"]),
+                data_readiness=str(claim["data_readiness"]),
+                requires_external_closure=float(claim["requires_external_closure"]) == 1.0,
+                quantitative_fit_ready=float(claim["quantitative_fit_ready"]) == 1.0,
+                model_overclaims_source=float(claim["model_overclaims_source"]) == 1.0,
+                reanalysis_stage="not_required_for_literature_claim",
+            )
+        )
+
+    if len(reanalysis_state_rows) != 1:
+        raise ValueError("reanalysis_state_rows must contain exactly one GlassBench row")
+    reanalysis = reanalysis_state_rows[0]
+    rows.append(
+        sota_evidence_verdict(
+            verdict_id="glassbench_reanalysis_state_verdict",
+            source_key=str(reanalysis["source_id"]),
+            phenomenon="trajectory_level_persistence_exchange_test",
+            claim_alignment="partial",
+            signed_constraint_class="closure_assisted_consistent",
+            data_readiness=str(reanalysis["claim_level"]),
+            requires_external_closure=True,
+            quantitative_fit_ready=float(reanalysis["ready_for_model_comparison"]) == 1.0,
+            model_overclaims_source=False,
+            reanalysis_stage=str(reanalysis["reanalysis_stage"]),
+        )
+    )
     write_sweep_csv(path, rows)
     return rows
 
@@ -6639,13 +6700,19 @@ def main() -> None:
     trajectory_adapter_contract_rows = write_trajectory_adapter_contract_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_contract.csv"
     )
-    write_sota_reanalysis_state_csv(
+    reanalysis_state_rows = write_sota_reanalysis_state_csv(
         DATA_DIR / "renewal_cage_sota_reanalysis_state.csv",
         data_accession_rows=data_accession_rows,
         readme_digest_rows=readme_digest_rows,
         local_cache_rows=local_cache_rows,
         zip_structure_rows=zip_structure_rows,
         adapter_contract_rows=trajectory_adapter_contract_rows,
+    )
+    write_sota_evidence_verdict_csv(
+        DATA_DIR / "renewal_cage_sota_evidence_verdict.csv",
+        claim_alignment_rows=sota_claim_alignment_rows,
+        signed_constraint_rows=sota_signed_constraint_rows,
+        reanalysis_state_rows=reanalysis_state_rows,
     )
     write_trajectory_adapter_contract_svg(
         FIGURE_DIR / "renewal_cage_trajectory_adapter_contract.svg",

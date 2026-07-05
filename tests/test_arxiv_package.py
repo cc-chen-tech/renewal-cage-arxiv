@@ -196,6 +196,31 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermodynamic["forbidden_claims_made"], "none")
         self.assertEqual(float(thermodynamic["publishable_alignment"]), 1.0)
 
+    def test_sota_evidence_verdict_aggregates_claim_strength_without_overclaim(self):
+        path = ROOT / "data" / "renewal_cage_sota_evidence_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["verdict_id"]: row for row in rows}
+        dynamic = by_id["kob_andersen_van_hove_caging_ngp_verdict"]
+        self.assertEqual(dynamic["evidence_grade"], "direct_dynamical_support")
+        self.assertEqual(dynamic["allowed_manuscript_claim"], "dynamical_signature_supported")
+        self.assertEqual(float(dynamic["publishable_without_overclaim"]), 1.0)
+
+        spatial = by_id["lacevic_four_point_dynamic_length_verdict"]
+        self.assertEqual(spatial["evidence_grade"], "closure_assisted_support")
+        self.assertEqual(float(spatial["requires_external_closure"]), 1.0)
+
+        thermodynamic = by_id["kauzmann_adam_gibbs_entropy_boundary_verdict"]
+        self.assertEqual(thermodynamic["evidence_grade"], "thermodynamic_scope_boundary")
+        self.assertEqual(thermodynamic["allowed_manuscript_claim"], "scope_boundary_only")
+
+        pending = by_id["glassbench_reanalysis_state_verdict"]
+        self.assertEqual(pending["evidence_grade"], "pending_trajectory_reanalysis")
+        self.assertEqual(float(pending["trajectory_reanalysis_required"]), 1.0)
+        self.assertEqual(float(pending["publishable_without_overclaim"]), 0.0)
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())

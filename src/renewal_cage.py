@@ -2658,6 +2658,98 @@ def sota_claim_alignment(
     }
 
 
+def sota_evidence_verdict(
+    *,
+    verdict_id: str,
+    source_key: str,
+    phenomenon: str,
+    claim_alignment: str,
+    signed_constraint_class: str,
+    data_readiness: str,
+    requires_external_closure: bool,
+    quantitative_fit_ready: bool,
+    model_overclaims_source: bool,
+    reanalysis_stage: str,
+) -> dict[str, float | str]:
+    """Assign a manuscript-safe evidence grade to a SOTA comparison row."""
+
+    for name, value in {
+        "verdict_id": verdict_id,
+        "source_key": source_key,
+        "phenomenon": phenomenon,
+        "claim_alignment": claim_alignment,
+        "signed_constraint_class": signed_constraint_class,
+        "data_readiness": data_readiness,
+        "reanalysis_stage": reanalysis_stage,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    allowed_alignments = {"supported", "partial", "scope_boundary", "not_supported"}
+    allowed_constraint_classes = {
+        "sota_consistent",
+        "closure_assisted_consistent",
+        "scope_boundary_consistent",
+        "missing_signature",
+        "not_supported",
+        "overclaimed_boundary",
+    }
+    if claim_alignment not in allowed_alignments:
+        raise ValueError("claim_alignment is not recognized")
+    if signed_constraint_class not in allowed_constraint_classes:
+        raise ValueError("signed_constraint_class is not recognized")
+
+    trajectory_pending = reanalysis_stage.startswith("awaiting_") or "not_reanalysis" in data_readiness
+    if model_overclaims_source or signed_constraint_class == "overclaimed_boundary":
+        evidence_grade = "overclaimed_or_forbidden"
+        allowed_claim = "do_not_claim"
+        publishable = False
+    elif trajectory_pending:
+        evidence_grade = "pending_trajectory_reanalysis"
+        allowed_claim = "pending_reanalysis_only"
+        publishable = False
+    elif claim_alignment == "scope_boundary" or signed_constraint_class == "scope_boundary_consistent":
+        evidence_grade = "thermodynamic_scope_boundary"
+        allowed_claim = "scope_boundary_only"
+        publishable = True
+    elif claim_alignment == "supported" and signed_constraint_class == "sota_consistent":
+        evidence_grade = "direct_dynamical_support"
+        allowed_claim = "dynamical_signature_supported"
+        publishable = True
+    elif claim_alignment == "partial" or signed_constraint_class == "closure_assisted_consistent" or requires_external_closure:
+        evidence_grade = "closure_assisted_support"
+        allowed_claim = "closure_assisted_dynamical_trend"
+        publishable = True
+    else:
+        evidence_grade = "not_supported"
+        allowed_claim = "do_not_claim"
+        publishable = False
+
+    if quantitative_fit_ready:
+        evidence_strength = "uncertainty_weighted_quantitative"
+    elif data_readiness in {"structural_raw", "metadata_verified_not_reanalysis"}:
+        evidence_strength = "structural_or_metadata"
+    else:
+        evidence_strength = "qualitative_or_protocol"
+
+    return {
+        "verdict_id": verdict_id,
+        "source_key": source_key,
+        "phenomenon": phenomenon,
+        "claim_alignment": claim_alignment,
+        "signed_constraint_class": signed_constraint_class,
+        "data_readiness": data_readiness,
+        "requires_external_closure": float(requires_external_closure),
+        "quantitative_fit_ready": float(quantitative_fit_ready),
+        "model_overclaims_source": float(model_overclaims_source),
+        "reanalysis_stage": reanalysis_stage,
+        "trajectory_reanalysis_required": float(trajectory_pending),
+        "evidence_strength": evidence_strength,
+        "evidence_grade": evidence_grade,
+        "allowed_manuscript_claim": allowed_claim,
+        "publishable_without_overclaim": float(publishable),
+    }
+
+
 def sota_signed_constraint_audit(
     *,
     constraint_id: str,

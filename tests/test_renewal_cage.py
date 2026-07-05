@@ -116,6 +116,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_claim_alignment,
     sota_data_accession_gate,
+    sota_evidence_verdict,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_readme_schema_gate,
@@ -2421,6 +2422,58 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 data_readiness="qualitative",
                 primary_blocker="none",
             )
+
+    def test_sota_evidence_verdict_grades_direct_dynamic_support(self):
+        row = sota_evidence_verdict(
+            verdict_id="kob_andersen_van_hove_verdict",
+            source_key="kob1995vanhove",
+            phenomenon="cage_plateau_transient_ngp_van_hove_tail",
+            claim_alignment="supported",
+            signed_constraint_class="sota_consistent",
+            data_readiness="structural_raw",
+            requires_external_closure=False,
+            quantitative_fit_ready=False,
+            model_overclaims_source=False,
+            reanalysis_stage="not_required_for_literature_claim",
+        )
+
+        self.assertEqual(row["evidence_grade"], "direct_dynamical_support")
+        self.assertEqual(row["allowed_manuscript_claim"], "dynamical_signature_supported")
+        self.assertEqual(row["publishable_without_overclaim"], 1.0)
+        self.assertEqual(row["trajectory_reanalysis_required"], 0.0)
+
+    def test_sota_evidence_verdict_keeps_boundaries_and_pending_reanalysis_separate(self):
+        thermodynamic = sota_evidence_verdict(
+            verdict_id="kauzmann_boundary_verdict",
+            source_key="kauzmann1948nature;adam1965temperature",
+            phenomenon="configurational_entropy_and_ideal_glass_scope",
+            claim_alignment="scope_boundary",
+            signed_constraint_class="scope_boundary_consistent",
+            data_readiness="qualitative",
+            requires_external_closure=True,
+            quantitative_fit_ready=False,
+            model_overclaims_source=False,
+            reanalysis_stage="not_required_for_literature_claim",
+        )
+        pending = sota_evidence_verdict(
+            verdict_id="glassbench_pending_verdict",
+            source_key="glassbench_zenodo_trajectory_release",
+            phenomenon="trajectory_level_persistence_exchange_test",
+            claim_alignment="partial",
+            signed_constraint_class="closure_assisted_consistent",
+            data_readiness="metadata_verified_not_reanalysis",
+            requires_external_closure=True,
+            quantitative_fit_ready=False,
+            model_overclaims_source=False,
+            reanalysis_stage="awaiting_full_archive_cache",
+        )
+
+        self.assertEqual(thermodynamic["evidence_grade"], "thermodynamic_scope_boundary")
+        self.assertEqual(thermodynamic["allowed_manuscript_claim"], "scope_boundary_only")
+        self.assertEqual(thermodynamic["publishable_without_overclaim"], 1.0)
+        self.assertEqual(pending["evidence_grade"], "pending_trajectory_reanalysis")
+        self.assertEqual(pending["trajectory_reanalysis_required"], 1.0)
+        self.assertEqual(pending["publishable_without_overclaim"], 0.0)
 
     def test_sota_signed_constraint_audit_accepts_dynamic_signatures_without_forbidden_claims(self):
         row = sota_signed_constraint_audit(
