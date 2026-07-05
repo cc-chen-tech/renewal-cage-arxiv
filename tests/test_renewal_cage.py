@@ -106,6 +106,7 @@ from renewal_cage import (  # noqa: E402
     stokes_einstein_benchmark_consistency,
     stretched_alpha_benchmark_consistency,
     stokes_einstein_product,
+    sota_claim_alignment,
     thermodynamic_scope_benchmark_consistency,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
@@ -1471,6 +1472,56 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["qualitative_comparison_ready"], 1.0)
         self.assertEqual(row["quantitative_inversion_ready"], 0.0)
         self.assertEqual(row["uncertainty_weighted_ready"], 0.0)
+
+    def test_sota_claim_alignment_scores_supported_dynamic_claim(self):
+        row = sota_claim_alignment(
+            claim_id="hedges_persistence_exchange_decoupling",
+            source_key="hedges2007persistence",
+            phenomenon="persistence_exchange_decoupling",
+            claim_type="dynamical_signature",
+            observed_claim="persistence and exchange times decouple on cooling",
+            model_diagnostic="raw_curve_persistence_exchange_protocol",
+            model_support_level="derived",
+            data_readiness="qualitative",
+            primary_blocker="machine_readable_curves",
+        )
+
+        self.assertEqual(row["claim_alignment"], "supported")
+        self.assertEqual(row["model_overclaims_source"], 0.0)
+        self.assertEqual(row["requires_external_closure"], 0.0)
+        self.assertEqual(row["quantitative_fit_ready"], 0.0)
+
+    def test_sota_claim_alignment_marks_thermodynamic_boundary_as_not_derived(self):
+        row = sota_claim_alignment(
+            claim_id="kauzmann_entropy_transition",
+            source_key="kauzmann1948nature",
+            phenomenon="thermodynamic_glass_transition",
+            claim_type="thermodynamic_transition",
+            observed_claim="configurational entropy extrapolates toward an ideal-glass limit",
+            model_diagnostic="adam_gibbs_entropy_closure",
+            model_support_level="closure_only",
+            data_readiness="qualitative",
+            primary_blocker="thermodynamic_input_law",
+        )
+
+        self.assertEqual(row["claim_alignment"], "scope_boundary")
+        self.assertEqual(row["model_overclaims_source"], 0.0)
+        self.assertEqual(row["requires_external_closure"], 1.0)
+        self.assertEqual(row["quantitative_fit_ready"], 0.0)
+
+    def test_sota_claim_alignment_rejects_overclaimed_thermodynamic_derivation(self):
+        with self.assertRaises(ValueError):
+            sota_claim_alignment(
+                claim_id="bad_thermodynamic_claim",
+                source_key="kauzmann1948nature",
+                phenomenon="thermodynamic_glass_transition",
+                claim_type="thermodynamic_transition",
+                observed_claim="ideal glass thermodynamics",
+                model_diagnostic="renewal_dynamics",
+                model_support_level="derived",
+                data_readiness="qualitative",
+                primary_blocker="none",
+            )
 
     def test_observable_falsification_matrix_marks_diagnostic_blockers(self):
         rows = observable_falsification_matrix(

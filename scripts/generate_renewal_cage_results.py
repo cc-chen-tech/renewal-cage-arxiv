@@ -93,6 +93,7 @@ from renewal_cage import (  # noqa: E402
     self_intermediate_scattering,
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
+    sota_claim_alignment,
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
@@ -2138,6 +2139,103 @@ def write_literature_inversion_readiness_csv(path: Path) -> list[dict[str, float
     return rows
 
 
+def write_sota_claim_alignment_csv(path: Path) -> list[dict[str, float | str]]:
+    """Map source-level SOTA claims to model diagnostics and scope boundaries."""
+
+    rows = [
+        sota_claim_alignment(
+            claim_id="kob_andersen_van_hove_caging_ngp",
+            source_key="kob1995vanhove",
+            phenomenon="cage_plateau_transient_ngp_van_hove_tail",
+            claim_type="dynamical_signature",
+            observed_claim="binary Lennard-Jones cooling shows caging, non-Gaussian displacement structure, and van-Hove tails",
+            model_diagnostic="msd_ngp_van_hove_gaussian_recovery",
+            model_support_level="derived",
+            data_readiness="structural_raw",
+            primary_blocker="uncertainty_columns",
+        ),
+        sota_claim_alignment(
+            claim_id="kob_andersen_intermediate_scattering_alpha",
+            source_key="kob1995intermediate",
+            phenomenon="self_intermediate_scattering_alpha_relaxation",
+            claim_type="dynamical_signature",
+            observed_claim="self-intermediate scattering has plateau and alpha relaxation with temperature-dependent shape",
+            model_diagnostic="multi_k_alpha_shape_raw_curve_protocol",
+            model_support_level="derived",
+            data_readiness="structural_raw",
+            primary_blocker="uncertainty_columns",
+        ),
+        sota_claim_alignment(
+            claim_id="hedges_persistence_exchange_decoupling",
+            source_key="hedges2007persistence",
+            phenomenon="persistence_exchange_decoupling",
+            claim_type="transport_decoupling",
+            observed_claim="persistence and exchange clocks decouple in atomistic glass formers",
+            model_diagnostic="raw_curve_persistence_exchange_protocol",
+            model_support_level="derived",
+            data_readiness="qualitative",
+            primary_blocker="machine_readable_joint_curves",
+        ),
+        sota_claim_alignment(
+            claim_id="lacevic_four_point_dynamic_length",
+            source_key="lacevic2003fourpoint",
+            phenomenon="chi4_peak_and_dynamic_length_growth",
+            claim_type="spatial_heterogeneity",
+            observed_claim="four-point correlations reveal growing dynamic heterogeneity and a dynamic length scale",
+            model_diagnostic="spatial_facilitation_chi4_proxy",
+            model_support_level="effective_closure",
+            data_readiness="qualitative",
+            primary_blocker="shared_transport_and_four_point_grid",
+        ),
+        sota_claim_alignment(
+            claim_id="jung_berthier_experimental_dynamic_heterogeneity",
+            source_key="berthier2024experimental",
+            phenomenon="experimental_dynamic_heterogeneity",
+            claim_type="spatial_heterogeneity",
+            observed_claim="machine-learning transfer predicts dynamic heterogeneity near experimental glass transition",
+            model_diagnostic="chi4_proxy_and_front_diffusivity_closure",
+            model_support_level="effective_closure",
+            data_readiness="qualitative",
+            primary_blocker="trajectory_level_chi4_input",
+        ),
+        sota_claim_alignment(
+            claim_id="guan_granick_fickian_non_gaussian",
+            source_key="guan2014fickian",
+            phenomenon="fickian_non_gaussian_diffusion",
+            claim_type="dynamical_signature",
+            observed_claim="hard-sphere colloids can be Fickian while retaining non-Gaussian displacement distributions",
+            model_diagnostic="transient_ngp_with_long_time_gaussian_recovery",
+            model_support_level="derived",
+            data_readiness="qualitative",
+            primary_blocker="digitized_uncertainty_weighted_curves",
+        ),
+        sota_claim_alignment(
+            claim_id="angell_fragility_growth",
+            source_key="angell1995formation",
+            phenomenon="fragility_growth",
+            claim_type="dynamical_signature",
+            observed_claim="fragile glass formers show rapidly growing apparent activation on cooling",
+            model_diagnostic="activated_barrier_fragility_proxy",
+            model_support_level="effective_closure",
+            data_readiness="qualitative",
+            primary_blocker="material_specific_barrier_origin",
+        ),
+        sota_claim_alignment(
+            claim_id="kauzmann_adam_gibbs_entropy_boundary",
+            source_key="kauzmann1948nature;adam1965temperature",
+            phenomenon="configurational_entropy_and_ideal_glass_scope",
+            claim_type="thermodynamic_transition",
+            observed_claim="entropy extrapolation and Adam-Gibbs relaxation connect thermodynamics to slowdown",
+            model_diagnostic="adam_gibbs_entropy_closure",
+            model_support_level="closure_only",
+            data_readiness="qualitative",
+            primary_blocker="thermodynamic_input_law",
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -3216,6 +3314,69 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     path.write_text(svg)
 
 
+def write_sota_claim_alignment_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 650
+    left, top = 75, 100
+    row_h = 54
+    colors_by_alignment = {
+        "supported": "#2f855a",
+        "partial": "#2b6cb0",
+        "scope_boundary": "#805ad5",
+        "not_supported": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        alignment = str(row["claim_alignment"])
+        color = colors_by_alignment[alignment]
+        readiness = str(row["data_readiness"]).replace("_", " ")
+        closure = int(float(row["requires_external_closure"]))
+        fit_ready = int(float(row["quantitative_fit_ready"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["source_key"])[:28]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 185}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["phenomenon"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 500}" y="{y + 1}" width="110" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 512}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{alignment.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 632}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">support: {str(row["model_support_level"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 790}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">closure={closure}; fit={fit_ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 925}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">block: {str(row["primary_blocker"]).replace("_", " ")[:27]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 185}" y="{y + 36}" font-family="Arial, sans-serif" font-size="9" fill="#555">{str(row["observed_claim"])[:115]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 632}" y="{y + 36}" font-family="Arial, sans-serif" font-size="9" fill="#555">data: {readiness}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA claim alignment audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Source-level claims are mapped to diagnostics, data readiness, and scope boundaries to prevent overclaiming.</text>
+  <text x="{left}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">source</text>
+  <text x="{left + 185}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">phenomenon and source claim</text>
+  <text x="{left + 500}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">alignment</text>
+  <text x="{left + 632}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">model/data status</text>
+  {"".join(marks)}
+  <rect x="75" y="580" width="14" height="14" fill="#2f855a" /><text x="96" y="592" font-family="Arial, sans-serif" font-size="12">derived dynamical support</text>
+  <rect x="260" y="580" width="14" height="14" fill="#2b6cb0" /><text x="281" y="592" font-family="Arial, sans-serif" font-size="12">effective closure or proxy</text>
+  <rect x="455" y="580" width="14" height="14" fill="#805ad5" /><text x="476" y="592" font-family="Arial, sans-serif" font-size="12">explicit scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -4193,6 +4354,13 @@ def main() -> None:
         params=params,
     )
     write_sota_comparison_csv(DATA_DIR / "renewal_cage_sota_comparison.csv")
+    sota_claim_alignment_rows = write_sota_claim_alignment_csv(
+        DATA_DIR / "renewal_cage_sota_claim_alignment.csv"
+    )
+    write_sota_claim_alignment_svg(
+        FIGURE_DIR / "renewal_cage_sota_claim_alignment.svg",
+        sota_claim_alignment_rows,
+    )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"
     )

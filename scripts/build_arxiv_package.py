@@ -1434,6 +1434,56 @@ def write_raw_curve_ingestion_contract_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_claim_alignment_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_claim_alignment.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA claim alignment audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Source-level claims are mapped to diagnostics, data readiness, and scope boundaries.",
+    )
+    left, top = 45, page_h - 88
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top, "source")
+    c.drawString(left + 120, top, "phenomenon")
+    c.drawString(left + 330, top, "alignment")
+    c.drawString(left + 420, top, "support")
+    c.drawString(left + 535, top, "closure")
+    c.drawString(left + 590, top, "fit")
+    c.drawString(left + 630, top, "blocker")
+    palette = {
+        "supported": colors.HexColor("#2f855a"),
+        "partial": colors.HexColor("#2b6cb0"),
+        "scope_boundary": colors.HexColor("#805ad5"),
+        "not_supported": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 20 - idx * 38
+        alignment = row["claim_alignment"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["source_key"][:20])
+        c.drawString(left + 120, y, row["phenomenon"].replace("_", " ")[:35])
+        c.setFillColor(palette[alignment])
+        c.rect(left + 330, y - 4, 72, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 335, y, alignment.replace("_", " ")[:14])
+        c.setFillColor(colors.black)
+        c.drawString(left + 420, y, row["model_support_level"].replace("_", " ")[:17])
+        c.drawString(left + 535, y, str(int(float(row["requires_external_closure"]))))
+        c.drawString(left + 590, y, str(int(float(row["quantitative_fit_ready"]))))
+        c.drawString(left + 630, y, row["primary_blocker"].replace("_", " ")[:24])
+        c.drawString(left + 120, y - 10, row["observed_claim"][:96])
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1971,6 +2021,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     thermodynamic_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_closure.pdf"
     mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
     sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
+    sota_claim_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_claim_alignment.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2002,6 +2053,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_thermodynamic_closure_pdf(thermodynamic_closure_pdf)
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
+    write_sota_claim_alignment_pdf(sota_claim_alignment_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2042,6 +2094,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(thermodynamic_closure_pdf, "figures/renewal_cage_thermodynamic_closure.pdf")
         archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
         archive.write(sota_benchmark_consistency_pdf, "figures/renewal_cage_sota_benchmark_consistency.pdf")
+        archive.write(sota_claim_alignment_pdf, "figures/renewal_cage_sota_claim_alignment.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(
             observable_falsification_matrix_pdf,

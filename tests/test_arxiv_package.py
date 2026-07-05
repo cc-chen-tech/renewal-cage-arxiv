@@ -154,6 +154,20 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(by_id["kob_andersen_van_hove_1995"]["quantitative_inversion_ready"]), 0.0)
         self.assertEqual(float(by_id["hedges_persistence_exchange_2007"]["uncertainty_weighted_ready"]), 0.0)
 
+    def test_sota_claim_alignment_preserves_scope_boundaries(self):
+        path = ROOT / "data" / "renewal_cage_sota_claim_alignment.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["claim_id"]: row for row in rows}
+        self.assertEqual(by_id["hedges_persistence_exchange_decoupling"]["claim_alignment"], "supported")
+        self.assertEqual(by_id["lacevic_four_point_dynamic_length"]["claim_alignment"], "partial")
+        thermodynamic = by_id["kauzmann_adam_gibbs_entropy_boundary"]
+        self.assertEqual(thermodynamic["claim_alignment"], "scope_boundary")
+        self.assertEqual(float(thermodynamic["requires_external_closure"]), 1.0)
+        self.assertEqual(float(thermodynamic["model_overclaims_source"]), 0.0)
+
     def test_observable_falsification_matrix_maps_literature_to_diagnostic_blockers(self):
         path = ROOT / "data" / "renewal_cage_observable_falsification_matrix.csv"
         self.assertTrue(path.exists())
@@ -298,6 +312,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", names)
             self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", names)
             self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", names)
@@ -331,6 +346,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", main_tex)
         self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
@@ -350,6 +366,7 @@ class ArxivPackageTests(unittest.TestCase):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
         readiness_figures = [
             "figures/renewal_cage_sota_benchmark_consistency.pdf",
+            "figures/renewal_cage_sota_claim_alignment.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_observable_falsification_matrix.pdf",
             "figures/renewal_cage_benchmark_fusion_readiness.pdf",
@@ -399,6 +416,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_sota_benchmark_consistency = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_benchmark_consistency.pdf"
+            ).read_bytes()
+            first_sota_claim_alignment = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_claim_alignment.pdf"
             ).read_bytes()
             first_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
@@ -466,6 +486,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_benchmark_consistency = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_benchmark_consistency.pdf"
             ).read_bytes()
+            second_sota_claim_alignment = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_claim_alignment.pdf"
+            ).read_bytes()
             second_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
@@ -520,6 +543,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_thermodynamic_closure, second_thermodynamic_closure)
         self.assertEqual(first_mct_beta_closure, second_mct_beta_closure)
         self.assertEqual(first_sota_benchmark_consistency, second_sota_benchmark_consistency)
+        self.assertEqual(first_sota_claim_alignment, second_sota_claim_alignment)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
         self.assertEqual(first_observable_falsification_matrix, second_observable_falsification_matrix)
         self.assertEqual(first_benchmark_fusion_readiness, second_benchmark_fusion_readiness)

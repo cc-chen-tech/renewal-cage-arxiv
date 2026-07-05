@@ -93,6 +93,10 @@ transport inversion with held-out late-NGP validation, joint multi-k/chi4
 persistence-exchange falsification, a van Hove tail/recovery consistency
 check, an Angell/Adam-Gibbs fragility-growth scope check, and a
 thermodynamic-transition no-go/scope-boundary row.
+The SOTA claim-alignment audit then separates source claims into derived
+dynamical support, effective-closure support, and explicit scope boundaries so
+that spatial four-point claims and thermodynamic-transition claims are not
+overstated as consequences of the renewal dynamics alone.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 
@@ -162,6 +166,7 @@ figures/renewal_cage_spatial_chi4.svg
 figures/renewal_cage_thermodynamic_closure.svg
 figures/renewal_cage_mct_beta_closure.svg
 figures/renewal_cage_sota_benchmark_consistency.svg
+figures/renewal_cage_sota_claim_alignment.svg
 figures/renewal_cage_literature_inversion_readiness.svg
 figures/renewal_cage_observable_falsification_matrix.svg
 figures/renewal_cage_benchmark_fusion_readiness.svg
@@ -200,6 +205,7 @@ data/renewal_cage_spatial_facilitation_inversion.csv
 data/renewal_cage_thermodynamic_closure.csv
 data/renewal_cage_mct_beta_closure.csv
 data/renewal_cage_sota_benchmark_consistency.csv
+data/renewal_cage_sota_claim_alignment.csv
 data/renewal_cage_literature_inversion_readiness.csv
 data/renewal_cage_observable_falsification_matrix.csv
 data/renewal_cage_benchmark_fusion_readiness.csv
@@ -235,6 +241,7 @@ paper/figures/renewal_cage_spatial_chi4.pdf
 paper/figures/renewal_cage_thermodynamic_closure.pdf
 paper/figures/renewal_cage_mct_beta_closure.pdf
 paper/figures/renewal_cage_sota_benchmark_consistency.pdf
+paper/figures/renewal_cage_sota_claim_alignment.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf
 paper/figures/renewal_cage_observable_falsification_matrix.pdf
 paper/figures/renewal_cage_benchmark_fusion_readiness.pdf

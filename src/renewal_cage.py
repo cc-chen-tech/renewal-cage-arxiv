@@ -1101,6 +1101,83 @@ def literature_inversion_readiness(
     }
 
 
+def sota_claim_alignment(
+    *,
+    claim_id: str,
+    source_key: str,
+    phenomenon: str,
+    claim_type: str,
+    observed_claim: str,
+    model_diagnostic: str,
+    model_support_level: str,
+    data_readiness: str,
+    primary_blocker: str,
+) -> dict[str, float | str]:
+    """Map a source-level glass claim to the model's diagnostic status."""
+
+    for name, value in {
+        "claim_id": claim_id,
+        "source_key": source_key,
+        "phenomenon": phenomenon,
+        "claim_type": claim_type,
+        "observed_claim": observed_claim,
+        "model_diagnostic": model_diagnostic,
+        "model_support_level": model_support_level,
+        "data_readiness": data_readiness,
+        "primary_blocker": primary_blocker,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+
+    allowed_claim_types = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    allowed_support = {"derived", "effective_closure", "closure_only", "not_supported"}
+    allowed_readiness = {"qualitative", "structural_raw", "uncertainty_weighted"}
+    if claim_type not in allowed_claim_types:
+        raise ValueError("claim_type is not recognized")
+    if model_support_level not in allowed_support:
+        raise ValueError("model_support_level is not recognized")
+    if data_readiness not in allowed_readiness:
+        raise ValueError("data_readiness is not recognized")
+    if claim_type == "thermodynamic_transition" and model_support_level == "derived":
+        raise ValueError("renewal dynamics cannot be marked as deriving a thermodynamic transition")
+
+    requires_closure = model_support_level in {"effective_closure", "closure_only"}
+    if model_support_level == "derived":
+        alignment = "supported"
+    elif model_support_level in {"effective_closure", "closure_only"}:
+        alignment = "scope_boundary" if claim_type == "thermodynamic_transition" else "partial"
+    else:
+        alignment = "not_supported"
+
+    quantitative_fit_ready = data_readiness == "uncertainty_weighted" and primary_blocker == "none"
+    overclaims = (
+        claim_type == "thermodynamic_transition" and model_support_level != "closure_only"
+    ) or (
+        claim_type == "spatial_heterogeneity" and model_support_level == "derived"
+    )
+
+    return {
+        "claim_id": claim_id,
+        "source_key": source_key,
+        "phenomenon": phenomenon,
+        "claim_type": claim_type,
+        "observed_claim": observed_claim,
+        "model_diagnostic": model_diagnostic,
+        "model_support_level": model_support_level,
+        "claim_alignment": alignment,
+        "data_readiness": data_readiness,
+        "primary_blocker": primary_blocker,
+        "requires_external_closure": float(requires_closure),
+        "quantitative_fit_ready": float(quantitative_fit_ready),
+        "model_overclaims_source": float(overclaims),
+    }
+
+
 def observable_falsification_matrix(
     *,
     benchmark_id: str,

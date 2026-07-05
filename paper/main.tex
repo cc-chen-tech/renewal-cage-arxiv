@@ -1002,6 +1002,17 @@ corrupted multi-$k$ case is rejected with residual $0.223$. These are still
 not fits to raw trajectory data; they are
 reproducible bridges from the SOTA comparison table to checkable
 model-versus-benchmark rows.
+The source-level alignment file
+\texttt{renewal\_cage\_sota\_claim\_alignment.csv} adds a stricter guard against
+overclaiming. It maps each cited benchmark claim to one of four statuses:
+derived dynamical support, partial effective closure, explicit thermodynamic
+scope boundary, or not supported. Under this audit, Kob-Andersen caging/NGP and
+self-intermediate-scattering claims, Hedges persistence/exchange decoupling,
+and Fickian non-Gaussian diffusion are marked as derived dynamical diagnostics;
+four-point dynamic length and experimental dynamic-heterogeneity claims are
+marked as effective spatial closures; Angell fragility is a barrier-law proxy;
+and Kauzmann/Adam-Gibbs thermodynamics is an explicit closure boundary rather
+than a consequence of renewal dynamics alone.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the
@@ -1220,6 +1231,15 @@ rejected without refitting the clocks.
   the thermodynamic-transition scope boundary: heat-capacity and Kauzmann
   signatures require the explicit entropy closure and are not derived from
   renewal dynamics alone.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_claim_alignment.pdf}
+  \caption{Source-level SOTA claim alignment. Each cited benchmark claim is
+  mapped to a model diagnostic, support level, data-readiness state, and primary
+  blocker. Dynamical signatures are separated from effective spatial closures
+  and from thermodynamic-transition scope boundaries.}
 \end{figure}
 
 \begin{figure}[p]
