@@ -126,6 +126,9 @@ fit is claimed.
 The frontier benchmark horizon classifies recent SOTA sources as trajectory
 reanalysis candidates, transport/heterogeneity candidates, closure horizons,
 model-extension gaps, or thermodynamic scope boundaries.
+The SOTA source-provenance gate then checks whether a cited source is actually
+a reanalysis input by requiring explicit identifiers, machine-readable files,
+raw trajectories or observable tables, protocol metadata, and reuse permission.
 The translation-rotation protocol adds an effective rotational renewal clock
 for Debye-Stokes-Einstein and near-Tg molecular-motion diagnostics without
 claiming a microscopic orientational potential theory.
@@ -205,6 +208,7 @@ figures/renewal_cage_real_benchmark_assimilation_gate.svg
 figures/renewal_cage_cross_observable_prediction_ledger.svg
 figures/renewal_cage_inversion_identifiability_audit.svg
 figures/renewal_cage_frontier_benchmark_horizon.svg
+figures/renewal_cage_sota_source_provenance.svg
 figures/renewal_cage_literature_inversion_readiness.svg
 figures/renewal_cage_observable_falsification_matrix.svg
 figures/renewal_cage_benchmark_fusion_readiness.svg
@@ -253,6 +257,7 @@ data/renewal_cage_real_benchmark_assimilation_gate.csv
 data/renewal_cage_cross_observable_prediction_ledger.csv
 data/renewal_cage_inversion_identifiability_audit.csv
 data/renewal_cage_frontier_benchmark_horizon.csv
+data/renewal_cage_sota_source_provenance.csv
 data/renewal_cage_literature_inversion_readiness.csv
 data/renewal_cage_observable_falsification_matrix.csv
 data/renewal_cage_benchmark_fusion_readiness.csv
@@ -298,6 +303,7 @@ paper/figures/renewal_cage_real_benchmark_assimilation_gate.pdf
 paper/figures/renewal_cage_cross_observable_prediction_ledger.pdf
 paper/figures/renewal_cage_inversion_identifiability_audit.pdf
 paper/figures/renewal_cage_frontier_benchmark_horizon.pdf
+paper/figures/renewal_cage_sota_source_provenance.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf
 paper/figures/renewal_cage_observable_falsification_matrix.pdf
 paper/figures/renewal_cage_benchmark_fusion_readiness.pdf

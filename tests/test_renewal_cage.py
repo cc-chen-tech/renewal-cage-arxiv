@@ -111,6 +111,7 @@ from renewal_cage import (  # noqa: E402
     stretched_alpha_benchmark_consistency,
     stokes_einstein_product,
     sota_claim_alignment,
+    sota_source_provenance_gate,
     sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
     temperature_dependent_params,
@@ -1778,6 +1779,77 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(rotational["model_extension_required"], 0.0)
         self.assertEqual(thermo["horizon_class"], "scope_boundary")
         self.assertEqual(thermo["overclaim_risk"], 0.0)
+
+    def test_sota_source_provenance_gate_promotes_public_trajectory_repository(self):
+        row = sota_source_provenance_gate(
+            source_id="glassbench_zenodo_trajectory_release",
+            citation_key="jung2025roadmap",
+            source_type="dataset_repository",
+            model_scope="dynamical_signature",
+            provenance_items=[
+                "doi",
+                "repository_url",
+                "machine_readable_files",
+                "raw_particle_trajectories",
+                "simulation_protocol_metadata",
+                "license_or_terms",
+            ],
+            supported_observables=[
+                "particle_trajectories",
+                "time_grid",
+                "temperature_grid",
+                "structure",
+            ],
+            required_downstream_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+            has_reanalysis_permission=True,
+        )
+
+        self.assertEqual(row["provenance_stage"], "trajectory_reanalysis_source")
+        self.assertEqual(row["can_enter_trajectory_protocol"], 1.0)
+        self.assertEqual(row["can_enter_raw_curve_protocol"], 0.0)
+        self.assertEqual(row["requires_digitization"], 0.0)
+        self.assertEqual(row["primary_blocker"], "none")
+
+    def test_sota_source_provenance_gate_blocks_citation_only_published_curves(self):
+        row = sota_source_provenance_gate(
+            source_id="hedges_persistence_exchange_jcp_article",
+            citation_key="hedges2007persistence",
+            source_type="article",
+            model_scope="transport_decoupling",
+            provenance_items=["doi", "published_figures"],
+            supported_observables=["persistence_time", "exchange_time", "tau_alpha"],
+            required_downstream_protocols=[
+                "persistence_exchange_protocol",
+                "persistence_exchange_uncertainty_protocol",
+            ],
+            has_reanalysis_permission=False,
+        )
+
+        self.assertEqual(row["provenance_stage"], "citation_only_source")
+        self.assertEqual(row["can_enter_trajectory_protocol"], 0.0)
+        self.assertEqual(row["can_enter_raw_curve_protocol"], 0.0)
+        self.assertEqual(row["requires_digitization"], 1.0)
+        self.assertEqual(row["primary_blocker"], "machine_readable_files")
+
+    def test_sota_source_provenance_gate_keeps_thermodynamics_as_scope_boundary(self):
+        row = sota_source_provenance_gate(
+            source_id="kauzmann_entropy_thermodynamic_boundary",
+            citation_key="kauzmann1948nature",
+            source_type="article",
+            model_scope="thermodynamic_transition",
+            provenance_items=["doi", "published_figures", "thermodynamic_observables"],
+            supported_observables=["configurational_entropy", "heat_capacity"],
+            required_downstream_protocols=["thermodynamic_entropy_closure"],
+            has_reanalysis_permission=True,
+        )
+
+        self.assertEqual(row["provenance_stage"], "scope_boundary_source")
+        self.assertEqual(row["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
+        self.assertEqual(row["scope_boundary"], 1.0)
 
     def test_sota_claim_alignment_scores_supported_dynamic_claim(self):
         row = sota_claim_alignment(

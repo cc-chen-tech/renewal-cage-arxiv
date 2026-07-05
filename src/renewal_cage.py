@@ -1576,6 +1576,143 @@ def frontier_benchmark_horizon(
     }
 
 
+def sota_source_provenance_gate(
+    *,
+    source_id: str,
+    citation_key: str,
+    source_type: str,
+    model_scope: str,
+    provenance_items: Sequence[str],
+    supported_observables: Sequence[str],
+    required_downstream_protocols: Sequence[str],
+    has_reanalysis_permission: bool,
+) -> dict[str, float | str]:
+    """Classify whether a SOTA source is usable as data, trajectories, or citation only."""
+
+    for name, value in {
+        "source_id": source_id,
+        "citation_key": citation_key,
+        "source_type": source_type,
+        "model_scope": model_scope,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    allowed_source_types = {"article", "dataset_repository", "code_repository", "mixed_release"}
+    allowed_scopes = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    if source_type not in allowed_source_types:
+        raise ValueError("source_type is not recognized")
+    if model_scope not in allowed_scopes:
+        raise ValueError("model_scope is not recognized")
+    if not provenance_items:
+        raise ValueError("provenance_items must be nonempty")
+    if not supported_observables:
+        raise ValueError("supported_observables must be nonempty")
+    if not required_downstream_protocols:
+        raise ValueError("required_downstream_protocols must be nonempty")
+    for name, values in {
+        "provenance_items": provenance_items,
+        "supported_observables": supported_observables,
+        "required_downstream_protocols": required_downstream_protocols,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    provenance = list(dict.fromkeys(provenance_items))
+    observables = list(dict.fromkeys(supported_observables))
+    protocols = list(dict.fromkeys(required_downstream_protocols))
+    provenance_set = set(provenance)
+    observable_set = set(observables)
+
+    has_identifier = bool({"doi", "repository_url"} & provenance_set)
+    has_machine_readable_files = "machine_readable_files" in provenance_set
+    has_raw_trajectories = "raw_particle_trajectories" in provenance_set or "particle_trajectories" in observable_set
+    has_curve_tables = "observable_tables" in provenance_set or "machine_readable_curves" in provenance_set
+    has_protocol_metadata = "simulation_protocol_metadata" in provenance_set or "experimental_protocol_metadata" in provenance_set
+    has_license_or_terms = "license_or_terms" in provenance_set
+    trajectory_protocol_requested = any(protocol.startswith("trajectory_") for protocol in protocols)
+    raw_curve_protocol_requested = any("raw_curve" in protocol or "persistence_exchange" in protocol for protocol in protocols)
+
+    can_enter_trajectory = (
+        model_scope != "thermodynamic_transition"
+        and trajectory_protocol_requested
+        and has_identifier
+        and has_machine_readable_files
+        and has_raw_trajectories
+        and has_protocol_metadata
+        and has_license_or_terms
+        and has_reanalysis_permission
+    )
+    can_enter_raw_curve = (
+        model_scope != "thermodynamic_transition"
+        and raw_curve_protocol_requested
+        and has_identifier
+        and has_machine_readable_files
+        and has_curve_tables
+        and has_protocol_metadata
+        and has_reanalysis_permission
+    )
+
+    if model_scope == "thermodynamic_transition":
+        stage = "scope_boundary_source"
+        blocker = "renewal_dynamics_not_thermodynamic_theory"
+    elif can_enter_trajectory:
+        stage = "trajectory_reanalysis_source"
+        blocker = "none"
+    elif can_enter_raw_curve:
+        stage = "raw_curve_reanalysis_source"
+        blocker = "none"
+    elif not has_machine_readable_files:
+        stage = "citation_only_source"
+        blocker = "machine_readable_files"
+    elif not has_reanalysis_permission:
+        stage = "machine_readable_but_not_reanalysis_permitted"
+        blocker = "reanalysis_permission"
+    elif not has_protocol_metadata:
+        stage = "machine_readable_source_incomplete_metadata"
+        blocker = "protocol_metadata"
+    elif not has_license_or_terms:
+        stage = "machine_readable_source_incomplete_metadata"
+        blocker = "license_or_terms"
+    elif trajectory_protocol_requested and not has_raw_trajectories:
+        stage = "machine_readable_source_incomplete_metadata"
+        blocker = "raw_particle_trajectories"
+    elif raw_curve_protocol_requested and not has_curve_tables:
+        stage = "machine_readable_source_incomplete_metadata"
+        blocker = "observable_tables"
+    else:
+        stage = "citation_only_source"
+        blocker = "machine_readable_files"
+
+    requires_digitization = stage == "citation_only_source"
+    return {
+        "source_id": source_id,
+        "citation_key": citation_key,
+        "source_type": source_type,
+        "model_scope": model_scope,
+        "provenance_items": ";".join(provenance),
+        "supported_observables": ";".join(observables),
+        "required_downstream_protocols": ";".join(protocols),
+        "has_identifier": float(has_identifier),
+        "has_machine_readable_files": float(has_machine_readable_files),
+        "has_raw_particle_trajectories": float(has_raw_trajectories),
+        "has_observable_tables": float(has_curve_tables),
+        "has_protocol_metadata": float(has_protocol_metadata),
+        "has_license_or_terms": float(has_license_or_terms),
+        "has_reanalysis_permission": float(has_reanalysis_permission),
+        "can_enter_trajectory_protocol": float(can_enter_trajectory),
+        "can_enter_raw_curve_protocol": float(can_enter_raw_curve),
+        "requires_digitization": float(requires_digitization),
+        "scope_boundary": float(model_scope == "thermodynamic_transition"),
+        "primary_blocker": blocker,
+        "provenance_stage": stage,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,

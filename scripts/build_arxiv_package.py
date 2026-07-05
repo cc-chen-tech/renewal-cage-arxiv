@@ -1808,6 +1808,56 @@ def write_frontier_benchmark_horizon_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_source_provenance_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_source_provenance.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA source provenance gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A citation is not promoted to an inversion input unless repository, raw-data, metadata, and reuse conditions are explicit.",
+    )
+    left, top = 48, page_h - 92
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top, "source")
+    c.drawString(left + 240, top, "stage")
+    c.drawString(left + 455, top, "traj")
+    c.drawString(left + 500, top, "raw")
+    c.drawString(left + 540, top, "digitize")
+    c.drawString(left + 600, top, "blocker")
+    palette = {
+        "trajectory_reanalysis_source": colors.HexColor("#2f855a"),
+        "raw_curve_reanalysis_source": colors.HexColor("#2b6cb0"),
+        "machine_readable_but_not_reanalysis_permitted": colors.HexColor("#d69e2e"),
+        "machine_readable_source_incomplete_metadata": colors.HexColor("#c05621"),
+        "citation_only_source": colors.HexColor("#718096"),
+        "scope_boundary_source": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 7.1)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 46
+        stage = row["provenance_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["source_id"].replace("_", " ")[:36])
+        c.setFillColor(palette[stage])
+        c.rect(left + 240, y - 4, 185, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 246, y, stage.replace("_", " ")[:29])
+        c.setFillColor(colors.black)
+        c.drawString(left + 462, y, str(int(float(row["can_enter_trajectory_protocol"]))))
+        c.drawString(left + 507, y, str(int(float(row["can_enter_raw_curve_protocol"]))))
+        c.drawString(left + 550, y, str(int(float(row["requires_digitization"]))))
+        c.drawString(left + 600, y, row["primary_blocker"].replace("_", " ")[:26])
+        c.drawString(left + 80, y - 12, f"provenance: {row['provenance_items'].replace('_', ' ')[:94]}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2529,6 +2579,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         PAPER_FIGURE_DIR / "renewal_cage_inversion_identifiability_audit.pdf"
     )
     frontier_benchmark_horizon_pdf = PAPER_FIGURE_DIR / "renewal_cage_frontier_benchmark_horizon.pdf"
+    sota_source_provenance_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_source_provenance.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2570,6 +2621,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
     write_frontier_benchmark_horizon_pdf(frontier_benchmark_horizon_pdf)
+    write_sota_source_provenance_pdf(sota_source_provenance_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2629,6 +2681,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_inversion_identifiability_audit.pdf",
         )
         archive.write(frontier_benchmark_horizon_pdf, "figures/renewal_cage_frontier_benchmark_horizon.pdf")
+        archive.write(sota_source_provenance_pdf, "figures/renewal_cage_sota_source_provenance.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(
             observable_falsification_matrix_pdf,

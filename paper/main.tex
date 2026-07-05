@@ -1051,6 +1051,14 @@ translation--rotation decoupling tests, making it a structural inversion
 candidate until uncertainty columns are supplied; and heat-capacity or entropy
 benchmarks remain thermodynamic scope boundaries. The rotational extension is a
 diagnostic clock model, not a microscopic orientational potential theory.
+The source-provenance gate
+\texttt{renewal\_cage\_sota\_source\_provenance.csv} adds an earlier audit
+layer: a cited source is not treated as an inversion input unless its DOI or
+repository, machine-readable files, raw trajectories or observable tables,
+protocol metadata, and reuse permissions are explicit. Under this gate, the
+GlassBench trajectory release is a trajectory-reanalysis source, the Hedges
+persistence/exchange paper remains citation-only until machine-readable files
+are supplied, and thermodynamic entropy sources remain scope boundaries.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the
@@ -1311,6 +1319,14 @@ rejected without refitting the clocks.
   checked for protocol-required observables, shared-system consistency,
   machine-readable curves, uncertainty estimates, and scope boundaries before
   any claim of quantitative real-data inversion.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_source_provenance.pdf}
+  \caption{SOTA source provenance gate. Citations, dataset repositories, and
+  scope boundaries are separated before any source is passed to trajectory or
+  raw-curve inversion protocols.}
 \end{figure}
 
 \begin{figure}[p]

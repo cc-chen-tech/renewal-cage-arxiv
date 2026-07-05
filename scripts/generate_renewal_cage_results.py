@@ -98,6 +98,7 @@ from renewal_cage import (  # noqa: E402
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
+    sota_source_provenance_gate,
     sota_signed_constraint_audit,
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
@@ -2857,6 +2858,64 @@ def write_frontier_benchmark_horizon_csv(path: Path) -> list[dict[str, float | s
     return rows
 
 
+def write_sota_source_provenance_csv(path: Path) -> list[dict[str, float | str]]:
+    """Gate SOTA sources by provenance before treating them as inversion inputs."""
+
+    rows = [
+        sota_source_provenance_gate(
+            source_id="glassbench_zenodo_trajectory_release",
+            citation_key="jung2025roadmap",
+            source_type="dataset_repository",
+            model_scope="dynamical_signature",
+            provenance_items=[
+                "doi",
+                "repository_url",
+                "machine_readable_files",
+                "raw_particle_trajectories",
+                "simulation_protocol_metadata",
+                "license_or_terms",
+            ],
+            supported_observables=[
+                "particle_trajectories",
+                "time_grid",
+                "temperature_grid",
+                "structure",
+            ],
+            required_downstream_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+            has_reanalysis_permission=True,
+        ),
+        sota_source_provenance_gate(
+            source_id="hedges_persistence_exchange_jcp_article",
+            citation_key="hedges2007persistence",
+            source_type="article",
+            model_scope="transport_decoupling",
+            provenance_items=["doi", "published_figures"],
+            supported_observables=["persistence_time", "exchange_time", "tau_alpha"],
+            required_downstream_protocols=[
+                "persistence_exchange_protocol",
+                "persistence_exchange_uncertainty_protocol",
+            ],
+            has_reanalysis_permission=False,
+        ),
+        sota_source_provenance_gate(
+            source_id="kauzmann_entropy_thermodynamic_boundary",
+            citation_key="kauzmann1948nature",
+            source_type="article",
+            model_scope="thermodynamic_transition",
+            provenance_items=["doi", "published_figures", "thermodynamic_observables"],
+            supported_observables=["configurational_entropy", "heat_capacity"],
+            required_downstream_protocols=["thermodynamic_entropy_closure"],
+            has_reanalysis_permission=True,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -4415,6 +4474,58 @@ def write_frontier_benchmark_horizon_svg(path: Path, rows: list[dict[str, float 
     path.write_text(svg)
 
 
+def write_sota_source_provenance_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 430
+    left, top = 75, 105
+    row_h = 68
+    colors = {
+        "trajectory_reanalysis_source": "#2f855a",
+        "raw_curve_reanalysis_source": "#2b6cb0",
+        "machine_readable_but_not_reanalysis_permitted": "#d69e2e",
+        "machine_readable_source_incomplete_metadata": "#c05621",
+        "citation_only_source": "#718096",
+        "scope_boundary_source": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["provenance_stage"])
+        color = colors[stage]
+        trajectory = int(float(row["can_enter_trajectory_protocol"]))
+        raw_curve = int(float(row["can_enter_raw_curve_protocol"]))
+        digitize = int(float(row["requires_digitization"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["source_id"]).replace("_", " ")[:44]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 330}" y="{y - 4}" width="235" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 340}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:36]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 590}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">traj={trajectory}; raw={raw_curve}; digitize={digitize}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 70}" y="{y + 38}" font-family="Arial, sans-serif" font-size="9" fill="#555">provenance: {str(row["provenance_items"]).replace("_", " ")[:96]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA source provenance gate</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A citation is not promoted to an inversion input unless repository, raw-data, metadata, and reuse conditions are all explicit.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">source</text>
+  <text x="{left + 330}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">provenance stage</text>
+  <text x="{left + 590}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">protocol entry</text>
+  {"".join(marks)}
+  <rect x="75" y="365" width="14" height="14" fill="#2f855a" /><text x="96" y="377" font-family="Arial, sans-serif" font-size="12">trajectory reanalysis source</text>
+  <rect x="285" y="365" width="14" height="14" fill="#718096" /><text x="306" y="377" font-family="Arial, sans-serif" font-size="12">citation only</text>
+  <rect x="430" y="365" width="14" height="14" fill="#805ad5" /><text x="451" y="377" font-family="Arial, sans-serif" font-size="12">scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -5642,6 +5753,13 @@ def main() -> None:
     write_frontier_benchmark_horizon_svg(
         FIGURE_DIR / "renewal_cage_frontier_benchmark_horizon.svg",
         frontier_horizon_rows,
+    )
+    source_provenance_rows = write_sota_source_provenance_csv(
+        DATA_DIR / "renewal_cage_sota_source_provenance.csv"
+    )
+    write_sota_source_provenance_svg(
+        FIGURE_DIR / "renewal_cage_sota_source_provenance.svg",
+        source_provenance_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"
