@@ -1,0 +1,34 @@
+{
+  "source": "remote_zip_member_prefix_range_reads",
+  "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+  "probe_compressed_bytes": 65536,
+  "inflated_prefix_limit_bytes": 1024,
+  "entries": [
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.23",
+      "compressed_probe_range_start": 2980602255,
+      "compressed_probe_range_end": 2980667790,
+      "compressed_probe_bytes": 65536,
+      "compressed_probe_md5": "ba323cefe12381456e5e8ac6e27a5cd9",
+      "inflated_prefix_bytes": 1024,
+      "inflated_prefix_hex": "fd377a585a000004e6d6b44602002101",
+      "xz_magic_verified": true,
+      "stream_inflate_ready": true
+    },
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.30",
+      "compressed_probe_range_start": 464175,
+      "compressed_probe_range_end": 529710,
+      "compressed_probe_bytes": 65536,
+      "compressed_probe_md5": "387e92a0106638606b478f2c5076b499",
+      "inflated_prefix_bytes": 1024,
+      "inflated_prefix_hex": "fd377a585a000004e6d6b44602002101",
+      "xz_magic_verified": true,
+      "stream_inflate_ready": true
+    }
+  ]
+}

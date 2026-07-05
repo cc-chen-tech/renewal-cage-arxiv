@@ -2932,6 +2932,128 @@ def sota_glassbench_trajectory_entry_metadata_gate(
     return rows
 
 
+def sota_glassbench_trajectory_member_stream_probe_gate(
+    *,
+    probe_id: str,
+    accession_id: str,
+    metadata_rows: Sequence[dict[str, float | str]],
+    probe_manifest: dict,
+) -> list[dict[str, float | str]]:
+    """Verify small deflated-member probes before attempting trajectory extraction."""
+
+    if not probe_id:
+        raise ValueError("probe_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+
+    entries_value = probe_manifest.get("entries", [])
+    probe_entries = (
+        [entry for entry in entries_value if isinstance(entry, dict)]
+        if isinstance(entries_value, list)
+        else []
+    )
+    probe_by_path = {str(entry.get("path", "")): entry for entry in probe_entries if entry.get("path")}
+
+    rows: list[dict[str, float | str]] = []
+    for metadata in metadata_rows:
+        system_id = str(metadata.get("system_id", "unknown"))
+        temperature = str(metadata.get("temperature", "none"))
+        source_path = str(metadata.get("source_path", "none"))
+        entry_ready = bool(float(metadata.get("entry_metadata_ready", 0.0)))
+        if not entry_ready or source_path == "none":
+            rows.append(
+                {
+                    "probe_id": f"{probe_id}_{system_id.lower()}_{temperature}",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "compressed_probe_range_start": -1.0,
+                    "compressed_probe_range_end": -1.0,
+                    "compressed_probe_bytes": 0.0,
+                    "compressed_probe_md5": "none",
+                    "inflated_prefix_bytes": 0.0,
+                    "inflated_prefix_hex": "none",
+                    "stream_inflate_ready": 0.0,
+                    "xz_magic_verified": 0.0,
+                    "member_prefix_verified": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": str(metadata.get("primary_blocker", "entry_metadata")),
+                    "probe_stage": "trajectory_entry_metadata_incomplete",
+                }
+            )
+            continue
+
+        entry = probe_by_path.get(source_path)
+        if entry is None:
+            rows.append(
+                {
+                    "probe_id": f"{probe_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "compressed_probe_range_start": -1.0,
+                    "compressed_probe_range_end": -1.0,
+                    "compressed_probe_bytes": 0.0,
+                    "compressed_probe_md5": "none",
+                    "inflated_prefix_bytes": 0.0,
+                    "inflated_prefix_hex": "none",
+                    "stream_inflate_ready": 0.0,
+                    "xz_magic_verified": 0.0,
+                    "member_prefix_verified": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "member_stream_probe",
+                    "probe_stage": "trajectory_member_stream_probe_missing",
+                }
+            )
+            continue
+
+        compressed_probe_bytes = int(entry.get("compressed_probe_bytes", 0) or 0)
+        inflated_prefix_bytes = int(entry.get("inflated_prefix_bytes", 0) or 0)
+        stream_ready = bool(entry.get("stream_inflate_ready", False))
+        xz_verified = bool(entry.get("xz_magic_verified", False))
+        prefix_verified = (
+            compressed_probe_bytes > 0
+            and inflated_prefix_bytes > 0
+            and stream_ready
+            and xz_verified
+            and str(entry.get("inflated_prefix_hex", "")).startswith("fd377a585a00")
+        )
+        if prefix_verified:
+            stage = "trajectory_member_prefix_verified_streaming_extraction_blocked"
+            blocker = "streaming_member_extraction_policy"
+        else:
+            stage = "trajectory_member_prefix_probe_failed"
+            blocker = "member_prefix"
+
+        rows.append(
+            {
+                "probe_id": f"{probe_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "compressed_probe_range_start": float(int(entry.get("compressed_probe_range_start", -1) or -1)),
+                "compressed_probe_range_end": float(int(entry.get("compressed_probe_range_end", -1) or -1)),
+                "compressed_probe_bytes": float(compressed_probe_bytes),
+                "compressed_probe_md5": str(entry.get("compressed_probe_md5", "none")),
+                "inflated_prefix_bytes": float(inflated_prefix_bytes),
+                "inflated_prefix_hex": str(entry.get("inflated_prefix_hex", "none")),
+                "stream_inflate_ready": float(stream_ready),
+                "xz_magic_verified": float(xz_verified),
+                "member_prefix_verified": float(prefix_verified),
+                "trajectory_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": blocker,
+                "probe_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

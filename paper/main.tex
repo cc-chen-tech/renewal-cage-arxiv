@@ -1181,6 +1181,26 @@ the manuscript build. The gate therefore advances the SOTA chain to
   manuscript-package extraction and remain outside real-data inversion.}
 \end{figure}
 
+The member-stream probe goes one level deeper without changing that boundary.
+For each KA2D trajectory member, a 64 KB range read from the compressed member
+start is raw-deflate inflated to a 1024-byte prefix. Both prefixes begin with
+the \texttt{fd377a585a00} XZ magic, so the remote payload is not only a ZIP
+entry with plausible metadata; it is a streamable \texttt{tar.xz} member. This
+turns the next step into an engineering policy decision about streaming
+extraction, disk budget, and downstream uncertainty analysis, not a question of
+whether the public archive contains the trajectory payload. The gate still
+keeps \texttt{trajectory\_extraction\_ready=0} and
+\texttt{real\_reanalysis\_ready=0}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.pdf}
+  \caption{GlassBench trajectory member stream probe. Small range reads from
+  the compressed KA2D trajectory members inflate to XZ-magic prefixes, verifying
+  the embedded \texttt{tar.xz} payload type while leaving full trajectory
+  extraction and uncertainty-weighted renewal-cage inversion as later gates.}
+\end{figure}
+
 \clearpage
 
 The reanalysis-state ledger

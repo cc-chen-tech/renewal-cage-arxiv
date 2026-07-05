@@ -118,6 +118,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_verdict,
     sota_glassbench_trajectory_entry_metadata_gate,
+    sota_glassbench_trajectory_member_stream_probe_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
@@ -2469,6 +2470,64 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         ka = by_system["KA"]
         self.assertEqual(ka["metadata_stage"], "trajectory_payload_missing")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_member_stream_probe_verifies_xz_prefix(self):
+        metadata_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "entry_metadata_ready": 1.0,
+                "compressed_size_bytes": 397_505_592.0,
+                "primary_blocker": "member_payload_size_policy",
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "entry_metadata_ready": 0.0,
+                "compressed_size_bytes": 0.0,
+                "primary_blocker": "trajectory_payload",
+            },
+        ]
+        probe_manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                    "compressed_probe_range_start": 2_980_602_255,
+                    "compressed_probe_range_end": 2_980_667_790,
+                    "compressed_probe_bytes": 65_536,
+                    "compressed_probe_md5": "ba323cefe12381456e5e8ac6e27a5cd9",
+                    "inflated_prefix_bytes": 1024,
+                    "inflated_prefix_hex": "fd377a585a000004e6d6b44602002101",
+                    "xz_magic_verified": True,
+                    "stream_inflate_ready": True,
+                }
+            ]
+        }
+
+        rows = sota_glassbench_trajectory_member_stream_probe_gate(
+            probe_id="glassbench_trajectory_member_stream_probe",
+            accession_id="glassbench_zenodo_10118191",
+            metadata_rows=metadata_rows,
+            probe_manifest=probe_manifest,
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["probe_stage"], "trajectory_member_prefix_verified_streaming_extraction_blocked")
+        self.assertEqual(ka2d["source_path"], "GlassBench/KA2D_trajectories/T0.23.tar.xz")
+        self.assertEqual(ka2d["compressed_probe_bytes"], 65_536.0)
+        self.assertEqual(ka2d["stream_inflate_ready"], 1.0)
+        self.assertEqual(ka2d["xz_magic_verified"], 1.0)
+        self.assertEqual(ka2d["member_prefix_verified"], 1.0)
+        self.assertEqual(ka2d["trajectory_extraction_ready"], 0.0)
+        self.assertEqual(ka2d["real_reanalysis_ready"], 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "streaming_member_extraction_policy")
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["probe_stage"], "trajectory_entry_metadata_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):
