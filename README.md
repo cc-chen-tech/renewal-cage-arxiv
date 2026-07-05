@@ -200,6 +200,11 @@ machine-readable blockers: physical lag times, multiple independent members,
 multi-k self-intermediate scattering, a chi4/overlap observable, and positive
 uncertainty columns are required before a real persistence/exchange comparison
 is allowed.
+The NPZ ensemble-horizon gate narrows the ensemble blocker: the current 1 MB
+inner-tar prefix probes expose three KA2D `.npz` members at both temperatures,
+so the archive is not a single-trajectory source, but the prefix evidence is
+still one member short of the four-member uncertainty threshold and no
+multi-member extraction is claimed.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
@@ -326,6 +331,7 @@ figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.svg
+figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
@@ -397,6 +403,7 @@ data/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv
+data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
@@ -487,6 +494,7 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf
+paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf

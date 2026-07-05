@@ -2613,6 +2613,74 @@ def write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(path: Pat
     c.save()
 
 
+def write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench NPZ ensemble-member horizon")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Inner-tar prefix probes count visible NPZ members before multi-member extraction or real reanalysis.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 58
+    colors_by_stage = {
+        "prefix_member_horizon_ready_extraction_blocked": colors.HexColor("#2b6cb0"),
+        "prefix_member_horizon_short": colors.HexColor("#b7791f"),
+        "trajectory_layout_incomplete": colors.HexColor("#c05621"),
+        "sota_inversion_already_ready": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 92, top + 18, "stage")
+    c.drawString(left + 335, top + 18, "member-count evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["horizon_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(colors.black)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 92, y - 12, 225, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 100, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 335,
+            y,
+            "prefix members={}; extracted curves={}; threshold={}; gap={}; extraction={}".format(
+                int(float(row["prefix_npz_member_count"])),
+                int(float(row["extracted_curve_member_count"])),
+                int(float(row["min_member_count"])),
+                int(float(row["member_count_gap_to_threshold"])),
+                int(float(row["multi_npz_extraction_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 335,
+            y - 14,
+            f'split={row["split_labels_in_probe"]}; tar probe={int(float(row["tar_probe_bytes"]))} bytes; first={row["first_npz_member"][:84]}',
+        )
+        c.drawString(left + 335, y - 27, f'next={row["next_required_action"].replace("_", " ")[:96]}')
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "The horizon counts headers visible in the prefix only; it does not claim multi-NPZ extraction, uncertainties, or real inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3845,6 +3913,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_first_npz_inversion_readiness_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
     )
+    sota_glassbench_trajectory_npz_ensemble_horizon_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -3928,6 +3999,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(
         sota_glassbench_trajectory_first_npz_inversion_readiness_pdf
+    )
+    write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
+        sota_glassbench_trajectory_npz_ensemble_horizon_pdf
     )
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
@@ -4040,6 +4114,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_first_npz_inversion_readiness_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf",
+        )
+        archive.write(
+            sota_glassbench_trajectory_npz_ensemble_horizon_pdf,
+            "figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf",
         )
         archive.write(
             sota_remote_result_curve_cache_pdf,

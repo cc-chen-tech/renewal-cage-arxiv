@@ -103,6 +103,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
@@ -3483,6 +3484,25 @@ def write_sota_glassbench_trajectory_first_npz_inversion_readiness_csv(
     return rows
 
 
+def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
+    path: Path,
+    *,
+    tar_probe_rows: list[dict[str, float | str]],
+    inversion_readiness_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Record visible NPZ ensemble-member horizon before multi-member extraction."""
+
+    rows = sota_glassbench_trajectory_npz_ensemble_horizon_gate(
+        horizon_id="glassbench_npz_ensemble_horizon",
+        accession_id="glassbench_zenodo_10118191",
+        tar_probe_rows=tar_probe_rows,
+        inversion_readiness_rows=inversion_readiness_rows,
+        min_member_count=4,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -6414,6 +6434,63 @@ def write_sota_glassbench_trajectory_first_npz_inversion_readiness_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 420
+    left, top = 75, 112
+    row_h = 78
+    colors = {
+        "prefix_member_horizon_ready_extraction_blocked": "#2b6cb0",
+        "prefix_member_horizon_short": "#b7791f",
+        "trajectory_layout_incomplete": "#c05621",
+        "sota_inversion_already_ready": "#2f855a",
+    }
+    marks = []
+    for index, row in enumerate(rows):
+        y = top + index * row_h
+        stage = str(row["horizon_stage"])
+        color = colors.get(stage, "#4a5568")
+        prefix_count = int(float(row["prefix_npz_member_count"]))
+        extracted = int(float(row["extracted_curve_member_count"]))
+        gap = int(float(row["member_count_gap_to_threshold"]))
+        minimum = int(float(row["min_member_count"]))
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 4}" width="330" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:45]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 470}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">prefix members={prefix_count}; extracted curves={extracted}; threshold={minimum}; gap={gap}; extraction={int(float(row["multi_npz_extraction_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 43}" font-family="Arial, sans-serif" font-size="9" fill="#555">split={row["split_labels_in_probe"]}; tar probe={int(float(row["tar_probe_bytes"]))} bytes; first member: {str(row["first_npz_member"])[:88]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">next: {str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench NPZ ensemble-member horizon</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Inner-tar prefix probes count visible NPZ members before any multi-member extraction or real reanalysis is claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">horizon stage</text>
+  <text x="{left + 470}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member-count evidence</text>
+  {"".join(marks)}
+  <rect x="75" y="358" width="14" height="14" fill="#b7791f" /><text x="96" y="370" font-family="Arial, sans-serif" font-size="12">prefix member horizon short</text>
+  <rect x="320" y="358" width="14" height="14" fill="#2b6cb0" /><text x="341" y="370" font-family="Arial, sans-serif" font-size="12">enough prefix members, extraction still blocked</text>
+  <text x="660" y="370" font-family="Arial, sans-serif" font-size="12">current KA2D prefix evidence: 3 visible members, one short of the 4-member gate</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -8201,6 +8278,15 @@ def main() -> None:
     write_sota_glassbench_trajectory_first_npz_inversion_readiness_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.svg",
         glassbench_trajectory_first_npz_inversion_readiness_rows,
+    )
+    glassbench_trajectory_npz_ensemble_horizon_rows = write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv",
+        tar_probe_rows=glassbench_trajectory_inner_tar_header_probe_rows,
+        inversion_readiness_rows=glassbench_trajectory_first_npz_inversion_readiness_rows,
+    )
+    write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg",
+        glassbench_trajectory_npz_ensemble_horizon_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"

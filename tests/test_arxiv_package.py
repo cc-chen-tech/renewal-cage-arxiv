@@ -733,6 +733,23 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka["readiness_stage"], "upstream_curve_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
+    def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(float(ka2d_030["prefix_npz_member_count"]), 3.0)
+        self.assertEqual(float(ka2d_030["extracted_curve_member_count"]), 1.0)
+        self.assertEqual(float(ka2d_030["member_count_gap_to_threshold"]), 1.0)
+        self.assertEqual(float(ka2d_030["prefix_member_horizon_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["multi_npz_extraction_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["real_reanalysis_ready"]), 0.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "additional_npz_member_headers")
+        self.assertEqual(ka2d_030["horizon_stage"], "prefix_member_horizon_short")
+
     def test_sota_remote_result_curve_cache_records_range_cached_numeric_curves(self):
         manifest_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
         path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_cache.csv"
@@ -1340,6 +1357,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)
@@ -1398,6 +1416,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", main_tex)
@@ -1439,6 +1458,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf",
+            "figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
             "figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf",
@@ -1618,6 +1638,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
             ).read_bytes()
+            first_sota_glassbench_trajectory_npz_ensemble_horizon = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf"
+            ).read_bytes()
             first_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1789,6 +1815,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
             ).read_bytes()
+            second_sota_glassbench_trajectory_npz_ensemble_horizon = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf"
+            ).read_bytes()
             second_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1922,6 +1954,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_glassbench_trajectory_first_npz_inversion_readiness,
             second_sota_glassbench_trajectory_first_npz_inversion_readiness,
+        )
+        self.assertEqual(
+            first_sota_glassbench_trajectory_npz_ensemble_horizon,
+            second_sota_glassbench_trajectory_npz_ensemble_horizon,
         )
         self.assertEqual(first_sota_remote_result_curve_cache, second_sota_remote_result_curve_cache)
         self.assertEqual(first_sota_remote_result_curve_fetch_gap, second_sota_remote_result_curve_fetch_gap)

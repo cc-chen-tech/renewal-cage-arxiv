@@ -3819,6 +3819,85 @@ def sota_glassbench_trajectory_first_npz_inversion_readiness_gate(
     return out
 
 
+def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
+    *,
+    horizon_id: str,
+    accession_id: str,
+    tar_probe_rows: Sequence[dict[str, float | str]],
+    inversion_readiness_rows: Sequence[dict[str, float | str]],
+    min_member_count: int,
+) -> list[dict[str, float | str]]:
+    """Record how many NPZ trajectory members are visible before ensemble extraction."""
+
+    if not horizon_id:
+        raise ValueError("horizon_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not tar_probe_rows:
+        raise ValueError("tar_probe_rows must be nonempty")
+    if int(min_member_count) != min_member_count or min_member_count < 1:
+        raise ValueError("min_member_count must be a positive integer")
+
+    readiness_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in inversion_readiness_rows
+    }
+    out: list[dict[str, float | str]] = []
+    for row in tar_probe_rows:
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        source_path = str(row.get("source_path", "none"))
+        layout_ready = bool(float(row.get("trajectory_layout_ready", 0.0)))
+        prefix_count = int(float(row.get("npz_member_count_in_probe", 0.0)))
+        tar_probe_bytes = int(float(row.get("tar_probe_bytes", 0.0)))
+        readiness = readiness_by_key.get((system_id, temperature), {})
+        extracted_member_count = int(float(readiness.get("member_count", 0.0)))
+        current_sota_ready = bool(float(readiness.get("sota_inversion_ready", 0.0)))
+        gap = max(0, int(min_member_count) - prefix_count)
+        prefix_horizon_ready = layout_ready and prefix_count >= int(min_member_count)
+
+        if not layout_ready:
+            stage = "trajectory_layout_incomplete"
+            blocker = str(row.get("primary_blocker", "trajectory_layout"))
+            next_action = "complete_inner_tar_layout_probe"
+        elif current_sota_ready:
+            stage = "sota_inversion_already_ready"
+            blocker = "none"
+            next_action = "report_uncertainty_weighted_residuals"
+        elif prefix_horizon_ready:
+            stage = "prefix_member_horizon_ready_extraction_blocked"
+            blocker = "streaming_multi_npz_extraction_policy"
+            next_action = "extract_visible_npz_members_and_compute_uncertainties"
+        else:
+            stage = "prefix_member_horizon_short"
+            blocker = "additional_npz_member_headers"
+            next_action = "extend_tar_probe_or_index_full_member_list"
+
+        out.append(
+            {
+                "horizon_id": f"{horizon_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "first_npz_member": str(row.get("first_npz_member", "none")),
+                "split_labels_in_probe": str(row.get("split_labels_in_probe", "none")),
+                "tar_probe_bytes": float(tar_probe_bytes),
+                "prefix_npz_member_count": float(prefix_count),
+                "extracted_curve_member_count": float(extracted_member_count),
+                "min_member_count": float(min_member_count),
+                "member_count_gap_to_threshold": float(gap),
+                "prefix_member_horizon_ready": float(prefix_horizon_ready),
+                "multi_npz_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "horizon_stage": stage,
+            }
+        )
+    return out
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

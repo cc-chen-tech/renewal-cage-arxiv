@@ -1311,6 +1311,23 @@ physical-time, ensemble-averaged, uncertainty-weighted SOTA inversion.
   persistence/exchange inversion is claimed.}
 \end{figure}
 
+The inner-tar member horizon narrows the ensemble blocker without overstating
+the result. The current 1 MB tar-prefix probes expose three KA2D
+\texttt{npz} members at both \texttt{T=0.23} and \texttt{T=0.30}. Thus the
+archive is not being treated as a single-trajectory source, but the visible
+prefix evidence is still one member short of the four-member uncertainty gate,
+and no multi-\texttt{npz} observable extraction or real reanalysis is claimed.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf}
+  \caption{GlassBench \texttt{npz} ensemble-member horizon. The gate counts
+  trajectory-member headers visible in the streamed tar prefix and compares
+  them with the member threshold required for uncertainty-weighted trajectory
+  inversion. It records ensemble potential only; it is not a multi-member
+  extraction, uncertainty estimate, or model fit.}
+\end{figure}
+
 \clearpage
 
 The reanalysis-state ledger

@@ -118,6 +118,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_verdict,
     sota_glassbench_trajectory_entry_metadata_gate,
+    sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
@@ -2910,6 +2911,71 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(ready["ensemble_ready"]), 1.0)
         self.assertEqual(float(ready["uncertainty_ready"]), 1.0)
         self.assertEqual(float(ready["sota_inversion_ready"]), 1.0)
+
+    def test_sota_glassbench_trajectory_npz_ensemble_horizon_counts_prefix_members_without_claiming_extraction(self):
+        tar_probe_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "trajectory_layout_ready": 1.0,
+                "npz_member_count_in_probe": 3.0,
+                "split_labels_in_probe": "train",
+                "tar_probe_bytes": 1048576.0,
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "trajectory_layout_ready": 0.0,
+                "npz_member_count_in_probe": 0.0,
+                "split_labels_in_probe": "none",
+                "tar_probe_bytes": 0.0,
+                "first_npz_member": "none",
+                "primary_blocker": "trajectory_payload",
+            },
+        ]
+        readiness_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "member_count": 1.0,
+                "sota_inversion_ready": 0.0,
+                "readiness_stage": "frame_index_curve_only",
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "member_count": 0.0,
+                "sota_inversion_ready": 0.0,
+                "readiness_stage": "upstream_curve_incomplete",
+            },
+        ]
+
+        rows = sota_glassbench_trajectory_npz_ensemble_horizon_gate(
+            horizon_id="glassbench_npz_ensemble_horizon",
+            accession_id="glassbench_zenodo_10118191",
+            tar_probe_rows=tar_probe_rows,
+            inversion_readiness_rows=readiness_rows,
+            min_member_count=4,
+        )
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d = by_key[("KA2D", "0.30")]
+        self.assertEqual(float(ka2d["prefix_npz_member_count"]), 3.0)
+        self.assertEqual(float(ka2d["extracted_curve_member_count"]), 1.0)
+        self.assertEqual(float(ka2d["member_count_gap_to_threshold"]), 1.0)
+        self.assertEqual(float(ka2d["prefix_member_horizon_ready"]), 0.0)
+        self.assertEqual(float(ka2d["multi_npz_extraction_ready"]), 0.0)
+        self.assertEqual(float(ka2d["real_reanalysis_ready"]), 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "additional_npz_member_headers")
+        self.assertEqual(ka2d["horizon_stage"], "prefix_member_horizon_short")
+        self.assertEqual(ka2d["next_required_action"], "extend_tar_probe_or_index_full_member_list")
+
+        ka = by_key[("KA", "none")]
+        self.assertEqual(ka["horizon_stage"], "trajectory_layout_incomplete")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):
         manifest = {
