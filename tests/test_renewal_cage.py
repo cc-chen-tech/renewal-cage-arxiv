@@ -111,6 +111,7 @@ from renewal_cage import (  # noqa: E402
     stretched_alpha_benchmark_consistency,
     stokes_einstein_product,
     sota_claim_alignment,
+    sota_data_accession_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
@@ -1848,6 +1849,89 @@ class DelayedRenewalCageTests(unittest.TestCase):
         )
 
         self.assertEqual(row["provenance_stage"], "scope_boundary_source")
+        self.assertEqual(row["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
+        self.assertEqual(row["scope_boundary"], 1.0)
+
+    def test_sota_data_accession_gate_marks_glassbench_remote_archive_ready(self):
+        row = sota_data_accession_gate(
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            citation_key="jung2025roadmap",
+            model_scope="dynamical_signature",
+            landing_url="https://zenodo.org/records/10118191",
+            doi="10.5281/zenodo.10118191",
+            archive_name="GlassBench.zip",
+            archive_md5="82c83a7146eb749e13417e4350022417",
+            archive_size_bytes=6042260027,
+            license_id="cc-by-4.0",
+            has_public_landing_page=True,
+            has_downloadable_archive=True,
+            has_schema_or_readme=True,
+            has_trajectory_files=True,
+            has_precomputed_descriptors=True,
+            local_cache_present=False,
+            intended_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+        )
+
+        self.assertEqual(row["accession_stage"], "remote_trajectory_accession_ready")
+        self.assertEqual(row["accession_ready"], 1.0)
+        self.assertEqual(row["ready_for_local_reanalysis"], 0.0)
+        self.assertEqual(row["primary_blocker"], "local_cache")
+        self.assertEqual(row["download_required"], 1.0)
+        self.assertGreater(row["archive_size_gb"], 5.0)
+
+    def test_sota_data_accession_gate_blocks_article_without_archive(self):
+        row = sota_data_accession_gate(
+            accession_id="hedges_jcp_article_no_archive",
+            source_id="hedges_persistence_exchange_jcp_article",
+            citation_key="hedges2007persistence",
+            model_scope="transport_decoupling",
+            landing_url="https://doi.org/10.1063/1.2817607",
+            doi="10.1063/1.2817607",
+            archive_name="none",
+            archive_md5="none",
+            archive_size_bytes=0,
+            license_id="article",
+            has_public_landing_page=True,
+            has_downloadable_archive=False,
+            has_schema_or_readme=False,
+            has_trajectory_files=False,
+            has_precomputed_descriptors=False,
+            local_cache_present=False,
+            intended_protocols=["persistence_exchange_uncertainty_protocol"],
+        )
+
+        self.assertEqual(row["accession_stage"], "citation_only_no_accession")
+        self.assertEqual(row["accession_ready"], 0.0)
+        self.assertEqual(row["ready_for_local_reanalysis"], 0.0)
+        self.assertEqual(row["primary_blocker"], "downloadable_archive")
+
+    def test_sota_data_accession_gate_keeps_thermodynamic_accession_as_scope_boundary(self):
+        row = sota_data_accession_gate(
+            accession_id="kauzmann_entropy_scope_boundary",
+            source_id="kauzmann_entropy_thermodynamic_boundary",
+            citation_key="kauzmann1948nature",
+            model_scope="thermodynamic_transition",
+            landing_url="https://doi.org/10.1021/cr60135a002",
+            doi="10.1021/cr60135a002",
+            archive_name="none",
+            archive_md5="none",
+            archive_size_bytes=0,
+            license_id="article",
+            has_public_landing_page=True,
+            has_downloadable_archive=False,
+            has_schema_or_readme=False,
+            has_trajectory_files=False,
+            has_precomputed_descriptors=False,
+            local_cache_present=False,
+            intended_protocols=["thermodynamic_entropy_closure"],
+        )
+
+        self.assertEqual(row["accession_stage"], "scope_boundary_accession")
         self.assertEqual(row["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
         self.assertEqual(row["scope_boundary"], 1.0)
 

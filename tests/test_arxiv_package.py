@@ -311,6 +311,32 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermo["provenance_stage"], "scope_boundary_source")
         self.assertEqual(float(thermo["scope_boundary"]), 1.0)
 
+    def test_sota_data_accession_manifest_records_remote_archive_without_claiming_cache(self):
+        path = ROOT / "data" / "renewal_cage_sota_data_accession.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["accession_id"]: row for row in rows}
+        glassbench = by_id["glassbench_zenodo_10118191"]
+        self.assertEqual(glassbench["doi"], "10.5281/zenodo.10118191")
+        self.assertEqual(glassbench["archive_name"], "GlassBench.zip")
+        self.assertEqual(glassbench["archive_md5"], "82c83a7146eb749e13417e4350022417")
+        self.assertEqual(glassbench["license_id"], "cc-by-4.0")
+        self.assertEqual(glassbench["accession_stage"], "remote_trajectory_accession_ready")
+        self.assertEqual(float(glassbench["accession_ready"]), 1.0)
+        self.assertEqual(float(glassbench["ready_for_local_reanalysis"]), 0.0)
+        self.assertEqual(glassbench["primary_blocker"], "local_cache")
+        self.assertGreater(float(glassbench["archive_size_gb"]), 5.0)
+
+        hedges = by_id["hedges_jcp_article_no_archive"]
+        self.assertEqual(hedges["accession_stage"], "citation_only_no_accession")
+        self.assertEqual(hedges["primary_blocker"], "downloadable_archive")
+
+        thermo = by_id["kauzmann_entropy_scope_boundary"]
+        self.assertEqual(thermo["accession_stage"], "scope_boundary_accession")
+        self.assertEqual(float(thermo["scope_boundary"]), 1.0)
+
     def test_observable_falsification_matrix_maps_literature_to_diagnostic_blockers(self):
         path = ROOT / "data" / "renewal_cage_observable_falsification_matrix.csv"
         self.assertTrue(path.exists())
@@ -522,6 +548,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_inversion_identifiability_audit.pdf", names)
             self.assertIn("figures/renewal_cage_frontier_benchmark_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_data_accession.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", names)
@@ -558,6 +585,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_data_accession.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", main_tex)
         self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
@@ -577,6 +605,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_claim_alignment.pdf",
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
             "figures/renewal_cage_sota_source_provenance.pdf",
+            "figures/renewal_cage_sota_data_accession.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_observable_falsification_matrix.pdf",
             "figures/renewal_cage_benchmark_fusion_readiness.pdf",
@@ -678,6 +707,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_source_provenance = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_source_provenance.pdf"
             ).read_bytes()
+            first_sota_data_accession = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_data_accession.pdf"
+            ).read_bytes()
             first_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
@@ -777,6 +809,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_source_provenance = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_source_provenance.pdf"
             ).read_bytes()
+            second_sota_data_accession = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_data_accession.pdf"
+            ).read_bytes()
             second_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
@@ -850,6 +885,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_inversion_identifiability_audit, second_inversion_identifiability_audit)
         self.assertEqual(first_frontier_benchmark_horizon, second_frontier_benchmark_horizon)
         self.assertEqual(first_sota_source_provenance, second_sota_source_provenance)
+        self.assertEqual(first_sota_data_accession, second_sota_data_accession)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
         self.assertEqual(first_observable_falsification_matrix, second_observable_falsification_matrix)
         self.assertEqual(first_benchmark_fusion_readiness, second_benchmark_fusion_readiness)

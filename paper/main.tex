@@ -1059,6 +1059,14 @@ protocol metadata, and reuse permissions are explicit. Under this gate, the
 GlassBench trajectory release is a trajectory-reanalysis source, the Hedges
 persistence/exchange paper remains citation-only until machine-readable files
 are supplied, and thermodynamic entropy sources remain scope boundaries.
+The data-accession manifest
+\texttt{renewal\_cage\_sota\_data\_accession.csv} records the next reproducible
+step for those sources. For the public GlassBench Zenodo record it stores DOI
+\texttt{10.5281/zenodo.10118191}, the landing page, archive name
+\texttt{GlassBench.zip}, md5 checksum, archive size, CC-BY-4.0 license, and
+README/schema availability. Because the archive is not locally cached in this
+repository, this row is marked as remote-accession ready but not yet a local
+real-data reanalysis.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the
@@ -1327,6 +1335,14 @@ rejected without refitting the clocks.
   \caption{SOTA source provenance gate. Citations, dataset repositories, and
   scope boundaries are separated before any source is passed to trajectory or
   raw-curve inversion protocols.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_data_accession.pdf}
+  \caption{SOTA data accession manifest. Remote data archives are separated
+  from local reanalysis readiness by recording DOI, archive identity, checksum,
+  size, license, schema/README status, and local-cache state.}
 \end{figure}
 
 \begin{figure}[p]

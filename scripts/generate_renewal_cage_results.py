@@ -98,6 +98,7 @@ from renewal_cage import (  # noqa: E402
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
+    sota_data_accession_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
     static_gamma_asymptotic_diagnostics,
@@ -2916,6 +2917,76 @@ def write_sota_source_provenance_csv(path: Path) -> list[dict[str, float | str]]
     return rows
 
 
+def write_sota_data_accession_csv(path: Path) -> list[dict[str, float | str]]:
+    """Record public data accessions before attempting local reanalysis."""
+
+    rows = [
+        sota_data_accession_gate(
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            citation_key="jung2025roadmap",
+            model_scope="dynamical_signature",
+            landing_url="https://zenodo.org/records/10118191",
+            doi="10.5281/zenodo.10118191",
+            archive_name="GlassBench.zip",
+            archive_md5="82c83a7146eb749e13417e4350022417",
+            archive_size_bytes=6042260027,
+            license_id="cc-by-4.0",
+            has_public_landing_page=True,
+            has_downloadable_archive=True,
+            has_schema_or_readme=True,
+            has_trajectory_files=True,
+            has_precomputed_descriptors=True,
+            local_cache_present=False,
+            intended_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+        ),
+        sota_data_accession_gate(
+            accession_id="hedges_jcp_article_no_archive",
+            source_id="hedges_persistence_exchange_jcp_article",
+            citation_key="hedges2007persistence",
+            model_scope="transport_decoupling",
+            landing_url="https://doi.org/10.1063/1.2817607",
+            doi="10.1063/1.2817607",
+            archive_name="none",
+            archive_md5="none",
+            archive_size_bytes=0,
+            license_id="article",
+            has_public_landing_page=True,
+            has_downloadable_archive=False,
+            has_schema_or_readme=False,
+            has_trajectory_files=False,
+            has_precomputed_descriptors=False,
+            local_cache_present=False,
+            intended_protocols=["persistence_exchange_uncertainty_protocol"],
+        ),
+        sota_data_accession_gate(
+            accession_id="kauzmann_entropy_scope_boundary",
+            source_id="kauzmann_entropy_thermodynamic_boundary",
+            citation_key="kauzmann1948nature",
+            model_scope="thermodynamic_transition",
+            landing_url="https://doi.org/10.1021/cr60135a002",
+            doi="10.1021/cr60135a002",
+            archive_name="none",
+            archive_md5="none",
+            archive_size_bytes=0,
+            license_id="article",
+            has_public_landing_page=True,
+            has_downloadable_archive=False,
+            has_schema_or_readme=False,
+            has_trajectory_files=False,
+            has_precomputed_descriptors=False,
+            local_cache_present=False,
+            intended_protocols=["thermodynamic_entropy_closure"],
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -4526,6 +4597,59 @@ def write_sota_source_provenance_svg(path: Path, rows: list[dict[str, float | st
     path.write_text(svg)
 
 
+def write_sota_data_accession_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 450
+    left, top = 75, 105
+    row_h = 72
+    colors = {
+        "remote_trajectory_accession_ready": "#2f855a",
+        "remote_raw_curve_accession_ready": "#2b6cb0",
+        "local_trajectory_cache_ready": "#276749",
+        "local_raw_curve_cache_ready": "#2c5282",
+        "metadata_incomplete_accession": "#c05621",
+        "citation_only_no_accession": "#718096",
+        "scope_boundary_accession": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["accession_stage"])
+        color = colors[stage]
+        accession_ready = int(float(row["accession_ready"]))
+        local_ready = int(float(row["ready_for_local_reanalysis"]))
+        size_gb = float(row["archive_size_gb"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["accession_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 305}" y="{y - 4}" width="230" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 314}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:35]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 560}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">accession={accession_ready}; local={local_ready}; size={size_gb:.2f} GB; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 72}" y="{y + 38}" font-family="Arial, sans-serif" font-size="9" fill="#555">doi: {row["doi"]}; archive: {row["archive_name"]}; md5: {str(row["archive_md5"])[:32]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA data accession manifest</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Remote archives are recorded with DOI, checksum, size, license, and local-cache status before any real-data reanalysis is claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">accession</text>
+  <text x="{left + 305}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 560}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="385" width="14" height="14" fill="#2f855a" /><text x="96" y="397" font-family="Arial, sans-serif" font-size="12">remote trajectory archive ready</text>
+  <rect x="310" y="385" width="14" height="14" fill="#718096" /><text x="331" y="397" font-family="Arial, sans-serif" font-size="12">citation only</text>
+  <rect x="455" y="385" width="14" height="14" fill="#805ad5" /><text x="476" y="397" font-family="Arial, sans-serif" font-size="12">scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -5760,6 +5884,13 @@ def main() -> None:
     write_sota_source_provenance_svg(
         FIGURE_DIR / "renewal_cage_sota_source_provenance.svg",
         source_provenance_rows,
+    )
+    data_accession_rows = write_sota_data_accession_csv(
+        DATA_DIR / "renewal_cage_sota_data_accession.csv"
+    )
+    write_sota_data_accession_svg(
+        FIGURE_DIR / "renewal_cage_sota_data_accession.svg",
+        data_accession_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"

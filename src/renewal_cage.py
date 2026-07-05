@@ -1713,6 +1713,152 @@ def sota_source_provenance_gate(
     }
 
 
+def sota_data_accession_gate(
+    *,
+    accession_id: str,
+    source_id: str,
+    citation_key: str,
+    model_scope: str,
+    landing_url: str,
+    doi: str,
+    archive_name: str,
+    archive_md5: str,
+    archive_size_bytes: int,
+    license_id: str,
+    has_public_landing_page: bool,
+    has_downloadable_archive: bool,
+    has_schema_or_readme: bool,
+    has_trajectory_files: bool,
+    has_precomputed_descriptors: bool,
+    local_cache_present: bool,
+    intended_protocols: Sequence[str],
+) -> dict[str, float | str]:
+    """Gate public data accessions before local trajectory or raw-curve reanalysis."""
+
+    for name, value in {
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "citation_key": citation_key,
+        "model_scope": model_scope,
+        "landing_url": landing_url,
+        "doi": doi,
+        "archive_name": archive_name,
+        "archive_md5": archive_md5,
+        "license_id": license_id,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    allowed_scopes = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    if model_scope not in allowed_scopes:
+        raise ValueError("model_scope is not recognized")
+    if archive_size_bytes < 0:
+        raise ValueError("archive_size_bytes must be nonnegative")
+    if not intended_protocols:
+        raise ValueError("intended_protocols must be nonempty")
+    if any(not protocol for protocol in intended_protocols):
+        raise ValueError("intended_protocols must contain nonempty strings")
+
+    protocols = list(dict.fromkeys(intended_protocols))
+    archive_size_gb = archive_size_bytes / 1_000_000_000.0
+    has_doi = doi != "none" and "." in doi
+    has_landing_url = landing_url.startswith("https://")
+    has_archive_name = archive_name != "none"
+    has_checksum = archive_md5 != "none" and archive_md5.startswith("md5:") is False and len(archive_md5) >= 16
+    large_download = archive_size_bytes > 1_000_000_000
+    trajectory_protocol_requested = any(protocol.startswith("trajectory_") for protocol in protocols)
+    raw_curve_protocol_requested = any("raw_curve" in protocol or "persistence_exchange" in protocol for protocol in protocols)
+    useful_data_payload = (
+        trajectory_protocol_requested
+        and has_trajectory_files
+        or raw_curve_protocol_requested
+        and has_precomputed_descriptors
+    )
+    accession_ready = (
+        model_scope != "thermodynamic_transition"
+        and has_public_landing_page
+        and has_landing_url
+        and has_doi
+        and has_downloadable_archive
+        and has_archive_name
+        and has_checksum
+        and archive_size_bytes > 0
+        and license_id != "none"
+        and has_schema_or_readme
+        and useful_data_payload
+    )
+    ready_for_local_reanalysis = accession_ready and local_cache_present
+
+    if model_scope == "thermodynamic_transition":
+        stage = "scope_boundary_accession"
+        blocker = "renewal_dynamics_not_thermodynamic_theory"
+    elif ready_for_local_reanalysis and has_trajectory_files:
+        stage = "local_trajectory_cache_ready"
+        blocker = "none"
+    elif ready_for_local_reanalysis:
+        stage = "local_raw_curve_cache_ready"
+        blocker = "none"
+    elif accession_ready and has_trajectory_files:
+        stage = "remote_trajectory_accession_ready"
+        blocker = "local_cache"
+    elif accession_ready:
+        stage = "remote_raw_curve_accession_ready"
+        blocker = "local_cache"
+    elif not has_public_landing_page or not has_landing_url or not has_doi:
+        stage = "citation_only_no_accession"
+        blocker = "public_landing_page"
+    elif not has_downloadable_archive or not has_archive_name:
+        stage = "citation_only_no_accession"
+        blocker = "downloadable_archive"
+    elif not has_checksum:
+        stage = "metadata_incomplete_accession"
+        blocker = "archive_md5"
+    elif license_id == "none":
+        stage = "metadata_incomplete_accession"
+        blocker = "license"
+    elif not has_schema_or_readme:
+        stage = "metadata_incomplete_accession"
+        blocker = "schema_or_readme"
+    elif not useful_data_payload:
+        stage = "metadata_incomplete_accession"
+        blocker = "trajectory_or_descriptor_payload"
+    else:
+        stage = "metadata_incomplete_accession"
+        blocker = "accession_metadata"
+
+    return {
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "citation_key": citation_key,
+        "model_scope": model_scope,
+        "landing_url": landing_url,
+        "doi": doi,
+        "archive_name": archive_name,
+        "archive_md5": archive_md5,
+        "archive_size_bytes": float(archive_size_bytes),
+        "archive_size_gb": float(archive_size_gb),
+        "license_id": license_id,
+        "has_public_landing_page": float(has_public_landing_page),
+        "has_downloadable_archive": float(has_downloadable_archive),
+        "has_schema_or_readme": float(has_schema_or_readme),
+        "has_trajectory_files": float(has_trajectory_files),
+        "has_precomputed_descriptors": float(has_precomputed_descriptors),
+        "local_cache_present": float(local_cache_present),
+        "intended_protocols": ";".join(protocols),
+        "large_download": float(large_download),
+        "download_required": float(accession_ready and not local_cache_present),
+        "accession_ready": float(accession_ready),
+        "ready_for_local_reanalysis": float(ready_for_local_reanalysis),
+        "scope_boundary": float(model_scope == "thermodynamic_transition"),
+        "primary_blocker": blocker,
+        "accession_stage": stage,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,

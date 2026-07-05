@@ -1858,6 +1858,57 @@ def write_sota_source_provenance_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_data_accession_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_data_accession.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA data accession manifest")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Remote archives are recorded with DOI, checksum, size, license, and local-cache status before reanalysis is claimed.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "accession")
+    c.drawString(left + 220, top, "stage")
+    c.drawString(left + 450, top, "GB")
+    c.drawString(left + 490, top, "access")
+    c.drawString(left + 540, top, "local")
+    c.drawString(left + 585, top, "blocker")
+    palette = {
+        "remote_trajectory_accession_ready": colors.HexColor("#2f855a"),
+        "remote_raw_curve_accession_ready": colors.HexColor("#2b6cb0"),
+        "local_trajectory_cache_ready": colors.HexColor("#276749"),
+        "local_raw_curve_cache_ready": colors.HexColor("#2c5282"),
+        "metadata_incomplete_accession": colors.HexColor("#c05621"),
+        "citation_only_no_accession": colors.HexColor("#718096"),
+        "scope_boundary_accession": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 6.9)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 48
+        stage = row["accession_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["accession_id"].replace("_", " ")[:34])
+        c.setFillColor(palette[stage])
+        c.rect(left + 220, y - 4, 190, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 226, y, stage.replace("_", " ")[:30])
+        c.setFillColor(colors.black)
+        c.drawString(left + 452, y, f"{float(row['archive_size_gb']):.2f}")
+        c.drawString(left + 500, y, str(int(float(row["accession_ready"]))))
+        c.drawString(left + 548, y, str(int(float(row["ready_for_local_reanalysis"]))))
+        c.drawString(left + 585, y, row["primary_blocker"].replace("_", " ")[:28])
+        c.drawString(left + 72, y - 12, f"doi: {row['doi']}; archive: {row['archive_name']}; md5: {row['archive_md5'][:32]}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2580,6 +2631,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     frontier_benchmark_horizon_pdf = PAPER_FIGURE_DIR / "renewal_cage_frontier_benchmark_horizon.pdf"
     sota_source_provenance_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_source_provenance.pdf"
+    sota_data_accession_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_data_accession.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2622,6 +2674,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
     write_frontier_benchmark_horizon_pdf(frontier_benchmark_horizon_pdf)
     write_sota_source_provenance_pdf(sota_source_provenance_pdf)
+    write_sota_data_accession_pdf(sota_data_accession_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2682,6 +2735,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         )
         archive.write(frontier_benchmark_horizon_pdf, "figures/renewal_cage_frontier_benchmark_horizon.pdf")
         archive.write(sota_source_provenance_pdf, "figures/renewal_cage_sota_source_provenance.pdf")
+        archive.write(sota_data_accession_pdf, "figures/renewal_cage_sota_data_accession.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(
             observable_falsification_matrix_pdf,
