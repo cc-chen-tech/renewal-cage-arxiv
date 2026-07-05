@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="520" viewBox="0 0 1160 520">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA GlassBench first-NPZ observable curves</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Frame-index minimal-image MSD and 2D NGP curves from one streamed KA2D NPZ member per temperature.</text>
+  <rect x="90" y="110" width="430" height="280" fill="#f8fafc" stroke="#cbd5e0" />
+  <rect x="650" y="110" width="430" height="280" fill="#f8fafc" stroke="#cbd5e0" />
+  <text x="90" y="94" font-family="Arial, sans-serif" font-size="14" font-weight="700">MSD versus frame index</text>
+  <text x="650" y="94" font-family="Arial, sans-serif" font-size="14" font-weight="700">2D NGP versus frame index</text>
+  <polyline points="90.0,390.0 112.6,388.9 135.3,388.9 157.9,388.9 180.5,388.8 203.2,388.8 225.8,388.9 248.4,388.9 271.1,388.9 293.7,388.9 316.3,388.9 338.9,388.9 361.6,388.9 384.2,388.9 406.8,388.9 429.5,388.8 452.1,388.9 474.7,388.9 497.4,388.9 520.0,388.9" fill="none" stroke="#2b6cb0" stroke-width="2.5" /><polyline points="650.0,390.0 672.6,367.5 695.3,371.7 717.9,368.0 740.5,378.7 763.2,360.9 785.8,383.0 808.4,383.2 831.1,372.0 853.7,368.2 876.3,381.3 898.9,387.9 921.6,377.9 944.2,383.4 966.8,383.0 989.5,362.9 1012.1,348.1 1034.7,380.7 1057.4,370.4 1080.0,374.5" fill="none" stroke="#2b6cb0" stroke-width="2.5" /><polyline points="90.0,390.0 112.6,388.5 135.3,388.5 157.9,388.5 180.5,388.6 203.2,388.4 225.8,388.6 248.4,388.5 271.1,388.5 293.7,388.6 316.3,388.5 338.9,388.6 361.6,388.5 384.2,388.4 406.8,388.6 429.5,388.6 452.1,388.5 474.7,388.4 497.4,388.5 520.0,388.5" fill="none" stroke="#c05621" stroke-width="2.5" /><polyline points="650.0,390.0 672.6,376.4 695.3,367.3 717.9,386.4 740.5,347.4 763.2,365.9 785.8,372.7 808.4,382.1 831.1,370.7 853.7,371.1 876.3,359.6 898.9,340.0 921.6,363.3 944.2,362.9 966.8,378.3 989.5,354.3 1012.1,370.5 1034.7,376.2 1057.4,360.4 1080.0,375.4" fill="none" stroke="#c05621" stroke-width="2.5" />
+  <text x="90" y="414" font-family="Arial, sans-serif" font-size="11" fill="#444">max MSD=1</text>
+  <text x="650" y="414" font-family="Arial, sans-serif" font-size="11" fill="#444">max NGP=1</text>
+  <rect x="75" y="440" width="14" height="14" fill="#2b6cb0" /><text x="96" y="452" font-family="Arial, sans-serif" font-size="12">T=0.23 first NPZ</text>
+  <rect x="230" y="440" width="14" height="14" fill="#c05621" /><text x="251" y="452" font-family="Arial, sans-serif" font-size="12">T=0.30 first NPZ</text>
+  <text x="430" y="452" font-family="Arial, sans-serif" font-size="12">blocker: single npz frame index curve; trajectory payload</text>
+  <text x="75" y="480" font-family="Arial, sans-serif" font-size="11" fill="#555">These curves are frame-index smoke artifacts, not uncertainty-weighted physical-time SOTA inversions.</text>
+</svg>

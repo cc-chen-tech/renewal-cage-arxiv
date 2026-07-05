@@ -3524,6 +3524,147 @@ def sota_glassbench_trajectory_first_npz_observable_smoke_gate(
     return rows
 
 
+def sota_glassbench_trajectory_first_npz_observable_curve_gate(
+    *,
+    curve_id: str,
+    accession_id: str,
+    smoke_rows: Sequence[dict[str, float | str]],
+    curve_manifest: dict,
+    required_method: str,
+) -> list[dict[str, float | str]]:
+    """Expand first-NPZ smoke checks into frame-index MSD/NGP curve rows."""
+
+    if not curve_id:
+        raise ValueError("curve_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not required_method:
+        raise ValueError("required_method must be nonempty")
+
+    entries_value = curve_manifest.get("entries", [])
+    curve_entries = (
+        [entry for entry in entries_value if isinstance(entry, dict)]
+        if isinstance(entries_value, list)
+        else []
+    )
+    curve_by_key = {
+        (str(entry.get("path", "")), str(entry.get("first_npz_member", ""))): entry
+        for entry in curve_entries
+        if entry.get("path") and entry.get("first_npz_member")
+    }
+
+    rows: list[dict[str, float | str]] = []
+    for smoke_row in smoke_rows:
+        system_id = str(smoke_row.get("system_id", "unknown"))
+        temperature = str(smoke_row.get("temperature", "none"))
+        source_path = str(smoke_row.get("source_path", "none"))
+        first_npz_member = str(smoke_row.get("first_npz_member", "none"))
+        smoke_ready = bool(float(smoke_row.get("observable_smoke_ready", 0.0)))
+        method = str(smoke_row.get("observable_method", "none"))
+        row_id_prefix = f"{curve_id}_{system_id.lower()}_t{temperature.replace('.', '_')}"
+        if not smoke_ready or source_path == "none" or first_npz_member == "none":
+            rows.append(
+                {
+                    "curve_id": f"{row_id_prefix}_frame_missing",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "observable_method": method,
+                    "frame_index": -1.0,
+                    "msd": 0.0,
+                    "ngp_2d": 0.0,
+                    "observable_curve_ready": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": str(smoke_row.get("primary_blocker", "first_npz_observable_smoke")),
+                    "curve_stage": "first_npz_observable_smoke_incomplete",
+                }
+            )
+            continue
+
+        entry = curve_by_key.get((source_path, first_npz_member))
+        if entry is None:
+            rows.append(
+                {
+                    "curve_id": f"{row_id_prefix}_frame_missing",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "observable_method": method,
+                    "frame_index": -1.0,
+                    "msd": 0.0,
+                    "ngp_2d": 0.0,
+                    "observable_curve_ready": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "first_npz_observable_curve",
+                    "curve_stage": "first_npz_observable_curve_missing",
+                }
+            )
+            continue
+
+        entry_method = str(entry.get("observable_method", "none"))
+        frame_indices = entry.get("frame_indices", [])
+        msd_values = entry.get("msd", [])
+        ngp_values = entry.get("ngp_2d", [])
+        curve_ready = (
+            entry_method == required_method
+            and isinstance(frame_indices, list)
+            and isinstance(msd_values, list)
+            and isinstance(ngp_values, list)
+            and len(frame_indices) == len(msd_values) == len(ngp_values)
+            and len(frame_indices) >= 2
+        )
+        if not curve_ready:
+            rows.append(
+                {
+                    "curve_id": f"{row_id_prefix}_frame_missing",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "observable_method": entry_method,
+                    "frame_index": -1.0,
+                    "msd": 0.0,
+                    "ngp_2d": 0.0,
+                    "observable_curve_ready": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "first_npz_observable_curve",
+                    "curve_stage": "first_npz_observable_curve_failed",
+                }
+            )
+            continue
+
+        for frame_index, msd, ngp in zip(frame_indices, msd_values, ngp_values):
+            frame = int(frame_index)
+            rows.append(
+                {
+                    "curve_id": f"{row_id_prefix}_frame_{frame}",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "first_npz_member": first_npz_member,
+                    "observable_method": entry_method,
+                    "frame_index": float(frame),
+                    "msd": float(msd),
+                    "ngp_2d": float(ngp),
+                    "observable_curve_ready": 1.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "single_npz_frame_index_curve",
+                    "curve_stage": "first_npz_observable_curve_ready_reanalysis_blocked",
+                }
+            )
+    return rows
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

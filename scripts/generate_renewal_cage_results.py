@@ -103,6 +103,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
@@ -3427,6 +3428,28 @@ def write_sota_glassbench_trajectory_first_npz_observable_smoke_csv(
     return rows
 
 
+def write_sota_glassbench_trajectory_first_npz_observable_curve_csv(
+    path: Path,
+    *,
+    smoke_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Expand first-NPZ MSD/NGP smoke checks into frame-index curves."""
+
+    manifest_path = (
+        DATA_DIR / "third_party" / "glassbench" / "trajectory_first_npz_observable_curve_10118191.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = sota_glassbench_trajectory_first_npz_observable_curve_gate(
+        curve_id="glassbench_trajectory_first_npz_observable_curve",
+        accession_id="glassbench_zenodo_10118191",
+        smoke_rows=smoke_rows,
+        curve_manifest=manifest,
+        required_method=manifest["observable_method"],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -6240,6 +6263,64 @@ def write_sota_glassbench_trajectory_first_npz_observable_smoke_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_first_npz_observable_curve_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 520
+    left, top = 90, 110
+    plot_w, plot_h = 430, 280
+    ready_rows = [row for row in rows if float(row["observable_curve_ready"]) > 0.5]
+    colors = {"0.23": "#2b6cb0", "0.30": "#c05621"}
+
+    def scale_points(temp: str, value_key: str, x0: int, y0: int, value_max: float) -> str:
+        subset = [row for row in ready_rows if str(row["temperature"]) == temp]
+        subset.sort(key=lambda row: float(row["frame_index"]))
+        if not subset:
+            return ""
+        max_frame = max(float(row["frame_index"]) for row in subset) or 1.0
+        points = []
+        for row in subset:
+            x = x0 + float(row["frame_index"]) / max_frame * plot_w
+            y = y0 + plot_h - float(row[value_key]) / value_max * plot_h
+            points.append(f"{x:.1f},{y:.1f}")
+        return " ".join(points)
+
+    max_msd = max([float(row["msd"]) for row in ready_rows] + [1.0])
+    max_ngp = max([float(row["ngp_2d"]) for row in ready_rows] + [1.0])
+    marks = []
+    for temp in sorted(colors):
+        msd_points = scale_points(temp, "msd", left, top, max_msd)
+        ngp_points = scale_points(temp, "ngp_2d", left + 560, top, max_ngp)
+        if msd_points:
+            marks.append(
+                f'<polyline points="{msd_points}" fill="none" stroke="{colors[temp]}" stroke-width="2.5" />'
+            )
+        if ngp_points:
+            marks.append(
+                f'<polyline points="{ngp_points}" fill="none" stroke="{colors[temp]}" stroke-width="2.5" />'
+            )
+    blocker = "; ".join(sorted({str(row["primary_blocker"]) for row in rows if float(row["real_reanalysis_ready"]) < 0.5}))
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA GlassBench first-NPZ observable curves</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Frame-index minimal-image MSD and 2D NGP curves from one streamed KA2D NPZ member per temperature.</text>
+  <rect x="{left}" y="{top}" width="{plot_w}" height="{plot_h}" fill="#f8fafc" stroke="#cbd5e0" />
+  <rect x="{left + 560}" y="{top}" width="{plot_w}" height="{plot_h}" fill="#f8fafc" stroke="#cbd5e0" />
+  <text x="{left}" y="{top - 16}" font-family="Arial, sans-serif" font-size="14" font-weight="700">MSD versus frame index</text>
+  <text x="{left + 560}" y="{top - 16}" font-family="Arial, sans-serif" font-size="14" font-weight="700">2D NGP versus frame index</text>
+  {"".join(marks)}
+  <text x="{left}" y="{top + plot_h + 24}" font-family="Arial, sans-serif" font-size="11" fill="#444">max MSD={max_msd:.4g}</text>
+  <text x="{left + 560}" y="{top + plot_h + 24}" font-family="Arial, sans-serif" font-size="11" fill="#444">max NGP={max_ngp:.4g}</text>
+  <rect x="75" y="440" width="14" height="14" fill="#2b6cb0" /><text x="96" y="452" font-family="Arial, sans-serif" font-size="12">T=0.23 first NPZ</text>
+  <rect x="230" y="440" width="14" height="14" fill="#c05621" /><text x="251" y="452" font-family="Arial, sans-serif" font-size="12">T=0.30 first NPZ</text>
+  <text x="430" y="452" font-family="Arial, sans-serif" font-size="12">blocker: {blocker.replace("_", " ")[:92]}</text>
+  <text x="75" y="480" font-family="Arial, sans-serif" font-size="11" fill="#555">These curves are frame-index smoke artifacts, not uncertainty-weighted physical-time SOTA inversions.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -8007,6 +8088,16 @@ def main() -> None:
     write_sota_glassbench_trajectory_first_npz_observable_smoke_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.svg",
         glassbench_trajectory_first_npz_observable_smoke_rows,
+    )
+    glassbench_trajectory_first_npz_observable_curve_rows = (
+        write_sota_glassbench_trajectory_first_npz_observable_curve_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.csv",
+            smoke_rows=glassbench_trajectory_first_npz_observable_smoke_rows,
+        )
+    )
+    write_sota_glassbench_trajectory_first_npz_observable_curve_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.svg",
+        glassbench_trajectory_first_npz_observable_curve_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"

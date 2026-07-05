@@ -191,6 +191,10 @@ minimal-image frame-index MSD and two-dimensional NGP summaries. The first
 coordinate-to-observable ingestion, while still blocking physical time-series
 comparison until time semantics, full ensemble extraction, and uncertainty
 weights are available.
+The first-NPZ observable-curve table retains the full 20-frame MSD and NGP
+sequence for both first members. It is the first real GlassBench coordinate
+payload converted into the repository's raw-curve shape, but it remains a
+frame-index, single-member artifact rather than a physical-time SOTA inversion.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
@@ -315,6 +319,7 @@ figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.svg
 figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.svg
+figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
@@ -384,6 +389,7 @@ data/renewal_cage_sota_glassbench_trajectory_member_stream_probe.csv
 data/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.csv
+data/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
@@ -398,6 +404,7 @@ data/third_party/glassbench/trajectory_member_stream_probe_10118191.json
 data/third_party/glassbench/trajectory_inner_tar_header_probe_10118191.json
 data/third_party/glassbench/trajectory_npz_schema_probe_10118191.json
 data/third_party/glassbench/trajectory_first_npz_observable_smoke_10118191.json
+data/third_party/glassbench/trajectory_first_npz_observable_curve_10118191.json
 data/third_party/glassbench/range_result_curve_cache_10118191.json
 data/third_party/glassbench/range_result_curve_values_10118191.json
 data/third_party/glassbench/range_result_curve_target_fetch_10118191.json
@@ -471,6 +478,7 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_member_stream_probe.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_inner_tar_header_probe.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_schema_probe.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf
+paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf

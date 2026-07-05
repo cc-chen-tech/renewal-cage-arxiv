@@ -2470,6 +2470,75 @@ def write_sota_glassbench_trajectory_first_npz_observable_smoke_pdf(path: Path) 
     c.save()
 
 
+def write_sota_glassbench_trajectory_first_npz_observable_curve_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    ready_rows = [row for row in rows if float(row["observable_curve_ready"]) > 0.5]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA GlassBench first-NPZ observable curves")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Frame-index minimal-image MSD and 2D NGP curves from one streamed KA2D NPZ member per temperature.",
+    )
+    left, bottom = 54, 88
+    width, height = 310, 250
+    gap = 84
+    max_frame = max([float(row["frame_index"]) for row in ready_rows] + [1.0])
+    max_msd = max([float(row["msd"]) for row in ready_rows] + [1.0])
+    max_ngp = max([float(row["ngp_2d"]) for row in ready_rows] + [1.0])
+    palette = {"0.23": colors.HexColor("#2b6cb0"), "0.30": colors.HexColor("#c05621")}
+
+    def draw_curve_panel(x0: float, title: str, value_key: str, ymax: float) -> None:
+        c.setStrokeColor(colors.HexColor("#cbd5e0"))
+        c.setFillColor(colors.HexColor("#f8fafc"))
+        c.rect(x0, bottom, width, height, stroke=1, fill=1)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(x0, bottom + height + 15, title)
+        c.setFont("Helvetica", 7)
+        c.drawString(x0, bottom - 18, "frame index")
+        c.drawString(x0, bottom + height + 3, f"max={ymax:.3g}")
+        for temp, color in palette.items():
+            subset = [row for row in ready_rows if row["temperature"] == temp]
+            subset.sort(key=lambda row: float(row["frame_index"]))
+            if len(subset) < 2:
+                continue
+            c.setStrokeColor(color)
+            c.setLineWidth(1.8)
+            points = [
+                (
+                    x0 + float(row["frame_index"]) / max_frame * width,
+                    bottom + float(row[value_key]) / ymax * height,
+                )
+                for row in subset
+            ]
+            path_obj = c.beginPath()
+            path_obj.moveTo(points[0][0], points[0][1])
+            for x, y in points[1:]:
+                path_obj.lineTo(x, y)
+            c.drawPath(path_obj)
+
+    draw_curve_panel(left, "MSD curve", "msd", max_msd)
+    draw_curve_panel(left + width + gap, "2D NGP curve", "ngp_2d", max_ngp)
+    c.setFont("Helvetica", 8)
+    c.setFillColor(palette["0.23"])
+    c.rect(54, 38, 9, 9, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.drawString(68, 38, "T=0.23 first NPZ")
+    c.setFillColor(palette["0.30"])
+    c.rect(175, 38, 9, 9, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.drawString(189, 38, "T=0.30 first NPZ")
+    c.drawString(322, 38, "single-member frame-index curves; no physical-time or uncertainty-weighted inversion")
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3696,6 +3765,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_first_npz_observable_smoke_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf"
     )
+    sota_glassbench_trajectory_first_npz_observable_curve_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -3773,6 +3845,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_glassbench_trajectory_npz_schema_probe_pdf(sota_glassbench_trajectory_npz_schema_probe_pdf)
     write_sota_glassbench_trajectory_first_npz_observable_smoke_pdf(
         sota_glassbench_trajectory_first_npz_observable_smoke_pdf
+    )
+    write_sota_glassbench_trajectory_first_npz_observable_curve_pdf(
+        sota_glassbench_trajectory_first_npz_observable_curve_pdf
     )
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
@@ -3877,6 +3952,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_first_npz_observable_smoke_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf",
+        )
+        archive.write(
+            sota_glassbench_trajectory_first_npz_observable_curve_pdf,
+            "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf",
         )
         archive.write(
             sota_remote_result_curve_cache_pdf,

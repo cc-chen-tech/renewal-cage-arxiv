@@ -118,6 +118,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_verdict,
     sota_glassbench_trajectory_entry_metadata_gate,
+    sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
@@ -2726,6 +2727,67 @@ class DelayedRenewalCageTests(unittest.TestCase):
         ka = by_system["KA"]
         self.assertEqual(ka["smoke_stage"], "trajectory_npz_schema_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_first_npz_observable_curve_exports_frame_rows(self):
+        smoke_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "observable_method": "minimal_image_displacement_from_first_frame",
+                "observable_smoke_ready": 1.0,
+                "primary_blocker": "single_npz_no_time_or_uncertainty",
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "first_npz_member": "none",
+                "observable_method": "none",
+                "observable_smoke_ready": 0.0,
+                "primary_blocker": "trajectory_payload",
+            },
+        ]
+        curve_manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                    "observable_method": "minimal_image_displacement_from_first_frame",
+                    "frame_indices": [0, 1, 11, 19],
+                    "msd": [0.0, 0.005484922658, 0.005117245596, 0.005414723094],
+                    "ngp_2d": [0.0, 0.048418253757, 0.178746269034, 0.051977831407],
+                }
+            ]
+        }
+
+        rows = sota_glassbench_trajectory_first_npz_observable_curve_gate(
+            curve_id="glassbench_trajectory_first_npz_observable_curve",
+            accession_id="glassbench_zenodo_10118191",
+            smoke_rows=smoke_rows,
+            curve_manifest=curve_manifest,
+            required_method="minimal_image_displacement_from_first_frame",
+        )
+
+        by_key = {(row["system_id"], row["temperature"], row["frame_index"]): row for row in rows}
+        peak = by_key[("KA2D", "0.30", 11.0)]
+        self.assertEqual(peak["curve_stage"], "first_npz_observable_curve_ready_reanalysis_blocked")
+        self.assertEqual(peak["observable_method"], "minimal_image_displacement_from_first_frame")
+        self.assertEqual(peak["observable_curve_ready"], 1.0)
+        self.assertAlmostEqual(peak["msd"], 0.005117245596)
+        self.assertAlmostEqual(peak["ngp_2d"], 0.178746269034)
+        self.assertEqual(peak["trajectory_extraction_ready"], 0.0)
+        self.assertEqual(peak["real_reanalysis_ready"], 0.0)
+        self.assertEqual(peak["primary_blocker"], "single_npz_frame_index_curve")
+
+        final = by_key[("KA2D", "0.30", 19.0)]
+        self.assertAlmostEqual(final["msd"], 0.005414723094)
+        self.assertAlmostEqual(final["ngp_2d"], 0.051977831407)
+
+        blocked = by_key[("KA", "none", -1.0)]
+        self.assertEqual(blocked["curve_stage"], "first_npz_observable_smoke_incomplete")
+        self.assertEqual(blocked["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):
         manifest = {

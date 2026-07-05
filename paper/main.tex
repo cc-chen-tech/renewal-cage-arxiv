@@ -1271,6 +1271,25 @@ pipeline rather than stopping at metadata or schema validation.
   as explicit blockers.}
 \end{figure}
 
+The companion curve table retains the full 20-frame MSD and NGP sequence for
+each first-\texttt{npz} member. These frame-index curves are intentionally not
+fit to the renewal-cage model: no physical time step, trajectory ensemble, or
+uncertainty estimate has been attached. Their purpose is narrower and
+reproducible: they prove that GlassBench coordinate payloads can be converted
+into the same observable curve format used by the repository's synthetic
+trajectory-to-inversion gates. This turns the remaining SOTA gap from an access
+or parsing problem into a controlled analysis-policy problem.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf}
+  \caption{GlassBench first-\texttt{npz} observable curves. The full 20-frame
+  frame-index MSD and two-dimensional NGP curves are retained for the first
+  streamed KA2D \texttt{npz} member at each temperature. These are
+  observable-ingestion curves, not physical-time or uncertainty-weighted model
+  inversions.}
+\end{figure}
+
 \clearpage
 
 The reanalysis-state ledger
