@@ -164,6 +164,11 @@ ranges and pairs time grids with same-temperature `rhomax` curves. KA2D at
 value entries at the last two time points. All rows remain
 `real_inversion_ready=0` until uncertainty columns and model-observable
 semantics are supplied.
+The observable-semantics gate then keeps those `rhomax` rows as
+overlap-density proxies rather than alpha, NGP, diffusion, or `chi4` inputs.
+This lets the repository use real GlassBench result payloads without promoting
+them to persistence/exchange inversion evidence before the required diagnostic
+semantics and uncertainty columns exist.
 The SOTA README-schema gate checks systems, folder tokens, reuse license, and
 citation guidance before claiming that a remote dataset can support a local
 trajectory adapter.
@@ -253,6 +258,7 @@ figures/renewal_cage_sota_remote_zip_central_directory.svg
 figures/renewal_cage_sota_glassbench_payload_index.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_payload_adapter.svg
+figures/renewal_cage_sota_remote_result_curve_observable_semantics.svg
 figures/renewal_cage_sota_readme_schema.svg
 figures/renewal_cage_trajectory_adapter_contract.svg
 figures/renewal_cage_literature_inversion_readiness.svg
@@ -312,6 +318,7 @@ data/renewal_cage_sota_remote_zip_central_directory.csv
 data/renewal_cage_sota_glassbench_payload_index.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_payload_adapter.csv
+data/renewal_cage_sota_remote_result_curve_observable_semantics.csv
 data/renewal_cage_sota_readme_digest.csv
 data/third_party/glassbench/zenodo_record_10118191.json
 data/third_party/glassbench/remote_zip_central_directory_10118191.json
@@ -383,6 +390,7 @@ paper/figures/renewal_cage_sota_remote_zip_central_directory.pdf
 paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf
+paper/figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf
 paper/figures/renewal_cage_trajectory_adapter_contract.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf

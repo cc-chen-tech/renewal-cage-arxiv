@@ -1547,6 +1547,25 @@ persistence/exchange inversion is claimed.
   diagnostic semantics still block real model inversion.}
 \end{figure}
 
+The next gate records this semantic boundary explicitly. A
+\texttt{rhomax} payload is treated as an overlap-density proxy, not as
+\texttt{F_s(k,t)}, NGP, diffusion, or \(\chi_4\). Thus the KA2D
+\texttt{T=0.30} rows are proxy-observable-ready but remain
+\texttt{diagnostic\_semantics\_ready=0}: alpha decay, diffusion, late NGP,
+\(\chi_4\), and uncertainty semantics are all missing for the
+persistence/exchange protocol. This prevents a common overclaim in
+machine-readable benchmark reuse: a numeric curve and a physically meaningful
+diagnostic input are different states.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf}
+  \caption{SOTA remote result-curve observable semantics. Structurally ready
+  \texttt{rhomax} payloads are retained as proxy observables, while the
+  model-level alpha, diffusion, late-NGP, \(\chi_4\), and uncertainty semantics
+  required for persistence/exchange inversion remain explicit blockers.}
+\end{figure}
+
 \clearpage
 
 \begin{figure}[p]

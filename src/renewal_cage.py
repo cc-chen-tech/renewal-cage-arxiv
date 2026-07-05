@@ -2963,6 +2963,88 @@ def sota_remote_result_curve_payload_adapter_gate(
     return rows
 
 
+def sota_remote_result_curve_observable_semantics_gate(
+    *,
+    semantics_id: str,
+    accession_id: str,
+    payload_adapter_rows: list[dict[str, float | str]],
+    role_semantics: dict[str, dict[str, Sequence[str] | str]],
+    required_model_semantics: Sequence[str],
+) -> list[dict[str, float | str]]:
+    """Classify structural result-curve payloads against model-observable semantics."""
+
+    if not semantics_id:
+        raise ValueError("semantics_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not payload_adapter_rows:
+        raise ValueError("payload_adapter_rows must be nonempty")
+    if not role_semantics:
+        raise ValueError("role_semantics must be nonempty")
+    required = list(dict.fromkeys(required_model_semantics))
+    if not required or any(not item for item in required):
+        raise ValueError("required_model_semantics must contain nonempty strings")
+
+    rows: list[dict[str, float | str]] = []
+    for payload_row in payload_adapter_rows:
+        curve_role = str(payload_row.get("curve_role", ""))
+        if not curve_role:
+            raise ValueError("payload rows must include curve_role")
+        role_info = role_semantics.get(curve_role, {})
+        candidate_observable = str(role_info.get("candidate_observable", "unmapped_result_curve"))
+        available_semantics = list(dict.fromkeys(role_info.get("available_semantics", [])))  # type: ignore[arg-type]
+        if any(not item for item in available_semantics):
+            raise ValueError("available semantics must be nonempty strings")
+
+        structural_ready = float(payload_row.get("structural_adapter_ready", 0.0)) == 1.0
+        uncertainty_ready = float(payload_row.get("uncertainty_adapter_ready", 0.0)) == 1.0
+        available_set = set(available_semantics)
+        missing_model_semantics = [item for item in required if item not in available_set]
+        proxy_ready = structural_ready and candidate_observable != "unmapped_result_curve"
+        diagnostic_ready = proxy_ready and uncertainty_ready and not missing_model_semantics
+
+        if not structural_ready:
+            stage = "structural_adapter_blocked"
+            blocker = str(payload_row.get("primary_blocker", "structural_adapter"))
+        elif not proxy_ready:
+            stage = "observable_semantics_unmapped"
+            blocker = "observable_semantics"
+        elif missing_model_semantics:
+            stage = "proxy_observable_ready_model_semantics_incomplete"
+            blocker = "model_observable_semantics"
+        elif not uncertainty_ready:
+            stage = "observable_uncertainty_missing"
+            blocker = str(payload_row.get("primary_blocker", "uncertainty"))
+        else:
+            stage = "model_observable_semantics_ready"
+            blocker = "none"
+
+        rows.append(
+            {
+                "semantics_id": f"{semantics_id}_{str(payload_row.get('system_id', '')).lower()}_{payload_row.get('temperature')}_{curve_role}",
+                "accession_id": accession_id,
+                "payload_adapter_id": str(payload_row.get("payload_adapter_id", "none")),
+                "system_id": str(payload_row.get("system_id", "none")),
+                "temperature": str(payload_row.get("temperature", "none")),
+                "curve_role": curve_role,
+                "candidate_observable": candidate_observable,
+                "available_semantics": ";".join(available_semantics) if available_semantics else "none",
+                "required_model_semantics": ";".join(required),
+                "missing_model_semantics": (
+                    ";".join(missing_model_semantics) if missing_model_semantics else "none"
+                ),
+                "structural_adapter_ready": float(structural_ready),
+                "proxy_observable_ready": float(proxy_ready),
+                "uncertainty_semantics_ready": float(uncertainty_ready),
+                "diagnostic_semantics_ready": float(diagnostic_ready),
+                "real_inversion_ready": 0.0,
+                "primary_blocker": blocker,
+                "semantics_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_reanalysis_state_gate(
     *,
     state_id: str,

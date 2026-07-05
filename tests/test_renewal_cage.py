@@ -122,6 +122,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_payload_index_gate,
     sota_remote_result_curve_cache_gate,
     sota_remote_result_curve_payload_adapter_gate,
+    sota_remote_result_curve_observable_semantics_gate,
     sota_remote_zip_central_directory_gate,
     sota_zenodo_record_fingerprint_gate,
     sota_readme_schema_gate,
@@ -2520,6 +2521,66 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["uncertainty_adapter_ready"], 0.0)
         self.assertEqual(row["real_inversion_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "sigma_rhomax")
+
+    def test_sota_remote_result_curve_observable_semantics_keeps_rhomax_as_proxy(self):
+        payload_rows = [
+            {
+                "payload_adapter_id": "glassbench_range_curve_payload_adapter_ka2d_0.30_rhomax_md",
+                "accession_id": "glassbench_zenodo_10118191",
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "curve_role": "rhomax_md",
+                "available_columns": "temperature;time;rhomax",
+                "structural_adapter_ready": 1.0,
+                "uncertainty_adapter_ready": 0.0,
+                "primary_blocker": "sigma_rhomax",
+            },
+            {
+                "payload_adapter_id": "glassbench_range_curve_payload_adapter_ka_0.44_rhomax_md",
+                "accession_id": "glassbench_zenodo_10118191",
+                "system_id": "KA",
+                "temperature": "0.44",
+                "curve_role": "rhomax_md",
+                "available_columns": "none",
+                "structural_adapter_ready": 0.0,
+                "uncertainty_adapter_ready": 0.0,
+                "primary_blocker": "numeric_rows",
+            },
+        ]
+
+        rows = sota_remote_result_curve_observable_semantics_gate(
+            semantics_id="glassbench_range_curve_observable_semantics",
+            accession_id="glassbench_zenodo_10118191",
+            payload_adapter_rows=payload_rows,
+            role_semantics={
+                "rhomax_md": {
+                    "candidate_observable": "overlap_density_proxy",
+                    "available_semantics": ["temperature", "time", "rhomax", "curve_role_label"],
+                }
+            },
+            required_model_semantics=[
+                "alpha_decay",
+                "diffusion",
+                "late_ngp",
+                "chi4_proxy",
+                "uncertainty",
+            ],
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["semantics_stage"], "proxy_observable_ready_model_semantics_incomplete")
+        self.assertEqual(ka2d["candidate_observable"], "overlap_density_proxy")
+        self.assertEqual(ka2d["proxy_observable_ready"], 1.0)
+        self.assertEqual(ka2d["diagnostic_semantics_ready"], 0.0)
+        self.assertIn("alpha_decay", ka2d["missing_model_semantics"])
+        self.assertEqual(ka2d["primary_blocker"], "model_observable_semantics")
+        self.assertEqual(ka2d["real_inversion_ready"], 0.0)
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["semantics_stage"], "structural_adapter_blocked")
+        self.assertEqual(ka["proxy_observable_ready"], 0.0)
+        self.assertEqual(ka["primary_blocker"], "numeric_rows")
 
     def test_sota_reanalysis_state_gate_marks_metadata_verified_not_reanalysis(self):
         row = sota_reanalysis_state_gate(

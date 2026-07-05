@@ -581,6 +581,37 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka["structural_adapter_ready"]), 0.0)
         self.assertEqual(ka["primary_blocker"], "numeric_rows")
 
+    def test_sota_remote_result_curve_observable_semantics_keeps_proxy_boundary(self):
+        path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_observable_semantics.csv"
+        self.assertTrue(path.exists())
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {
+            (row["system_id"], row["temperature"], row["curve_role"]): row
+            for row in rows
+        }
+        ka2d_md = by_key[("KA2D", "0.30", "rhomax_md")]
+        self.assertEqual(
+            ka2d_md["semantics_stage"],
+            "proxy_observable_ready_model_semantics_incomplete",
+        )
+        self.assertEqual(ka2d_md["candidate_observable"], "overlap_density_proxy")
+        self.assertEqual(float(ka2d_md["proxy_observable_ready"]), 1.0)
+        self.assertEqual(float(ka2d_md["diagnostic_semantics_ready"]), 0.0)
+        self.assertIn("alpha_decay", ka2d_md["missing_model_semantics"])
+        self.assertIn("diffusion", ka2d_md["missing_model_semantics"])
+        self.assertIn("late_ngp", ka2d_md["missing_model_semantics"])
+        self.assertIn("chi4_proxy", ka2d_md["missing_model_semantics"])
+        self.assertEqual(float(ka2d_md["real_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_md["primary_blocker"], "model_observable_semantics")
+
+        ka = by_key[("KA", "0.44", "rhomax_md")]
+        self.assertEqual(ka["semantics_stage"], "structural_adapter_blocked")
+        self.assertEqual(float(ka["proxy_observable_ready"]), 0.0)
+        self.assertEqual(ka["primary_blocker"], "numeric_rows")
+
     def test_sota_reanalysis_state_summarizes_current_glassbench_blocker(self):
         path = ROOT / "data" / "renewal_cage_sota_reanalysis_state.csv"
         self.assertTrue(path.exists())
@@ -1013,6 +1044,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf", names)
             self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
@@ -1059,6 +1091,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", main_tex)
         self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
@@ -1088,6 +1121,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_payload_index.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf",
+            "figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
@@ -1227,6 +1261,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_remote_result_curve_payload_adapter = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
             ).read_bytes()
+            first_sota_remote_result_curve_observable_semantics = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_observable_semantics.pdf"
+            ).read_bytes()
             first_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1353,6 +1390,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_remote_result_curve_payload_adapter = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_payload_adapter.pdf"
             ).read_bytes()
+            second_sota_remote_result_curve_observable_semantics = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_observable_semantics.pdf"
+            ).read_bytes()
             second_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1441,6 +1481,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_remote_result_curve_payload_adapter,
             second_sota_remote_result_curve_payload_adapter,
+        )
+        self.assertEqual(
+            first_sota_remote_result_curve_observable_semantics,
+            second_sota_remote_result_curve_observable_semantics,
         )
         self.assertEqual(first_sota_readme_schema, second_sota_readme_schema)
         self.assertEqual(first_trajectory_adapter_contract, second_trajectory_adapter_contract)
