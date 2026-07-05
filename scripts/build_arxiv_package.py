@@ -2010,6 +2010,62 @@ def write_sota_zenodo_record_fingerprint_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_remote_zip_central_directory_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_remote_zip_central_directory.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA remote ZIP central directory")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "HTTP Range reads verify GlassBench ZIP64 roots and entry count without downloading the full archive payload.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.3)
+    c.drawString(left, top, "remote structure")
+    c.drawString(left + 230, top, "stage")
+    c.drawString(left + 462, top, "entries")
+    c.drawString(left + 512, top, "roots")
+    c.drawString(left + 558, top, "real")
+    c.drawString(left + 598, top, "blocker")
+    palette = {
+        "remote_zip_structure_verified": colors.HexColor("#2f855a"),
+        "remote_zip_structure_and_cache_ready": colors.HexColor("#276749"),
+        "remote_zip_structure_incomplete": colors.HexColor("#c05621"),
+        "remote_central_directory_missing": colors.HexColor("#c05621"),
+        "remote_central_directory_empty": colors.HexColor("#c05621"),
+        "remote_archive_size_mismatch": colors.HexColor("#c05621"),
+        "remote_range_unavailable": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica", 6.9)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 53
+        stage = row["remote_zip_structure_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["remote_structure_id"].replace("_", " ")[:36])
+        c.setFillColor(palette[stage])
+        c.rect(left + 230, y - 4, 198, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 236, y, stage.replace("_", " ")[:31])
+        c.setFillColor(colors.black)
+        c.drawString(left + 470, y, str(int(float(row["entry_count"]))))
+        c.drawString(left + 520, y, f"{float(row['root_coverage']):.2f}")
+        c.drawString(left + 568, y, str(int(float(row["real_reanalysis_ready"]))))
+        c.drawString(left + 598, y, row["primary_blocker"].replace("_", " ")[:30])
+        c.drawString(
+            left + 72,
+            y - 12,
+            f"zip64={int(float(row['zip64']))}; range={int(float(row['range_supported']))}; cd={int(float(row['central_directory_size_bytes']))} bytes at {int(float(row['central_directory_offset']))}",
+        )
+        c.drawString(left + 72, y - 24, f"roots: {row['present_roots'].replace('_', ' ')[:96]}")
+    c.showPage()
+    c.save()
+
+
 def write_sota_readme_schema_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_readme_schema.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2890,6 +2946,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_zenodo_record_fingerprint_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_zenodo_record_fingerprint.pdf"
     )
+    sota_remote_zip_central_directory_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_remote_zip_central_directory.pdf"
+    )
     sota_readme_schema_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_readme_schema.pdf"
     trajectory_adapter_contract_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_adapter_contract.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
@@ -2938,6 +2997,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_source_provenance_pdf(sota_source_provenance_pdf)
     write_sota_data_accession_pdf(sota_data_accession_pdf)
     write_sota_zenodo_record_fingerprint_pdf(sota_zenodo_record_fingerprint_pdf)
+    write_sota_remote_zip_central_directory_pdf(sota_remote_zip_central_directory_pdf)
     write_sota_readme_schema_pdf(sota_readme_schema_pdf)
     write_trajectory_adapter_contract_pdf(trajectory_adapter_contract_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
@@ -3006,6 +3066,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_zenodo_record_fingerprint_pdf,
             "figures/renewal_cage_sota_zenodo_record_fingerprint.pdf",
+        )
+        archive.write(
+            sota_remote_zip_central_directory_pdf,
+            "figures/renewal_cage_sota_remote_zip_central_directory.pdf",
         )
         archive.write(sota_readme_schema_pdf, "figures/renewal_cage_sota_readme_schema.pdf")
         archive.write(trajectory_adapter_contract_pdf, "figures/renewal_cage_trajectory_adapter_contract.pdf")

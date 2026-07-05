@@ -2442,6 +2442,113 @@ def sota_zip_structure_gate(
     }
 
 
+def sota_remote_zip_central_directory_gate(
+    *,
+    remote_structure_id: str,
+    accession_id: str,
+    source_id: str,
+    manifest: dict,
+    expected_archive_size_bytes: int,
+    required_roots: Sequence[str],
+    full_archive_cached: bool,
+) -> dict[str, float | str]:
+    """Verify a remote ZIP central-directory manifest without downloading payloads."""
+
+    for name, value in {
+        "remote_structure_id": remote_structure_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if expected_archive_size_bytes < 0:
+        raise ValueError("expected_archive_size_bytes must be nonnegative")
+    if not required_roots:
+        raise ValueError("required_roots must be nonempty")
+    if any(not root for root in required_roots):
+        raise ValueError("required_roots must contain nonempty strings")
+
+    roots = [root.strip("/") for root in dict.fromkeys(required_roots)]
+    entries_value = manifest.get("entries", [])
+    entries = [
+        str(entry).strip("/")
+        for entry in entries_value
+        if str(entry).strip("/")
+    ] if isinstance(entries_value, list) else []
+    range_supported = bool(manifest.get("range_supported", False))
+    archive_size = int(manifest.get("archive_size_bytes", -1))
+    size_matches = archive_size == expected_archive_size_bytes
+    tail_probe_bytes = int(manifest.get("tail_probe_bytes", 0) or 0)
+    cd_size = int(manifest.get("central_directory_size_bytes", 0) or 0)
+    cd_offset = int(manifest.get("central_directory_offset", -1) or -1)
+    entry_count = int(manifest.get("entry_count", len(entries)) or 0)
+    zip64 = bool(manifest.get("zip64", False))
+    archive_url = str(manifest.get("archive_url", "none"))
+
+    present_roots = [
+        root
+        for root in roots
+        if any(entry == root or entry.startswith(f"{root}/") for entry in entries)
+    ]
+    missing_roots = [root for root in roots if root not in set(present_roots)]
+    structure_ready = (
+        range_supported
+        and size_matches
+        and tail_probe_bytes > 0
+        and cd_size > 0
+        and cd_offset >= 0
+        and entry_count > 0
+        and not missing_roots
+    )
+
+    if not range_supported:
+        stage = "remote_range_unavailable"
+        blocker = "remote_range"
+    elif not size_matches:
+        stage = "remote_archive_size_mismatch"
+        blocker = "archive_size_bytes"
+    elif tail_probe_bytes <= 0 or cd_size <= 0 or cd_offset < 0:
+        stage = "remote_central_directory_missing"
+        blocker = "central_directory"
+    elif entry_count <= 0:
+        stage = "remote_central_directory_empty"
+        blocker = "entry_count"
+    elif missing_roots:
+        stage = "remote_zip_structure_incomplete"
+        blocker = "archive_roots"
+    elif full_archive_cached:
+        stage = "remote_zip_structure_and_cache_ready"
+        blocker = "local_adapter"
+    else:
+        stage = "remote_zip_structure_verified"
+        blocker = "archive_cache"
+
+    return {
+        "remote_structure_id": remote_structure_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "archive_url": archive_url,
+        "archive_size_bytes": float(archive_size),
+        "expected_archive_size_bytes": float(expected_archive_size_bytes),
+        "archive_size_matches": float(size_matches),
+        "range_supported": float(range_supported),
+        "zip64": float(zip64),
+        "tail_probe_bytes": float(tail_probe_bytes),
+        "central_directory_size_bytes": float(cd_size),
+        "central_directory_offset": float(cd_offset),
+        "entry_count": float(entry_count),
+        "required_roots": ";".join(roots),
+        "present_roots": ";".join(present_roots) if present_roots else "none",
+        "missing_roots": ";".join(missing_roots) if missing_roots else "none",
+        "root_coverage": (len(roots) - len(missing_roots)) / len(roots),
+        "full_archive_cached": float(full_archive_cached),
+        "remote_zip_structure_ready": float(structure_ready),
+        "real_reanalysis_ready": 0.0,
+        "primary_blocker": blocker,
+        "remote_zip_structure_stage": stage,
+    }
+
+
 def sota_reanalysis_state_gate(
     *,
     state_id: str,

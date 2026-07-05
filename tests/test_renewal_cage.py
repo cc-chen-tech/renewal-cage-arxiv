@@ -119,6 +119,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_verdict,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
+    sota_remote_zip_central_directory_gate,
     sota_zenodo_record_fingerprint_gate,
     sota_readme_schema_gate,
     sota_reanalysis_state_gate,
@@ -2256,6 +2257,55 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["root_coverage"], 1.0)
         self.assertEqual(row["entry_count"], 6.0)
         self.assertEqual(row["primary_blocker"], "none")
+
+    def test_sota_remote_zip_central_directory_verifies_glassbench_roots_without_download(self):
+        manifest = {
+            "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+            "archive_size_bytes": 6042260027,
+            "range_supported": True,
+            "zip64": True,
+            "tail_probe_bytes": 1048576,
+            "central_directory_size_bytes": 7915,
+            "central_directory_offset": 6042252014,
+            "entry_count": 70,
+            "entries": [
+                "GlassBench/",
+                "GlassBench/README",
+                "GlassBench/KA_trajectories/",
+                "GlassBench/KA_trajectories/T0.44.xyz",
+                "GlassBench/KA_models/model.json",
+                "GlassBench/KA_results/FIG2.dat",
+                "GlassBench/KA2D_trajectories/T0.30.xyz",
+                "GlassBench/KA2D_models/model.json",
+                "GlassBench/KA2D_results/FIG3.dat",
+            ],
+        }
+        row = sota_remote_zip_central_directory_gate(
+            remote_structure_id="glassbench_remote_zip_central_directory",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            manifest=manifest,
+            expected_archive_size_bytes=6042260027,
+            required_roots=[
+                "GlassBench/KA_trajectories",
+                "GlassBench/KA_models",
+                "GlassBench/KA_results",
+                "GlassBench/KA2D_trajectories",
+                "GlassBench/KA2D_models",
+                "GlassBench/KA2D_results",
+            ],
+            full_archive_cached=False,
+        )
+
+        self.assertEqual(row["remote_zip_structure_stage"], "remote_zip_structure_verified")
+        self.assertEqual(row["remote_zip_structure_ready"], 1.0)
+        self.assertEqual(row["zip64"], 1.0)
+        self.assertEqual(row["range_supported"], 1.0)
+        self.assertEqual(row["root_coverage"], 1.0)
+        self.assertEqual(row["entry_count"], 70.0)
+        self.assertEqual(row["full_archive_cached"], 0.0)
+        self.assertEqual(row["real_reanalysis_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "archive_cache")
 
     def test_sota_reanalysis_state_gate_marks_metadata_verified_not_reanalysis(self):
         row = sota_reanalysis_state_gate(

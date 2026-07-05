@@ -1116,6 +1116,18 @@ step: it reads only the archive central directory and requires
 \texttt{KA2D/\_trajectories}, \texttt{KA2D/\_models}, and
 \texttt{KA2D/\_results}. With the full zip absent, the current row remains at
 \texttt{zip\_archive\_missing}.
+To move one step beyond README-level metadata without downloading the 6.04 GB
+payload, the remote central-directory manifest
+\texttt{renewal\_cage\_sota\_remote\_zip\_central\_directory.csv} records an
+HTTP Range probe of the public \texttt{GlassBench.zip}. The response supports
+partial content, the archive is ZIP64, the central directory contains 70
+entries, and the verified roots are the actual archive paths
+\texttt{GlassBench/KA\_trajectories}, \texttt{GlassBench/KA\_models},
+\texttt{GlassBench/KA\_results}, \texttt{GlassBench/KA2D\_trajectories},
+\texttt{GlassBench/KA2D\_models}, and
+\texttt{GlassBench/KA2D\_results}. This verifies remote archive structure, but
+the row still has \texttt{real\_reanalysis\_ready=0} because the coordinate
+payloads are not cached locally.
 The reanalysis-state ledger
 \texttt{renewal\_cage\_sota\_reanalysis\_state.csv} collapses these gates into
 a single claim boundary. The current GlassBench row has
@@ -1486,6 +1498,15 @@ rejected without refitting the clocks.
   record verifies DOI, license, file sizes, and md5 checksums for the
   lightweight README and full archive while keeping trajectory reanalysis
   blocked until the full archive is locally cached.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_remote_zip_central_directory.pdf}
+  \caption{SOTA remote ZIP central-directory gate. HTTP Range reads verify that
+  the public GlassBench ZIP64 archive exposes KA and KA2D trajectory, model,
+  and result roots without downloading the full 6.04 GB payload; local
+  trajectory reanalysis remains blocked until those payloads are cached.}
 \end{figure}
 
 \begin{figure}[p]

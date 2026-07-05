@@ -105,6 +105,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_verdict,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
+    sota_remote_zip_central_directory_gate,
     sota_reanalysis_state_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
@@ -3254,6 +3255,33 @@ def write_sota_zip_structure_csv(path: Path) -> list[dict[str, float | str]]:
     return rows
 
 
+def write_sota_remote_zip_central_directory_csv(path: Path) -> list[dict[str, float | str]]:
+    """Verify remote ZIP64 central-directory roots without downloading trajectories."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "remote_zip_central_directory_10118191.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = [
+        sota_remote_zip_central_directory_gate(
+            remote_structure_id="glassbench_remote_zip_central_directory",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            manifest=manifest,
+            expected_archive_size_bytes=6042260027,
+            required_roots=[
+                "GlassBench/KA_trajectories",
+                "GlassBench/KA_models",
+                "GlassBench/KA_results",
+                "GlassBench/KA2D_trajectories",
+                "GlassBench/KA2D_models",
+                "GlassBench/KA2D_results",
+            ],
+            full_archive_cached=False,
+        )
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_reanalysis_state_csv(
     path: Path,
     *,
@@ -5479,6 +5507,62 @@ def write_sota_zenodo_record_fingerprint_svg(path: Path, rows: list[dict[str, fl
     path.write_text(svg)
 
 
+def write_sota_remote_zip_central_directory_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 340
+    left, top = 75, 112
+    colors = {
+        "remote_zip_structure_verified": "#2f855a",
+        "remote_zip_structure_and_cache_ready": "#276749",
+        "remote_zip_structure_incomplete": "#c05621",
+        "remote_central_directory_missing": "#c05621",
+        "remote_central_directory_empty": "#c05621",
+        "remote_archive_size_mismatch": "#c05621",
+        "remote_range_unavailable": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * 82
+        stage = str(row["remote_zip_structure_stage"])
+        color = colors[stage]
+        remote_ready = int(float(row["remote_zip_structure_ready"]))
+        real_ready = int(float(row["real_reanalysis_ready"]))
+        coverage = float(row["root_coverage"])
+        entries = int(float(row["entry_count"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["remote_structure_id"]).replace("_", " ")[:44]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 320}" y="{y - 4}" width="245" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 330}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:35]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 590}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">remote={remote_ready}; real fit={real_ready}; entries={entries}; roots={coverage:.2f}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 72}" y="{y + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">zip64={int(float(row["zip64"]))}; range={int(float(row["range_supported"]))}; cd={int(float(row["central_directory_size_bytes"]))} bytes at offset {int(float(row["central_directory_offset"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 72}" y="{y + 56}" font-family="Arial, sans-serif" font-size="9" fill="#555">present roots: {str(row["present_roots"]).replace("_", " ")[:130]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA remote ZIP central directory</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">HTTP Range reads verify GlassBench ZIP64 roots and entry count without downloading the 6.04 GB archive payload.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">remote structure</text>
+  <text x="{left + 320}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 590}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="276" width="14" height="14" fill="#2f855a" /><text x="96" y="288" font-family="Arial, sans-serif" font-size="12">remote central directory verified</text>
+  <rect x="340" y="276" width="14" height="14" fill="#c05621" /><text x="361" y="288" font-family="Arial, sans-serif" font-size="12">root or directory evidence incomplete</text>
+  <text x="610" y="288" font-family="Arial, sans-serif" font-size="12">full local archive is still required before trajectory reanalysis</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_readme_schema_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 380
@@ -6885,6 +6969,13 @@ def main() -> None:
     )
     write_sota_archive_preflight_csv(
         DATA_DIR / "renewal_cage_sota_archive_preflight.csv"
+    )
+    remote_zip_central_directory_rows = write_sota_remote_zip_central_directory_csv(
+        DATA_DIR / "renewal_cage_sota_remote_zip_central_directory.csv"
+    )
+    write_sota_remote_zip_central_directory_svg(
+        FIGURE_DIR / "renewal_cage_sota_remote_zip_central_directory.svg",
+        remote_zip_central_directory_rows,
     )
     readme_digest_rows = write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"
