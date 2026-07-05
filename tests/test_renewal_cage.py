@@ -119,6 +119,7 @@ from renewal_cage import (  # noqa: E402
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_readme_schema_gate,
+    sota_reanalysis_state_gate,
     sota_source_provenance_gate,
     sota_zip_structure_gate,
     sota_signed_constraint_audit,
@@ -2206,6 +2207,56 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["zip_structure_ready"], 1.0)
         self.assertEqual(row["root_coverage"], 1.0)
         self.assertEqual(row["entry_count"], 6.0)
+        self.assertEqual(row["primary_blocker"], "none")
+
+    def test_sota_reanalysis_state_gate_marks_metadata_verified_not_reanalysis(self):
+        row = sota_reanalysis_state_gate(
+            state_id="glassbench_reanalysis_state",
+            source_id="glassbench_zenodo_trajectory_release",
+            accession_ready=True,
+            readme_digest_ready=True,
+            local_cache_verified=False,
+            zip_structure_ready=False,
+            adapter_ready=False,
+            local_cache_blocker="archive_path",
+            zip_structure_blocker="archive_path",
+            adapter_blocker="coordinate_file",
+            required_final_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_curve_persistence_exchange_gate",
+                "trajectory_prediction_falsification_gate",
+            ],
+        )
+
+        self.assertEqual(row["reanalysis_stage"], "awaiting_full_archive_cache")
+        self.assertEqual(row["claim_level"], "metadata_verified_not_reanalysis")
+        self.assertEqual(row["ready_for_trajectory_reanalysis"], 0.0)
+        self.assertEqual(row["ready_for_model_comparison"], 0.0)
+        self.assertEqual(row["primary_blocker"], "archive_path")
+        self.assertEqual(row["next_action"], "cache_full_archive_and_verify_checksum")
+
+    def test_sota_reanalysis_state_gate_promotes_adapter_ready_state(self):
+        row = sota_reanalysis_state_gate(
+            state_id="synthetic_reanalysis_state",
+            source_id="synthetic_fixture",
+            accession_ready=True,
+            readme_digest_ready=True,
+            local_cache_verified=True,
+            zip_structure_ready=True,
+            adapter_ready=True,
+            local_cache_blocker="none",
+            zip_structure_blocker="none",
+            adapter_blocker="none",
+            required_final_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_curve_persistence_exchange_gate",
+            ],
+        )
+
+        self.assertEqual(row["reanalysis_stage"], "ready_for_trajectory_observable_protocol")
+        self.assertEqual(row["claim_level"], "local_archive_adapter_ready")
+        self.assertEqual(row["ready_for_trajectory_reanalysis"], 1.0)
         self.assertEqual(row["primary_blocker"], "none")
 
     def test_sota_readme_schema_gate_marks_glassbench_remote_schema_ready(self):

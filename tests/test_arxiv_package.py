@@ -413,6 +413,23 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("KA/_trajectories", glassbench["required_roots"])
         self.assertIn("KA2D/_results", glassbench["missing_roots"])
 
+    def test_sota_reanalysis_state_summarizes_current_glassbench_blocker(self):
+        path = ROOT / "data" / "renewal_cage_sota_reanalysis_state.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["state_id"]: row for row in rows}
+        glassbench = by_id["glassbench_reanalysis_state"]
+        self.assertEqual(glassbench["reanalysis_stage"], "awaiting_full_archive_cache")
+        self.assertEqual(glassbench["claim_level"], "metadata_verified_not_reanalysis")
+        self.assertEqual(float(glassbench["accession_ready"]), 1.0)
+        self.assertEqual(float(glassbench["readme_digest_ready"]), 1.0)
+        self.assertEqual(float(glassbench["local_cache_verified"]), 0.0)
+        self.assertEqual(float(glassbench["ready_for_model_comparison"]), 0.0)
+        self.assertEqual(glassbench["primary_blocker"], "archive_path")
+        self.assertEqual(glassbench["next_action"], "cache_full_archive_and_verify_checksum")
+
     def test_sota_readme_schema_gate_records_remote_schema_without_archive_inspection(self):
         path = ROOT / "data" / "renewal_cage_sota_readme_schema.csv"
         self.assertTrue(path.exists())

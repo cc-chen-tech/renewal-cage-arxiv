@@ -102,6 +102,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
+    sota_reanalysis_state_gate,
     sota_readme_schema_gate,
     sota_source_provenance_gate,
     sota_signed_constraint_audit,
@@ -3156,6 +3157,65 @@ def write_sota_zip_structure_csv(path: Path) -> list[dict[str, float | str]]:
                 "KA2D/_trajectories",
                 "KA2D/_models",
                 "KA2D/_results",
+            ],
+        )
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_reanalysis_state_csv(
+    path: Path,
+    *,
+    data_accession_rows: list[dict[str, float | str]],
+    readme_digest_rows: list[dict[str, float | str]],
+    local_cache_rows: list[dict[str, float | str]],
+    zip_structure_rows: list[dict[str, float | str]],
+    adapter_contract_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Summarize the current source-to-model-comparison state for SOTA data."""
+
+    accession_by_id = {str(row["accession_id"]): row for row in data_accession_rows}
+    digest_by_id = {str(row["digest_id"]): row for row in readme_digest_rows}
+    cache_by_id = {str(row["cache_id"]): row for row in local_cache_rows}
+    zip_by_id = {str(row["structure_id"]): row for row in zip_structure_rows}
+    glassbench_adapters = [
+        row
+        for row in adapter_contract_rows
+        if str(row["accession_id"]) == "glassbench_zenodo_10118191"
+    ]
+    adapter_ready = bool(glassbench_adapters) and all(
+        float(row["adapter_ready"]) == 1.0 for row in glassbench_adapters
+    )
+    adapter_blocker = next(
+        (
+            str(row["primary_blocker"])
+            for row in glassbench_adapters
+            if str(row["primary_blocker"]) != "none"
+        ),
+        "none",
+    )
+    accession = accession_by_id["glassbench_zenodo_10118191"]
+    digest = digest_by_id["glassbench_readme_digest"]
+    cache = cache_by_id["glassbench_local_cache"]
+    zip_row = zip_by_id["glassbench_zip_structure"]
+    rows = [
+        sota_reanalysis_state_gate(
+            state_id="glassbench_reanalysis_state",
+            source_id="glassbench_zenodo_trajectory_release",
+            accession_ready=float(accession["accession_ready"]) == 1.0,
+            readme_digest_ready=float(digest["readme_digest_ready"]) == 1.0,
+            local_cache_verified=float(cache["local_cache_verified"]) == 1.0,
+            zip_structure_ready=float(zip_row["zip_structure_ready"]) == 1.0,
+            adapter_ready=adapter_ready,
+            local_cache_blocker=str(cache["primary_blocker"]),
+            zip_structure_blocker=str(zip_row["primary_blocker"]),
+            adapter_blocker=adapter_blocker,
+            required_final_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_curve_persistence_exchange_gate",
+                "trajectory_prediction_falsification_gate",
             ],
         )
     ]
@@ -6560,13 +6620,13 @@ def main() -> None:
     write_sota_archive_preflight_csv(
         DATA_DIR / "renewal_cage_sota_archive_preflight.csv"
     )
-    write_sota_readme_digest_csv(
+    readme_digest_rows = write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"
     )
-    write_sota_local_cache_verification_csv(
+    local_cache_rows = write_sota_local_cache_verification_csv(
         DATA_DIR / "renewal_cage_sota_local_cache_verification.csv"
     )
-    write_sota_zip_structure_csv(
+    zip_structure_rows = write_sota_zip_structure_csv(
         DATA_DIR / "renewal_cage_sota_zip_structure.csv"
     )
     readme_schema_rows = write_sota_readme_schema_csv(
@@ -6578,6 +6638,14 @@ def main() -> None:
     )
     trajectory_adapter_contract_rows = write_trajectory_adapter_contract_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_contract.csv"
+    )
+    write_sota_reanalysis_state_csv(
+        DATA_DIR / "renewal_cage_sota_reanalysis_state.csv",
+        data_accession_rows=data_accession_rows,
+        readme_digest_rows=readme_digest_rows,
+        local_cache_rows=local_cache_rows,
+        zip_structure_rows=zip_structure_rows,
+        adapter_contract_rows=trajectory_adapter_contract_rows,
     )
     write_trajectory_adapter_contract_svg(
         FIGURE_DIR / "renewal_cage_trajectory_adapter_contract.svg",

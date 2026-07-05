@@ -1097,6 +1097,13 @@ step: it reads only the archive central directory and requires
 \texttt{KA2D/\_trajectories}, \texttt{KA2D/\_models}, and
 \texttt{KA2D/\_results}. With the full zip absent, the current row remains at
 \texttt{zip\_archive\_missing}.
+The reanalysis-state ledger
+\texttt{renewal\_cage\_sota\_reanalysis\_state.csv} collapses these gates into
+a single claim boundary. The current GlassBench row has
+\texttt{claim\_level=metadata\_verified\_not\_reanalysis} and
+\texttt{reanalysis\_stage=awaiting\_full\_archive\_cache}; the next action is
+to cache the full archive and verify its checksum before any trajectory-level
+model comparison is claimed.
 The README-schema gate
 \texttt{renewal\_cage\_sota\_readme\_schema.csv} then checks the next layer of
 metadata without downloading the full archive: the public README names the

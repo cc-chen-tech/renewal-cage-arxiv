@@ -2309,6 +2309,89 @@ def sota_zip_structure_gate(
     }
 
 
+def sota_reanalysis_state_gate(
+    *,
+    state_id: str,
+    source_id: str,
+    accession_ready: bool,
+    readme_digest_ready: bool,
+    local_cache_verified: bool,
+    zip_structure_ready: bool,
+    adapter_ready: bool,
+    local_cache_blocker: str,
+    zip_structure_blocker: str,
+    adapter_blocker: str,
+    required_final_protocols: Sequence[str],
+) -> dict[str, float | str]:
+    """Summarize the current SOTA reanalysis state without overclaiming progress."""
+
+    for name, value in {
+        "state_id": state_id,
+        "source_id": source_id,
+        "local_cache_blocker": local_cache_blocker,
+        "zip_structure_blocker": zip_structure_blocker,
+        "adapter_blocker": adapter_blocker,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if not required_final_protocols:
+        raise ValueError("required_final_protocols must be nonempty")
+    if any(not protocol for protocol in required_final_protocols):
+        raise ValueError("required_final_protocols must contain nonempty strings")
+
+    protocols = list(dict.fromkeys(required_final_protocols))
+    if not accession_ready:
+        stage = "awaiting_public_accession"
+        claim_level = "citation_only"
+        blocker = "accession"
+        next_action = "obtain_public_machine_readable_accession"
+    elif not readme_digest_ready:
+        stage = "awaiting_readme_digest"
+        claim_level = "remote_metadata_only"
+        blocker = "readme_digest"
+        next_action = "cache_and_verify_lightweight_readme"
+    elif not local_cache_verified:
+        stage = "awaiting_full_archive_cache"
+        claim_level = "metadata_verified_not_reanalysis"
+        blocker = local_cache_blocker
+        next_action = "cache_full_archive_and_verify_checksum"
+    elif not zip_structure_ready:
+        stage = "awaiting_zip_structure"
+        claim_level = "local_archive_checksum_verified"
+        blocker = zip_structure_blocker
+        next_action = "inspect_zip_central_directory_roots"
+    elif not adapter_ready:
+        stage = "awaiting_adapter_mapping"
+        claim_level = "archive_structure_verified"
+        blocker = adapter_blocker
+        next_action = "map_trajectory_columns_and_metadata"
+    else:
+        stage = "ready_for_trajectory_observable_protocol"
+        claim_level = "local_archive_adapter_ready"
+        blocker = "none"
+        next_action = "run_trajectory_observable_protocol"
+
+    ready_for_reanalysis = adapter_ready and zip_structure_ready and local_cache_verified
+    ready_for_model_comparison = ready_for_reanalysis and len(protocols) >= 2
+    return {
+        "state_id": state_id,
+        "source_id": source_id,
+        "accession_ready": float(accession_ready),
+        "readme_digest_ready": float(readme_digest_ready),
+        "local_cache_verified": float(local_cache_verified),
+        "zip_structure_ready": float(zip_structure_ready),
+        "adapter_ready": float(adapter_ready),
+        "required_final_protocols": ";".join(protocols),
+        "required_final_protocol_count": float(len(protocols)),
+        "ready_for_trajectory_reanalysis": float(ready_for_reanalysis),
+        "ready_for_model_comparison": float(ready_for_model_comparison),
+        "claim_level": claim_level,
+        "primary_blocker": blocker,
+        "next_action": next_action,
+        "reanalysis_stage": stage,
+    }
+
+
 def sota_readme_schema_gate(
     *,
     schema_id: str,
