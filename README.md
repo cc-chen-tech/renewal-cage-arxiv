@@ -217,6 +217,7 @@ figures/renewal_cage_frontier_benchmark_horizon.svg
 figures/renewal_cage_sota_source_provenance.svg
 figures/renewal_cage_sota_data_accession.svg
 figures/renewal_cage_sota_readme_schema.svg
+figures/renewal_cage_trajectory_adapter_contract.svg
 figures/renewal_cage_literature_inversion_readiness.svg
 figures/renewal_cage_observable_falsification_matrix.svg
 figures/renewal_cage_benchmark_fusion_readiness.svg
@@ -268,6 +269,7 @@ data/renewal_cage_frontier_benchmark_horizon.csv
 data/renewal_cage_sota_source_provenance.csv
 data/renewal_cage_sota_data_accession.csv
 data/renewal_cage_sota_readme_schema.csv
+data/renewal_cage_trajectory_adapter_contract.csv
 data/renewal_cage_literature_inversion_readiness.csv
 data/renewal_cage_observable_falsification_matrix.csv
 data/renewal_cage_benchmark_fusion_readiness.csv
@@ -316,6 +318,7 @@ paper/figures/renewal_cage_frontier_benchmark_horizon.pdf
 paper/figures/renewal_cage_sota_source_provenance.pdf
 paper/figures/renewal_cage_sota_data_accession.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf
+paper/figures/renewal_cage_trajectory_adapter_contract.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf
 paper/figures/renewal_cage_observable_falsification_matrix.pdf
 paper/figures/renewal_cage_benchmark_fusion_readiness.pdf

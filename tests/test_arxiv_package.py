@@ -359,6 +359,33 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(missing["schema_stage"], "metadata_incomplete_schema")
         self.assertEqual(missing["primary_blocker"], "trajectory_folder")
 
+    def test_trajectory_adapter_contract_keeps_glassbench_remote_until_local_archive_inspected(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_adapter_contract.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["contract_id"]: row for row in rows}
+        ka = by_id["glassbench_ka_remote_contract"]
+        self.assertEqual(ka["adapter_stage"], "remote_adapter_contract_only")
+        self.assertEqual(ka["system_id"], "KA")
+        self.assertEqual(float(ka["adapter_ready"]), 0.0)
+        self.assertEqual(float(ka["local_archive_inspected"]), 0.0)
+        self.assertEqual(ka["primary_blocker"], "coordinate_file")
+        self.assertIn("coordinate_file", ka["missing_local_fields"])
+
+        ka2d = by_id["glassbench_ka2d_remote_contract"]
+        self.assertEqual(ka2d["adapter_stage"], "remote_adapter_contract_only")
+        self.assertEqual(ka2d["system_id"], "KA2D")
+        self.assertEqual(float(ka2d["adapter_ready"]), 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "coordinate_file")
+
+        synthetic = by_id["synthetic_local_trajectory_adapter"]
+        self.assertEqual(synthetic["adapter_stage"], "local_trajectory_adapter_ready")
+        self.assertEqual(float(synthetic["adapter_ready"]), 1.0)
+        self.assertEqual(float(synthetic["local_archive_inspected"]), 1.0)
+        self.assertEqual(synthetic["primary_blocker"], "none")
+
     def test_observable_falsification_matrix_maps_literature_to_diagnostic_blockers(self):
         path = ROOT / "data" / "renewal_cage_observable_falsification_matrix.csv"
         self.assertTrue(path.exists())
@@ -572,6 +599,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", names)
             self.assertIn("figures/renewal_cage_sota_data_accession.pdf", names)
             self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", names)
@@ -610,6 +638,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_data_accession.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", main_tex)
         self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
@@ -631,6 +660,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_source_provenance.pdf",
             "figures/renewal_cage_sota_data_accession.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
+            "figures/renewal_cage_trajectory_adapter_contract.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_observable_falsification_matrix.pdf",
             "figures/renewal_cage_benchmark_fusion_readiness.pdf",
@@ -738,6 +768,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
+            first_trajectory_adapter_contract = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_adapter_contract.pdf"
+            ).read_bytes()
             first_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
@@ -843,6 +876,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
+            second_trajectory_adapter_contract = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_adapter_contract.pdf"
+            ).read_bytes()
             second_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
@@ -918,6 +954,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_source_provenance, second_sota_source_provenance)
         self.assertEqual(first_sota_data_accession, second_sota_data_accession)
         self.assertEqual(first_sota_readme_schema, second_sota_readme_schema)
+        self.assertEqual(first_trajectory_adapter_contract, second_trajectory_adapter_contract)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
         self.assertEqual(first_observable_falsification_matrix, second_observable_falsification_matrix)
         self.assertEqual(first_benchmark_fusion_readiness, second_benchmark_fusion_readiness)

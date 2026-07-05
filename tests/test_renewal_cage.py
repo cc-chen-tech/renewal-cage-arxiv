@@ -119,6 +119,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
+    trajectory_adapter_contract,
     trajectory_inversion_readiness_gate,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
@@ -1980,6 +1981,74 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["schema_stage"], "metadata_incomplete_schema")
         self.assertEqual(row["schema_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "trajectory_folder")
+
+    def test_trajectory_adapter_contract_blocks_remote_glassbench_without_local_files(self):
+        row = trajectory_adapter_contract(
+            contract_id="glassbench_ka_remote_contract",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            system_id="KA",
+            expected_archive_roots=["KA/_trajectories", "KA/_models", "KA/_results"],
+            required_local_fields=[
+                "archive_root",
+                "trajectory_folder",
+                "coordinate_file",
+                "time_grid",
+                "particle_identity",
+                "box_geometry",
+                "temperature_or_state_point",
+                "species_labels",
+                "units_metadata",
+            ],
+            available_local_fields=["archive_root", "trajectory_folder"],
+            intended_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+            local_archive_inspected=False,
+        )
+
+        self.assertEqual(row["adapter_stage"], "remote_adapter_contract_only")
+        self.assertEqual(row["adapter_ready"], 0.0)
+        self.assertEqual(row["local_archive_inspected"], 0.0)
+        self.assertEqual(row["available_required_field_count"], 2.0)
+        self.assertEqual(row["primary_blocker"], "coordinate_file")
+        self.assertIn("coordinate_file", row["missing_local_fields"])
+
+    def test_trajectory_adapter_contract_promotes_local_synthetic_adapter(self):
+        required_fields = [
+            "archive_root",
+            "trajectory_folder",
+            "coordinate_file",
+            "time_grid",
+            "particle_identity",
+            "box_geometry",
+            "temperature_or_state_point",
+            "species_labels",
+            "units_metadata",
+        ]
+        row = trajectory_adapter_contract(
+            contract_id="synthetic_local_trajectory_adapter",
+            accession_id="synthetic_local_cache",
+            source_id="synthetic_intermediate_scattering_fixture",
+            system_id="synthetic",
+            expected_archive_roots=["synthetic/_trajectories"],
+            required_local_fields=required_fields,
+            available_local_fields=required_fields,
+            intended_protocols=[
+                "trajectory_observable_protocol",
+                "trajectory_uncertainty_protocol",
+                "trajectory_inversion_readiness_gate",
+            ],
+            local_archive_inspected=True,
+        )
+
+        self.assertEqual(row["adapter_stage"], "local_trajectory_adapter_ready")
+        self.assertEqual(row["adapter_ready"], 1.0)
+        self.assertEqual(row["local_archive_inspected"], 1.0)
+        self.assertEqual(row["missing_local_fields"], "none")
+        self.assertEqual(row["primary_blocker"], "none")
 
     def test_sota_claim_alignment_scores_supported_dynamic_claim(self):
         row = sota_claim_alignment(

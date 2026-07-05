@@ -1972,6 +1972,82 @@ def sota_readme_schema_gate(
     }
 
 
+def trajectory_adapter_contract(
+    *,
+    contract_id: str,
+    accession_id: str,
+    source_id: str,
+    system_id: str,
+    expected_archive_roots: Sequence[str],
+    required_local_fields: Sequence[str],
+    available_local_fields: Sequence[str],
+    intended_protocols: Sequence[str],
+    local_archive_inspected: bool,
+) -> dict[str, float | str]:
+    """Gate local trajectory adapter readiness after remote README/schema checks."""
+
+    for name, value in {
+        "contract_id": contract_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "system_id": system_id,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    for name, values in {
+        "expected_archive_roots": expected_archive_roots,
+        "required_local_fields": required_local_fields,
+        "available_local_fields": available_local_fields,
+        "intended_protocols": intended_protocols,
+    }.items():
+        if not values:
+            raise ValueError(f"{name} must be nonempty")
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    roots = list(dict.fromkeys(expected_archive_roots))
+    required = list(dict.fromkeys(required_local_fields))
+    available = list(dict.fromkeys(available_local_fields))
+    protocols = list(dict.fromkeys(intended_protocols))
+    available_set = set(available)
+    missing = [field for field in required if field not in available_set]
+    available_required_count = sum(1 for field in required if field in available_set)
+    trajectory_protocol_requested = any(protocol.startswith("trajectory_") for protocol in protocols)
+    adapter_ready = bool(local_archive_inspected and not missing and trajectory_protocol_requested)
+
+    if adapter_ready:
+        stage = "local_trajectory_adapter_ready"
+        blocker = "none"
+    elif missing:
+        stage = "remote_adapter_contract_only" if not local_archive_inspected else "metadata_incomplete_adapter"
+        blocker = missing[0]
+    elif not local_archive_inspected:
+        stage = "remote_adapter_contract_only"
+        blocker = "local_archive_inspection"
+    else:
+        stage = "metadata_incomplete_adapter"
+        blocker = "trajectory_protocol"
+
+    return {
+        "contract_id": contract_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+        "system_id": system_id,
+        "expected_archive_roots": ";".join(roots),
+        "required_local_fields": ";".join(required),
+        "available_local_fields": ";".join(available),
+        "missing_local_fields": ";".join(missing) if missing else "none",
+        "required_field_count": float(len(required)),
+        "available_required_field_count": float(available_required_count),
+        "local_archive_inspected": float(local_archive_inspected),
+        "trajectory_protocol_requested": float(trajectory_protocol_requested),
+        "adapter_ready": float(adapter_ready),
+        "intended_protocols": ";".join(protocols),
+        "primary_blocker": blocker,
+        "adapter_stage": stage,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,

@@ -1958,6 +1958,57 @@ def write_sota_readme_schema_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_adapter_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_adapter_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Trajectory adapter contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Local trajectory adapters must expose coordinate, time-grid, identity, box, state-point, species, and units fields before trajectory diagnostics are claimed.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "contract")
+    c.drawString(left + 230, top, "stage")
+    c.drawString(left + 430, top, "system")
+    c.drawString(left + 485, top, "fields")
+    c.drawString(left + 545, top, "ready")
+    c.drawString(left + 590, top, "blocker")
+    palette = {
+        "remote_adapter_contract_only": colors.HexColor("#805ad5"),
+        "metadata_incomplete_adapter": colors.HexColor("#c05621"),
+        "local_trajectory_adapter_ready": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica", 7.0)
+    for idx, row in enumerate(rows):
+        y = top - 25 - idx * 43
+        stage = row["adapter_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["contract_id"].replace("_", " ")[:34])
+        c.setFillColor(palette[stage])
+        c.rect(left + 230, y - 4, 170, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 236, y, stage.replace("_", " ")[:27])
+        c.setFillColor(colors.black)
+        c.drawString(left + 430, y, row["system_id"][:9])
+        c.drawString(
+            left + 486,
+            y,
+            f"{int(float(row['available_required_field_count']))}/{int(float(row['required_field_count']))}",
+        )
+        c.drawString(left + 550, y, str(int(float(row["adapter_ready"]))))
+        c.drawString(left + 590, y, row["primary_blocker"].replace("_", " ")[:28])
+        c.drawString(left + 70, y - 12, f"missing: {row['missing_local_fields'][:94]}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2682,6 +2733,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_source_provenance_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_source_provenance.pdf"
     sota_data_accession_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_data_accession.pdf"
     sota_readme_schema_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_readme_schema.pdf"
+    trajectory_adapter_contract_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_adapter_contract.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2726,6 +2778,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_source_provenance_pdf(sota_source_provenance_pdf)
     write_sota_data_accession_pdf(sota_data_accession_pdf)
     write_sota_readme_schema_pdf(sota_readme_schema_pdf)
+    write_trajectory_adapter_contract_pdf(trajectory_adapter_contract_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2788,6 +2841,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(sota_source_provenance_pdf, "figures/renewal_cage_sota_source_provenance.pdf")
         archive.write(sota_data_accession_pdf, "figures/renewal_cage_sota_data_accession.pdf")
         archive.write(sota_readme_schema_pdf, "figures/renewal_cage_sota_readme_schema.pdf")
+        archive.write(trajectory_adapter_contract_pdf, "figures/renewal_cage_trajectory_adapter_contract.pdf")
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(
             observable_falsification_matrix_pdf,

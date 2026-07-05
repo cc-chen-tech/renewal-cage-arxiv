@@ -1075,6 +1075,16 @@ three-dimensional Kob-Andersen mixture, the two-dimensional KA2D mixture, the
 the Creative Commons Attribution 4.0 reuse condition, and the KA/KA2D
 supporting citations. This makes the remote schema ready for a future adapter,
 but the adapter remains blocked until the local archive contents are inspected.
+The trajectory-adapter contract
+\texttt{renewal\_cage\_trajectory\_adapter\_contract.csv} makes this boundary
+operational. A local adapter is not allowed to enter the trajectory observable,
+uncertainty, or inversion-readiness protocols until the extracted archive
+exposes the coordinate file, time grid, particle identities, box geometry,
+temperature or state point, species labels, and units metadata. The GlassBench
+KA and KA2D rows are therefore kept at the remote-contract stage with
+\texttt{coordinate\_file} as the first blocker, while a synthetic local row
+demonstrates the positive ready state. This is an accession-to-adapter protocol,
+not a claim that real GlassBench trajectories have already been fitted.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the
@@ -1359,6 +1369,16 @@ rejected without refitting the clocks.
   \caption{SOTA README schema gate. The GlassBench README supplies system,
   folder, license, and citation evidence for a future trajectory adapter, but
   local archive inspection is still required before real-data reanalysis.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_trajectory_adapter_contract.pdf}
+  \caption{Trajectory adapter contract. Remote GlassBench KA and KA2D rows
+  remain adapter-contract entries until the local archive exposes coordinate,
+  time-grid, particle-identity, box, state-point, species, and units fields;
+  the synthetic row shows the ready state required before trajectory
+  diagnostics are claimed.}
 \end{figure}
 
 \begin{figure}[p]

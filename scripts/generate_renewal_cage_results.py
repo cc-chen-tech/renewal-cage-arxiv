@@ -111,6 +111,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
+    trajectory_adapter_contract,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_inversion_readiness_gate,
@@ -3023,6 +3024,64 @@ def write_sota_readme_schema_csv(path: Path) -> list[dict[str, float | str]]:
     return rows
 
 
+def write_trajectory_adapter_contract_csv(path: Path) -> list[dict[str, float | str]]:
+    """Record local trajectory-adapter requirements after remote schema accession."""
+
+    required_fields = [
+        "archive_root",
+        "trajectory_folder",
+        "coordinate_file",
+        "time_grid",
+        "particle_identity",
+        "box_geometry",
+        "temperature_or_state_point",
+        "species_labels",
+        "units_metadata",
+    ]
+    protocols = [
+        "trajectory_observable_protocol",
+        "trajectory_uncertainty_protocol",
+        "trajectory_inversion_readiness_gate",
+    ]
+    rows = [
+        trajectory_adapter_contract(
+            contract_id="glassbench_ka_remote_contract",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            system_id="KA",
+            expected_archive_roots=["KA/_trajectories", "KA/_models", "KA/_results"],
+            required_local_fields=required_fields,
+            available_local_fields=["archive_root", "trajectory_folder"],
+            intended_protocols=protocols,
+            local_archive_inspected=False,
+        ),
+        trajectory_adapter_contract(
+            contract_id="glassbench_ka2d_remote_contract",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            system_id="KA2D",
+            expected_archive_roots=["KA2D/_trajectories", "KA2D/_models", "KA2D/_results"],
+            required_local_fields=required_fields,
+            available_local_fields=["archive_root", "trajectory_folder"],
+            intended_protocols=protocols,
+            local_archive_inspected=False,
+        ),
+        trajectory_adapter_contract(
+            contract_id="synthetic_local_trajectory_adapter",
+            accession_id="synthetic_local_cache",
+            source_id="synthetic_intermediate_scattering_fixture",
+            system_id="synthetic",
+            expected_archive_roots=["synthetic/_trajectories"],
+            required_local_fields=required_fields,
+            available_local_fields=required_fields,
+            intended_protocols=protocols,
+            local_archive_inspected=True,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -4733,6 +4792,54 @@ def write_sota_readme_schema_svg(path: Path, rows: list[dict[str, float | str]])
     path.write_text(svg)
 
 
+def write_trajectory_adapter_contract_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 430
+    left, top = 70, 112
+    row_h = 76
+    colors = {
+        "remote_adapter_contract_only": "#805ad5",
+        "metadata_incomplete_adapter": "#c05621",
+        "local_trajectory_adapter_ready": "#2f855a",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["adapter_stage"])
+        color = colors[stage]
+        missing = str(row["missing_local_fields"])
+        missing_label = missing.replace("_", " ")[:50]
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">{str(row["contract_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 300}" y="{y - 5}" width="232" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 310}" y="{y + 11}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:35]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 555}" y="{y + 13}" font-family="Arial, sans-serif" font-size="11">system={row["system_id"]}; ready={int(float(row["adapter_ready"]))}; inspected={int(float(row["local_archive_inspected"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 70}" y="{y + 38}" font-family="Arial, sans-serif" font-size="9" fill="#555">fields {int(float(row["available_required_field_count"]))}/{int(float(row["required_field_count"]))}; missing: {missing_label}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Trajectory adapter contract</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Remote archive metadata is separated from local coordinate, time-grid, identity, box, state-point, species, and units fields needed by trajectory diagnostics.</text>
+  <text x="{left}" y="{top - 25}" font-family="Arial, sans-serif" font-size="12" font-weight="700">contract</text>
+  <text x="{left + 300}" y="{top - 25}" font-family="Arial, sans-serif" font-size="12" font-weight="700">adapter stage</text>
+  <text x="{left + 555}" y="{top - 25}" font-family="Arial, sans-serif" font-size="12" font-weight="700">gate result</text>
+  {"".join(marks)}
+  <rect x="70" y="365" width="14" height="14" fill="#805ad5" /><text x="91" y="377" font-family="Arial, sans-serif" font-size="12">remote contract only</text>
+  <rect x="255" y="365" width="14" height="14" fill="#2f855a" /><text x="276" y="377" font-family="Arial, sans-serif" font-size="12">local adapter ready</text>
+  <rect x="430" y="365" width="14" height="14" fill="#c05621" /><text x="451" y="377" font-family="Arial, sans-serif" font-size="12">local metadata incomplete</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -5981,6 +6088,13 @@ def main() -> None:
     write_sota_readme_schema_svg(
         FIGURE_DIR / "renewal_cage_sota_readme_schema.svg",
         readme_schema_rows,
+    )
+    trajectory_adapter_contract_rows = write_trajectory_adapter_contract_csv(
+        DATA_DIR / "renewal_cage_trajectory_adapter_contract.csv"
+    )
+    write_trajectory_adapter_contract_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_adapter_contract.svg",
+        trajectory_adapter_contract_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"
