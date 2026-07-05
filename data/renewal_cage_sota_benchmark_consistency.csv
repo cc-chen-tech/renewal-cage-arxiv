@@ -1,0 +1,2 @@
+benchmark_id,observed_critical_decay,observed_von_schweidler,required_decades,critical_window_decades,von_schweidler_window_decades,model_predicts_visible_critical_decay,model_predicts_visible_von_schweidler,critical_decay_consistent,von_schweidler_consistent,overall_consistent
+kob_andersen_1995_beta_window,0.0,1.0,0.5,0.07058107428570728,1.9030899869919435,0.0,1.0,1.0,1.0,1.0

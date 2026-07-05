@@ -51,6 +51,7 @@ from renewal_cage import (  # noqa: E402
     late_mechanism_selection,
     minimal_barrier_requirements,
     local_alpha_stretching_exponent,
+    mct_beta_benchmark_consistency,
     mct_beta_correlator,
     mct_beta_temperature_scan,
     moments_1d,
@@ -731,6 +732,23 @@ def write_mct_beta_closure_csv(
         alpha_time_ref=alpha_time_ref,
         alpha_activation=alpha_activation,
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_benchmark_consistency_csv(path: Path, beta: MCTBetaParams) -> list[dict[str, float | str]]:
+    rows = [
+        mct_beta_benchmark_consistency(
+            beta,
+            benchmark_id="kob_andersen_1995_beta_window",
+            observed_critical_decay=False,
+            observed_von_schweidler=True,
+            observation_min_time=0.85 * beta.beta_time,
+            observation_max_time=500.0 * beta.beta_time,
+            alpha_time=80.0 * beta.beta_time,
+            required_decades=0.5,
+        )
+    ]
     write_sweep_csv(path, rows)
     return rows
 
@@ -2016,6 +2034,68 @@ def write_mct_beta_closure_svg(path: Path, rows: list[dict[str, float]], base: M
     path.write_text(svg)
 
 
+def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    row = rows[0]
+    left_a, top, right_a, bottom = 90, 105, 520, 430
+    left_b, right_b = 660, 1040
+    metrics = [
+        ("obs critical", float(row["observed_critical_decay"]), "#718096"),
+        ("model critical", float(row["model_predicts_visible_critical_decay"]), "#2b6cb0"),
+        ("obs von", float(row["observed_von_schweidler"]), "#718096"),
+        ("model von", float(row["model_predicts_visible_von_schweidler"]), "#c05621"),
+    ]
+    bars = []
+    bar_w = 54
+    gap = 38
+    for idx, (label, value, color) in enumerate(metrics):
+        x = left_a + idx * (bar_w + gap)
+        h = value * (bottom - top)
+        bars.append(f'<rect x="{x}" y="{bottom - h:.2f}" width="{bar_w}" height="{h:.2f}" fill="{color}" />')
+        bars.append(
+            f'<text x="{x - 8}" y="{bottom + 24}" font-family="Arial, sans-serif" font-size="11">{label}</text>'
+        )
+    decade_values = np.array(
+        [
+            float(row["critical_window_decades"]),
+            float(row["von_schweidler_window_decades"]),
+            float(row["required_decades"]),
+        ]
+    )
+    x_decades = np.array([0.0, 1.0, 2.0])
+    x = scale(x_decades, left_b, right_b)
+    y = scale(decade_values, bottom, top)
+    decade_labels = [
+        ("critical window", "#2b6cb0"),
+        ("von window", "#c05621"),
+        ("required", "#555555"),
+    ]
+    points = []
+    for idx, ((label, color), xi, yi, value) in enumerate(zip(decade_labels, x, y, decade_values)):
+        points.append(f'<circle cx="{xi:.2f}" cy="{yi:.2f}" r="5" fill="{color}" />')
+        points.append(
+            f'<text x="{left_b + 12}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}: {value:.2f}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA benchmark consistency</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Kob-Andersen beta-window conclusion: late von-Schweidler visible, early critical decay hidden in the observed window.</text>
+  <line x1="{left_a}" y1="{bottom}" x2="{right_a}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_a}" y1="{bottom}" x2="{left_a}" y2="{top}" stroke="#222" />
+  <text x="{left_a}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Literature claim vs model visibility</text>
+  {"".join(bars)}
+  <text x="{left_a}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">overall consistent = {int(float(row['overall_consistent']))}</text>
+  <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
+  <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Visible beta-window decades</text>
+  {polyline(x, y, "#222222", width=1.2)}
+  {"".join(points)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_requirements_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 560
@@ -2814,6 +2894,14 @@ def main() -> None:
         FIGURE_DIR / "renewal_cage_mct_beta_closure.svg",
         mct_beta_rows,
         mct_beta,
+    )
+    sota_benchmark_rows = write_sota_benchmark_consistency_csv(
+        DATA_DIR / "renewal_cage_sota_benchmark_consistency.csv",
+        mct_beta,
+    )
+    write_sota_benchmark_consistency_svg(
+        FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.svg",
+        sota_benchmark_rows,
     )
     cooling_interval = 1.0 / temperatures[-1] - 1.0 / temperatures[0]
     barrier_requirement_rows = write_barrier_requirements_csv(

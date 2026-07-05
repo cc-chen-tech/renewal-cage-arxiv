@@ -52,6 +52,7 @@ from renewal_cage import (  # noqa: E402
     minimal_barrier_requirements,
     MCTBetaParams,
     mct_beta_correlator,
+    mct_beta_benchmark_consistency,
     mct_beta_temperature_scan,
     observable_consistency_diagnostics,
     radial_van_hove_3d,
@@ -1117,6 +1118,35 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertTrue(np.all(np.diff(separation) > 0.0))
         self.assertGreater(rows[-1]["von_schweidler_exit_time"], rows[-1]["beta_time"])
         self.assertLess(rows[-1]["von_schweidler_exit_time"], rows[-1]["alpha_time"])
+
+    def test_mct_beta_benchmark_consistency_matches_kob_andersen_window(self):
+        beta = MCTBetaParams(
+            plateau=0.68,
+            critical_amplitude=0.08,
+            von_schweidler_amplitude=0.05,
+            critical_exponent=0.32,
+            von_schweidler_exponent=0.6,
+            beta_time=4.0,
+        )
+
+        row = mct_beta_benchmark_consistency(
+            beta,
+            benchmark_id="kob_andersen_1995_beta_window",
+            observed_critical_decay=False,
+            observed_von_schweidler=True,
+            observation_min_time=0.85 * beta.beta_time,
+            observation_max_time=500.0 * beta.beta_time,
+            alpha_time=80.0 * beta.beta_time,
+            required_decades=0.5,
+        )
+
+        self.assertLess(row["critical_window_decades"], 0.5)
+        self.assertGreater(row["von_schweidler_window_decades"], 0.5)
+        self.assertEqual(row["model_predicts_visible_critical_decay"], 0.0)
+        self.assertEqual(row["model_predicts_visible_von_schweidler"], 1.0)
+        self.assertEqual(row["critical_decay_consistent"], 1.0)
+        self.assertEqual(row["von_schweidler_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

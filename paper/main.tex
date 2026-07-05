@@ -919,6 +919,19 @@ diffusive-front closure rather than a full facilitation-field theory
 is an Adam-Gibbs/Kauzmann closure rather than a microscopic entropy derivation;
 and the MCT beta window is an effective two-exponent closure rather than a
 derived memory-kernel calculation.
+The companion file
+\texttt{renewal\_cage\_sota\_benchmark\_consistency.csv} begins converting
+these literature statements into explicit checks. For the Kob-Andersen
+intermediate-scattering benchmark \cite{kob1995intermediate}, the reported
+qualitative pattern is that the late beta regime is well represented by a von
+Schweidler law, whereas the early beta regime does not show a clear critical
+decay. The beta-window visibility diagnostic encodes this as an observation
+window: with only $0.071$ decades of pre-plateau critical window but $1.90$
+decades of post-plateau von-Schweidler window, the model predicts hidden
+critical decay and visible von-Schweidler departure, matching both qualitative
+claims. This is still not a fit to the raw trajectory data; it is the first
+reproducible bridge from the SOTA comparison table to a checkable
+model-versus-benchmark row.
 
 \begin{figure}[h]
   \centering
@@ -1034,6 +1047,15 @@ derived memory-kernel calculation.
   critical approach and von Schweidler departure around the cage plateau,
   together with a clock-separation diagnostic between beta and alpha
   relaxation.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_benchmark_consistency.pdf}
+  \caption{SOTA benchmark consistency diagnostic. The first benchmark row
+  encodes the Kob-Andersen beta-window conclusion that late von-Schweidler
+  behavior is visible while early critical decay is not cleanly resolved, and
+  checks whether the model's beta-window visibility predicts the same pattern.}
 \end{figure}
 
 \begin{figure}[h]

@@ -909,6 +909,65 @@ def write_mct_beta_closure_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_benchmark_consistency_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_benchmark_consistency.csv").open() as f:
+        row = next(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA benchmark consistency")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "Kob-Andersen beta-window conclusion encoded as a visibility diagnostic.")
+
+    observed_model = np.array(
+        [
+            float(row["observed_critical_decay"]),
+            float(row["model_predicts_visible_critical_decay"]),
+            float(row["observed_von_schweidler"]),
+            float(row["model_predicts_visible_von_schweidler"]),
+        ]
+    )
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        np.arange(len(observed_model), dtype=float),
+        [
+            ("observed/model flags", observed_model, colors.HexColor("#2b6cb0")),
+        ],
+        "AI. Literature claim vs model visibility",
+        xlabel="critical obs/model, von obs/model",
+        y_range=(0.0, 1.05),
+    )
+    decades = np.array(
+        [
+            float(row["critical_window_decades"]),
+            float(row["von_schweidler_window_decades"]),
+            float(row["required_decades"]),
+        ]
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        np.arange(len(decades), dtype=float),
+        [
+            ("visible decades", decades, colors.HexColor("#c05621")),
+        ],
+        "AJ. Beta-window visibility",
+        xlabel="critical, von, required",
+    )
+    c.setFont("Helvetica", 9)
+    c.drawString(45, 118, f"overall consistent = {int(float(row['overall_consistent']))}")
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1314,6 +1373,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
     thermodynamic_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_closure.pdf"
     mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
+    sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1334,6 +1394,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_spatial_chi4_pdf(spatial_chi4_pdf)
     write_thermodynamic_closure_pdf(thermodynamic_closure_pdf)
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
+    write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1359,6 +1420,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")
         archive.write(thermodynamic_closure_pdf, "figures/renewal_cage_thermodynamic_closure.pdf")
         archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
+        archive.write(sota_benchmark_consistency_pdf, "figures/renewal_cage_sota_benchmark_consistency.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

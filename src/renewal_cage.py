@@ -477,6 +477,64 @@ def mct_beta_temperature_scan(
     return rows
 
 
+def mct_beta_benchmark_consistency(
+    beta: MCTBetaParams,
+    *,
+    benchmark_id: str,
+    observed_critical_decay: bool,
+    observed_von_schweidler: bool,
+    observation_min_time: float,
+    observation_max_time: float,
+    alpha_time: float,
+    required_decades: float,
+) -> dict[str, float | str]:
+    """Compare qualitative MCT beta-window observations with visible model windows."""
+
+    _validate_mct_beta_params(beta)
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "observation_min_time": observation_min_time,
+        "observation_max_time": observation_max_time,
+        "alpha_time": alpha_time,
+        "required_decades": required_decades,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if observation_max_time <= observation_min_time:
+        raise ValueError("observation_max_time must exceed observation_min_time")
+
+    if observation_min_time < beta.beta_time:
+        critical_start = max(observation_min_time, np.finfo(float).tiny)
+        critical_window_decades = math.log10(beta.beta_time / critical_start)
+    else:
+        critical_window_decades = 0.0
+
+    von_window_end = min(observation_max_time, alpha_time)
+    if von_window_end > beta.beta_time:
+        von_schweidler_window_decades = math.log10(von_window_end / beta.beta_time)
+    else:
+        von_schweidler_window_decades = 0.0
+
+    model_critical_visible = critical_window_decades >= required_decades
+    model_von_visible = von_schweidler_window_decades >= required_decades
+    critical_consistent = model_critical_visible == observed_critical_decay
+    von_consistent = model_von_visible == observed_von_schweidler
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_critical_decay": float(observed_critical_decay),
+        "observed_von_schweidler": float(observed_von_schweidler),
+        "required_decades": required_decades,
+        "critical_window_decades": critical_window_decades,
+        "von_schweidler_window_decades": von_schweidler_window_decades,
+        "model_predicts_visible_critical_decay": float(model_critical_visible),
+        "model_predicts_visible_von_schweidler": float(model_von_visible),
+        "critical_decay_consistent": float(critical_consistent),
+        "von_schweidler_consistent": float(von_consistent),
+        "overall_consistent": float(critical_consistent and von_consistent),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

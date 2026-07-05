@@ -56,6 +56,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_spatial_chi4.pdf", names)
             self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", names)
             self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -80,6 +81,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_spatial_chi4.pdf", main_tex)
         self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
         self.assertIn("figures/renewal_cage_barrier_requirements.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
@@ -112,6 +114,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_mct_beta_closure = (
                 ROOT / "paper" / "figures" / "renewal_cage_mct_beta_closure.pdf"
+            ).read_bytes()
+            first_sota_benchmark_consistency = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_benchmark_consistency.pdf"
             ).read_bytes()
             first_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
@@ -152,6 +157,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_mct_beta_closure = (
                 ROOT / "paper" / "figures" / "renewal_cage_mct_beta_closure.pdf"
             ).read_bytes()
+            second_sota_benchmark_consistency = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_benchmark_consistency.pdf"
+            ).read_bytes()
             second_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
             ).read_bytes()
@@ -181,6 +189,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_spatial_chi4, second_spatial_chi4)
         self.assertEqual(first_thermodynamic_closure, second_thermodynamic_closure)
         self.assertEqual(first_mct_beta_closure, second_mct_beta_closure)
+        self.assertEqual(first_sota_benchmark_consistency, second_sota_benchmark_consistency)
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)
