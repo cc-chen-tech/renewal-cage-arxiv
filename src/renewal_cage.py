@@ -65,6 +65,20 @@ class TemperatureLawParams:
 
 
 @dataclass(frozen=True)
+class ConfigurationalEntropyParams:
+    """Minimal Kauzmann/Adam-Gibbs configurational entropy law.
+
+    ``entropy_ref`` is the configurational entropy per rearranging unit at
+    ``reference_temperature``. The linear extrapolation reaches zero at
+    ``kauzmann_temperature``.
+    """
+
+    reference_temperature: float
+    entropy_ref: float
+    kauzmann_temperature: float
+
+
+@dataclass(frozen=True)
 class ActivatedBarrierParams:
     """Activated-barrier interpretation of the temperature law."""
 
@@ -152,6 +166,17 @@ def _validate_temperature_law(law: TemperatureLawParams) -> None:
             raise ValueError(f"{name} must be nonnegative")
 
 
+def _validate_configurational_entropy_law(law: ConfigurationalEntropyParams) -> None:
+    if law.reference_temperature <= 0.0:
+        raise ValueError("reference_temperature must be positive")
+    if law.entropy_ref <= 0.0:
+        raise ValueError("entropy_ref must be positive")
+    if law.kauzmann_temperature <= 0.0:
+        raise ValueError("kauzmann_temperature must be positive")
+    if law.kauzmann_temperature >= law.reference_temperature:
+        raise ValueError("kauzmann_temperature must be below reference_temperature")
+
+
 def _validate_facilitated_exchange_law(law: FacilitatedExchangeLawParams) -> None:
     for name in ("reference_temperature", "shape_ref", "exchange_renewal_count_ref"):
         value = getattr(law, name)
@@ -211,6 +236,116 @@ def temperature_dependent_params(temperature: float, law: TemperatureLawParams) 
         renewal_rate=law.renewal_rate_ref * math.exp(-law.rate_activation * inverse_temperature_shift),
         renewal_delay=law.renewal_delay_ref * math.exp(law.delay_activation * inverse_temperature_shift),
     )
+
+
+def configurational_entropy(temperature: np.ndarray, law: ConfigurationalEntropyParams) -> np.ndarray:
+    """Linear Kauzmann configurational entropy extrapolation."""
+
+    _validate_configurational_entropy_law(law)
+    temperature = np.asarray(temperature, dtype=float)
+    if np.any(temperature <= 0.0):
+        raise ValueError("temperatures must be positive")
+    entropy = law.entropy_ref * (temperature - law.kauzmann_temperature) / (
+        law.reference_temperature - law.kauzmann_temperature
+    )
+    return np.maximum(entropy, 0.0)
+
+
+def excess_heat_capacity(temperature: np.ndarray, law: ConfigurationalEntropyParams) -> np.ndarray:
+    """Excess heat capacity implied by ``s_c(T)`` via ``Delta c_p=T ds_c/dT``."""
+
+    _validate_configurational_entropy_law(law)
+    temperature = np.asarray(temperature, dtype=float)
+    if np.any(temperature <= 0.0):
+        raise ValueError("temperatures must be positive")
+    slope = law.entropy_ref / (law.reference_temperature - law.kauzmann_temperature)
+    return temperature * slope
+
+
+def adam_gibbs_relaxation_time(
+    temperature: np.ndarray,
+    law: ConfigurationalEntropyParams,
+    *,
+    activation_free_energy: float,
+    tau_ref: float,
+) -> np.ndarray:
+    """Adam-Gibbs relaxation time normalized at the reference temperature."""
+
+    if activation_free_energy <= 0.0:
+        raise ValueError("activation_free_energy must be positive")
+    if tau_ref <= 0.0:
+        raise ValueError("tau_ref must be positive")
+    temperature = np.asarray(temperature, dtype=float)
+    entropy = configurational_entropy(temperature, law)
+    if np.any(entropy <= 0.0):
+        raise ValueError("temperatures must remain above the Kauzmann temperature")
+    reference_term = activation_free_energy / (law.reference_temperature * law.entropy_ref)
+    term = activation_free_energy / (temperature * entropy)
+    return tau_ref * np.exp(term - reference_term)
+
+
+def adam_gibbs_thermodynamic_scan(
+    *,
+    temperatures: np.ndarray,
+    entropy_law: ConfigurationalEntropyParams,
+    activation_free_energy: float,
+    tau_ref: float,
+    renewal_rate_ref: float,
+    wave_number: float,
+    cage_variance: float,
+    cage_tau: float,
+    jump_variance: float,
+) -> list[dict[str, float]]:
+    """Thermodynamic extension linking configurational entropy to renewal slowdown."""
+
+    if renewal_rate_ref <= 0.0:
+        raise ValueError("renewal_rate_ref must be positive")
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    for name, value in {
+        "cage_variance": cage_variance,
+        "cage_tau": cage_tau,
+        "jump_variance": jump_variance,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    temperatures = np.asarray(temperatures, dtype=float)
+    entropy = configurational_entropy(temperatures, entropy_law)
+    heat_capacity = excess_heat_capacity(temperatures, entropy_law)
+    tau_ag = adam_gibbs_relaxation_time(
+        temperatures,
+        entropy_law,
+        activation_free_energy=activation_free_energy,
+        tau_ref=tau_ref,
+    )
+    rows: list[dict[str, float]] = []
+    reference_tau_alpha = None
+    for temperature, entropy_value, heat_value, tau_value in zip(temperatures, entropy, heat_capacity, tau_ag):
+        params = DelayedRenewalCageParams(
+            cage_variance=cage_variance,
+            cage_tau=cage_tau,
+            jump_variance=jump_variance,
+            renewal_rate=renewal_rate_ref,
+            renewal_delay=float(tau_value),
+        )
+        tau_alpha = alpha_relaxation_time(wave_number, params)
+        if reference_tau_alpha is None:
+            reference_tau_alpha = tau_alpha
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "configurational_entropy": float(entropy_value),
+                "excess_heat_capacity": float(heat_value),
+                "adam_gibbs_tau": float(tau_value),
+                "renewal_rate": renewal_rate_ref,
+                "renewal_delay": float(tau_value),
+                "tau_alpha": tau_alpha,
+                "thermodynamic_slowdown": float(tau_value / tau_ref),
+                "tau_alpha_growth": tau_alpha / reference_tau_alpha,
+                "inverse_entropy_control": float(1.0 / (temperature * entropy_value)),
+            }
+        )
+    return rows
 
 
 def temperature_dependent_gamma_exchange(

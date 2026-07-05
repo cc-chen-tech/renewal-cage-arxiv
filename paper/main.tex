@@ -49,8 +49,9 @@ and its predictions are contrasted with a static gamma-disorder null model. A
 persistence-exchange extension separates first cage escape from subsequent
 exchange, producing Stokes-Einstein decoupling at fixed long-time diffusion
 while preserving Gaussian recovery. The result is an effective diagnostic
-theory for dynamical glass signatures, not a thermodynamic theory of an ideal
-glass transition.
+theory for dynamical glass signatures, with thermodynamic glass-transition
+features included only through an explicit entropy closure rather than a
+microscopic derivation of an ideal glass transition.
 \end{abstract}
 
 \maketitle
@@ -431,6 +432,36 @@ also grows a dynamic length and hence the four-point amplitude. This is still a
 compact-domain closure, not a microscopic spatial facilitation field, but it
 moves the $\chi_4$ amplitude from an arbitrary scale factor to a falsifiable
 clock-derived prediction.
+
+\section{Thermodynamic Entropy Closure}
+
+The renewal model above is kinetic. To compare with thermodynamic glass
+signatures, one can add a minimal configurational-entropy sector rather than
+pretending it was already present. Following the Kauzmann extrapolation
+\cite{kauzmann1948nature}, take
+\begin{equation}
+  s_c(T)=s_{c0}\frac{T-T_K}{T_0-T_K},
+\end{equation}
+with $s_c(T_K)=0$. The corresponding excess heat capacity is
+\begin{equation}
+  \Delta c_p(T)=T\frac{ds_c}{dT}.
+\end{equation}
+The Adam-Gibbs relation \cite{adam1965temperature} then gives
+\begin{equation}
+  \tau_{\rm AG}(T)=\tau_0
+  \exp\left[
+    \frac{A_{\rm AG}}{T s_c(T)}
+    -\frac{A_{\rm AG}}{T_0 s_c(T_0)}
+  \right].
+\end{equation}
+In this closure, $\tau_{\rm AG}(T)$ sets the delayed-renewal persistence time
+$\tau_d(T)$ while the renewal rate and cage parameters can be kept fixed or
+combined with the dynamic laws above. This produces a thermodynamic route to
+super-Arrhenius alpha slowdown and a Kauzmann-like entropy extrapolation. It is
+still an added effective entropy law, not a microscopic derivation of
+configurational entropy or a proof of an ideal glass transition; those are the
+remaining RFOT-level questions
+\cite{lubchenko2007theory,berthier2011theoretical}.
 
 \section{Finite-Exchange Heterogeneity Extension}
 
@@ -826,6 +857,10 @@ $T=1.00$ to $0.62$ increases the clock-derived $\xi_4$ by a factor of $3.09$
 and $N_{\rm corr}$ by a factor of $29.5$, raising the renewal contribution to
 the $\chi_4$ peak by a factor of $34.7$ without fitting an external domain
 size.
+The thermodynamic closure with $T_K=0.45$ and $s_c(T_0)=1.2$ drives an
+Adam-Gibbs renewal delay that grows by more than four orders of magnitude by
+$T=0.52$, while $s_c$ extrapolates toward zero and $\Delta c_p$ remains
+positive.
 The persistence-exchange extension keeps $D=0.35$ fixed while increasing
 $\tau_p/\tau_x$ from $1$ to $12$; the resulting $D\tau_\alpha$ grows from
 $1.01$ to $4.98$, while the late NGP falls from $1.21\times10^{-2}$ to
@@ -846,10 +881,9 @@ decoupling \cite{ediger2000spatial,berthier2011theoretical}, and
 persistence/exchange decoupling \cite{hedges2007persistence}. The same audit
 marks remaining gaps explicitly: the spatial four-point length is now a
 diffusive-front closure rather than a full facilitation-field theory
-\cite{lacevic2003fourpoint,berthier2024experimental}; MCT beta-relaxation
-exponents are not derived; and thermodynamic glass-transition phenomena such
-as configurational entropy and heat-capacity anomalies are outside the present
-renewal dynamics.
+\cite{lacevic2003fourpoint,berthier2024experimental}; the thermodynamic sector
+is an Adam-Gibbs/Kauzmann closure rather than a microscopic entropy derivation;
+and MCT beta-relaxation exponents are not derived.
 
 \begin{figure}[h]
   \centering
@@ -947,6 +981,15 @@ renewal dynamics.
   length $\xi_4$ and correlated renewal volume $N_{\rm corr}$, making the
   renewal contribution to the $\chi_4$ peak grow on cooling without fitting an
   external domain size.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_thermodynamic_closure.pdf}
+  \caption{Thermodynamic entropy closure. A Kauzmann-style configurational
+  entropy extrapolation and excess heat capacity are coupled to the renewal
+  persistence clock through an Adam-Gibbs relaxation time, producing
+  super-Arrhenius alpha slowdown while keeping the entropy law explicit.}
 \end{figure}
 
 \begin{figure}[h]

@@ -1009,6 +1009,53 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(rows[-1]["apparent_alpha_activation_energy"], rows[0]["apparent_alpha_activation_energy"])
         self.assertGreater(rows[-1]["local_fragility_index"], rows[0]["local_fragility_index"])
 
+    def test_configurational_entropy_law_extrapolates_to_kauzmann_temperature(self):
+        entropy_cls = getattr(sys.modules["renewal_cage"], "ConfigurationalEntropyParams", None)
+        entropy_fn = getattr(sys.modules["renewal_cage"], "configurational_entropy", None)
+        heat_fn = getattr(sys.modules["renewal_cage"], "excess_heat_capacity", None)
+        if entropy_cls is None or entropy_fn is None or heat_fn is None:
+            self.fail("thermodynamic entropy closure is missing")
+
+        law = entropy_cls(reference_temperature=1.0, entropy_ref=1.2, kauzmann_temperature=0.45)
+        temperatures = np.array([1.0, 0.7, 0.5])
+        entropy = entropy_fn(temperatures, law)
+        heat_capacity = heat_fn(temperatures, law)
+
+        self.assertTrue(np.all(np.diff(entropy) < 0.0))
+        self.assertAlmostEqual(float(entropy_fn(np.array([0.45]), law)[0]), 0.0)
+        self.assertTrue(np.all(heat_capacity > 0.0))
+        self.assertGreater(1.0 / (temperatures[-1] * entropy[-1]), 1.0 / (temperatures[0] * entropy[0]))
+
+    def test_adam_gibbs_thermodynamic_scan_links_entropy_to_renewal_slowdown(self):
+        entropy_cls = getattr(sys.modules["renewal_cage"], "ConfigurationalEntropyParams", None)
+        scan_fn = getattr(sys.modules["renewal_cage"], "adam_gibbs_thermodynamic_scan", None)
+        if entropy_cls is None or scan_fn is None:
+            self.fail("Adam-Gibbs thermodynamic scan is missing")
+        law = entropy_cls(reference_temperature=1.0, entropy_ref=1.2, kauzmann_temperature=0.45)
+        temperatures = np.array([1.0, 0.8, 0.62, 0.5])
+
+        rows = scan_fn(
+            temperatures=temperatures,
+            entropy_law=law,
+            activation_free_energy=1.6,
+            tau_ref=3.0,
+            renewal_rate_ref=0.18,
+            wave_number=1.1,
+            cage_variance=1.0,
+            cage_tau=0.7,
+            jump_variance=0.8,
+        )
+
+        entropy = np.array([row["configurational_entropy"] for row in rows])
+        tau_ag = np.array([row["adam_gibbs_tau"] for row in rows])
+        tau_alpha = np.array([row["tau_alpha"] for row in rows])
+        self.assertTrue(np.all(np.diff(entropy) < 0.0))
+        self.assertTrue(np.all(np.diff(tau_ag) > 0.0))
+        self.assertTrue(np.all(np.diff(tau_alpha) > 0.0))
+        self.assertGreater(rows[-1]["thermodynamic_slowdown"], 10.0)
+        self.assertGreater(rows[-1]["inverse_entropy_control"], rows[0]["inverse_entropy_control"])
+        self.assertGreater(rows[-1]["excess_heat_capacity"], 0.0)
+
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(
             reference_temperature=1.0,

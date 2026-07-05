@@ -821,6 +821,49 @@ def write_spatial_chi4_pdf(path: Path) -> None:
     c.save()
 
 
+def write_thermodynamic_closure_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_thermodynamic_closure.csv")
+    inverse_shift = 1.0 / data["temperature"] - 1.0 / data["temperature"][0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Thermodynamic entropy closure")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "Kauzmann entropy extrapolation drives Adam-Gibbs renewal slowdown.")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("s_c / hot", data["configurational_entropy"] / data["configurational_entropy"][0], colors.HexColor("#2b6cb0")),
+            ("Delta c_p / hot", data["excess_heat_capacity"] / data["excess_heat_capacity"][0], colors.HexColor("#2f855a")),
+        ],
+        "AE. Configurational entropy sector",
+        xlabel="inverse-temperature shift",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("tau_AG / hot", data["thermodynamic_slowdown"], colors.HexColor("#c05621")),
+            ("tau_alpha / hot", data["tau_alpha_growth"], colors.HexColor("#805ad5")),
+        ],
+        "AF. Adam-Gibbs kinetic coupling",
+        xlabel="inverse-temperature shift",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1224,6 +1267,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
+    thermodynamic_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_closure.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1242,6 +1286,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_glass_audit_pdf(glass_audit_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_spatial_chi4_pdf(spatial_chi4_pdf)
+    write_thermodynamic_closure_pdf(thermodynamic_closure_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1265,6 +1310,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")
+        archive.write(thermodynamic_closure_pdf, "figures/renewal_cage_thermodynamic_closure.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from renewal_cage import (  # noqa: E402
     ActivatedBarrierParams,
+    ConfigurationalEntropyParams,
     DelayedRenewalCageParams,
     FacilitatedExchangeLawParams,
     GammaExchangeParams,
@@ -23,6 +24,7 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_time,
     alpha_shape_superposition_residual,
     activated_barrier_temperature_law,
+    adam_gibbs_thermodynamic_scan,
     barrier_amplification_laws,
     correlated_domain_susceptibility,
     delayed_poisson_mean,
@@ -680,6 +682,34 @@ def write_spatial_chi4_csv(
     return rows
 
 
+def write_thermodynamic_closure_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    entropy_law: ConfigurationalEntropyParams,
+    *,
+    activation_free_energy: float,
+    tau_ref: float,
+    renewal_rate_ref: float,
+    wave_number: float,
+    cage_variance: float,
+    cage_tau: float,
+    jump_variance: float,
+) -> list[dict[str, float]]:
+    rows = adam_gibbs_thermodynamic_scan(
+        temperatures=temperatures,
+        entropy_law=entropy_law,
+        activation_free_energy=activation_free_energy,
+        tau_ref=tau_ref,
+        renewal_rate_ref=renewal_rate_ref,
+        wave_number=wave_number,
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_heterogeneity_csv(
     path: Path,
     time: np.ndarray,
@@ -1245,10 +1275,10 @@ def write_sota_comparison_csv(path: Path) -> list[dict[str, float | str]]:
         {
             "phenomenon": "thermodynamic_glass_transition",
             "benchmark_observable": "configurational entropy, heat-capacity anomaly, ideal-glass/Kauzmann questions",
-            "benchmark_source": "berthier2011theoretical",
-            "model_prediction": "no equilibrium free-energy or entropy sector",
-            "model_status": "unsupported",
-            "next_gap": "add or explicitly exclude thermodynamic theory",
+            "benchmark_source": "kauzmann1948nature;adam1965temperature;lubchenko2007theory;berthier2011theoretical",
+            "model_prediction": "Kauzmann entropy extrapolation plus Adam-Gibbs renewal slowdown",
+            "model_status": "partial",
+            "next_gap": "derive configurational entropy and barriers from microscopic structure",
         },
     ]
     write_sweep_csv(path, rows)
@@ -1835,6 +1865,53 @@ def write_spatial_chi4_svg(path: Path, rows: list[dict[str, float]]) -> None:
   {plot(left_a, right_a, [("xi4 / hot", length_growth, "#2b6cb0"), ("Ncorr / hot", size_growth, "#2f855a"), ("chi4 peak / hot", chi4_growth, "#c05621")])}
   {axes(left_b, right_b, "B. Timing of the spatial susceptibility", "inverse-temperature shift")}
   {plot(left_b, right_b, [("chi4 peak time", peak_times / peak_times[0], "#805ad5"), ("tau alpha", tau_alpha / tau_alpha[0], "#d69e2e")])}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_thermodynamic_closure_svg(path: Path, rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left_a, top, right_a, bottom = 75, 90, 520, 430
+    left_b, right_b = 660, 1040
+    inverse_shift = np.array([1.0 / row["temperature"] - 1.0 / rows[0]["temperature"] for row in rows])
+    entropy = np.array([row["configurational_entropy"] for row in rows])
+    heat_capacity = np.array([row["excess_heat_capacity"] for row in rows])
+    tau_ag = np.array([row["thermodynamic_slowdown"] for row in rows])
+    tau_alpha = np.array([row["tau_alpha_growth"] for row in rows])
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 76}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, curves: list[tuple[str, np.ndarray, str]]) -> str:
+        x = scale(inverse_shift, left, right)
+        all_values = np.concatenate([curve for _, curve, _ in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve, color) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, color))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Thermodynamic entropy closure</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Kauzmann entropy extrapolation drives Adam-Gibbs renewal slowdown.</text>
+  {axes(left_a, right_a, "A. Configurational entropy sector", "inverse-temperature shift")}
+  {plot(left_a, right_a, [("s_c", entropy / entropy[0], "#2b6cb0"), ("Delta c_p", heat_capacity / heat_capacity[0], "#2f855a")])}
+  {axes(left_b, right_b, "B. Adam-Gibbs kinetic coupling", "inverse-temperature shift")}
+  {plot(left_b, right_b, [("tau_AG / hot", tau_ag, "#c05621"), ("tau_alpha / hot", tau_alpha, "#805ad5")])}
 </svg>
 """
     path.write_text(svg)
@@ -2597,6 +2674,26 @@ def main() -> None:
         particle_density=0.85,
     )
     write_spatial_chi4_svg(FIGURE_DIR / "renewal_cage_spatial_chi4.svg", spatial_chi4_rows)
+    thermodynamic_rows = write_thermodynamic_closure_csv(
+        DATA_DIR / "renewal_cage_thermodynamic_closure.csv",
+        np.array([1.0, 0.82, 0.68, 0.58, 0.52]),
+        ConfigurationalEntropyParams(
+            reference_temperature=1.0,
+            entropy_ref=1.2,
+            kauzmann_temperature=0.45,
+        ),
+        activation_free_energy=1.6,
+        tau_ref=3.0,
+        renewal_rate_ref=params.renewal_rate,
+        wave_number=1.1,
+        cage_variance=params.cage_variance,
+        cage_tau=params.cage_tau,
+        jump_variance=params.jump_variance,
+    )
+    write_thermodynamic_closure_svg(
+        FIGURE_DIR / "renewal_cage_thermodynamic_closure.svg",
+        thermodynamic_rows,
+    )
     cooling_interval = 1.0 / temperatures[-1] - 1.0 / temperatures[0]
     barrier_requirement_rows = write_barrier_requirements_csv(
         DATA_DIR / "renewal_cage_barrier_requirements.csv",
