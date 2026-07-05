@@ -103,6 +103,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_glassbench_payload_index_gate,
     sota_local_cache_verification_gate,
@@ -3325,6 +3326,25 @@ def write_sota_glassbench_trajectory_payload_locator_csv(path: Path) -> list[dic
     return rows
 
 
+def write_sota_glassbench_trajectory_entry_metadata_csv(
+    path: Path,
+    *,
+    locator_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Verify ZIP-entry metadata for located GlassBench trajectory payloads."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "trajectory_entry_metadata_10118191.json"
+    rows = sota_glassbench_trajectory_entry_metadata_gate(
+        metadata_id="glassbench_trajectory_entry_metadata",
+        accession_id="glassbench_zenodo_10118191",
+        locator_rows=locator_rows,
+        metadata_manifest=json.loads(manifest_path.read_text(encoding="utf-8")),
+        max_policy_member_bytes=250_000_000,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -5856,6 +5876,62 @@ def write_sota_glassbench_trajectory_payload_locator_svg(path: Path, rows: list[
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_entry_metadata_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 430
+    left, top = 75, 112
+    row_h = 72
+    colors = {
+        "trajectory_entry_metadata_ready_payload_size_blocked": "#2b6cb0",
+        "trajectory_entry_metadata_ready_fetch_policy_ready": "#2f855a",
+        "trajectory_entry_metadata_incomplete": "#c05621",
+        "trajectory_entry_metadata_missing": "#c05621",
+        "trajectory_payload_missing": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["metadata_stage"])
+        color = colors[stage]
+        metadata_ready = int(float(row["entry_metadata_ready"]))
+        within_policy = int(float(row["full_member_fetch_within_policy"]))
+        extraction_ready = int(float(row["trajectory_extraction_ready"]))
+        size_mb = float(row["compressed_size_bytes"]) / 1_000_000.0
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 4}" width="285" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:41]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 425}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">metadata={metadata_ready}; policy={within_policy}; extract={extraction_ready}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">path: {str(row["source_path"])[:116]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 56}" font-family="Arial, sans-serif" font-size="9" fill="#555">method={row["compression_method"]}; compressed={size_mb:.1f} MB; local-header={int(float(row["local_header_offset"]))}; data-range={int(float(row["compressed_data_range_start"]))}-{int(float(row["compressed_data_range_end"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA GlassBench trajectory entry metadata</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">ZIP central-directory and local-header range reads verify KA2D trajectory member ranges without downloading the large compressed members.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 425}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness and blocker</text>
+  {"".join(marks)}
+  <rect x="75" y="382" width="14" height="14" fill="#2b6cb0" /><text x="96" y="394" font-family="Arial, sans-serif" font-size="12">metadata ready but full member exceeds policy</text>
+  <rect x="430" y="382" width="14" height="14" fill="#c05621" /><text x="451" y="394" font-family="Arial, sans-serif" font-size="12">payload or metadata missing</text>
+  <text x="690" y="394" font-family="Arial, sans-serif" font-size="12">trajectory extraction remains a separate cache and adapter step</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -7579,6 +7655,14 @@ def main() -> None:
     write_sota_glassbench_trajectory_payload_locator_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_payload_locator.svg",
         glassbench_trajectory_payload_locator_rows,
+    )
+    glassbench_trajectory_entry_metadata_rows = write_sota_glassbench_trajectory_entry_metadata_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_trajectory_entry_metadata.csv",
+        locator_rows=glassbench_trajectory_payload_locator_rows,
+    )
+    write_sota_glassbench_trajectory_entry_metadata_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_entry_metadata.svg",
+        glassbench_trajectory_entry_metadata_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"

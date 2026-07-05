@@ -1,0 +1,46 @@
+{
+  "source": "remote_zip_central_directory_and_local_header_range_reads",
+  "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+  "archive_size_bytes": 6042260027,
+  "central_directory_range": "6042252014-6042259928",
+  "central_directory_size_bytes": 7915,
+  "entry_count": 2,
+  "entries": [
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.23",
+      "payload_format": "tar.xz",
+      "compression_method": "deflate",
+      "compression_method_code": 8,
+      "crc32": "4458a3de",
+      "compressed_size_bytes": 397505592,
+      "uncompressed_size_bytes": 397384372,
+      "local_header_offset": 2980602152,
+      "local_header_probe_range": "2980602152-2980602407",
+      "local_header_verified": true,
+      "local_header_file_name_length": 41,
+      "local_header_extra_length": 32,
+      "compressed_data_range_start": 2980602255,
+      "compressed_data_range_end": 3378107846
+    },
+    {
+      "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+      "system_id": "KA2D",
+      "temperature": "0.30",
+      "payload_format": "tar.xz",
+      "compression_method": "deflate",
+      "compression_method_code": 8,
+      "crc32": "5e6a4b14",
+      "compressed_size_bytes": 2980137961,
+      "uncompressed_size_bytes": 2979229176,
+      "local_header_offset": 464072,
+      "local_header_probe_range": "464072-464327",
+      "local_header_verified": true,
+      "local_header_file_name_length": 41,
+      "local_header_extra_length": 32,
+      "compressed_data_range_start": 464175,
+      "compressed_data_range_end": 2980602135
+    }
+  ]
+}

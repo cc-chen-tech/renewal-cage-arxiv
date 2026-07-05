@@ -1159,6 +1159,28 @@ offsets and compressed sizes, so the row has
   archive is available.}
 \end{figure}
 
+The entry-metadata gate then removes the previous
+\texttt{zip\_entry\_metadata} ambiguity by parsing the remote ZIP central
+directory and probing the local headers for those KA2D members. It verifies CRC,
+compression method, compressed size, uncompressed size, local-header offset, and
+compressed-data byte range without downloading the member payloads. The result is
+still deliberately not a real trajectory fit: the \texttt{T0.23} member is
+397.5 MB compressed and the \texttt{T0.30} member is 2.98 GB compressed, both
+above the current policy threshold for embedding or automatic member fetches in
+the manuscript build. The gate therefore advances the SOTA chain to
+\texttt{entry\_metadata\_ready=1} while keeping
+\texttt{trajectory\_extraction\_ready=0} and
+\texttt{real\_reanalysis\_ready=0}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf}
+  \caption{GlassBench trajectory entry metadata. Remote central-directory and
+  local-header range reads verify the byte ranges and sizes of the KA2D
+  trajectory members, but the deflated members are too large for automatic
+  manuscript-package extraction and remain outside real-data inversion.}
+\end{figure}
+
 \clearpage
 
 The reanalysis-state ledger

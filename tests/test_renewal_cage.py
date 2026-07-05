@@ -117,6 +117,7 @@ from renewal_cage import (  # noqa: E402
     sota_claim_alignment,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_payload_locator_gate,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
@@ -2408,6 +2409,66 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(ka["locator_stage"], "remote_trajectory_payload_missing")
         self.assertEqual(ka["source_path"], "none")
         self.assertEqual(ka["temperature"], "none")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_entry_metadata_blocks_large_deflated_members(self):
+        locator_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "remote_payload_located": 1.0,
+                "range_supported": 1.0,
+            },
+            {
+                "system_id": "KA",
+                "temperature": "none",
+                "source_path": "none",
+                "remote_payload_located": 0.0,
+                "range_supported": 1.0,
+            },
+        ]
+        metadata_manifest = {
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "compression_method": "deflate",
+                    "crc32": "5e6a4b14",
+                    "compressed_size_bytes": 2_980_137_961,
+                    "uncompressed_size_bytes": 2_979_229_176,
+                    "local_header_offset": 464_072,
+                    "compressed_data_range_start": 464_175,
+                    "compressed_data_range_end": 2_980_602_135,
+                    "local_header_verified": True,
+                }
+            ]
+        }
+
+        rows = sota_glassbench_trajectory_entry_metadata_gate(
+            metadata_id="glassbench_trajectory_entry_metadata",
+            accession_id="glassbench_zenodo_10118191",
+            locator_rows=locator_rows,
+            metadata_manifest=metadata_manifest,
+            max_policy_member_bytes=250_000_000,
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["metadata_stage"], "trajectory_entry_metadata_ready_payload_size_blocked")
+        self.assertEqual(ka2d["source_path"], "GlassBench/KA2D_trajectories/T0.30.tar.xz")
+        self.assertEqual(ka2d["compression_method"], "deflate")
+        self.assertEqual(ka2d["entry_metadata_ready"], 1.0)
+        self.assertEqual(ka2d["local_header_verified"], 1.0)
+        self.assertEqual(ka2d["compressed_size_bytes"], 2_980_137_961.0)
+        self.assertEqual(ka2d["compressed_data_range_start"], 464_175.0)
+        self.assertEqual(ka2d["compressed_data_range_end"], 2_980_602_135.0)
+        self.assertEqual(ka2d["full_member_fetch_within_policy"], 0.0)
+        self.assertEqual(ka2d["trajectory_extraction_ready"], 0.0)
+        self.assertEqual(ka2d["real_reanalysis_ready"], 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "member_payload_size_policy")
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["metadata_stage"], "trajectory_payload_missing")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):

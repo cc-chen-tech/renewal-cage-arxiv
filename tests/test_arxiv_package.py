@@ -539,6 +539,38 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka["source_path"], "none")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
+    def test_sota_glassbench_trajectory_entry_metadata_records_remote_zip_ranges(self):
+        manifest_path = ROOT / "data" / "third_party" / "glassbench" / "trajectory_entry_metadata_10118191.json"
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_entry_metadata.csv"
+        self.assertTrue(manifest_path.exists())
+        self.assertTrue(path.exists())
+
+        manifest = json.loads(manifest_path.read_text())
+        self.assertEqual(manifest["source"], "remote_zip_central_directory_and_local_header_range_reads")
+        self.assertEqual(manifest["central_directory_range"], "6042252014-6042259928")
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["metadata_stage"], "trajectory_entry_metadata_ready_payload_size_blocked")
+        self.assertEqual(ka2d_030["source_path"], "GlassBench/KA2D_trajectories/T0.30.tar.xz")
+        self.assertEqual(ka2d_030["compression_method"], "deflate")
+        self.assertEqual(float(ka2d_030["entry_metadata_ready"]), 1.0)
+        self.assertEqual(float(ka2d_030["local_header_verified"]), 1.0)
+        self.assertEqual(float(ka2d_030["compressed_size_bytes"]), 2_980_137_961.0)
+        self.assertEqual(float(ka2d_030["compressed_data_range_start"]), 464_175.0)
+        self.assertEqual(float(ka2d_030["compressed_data_range_end"]), 2_980_602_135.0)
+        self.assertEqual(float(ka2d_030["full_member_fetch_within_policy"]), 0.0)
+        self.assertEqual(float(ka2d_030["trajectory_extraction_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["real_reanalysis_ready"]), 0.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "member_payload_size_policy")
+
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(float(ka2d_023["compressed_size_bytes"]), 397_505_592.0)
+        self.assertEqual(float(ka2d_023["full_member_fetch_within_policy"]), 0.0)
+
     def test_sota_remote_result_curve_cache_records_range_cached_numeric_curves(self):
         manifest_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
         path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_cache.csv"
@@ -1139,6 +1171,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_remote_zip_central_directory.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)
@@ -1190,6 +1223,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_remote_zip_central_directory.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", main_tex)
@@ -1224,6 +1258,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_remote_zip_central_directory.pdf",
             "figures/renewal_cage_sota_glassbench_payload_index.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_payload_locator.pdf",
+            "figures/renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
             "figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf",
@@ -1373,6 +1408,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_glassbench_trajectory_payload_locator = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_trajectory_payload_locator.pdf"
             ).read_bytes()
+            first_sota_glassbench_trajectory_entry_metadata = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf"
+            ).read_bytes()
             first_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1514,6 +1552,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_glassbench_trajectory_payload_locator = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_trajectory_payload_locator.pdf"
             ).read_bytes()
+            second_sota_glassbench_trajectory_entry_metadata = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_trajectory_entry_metadata.pdf"
+            ).read_bytes()
             second_sota_remote_result_curve_cache = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_result_curve_cache.pdf"
             ).read_bytes()
@@ -1619,6 +1660,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_glassbench_trajectory_payload_locator,
             second_sota_glassbench_trajectory_payload_locator,
+        )
+        self.assertEqual(
+            first_sota_glassbench_trajectory_entry_metadata,
+            second_sota_glassbench_trajectory_entry_metadata,
         )
         self.assertEqual(first_sota_remote_result_curve_cache, second_sota_remote_result_curve_cache)
         self.assertEqual(first_sota_remote_result_curve_fetch_gap, second_sota_remote_result_curve_fetch_gap)

@@ -2795,6 +2795,143 @@ def sota_glassbench_trajectory_payload_locator_gate(
     return rows
 
 
+def sota_glassbench_trajectory_entry_metadata_gate(
+    *,
+    metadata_id: str,
+    accession_id: str,
+    locator_rows: Sequence[dict[str, float | str]],
+    metadata_manifest: dict,
+    max_policy_member_bytes: int,
+) -> list[dict[str, float | str]]:
+    """Verify ZIP-entry metadata for located trajectory payloads without fetching members."""
+
+    if not metadata_id:
+        raise ValueError("metadata_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if max_policy_member_bytes <= 0:
+        raise ValueError("max_policy_member_bytes must be positive")
+
+    entries_value = metadata_manifest.get("entries", [])
+    metadata_entries = (
+        [entry for entry in entries_value if isinstance(entry, dict)]
+        if isinstance(entries_value, list)
+        else []
+    )
+    metadata_by_path = {str(entry.get("path", "")): entry for entry in metadata_entries if entry.get("path")}
+
+    rows: list[dict[str, float | str]] = []
+    for locator in locator_rows:
+        system_id = str(locator.get("system_id", "unknown"))
+        temperature = str(locator.get("temperature", "none"))
+        source_path = str(locator.get("source_path", "none"))
+        located = bool(float(locator.get("remote_payload_located", 0.0)))
+        if not located or source_path == "none":
+            rows.append(
+                {
+                    "metadata_id": f"{metadata_id}_{system_id.lower()}_{temperature}",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "compression_method": "none",
+                    "crc32": "none",
+                    "compressed_size_bytes": 0.0,
+                    "uncompressed_size_bytes": 0.0,
+                    "local_header_offset": -1.0,
+                    "compressed_data_range_start": -1.0,
+                    "compressed_data_range_end": -1.0,
+                    "entry_metadata_ready": 0.0,
+                    "local_header_verified": 0.0,
+                    "full_member_fetch_within_policy": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "trajectory_payload",
+                    "metadata_stage": "trajectory_payload_missing",
+                }
+            )
+            continue
+
+        entry = metadata_by_path.get(source_path)
+        if entry is None:
+            rows.append(
+                {
+                    "metadata_id": f"{metadata_id}_{system_id.lower()}_{temperature}",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "compression_method": "unknown",
+                    "crc32": "none",
+                    "compressed_size_bytes": 0.0,
+                    "uncompressed_size_bytes": 0.0,
+                    "local_header_offset": -1.0,
+                    "compressed_data_range_start": -1.0,
+                    "compressed_data_range_end": -1.0,
+                    "entry_metadata_ready": 0.0,
+                    "local_header_verified": 0.0,
+                    "full_member_fetch_within_policy": 0.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "real_reanalysis_ready": 0.0,
+                    "primary_blocker": "entry_metadata",
+                    "metadata_stage": "trajectory_entry_metadata_missing",
+                }
+            )
+            continue
+
+        compressed_size = int(entry.get("compressed_size_bytes", 0) or 0)
+        uncompressed_size = int(entry.get("uncompressed_size_bytes", 0) or 0)
+        local_header_offset = int(entry.get("local_header_offset", -1) or -1)
+        range_start = int(entry.get("compressed_data_range_start", -1) or -1)
+        range_end = int(entry.get("compressed_data_range_end", -1) or -1)
+        local_header_verified = bool(entry.get("local_header_verified", False))
+        metadata_ready = (
+            compressed_size > 0
+            and uncompressed_size > 0
+            and local_header_offset >= 0
+            and range_start >= 0
+            and range_end >= range_start
+            and bool(str(entry.get("crc32", "")))
+            and local_header_verified
+        )
+        within_policy = metadata_ready and compressed_size <= max_policy_member_bytes
+
+        if not metadata_ready:
+            stage = "trajectory_entry_metadata_incomplete"
+            blocker = "entry_metadata"
+        elif not within_policy:
+            stage = "trajectory_entry_metadata_ready_payload_size_blocked"
+            blocker = "member_payload_size_policy"
+        else:
+            stage = "trajectory_entry_metadata_ready_fetch_policy_ready"
+            blocker = "member_payload_cache"
+
+        rows.append(
+            {
+                "metadata_id": f"{metadata_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "compression_method": str(entry.get("compression_method", "unknown")),
+                "crc32": str(entry.get("crc32", "none")),
+                "compressed_size_bytes": float(compressed_size),
+                "uncompressed_size_bytes": float(uncompressed_size),
+                "local_header_offset": float(local_header_offset),
+                "compressed_data_range_start": float(range_start),
+                "compressed_data_range_end": float(range_end),
+                "entry_metadata_ready": float(metadata_ready),
+                "local_header_verified": float(local_header_verified),
+                "full_member_fetch_within_policy": float(within_policy),
+                "trajectory_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": blocker,
+                "metadata_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,
