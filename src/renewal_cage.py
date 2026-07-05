@@ -79,6 +79,24 @@ class ConfigurationalEntropyParams:
 
 
 @dataclass(frozen=True)
+class MCTBetaParams:
+    """Effective MCT beta-relaxation window around the cage plateau.
+
+    The envelope is not a microscopic mode-coupling memory kernel. It is a
+    diagnostic closure for the two beta-window power laws:
+    ``phi-f_c ~ t^{-a}`` before the plateau and
+    ``f_c-phi ~ t^b`` in the von Schweidler departure.
+    """
+
+    plateau: float
+    critical_amplitude: float
+    von_schweidler_amplitude: float
+    critical_exponent: float
+    von_schweidler_exponent: float
+    beta_time: float
+
+
+@dataclass(frozen=True)
 class ActivatedBarrierParams:
     """Activated-barrier interpretation of the temperature law."""
 
@@ -175,6 +193,20 @@ def _validate_configurational_entropy_law(law: ConfigurationalEntropyParams) -> 
         raise ValueError("kauzmann_temperature must be positive")
     if law.kauzmann_temperature >= law.reference_temperature:
         raise ValueError("kauzmann_temperature must be below reference_temperature")
+
+
+def _validate_mct_beta_params(params: MCTBetaParams) -> None:
+    if not (0.0 < params.plateau < 1.0):
+        raise ValueError("plateau must lie between zero and one")
+    for name in ("critical_amplitude", "von_schweidler_amplitude"):
+        if getattr(params, name) <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if not (0.0 < params.critical_exponent < 0.5):
+        raise ValueError("critical_exponent must lie between zero and one half")
+    if not (0.0 < params.von_schweidler_exponent < 1.0):
+        raise ValueError("von_schweidler_exponent must lie between zero and one")
+    if params.beta_time <= 0.0:
+        raise ValueError("beta_time must be positive")
 
 
 def _validate_facilitated_exchange_law(law: FacilitatedExchangeLawParams) -> None:
@@ -343,6 +375,103 @@ def adam_gibbs_thermodynamic_scan(
                 "thermodynamic_slowdown": float(tau_value / tau_ref),
                 "tau_alpha_growth": tau_alpha / reference_tau_alpha,
                 "inverse_entropy_control": float(1.0 / (temperature * entropy_value)),
+            }
+        )
+    return rows
+
+
+def mct_exponent_parameter_from_exponents(critical_exponent: float, von_schweidler_exponent: float) -> dict[str, float]:
+    """Return the MCT exponent-parameter values implied by ``a`` and ``b``.
+
+    Idealized MCT relates the two exponents to a common parameter
+    ``lambda``. Experimental beta-window fits can use the mismatch between
+    the two estimates as a falsification diagnostic.
+    """
+
+    if not (0.0 < critical_exponent < 0.5):
+        raise ValueError("critical_exponent must lie between zero and one half")
+    if not (0.0 < von_schweidler_exponent < 1.0):
+        raise ValueError("von_schweidler_exponent must lie between zero and one")
+    lambda_from_a = math.gamma(1.0 - critical_exponent) ** 2 / math.gamma(1.0 - 2.0 * critical_exponent)
+    lambda_from_b = math.gamma(1.0 + von_schweidler_exponent) ** 2 / math.gamma(
+        1.0 + 2.0 * von_schweidler_exponent
+    )
+    return {
+        "lambda_from_a": lambda_from_a,
+        "lambda_from_b": lambda_from_b,
+        "lambda_mismatch": lambda_from_a - lambda_from_b,
+        "lambda_relative_mismatch": abs(lambda_from_a - lambda_from_b) / ((lambda_from_a + lambda_from_b) / 2.0),
+    }
+
+
+def mct_beta_correlator(time: np.ndarray, params: MCTBetaParams) -> np.ndarray:
+    """Piecewise MCT beta-window envelope for a normalized correlator."""
+
+    _validate_mct_beta_params(params)
+    time = np.asarray(time, dtype=float)
+    if np.any(time <= 0.0):
+        raise ValueError("time values must be positive")
+    scaled = time / params.beta_time
+    correlator = np.where(
+        scaled < 1.0,
+        params.plateau + params.critical_amplitude * scaled ** (-params.critical_exponent),
+        params.plateau - params.von_schweidler_amplitude * scaled ** params.von_schweidler_exponent,
+    )
+    if np.any(correlator <= 0.0) or np.any(correlator >= 1.0):
+        raise ValueError("beta-window correlator left the physical interval (0, 1)")
+    return correlator
+
+
+def mct_beta_temperature_scan(
+    *,
+    temperatures: np.ndarray,
+    base: MCTBetaParams,
+    beta_time_activation: float,
+    plateau_growth: float,
+    alpha_time_ref: float,
+    alpha_activation: float,
+) -> list[dict[str, float]]:
+    """Cooling scan for an effective MCT beta window coupled to alpha slowing."""
+
+    _validate_mct_beta_params(base)
+    if beta_time_activation < 0.0:
+        raise ValueError("beta_time_activation must be nonnegative")
+    if plateau_growth < 0.0:
+        raise ValueError("plateau_growth must be nonnegative")
+    if alpha_time_ref <= 0.0:
+        raise ValueError("alpha_time_ref must be positive")
+    if alpha_activation < 0.0:
+        raise ValueError("alpha_activation must be nonnegative")
+    temperatures = np.asarray(temperatures, dtype=float)
+    if np.any(temperatures <= 0.0):
+        raise ValueError("temperatures must be positive")
+    reference_temperature = temperatures[0]
+    exponent = mct_exponent_parameter_from_exponents(base.critical_exponent, base.von_schweidler_exponent)
+    rows: list[dict[str, float]] = []
+    for temperature in temperatures:
+        inverse_shift = 1.0 / temperature - 1.0 / reference_temperature
+        beta_time = base.beta_time * math.exp(beta_time_activation * inverse_shift)
+        alpha_time = alpha_time_ref * math.exp(alpha_activation * inverse_shift)
+        plateau = min(0.98, base.plateau + plateau_growth * inverse_shift)
+        exit_level = 0.5 * plateau
+        exit_scaled = ((plateau - exit_level) / base.von_schweidler_amplitude) ** (
+            1.0 / base.von_schweidler_exponent
+        )
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "inverse_temperature_shift": float(inverse_shift),
+                "plateau": plateau,
+                "critical_exponent": base.critical_exponent,
+                "von_schweidler_exponent": base.von_schweidler_exponent,
+                "lambda_from_a": exponent["lambda_from_a"],
+                "lambda_from_b": exponent["lambda_from_b"],
+                "lambda_relative_mismatch": exponent["lambda_relative_mismatch"],
+                "beta_time": beta_time,
+                "critical_entry_time": beta_time,
+                "von_schweidler_exit_time": beta_time * exit_scaled,
+                "alpha_time": alpha_time,
+                "alpha_beta_separation": alpha_time / beta_time,
             }
         )
     return rows

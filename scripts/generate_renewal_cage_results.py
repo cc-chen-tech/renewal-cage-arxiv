@@ -19,6 +19,7 @@ from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
     FacilitatedExchangeLawParams,
     GammaExchangeParams,
+    MCTBetaParams,
     TemperatureLawParams,
     alpha_relaxation_shape_curve,
     alpha_relaxation_time,
@@ -50,6 +51,8 @@ from renewal_cage import (  # noqa: E402
     late_mechanism_selection,
     minimal_barrier_requirements,
     local_alpha_stretching_exponent,
+    mct_beta_correlator,
+    mct_beta_temperature_scan,
     moments_1d,
     ngp_1d,
     normalized_alpha_decay,
@@ -710,6 +713,28 @@ def write_thermodynamic_closure_csv(
     return rows
 
 
+def write_mct_beta_closure_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    base: MCTBetaParams,
+    *,
+    beta_time_activation: float,
+    plateau_growth: float,
+    alpha_time_ref: float,
+    alpha_activation: float,
+) -> list[dict[str, float]]:
+    rows = mct_beta_temperature_scan(
+        temperatures=temperatures,
+        base=base,
+        beta_time_activation=beta_time_activation,
+        plateau_growth=plateau_growth,
+        alpha_time_ref=alpha_time_ref,
+        alpha_activation=alpha_activation,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_heterogeneity_csv(
     path: Path,
     time: np.ndarray,
@@ -1267,10 +1292,10 @@ def write_sota_comparison_csv(path: Path) -> list[dict[str, float | str]]:
         {
             "phenomenon": "mct_beta_relaxation",
             "benchmark_observable": "beta-relaxation scaling, von Schweidler law, and MCT exponents",
-            "benchmark_source": "kob1995intermediate;berthier2011theoretical",
-            "model_prediction": "cage plateau is present, but MCT beta exponent structure is absent",
-            "model_status": "unsupported",
-            "next_gap": "couple renewal clock to a beta-relaxation kernel or memory function",
+            "benchmark_source": "gotze1992relaxation;kob1995intermediate;berthier2011theoretical",
+            "model_prediction": "effective beta-window envelope gives critical decay and von Schweidler departure around the cage plateau",
+            "model_status": "partial",
+            "next_gap": "derive the memory kernel and exponent parameter from microscopic structure",
         },
         {
             "phenomenon": "thermodynamic_glass_transition",
@@ -1912,6 +1937,80 @@ def write_thermodynamic_closure_svg(path: Path, rows: list[dict[str, float]]) ->
   {plot(left_a, right_a, [("s_c", entropy / entropy[0], "#2b6cb0"), ("Delta c_p", heat_capacity / heat_capacity[0], "#2f855a")])}
   {axes(left_b, right_b, "B. Adam-Gibbs kinetic coupling", "inverse-temperature shift")}
   {plot(left_b, right_b, [("tau_AG / hot", tau_ag, "#c05621"), ("tau_alpha / hot", tau_alpha, "#805ad5")])}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_mct_beta_closure_svg(path: Path, rows: list[dict[str, float]], base: MCTBetaParams) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left_a, top, right_a, bottom = 75, 90, 520, 430
+    left_b, right_b = 660, 1040
+    scaled_time = np.geomspace(0.1, 20.0, 260)
+    time = scaled_time * base.beta_time
+    correlator = mct_beta_correlator(time, base)
+    plateau = np.full_like(correlator, base.plateau)
+    inverse_shift = np.array([row["inverse_temperature_shift"] for row in rows])
+    beta_time = np.array([row["beta_time"] for row in rows])
+    exit_time = np.array([row["von_schweidler_exit_time"] for row in rows])
+    alpha_time = np.array([row["alpha_time"] for row in rows])
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 70}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot_scaled_time(left: int, right: int) -> str:
+        log_scaled_time = np.log10(scaled_time)
+        x = scale(log_scaled_time, left, right)
+        y_all = scale(np.concatenate([correlator, plateau]), bottom, top)
+        y_corr = y_all[: len(correlator)]
+        y_plateau = y_all[len(correlator) :]
+        marker_x = left + (0.0 - np.min(log_scaled_time)) * (right - left) / (
+            np.max(log_scaled_time) - np.min(log_scaled_time)
+        )
+        return "\n".join(
+            [
+                polyline(x, y_corr, "#2b6cb0"),
+                polyline(x, y_plateau, "#555555", width=1.2),
+                f'<line x1="{marker_x:.2f}" y1="{top}" x2="{marker_x:.2f}" y2="{bottom}" stroke="#888" stroke-dasharray="4 4" />',
+                f'<text x="{left + 18}" y="{top + 25}" font-family="Arial, sans-serif" font-size="12" fill="#2b6cb0">phi_beta(t)</text>',
+                f'<text x="{left + 18}" y="{top + 43}" font-family="Arial, sans-serif" font-size="12" fill="#555555">plateau f_c</text>',
+            ]
+        )
+
+    def plot_cooling(left: int, right: int) -> str:
+        x = scale(inverse_shift, left, right)
+        curves = [
+            ("t_beta / hot", beta_time / beta_time[0], "#2b6cb0"),
+            ("von exit / hot", exit_time / exit_time[0], "#c05621"),
+            ("tau alpha / hot", alpha_time / alpha_time[0], "#805ad5"),
+        ]
+        all_values = np.concatenate([curve for _, curve, _ in curves])
+        y_all = scale(np.log10(all_values), bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve, color) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, color))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">MCT beta-window closure</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">An effective beta envelope adds critical decay and von-Schweidler departure around the cage plateau.</text>
+  {axes(left_a, right_a, "A. Two-sided beta power laws", "log10(t / t_beta)")}
+  {plot_scaled_time(left_a, right_a)}
+  {axes(left_b, right_b, "B. Cooling separates beta and alpha clocks", "inverse-temperature shift")}
+  {plot_cooling(left_b, right_b)}
 </svg>
 """
     path.write_text(svg)
@@ -2693,6 +2792,28 @@ def main() -> None:
     write_thermodynamic_closure_svg(
         FIGURE_DIR / "renewal_cage_thermodynamic_closure.svg",
         thermodynamic_rows,
+    )
+    mct_beta = MCTBetaParams(
+        plateau=0.68,
+        critical_amplitude=0.08,
+        von_schweidler_amplitude=0.05,
+        critical_exponent=0.32,
+        von_schweidler_exponent=0.6,
+        beta_time=4.0,
+    )
+    mct_beta_rows = write_mct_beta_closure_csv(
+        DATA_DIR / "renewal_cage_mct_beta_closure.csv",
+        np.array([1.0, 0.82, 0.68, 0.58, 0.52]),
+        mct_beta,
+        beta_time_activation=2.4,
+        plateau_growth=0.14,
+        alpha_time_ref=30.0,
+        alpha_activation=5.0,
+    )
+    write_mct_beta_closure_svg(
+        FIGURE_DIR / "renewal_cage_mct_beta_closure.svg",
+        mct_beta_rows,
+        mct_beta,
     )
     cooling_interval = 1.0 / temperatures[-1] - 1.0 / temperatures[0]
     barrier_requirement_rows = write_barrier_requirements_csv(

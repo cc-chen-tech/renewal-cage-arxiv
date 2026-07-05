@@ -864,6 +864,51 @@ def write_thermodynamic_closure_pdf(path: Path) -> None:
     c.save()
 
 
+def write_mct_beta_closure_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_mct_beta_closure.csv")
+    inverse_shift = data["inverse_temperature_shift"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "MCT beta-window closure")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "Effective critical decay and von-Schweidler departure around the cage plateau.")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("plateau f_c", data["plateau"] / data["plateau"][0], colors.HexColor("#2b6cb0")),
+            ("lambda_a", data["lambda_from_a"] / data["lambda_from_a"][0], colors.HexColor("#2f855a")),
+            ("lambda_b", data["lambda_from_b"] / data["lambda_from_b"][0], colors.HexColor("#c05621")),
+        ],
+        "AG. Beta exponent diagnostics",
+        xlabel="inverse-temperature shift",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("t_beta / hot", data["beta_time"] / data["beta_time"][0], colors.HexColor("#2b6cb0")),
+            ("von exit / hot", data["von_schweidler_exit_time"] / data["von_schweidler_exit_time"][0], colors.HexColor("#c05621")),
+            ("tau alpha / hot", data["alpha_time"] / data["alpha_time"][0], colors.HexColor("#805ad5")),
+        ],
+        "AH. Beta-to-alpha clock separation",
+        xlabel="inverse-temperature shift",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1268,6 +1313,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
     thermodynamic_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_closure.pdf"
+    mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1287,6 +1333,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_spatial_chi4_pdf(spatial_chi4_pdf)
     write_thermodynamic_closure_pdf(thermodynamic_closure_pdf)
+    write_mct_beta_closure_pdf(mct_beta_closure_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1311,6 +1358,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")
         archive.write(thermodynamic_closure_pdf, "figures/renewal_cage_thermodynamic_closure.pdf")
+        archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

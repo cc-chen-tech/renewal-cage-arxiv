@@ -27,7 +27,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(phenomena["thermodynamic_glass_transition"]["model_status"], "partial")
         self.assertEqual(phenomena["spatial_chi4_length"]["model_status"], "partial")
         self.assertEqual(phenomena["persistence_exchange_decoupling"]["model_status"], "supported")
-        self.assertEqual(phenomena["mct_beta_relaxation"]["model_status"], "unsupported")
+        self.assertEqual(phenomena["mct_beta_relaxation"]["model_status"], "partial")
         self.assertGreaterEqual(len(rows), 10)
 
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
@@ -55,6 +55,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_glass_phase_diagram.pdf", names)
             self.assertIn("figures/renewal_cage_spatial_chi4.pdf", names)
             self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", names)
+            self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -78,6 +79,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_glass_phase_diagram.pdf", main_tex)
         self.assertIn("figures/renewal_cage_spatial_chi4.pdf", main_tex)
         self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_barrier_requirements.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
@@ -107,6 +109,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_spatial_chi4 = (ROOT / "paper" / "figures" / "renewal_cage_spatial_chi4.pdf").read_bytes()
             first_thermodynamic_closure = (
                 ROOT / "paper" / "figures" / "renewal_cage_thermodynamic_closure.pdf"
+            ).read_bytes()
+            first_mct_beta_closure = (
+                ROOT / "paper" / "figures" / "renewal_cage_mct_beta_closure.pdf"
             ).read_bytes()
             first_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
@@ -144,6 +149,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_thermodynamic_closure = (
                 ROOT / "paper" / "figures" / "renewal_cage_thermodynamic_closure.pdf"
             ).read_bytes()
+            second_mct_beta_closure = (
+                ROOT / "paper" / "figures" / "renewal_cage_mct_beta_closure.pdf"
+            ).read_bytes()
             second_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
             ).read_bytes()
@@ -172,6 +180,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_glass_phase_diagram, second_glass_phase_diagram)
         self.assertEqual(first_spatial_chi4, second_spatial_chi4)
         self.assertEqual(first_thermodynamic_closure, second_thermodynamic_closure)
+        self.assertEqual(first_mct_beta_closure, second_mct_beta_closure)
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)

@@ -50,6 +50,9 @@ from renewal_cage import (  # noqa: E402
     local_alpha_stretching_exponent,
     late_mechanism_selection,
     minimal_barrier_requirements,
+    MCTBetaParams,
+    mct_beta_correlator,
+    mct_beta_temperature_scan,
     observable_consistency_diagnostics,
     radial_van_hove_3d,
     local_cage_variance,
@@ -1055,6 +1058,65 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(rows[-1]["thermodynamic_slowdown"], 10.0)
         self.assertGreater(rows[-1]["inverse_entropy_control"], rows[0]["inverse_entropy_control"])
         self.assertGreater(rows[-1]["excess_heat_capacity"], 0.0)
+
+    def test_mct_beta_correlator_has_critical_and_von_schweidler_slopes(self):
+        beta = MCTBetaParams(
+            plateau=0.72,
+            critical_amplitude=0.09,
+            von_schweidler_amplitude=0.08,
+            critical_exponent=0.31,
+            von_schweidler_exponent=0.58,
+            beta_time=12.0,
+        )
+        time = np.geomspace(1.2, 120.0, 160)
+        correlator = mct_beta_correlator(time, beta)
+
+        early = time < beta.beta_time
+        late = time > beta.beta_time
+        early_slope = np.polyfit(
+            np.log(time[early] / beta.beta_time),
+            np.log(correlator[early] - beta.plateau),
+            1,
+        )[0]
+        late_slope = np.polyfit(
+            np.log(time[late] / beta.beta_time),
+            np.log(beta.plateau - correlator[late]),
+            1,
+        )[0]
+
+        self.assertAlmostEqual(early_slope, -beta.critical_exponent, delta=0.01)
+        self.assertAlmostEqual(late_slope, beta.von_schweidler_exponent, delta=0.01)
+        self.assertLess(np.max(correlator), 1.0)
+        self.assertGreater(np.min(correlator), 0.0)
+
+    def test_mct_beta_temperature_scan_links_plateau_window_to_alpha_crossover(self):
+        base = MCTBetaParams(
+            plateau=0.68,
+            critical_amplitude=0.08,
+            von_schweidler_amplitude=0.05,
+            critical_exponent=0.32,
+            von_schweidler_exponent=0.6,
+            beta_time=4.0,
+        )
+        temperatures = np.array([1.0, 0.82, 0.68, 0.58])
+
+        rows = mct_beta_temperature_scan(
+            temperatures=temperatures,
+            base=base,
+            beta_time_activation=2.4,
+            plateau_growth=0.14,
+            alpha_time_ref=30.0,
+            alpha_activation=5.0,
+        )
+
+        beta_time = np.array([row["beta_time"] for row in rows])
+        plateau = np.array([row["plateau"] for row in rows])
+        separation = np.array([row["alpha_beta_separation"] for row in rows])
+        self.assertTrue(np.all(np.diff(beta_time) > 0.0))
+        self.assertTrue(np.all(np.diff(plateau) > 0.0))
+        self.assertTrue(np.all(np.diff(separation) > 0.0))
+        self.assertGreater(rows[-1]["von_schweidler_exit_time"], rows[-1]["beta_time"])
+        self.assertLess(rows[-1]["von_schweidler_exit_time"], rows[-1]["alpha_time"])
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

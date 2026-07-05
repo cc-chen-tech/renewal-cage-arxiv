@@ -463,6 +463,36 @@ configurational entropy or a proof of an ideal glass transition; those are the
 remaining RFOT-level questions
 \cite{lubchenko2007theory,berthier2011theoretical}.
 
+\section{Effective MCT Beta-Window Closure}
+
+The cage plateau in the renewal model does not by itself reproduce the full
+mode-coupling-theory beta-relaxation structure. To make this limitation
+testable rather than hidden, we add a minimal beta-window envelope around a
+normalized correlator plateau $f_c$,
+\begin{equation}
+  \phi_\beta(t)=
+  \begin{cases}
+    f_c+h_a(t/t_\beta)^{-a}, & t<t_\beta,\\
+    f_c-h_b(t/t_\beta)^b, & t\ge t_\beta.
+  \end{cases}
+\end{equation}
+The first branch is the critical approach to the plateau and the second is the
+von Schweidler departure \cite{gotze1992relaxation,kob1995intermediate}. In
+idealized MCT the exponents satisfy a common exponent-parameter relation,
+\begin{equation}
+  \lambda_a=\frac{\Gamma(1-a)^2}{\Gamma(1-2a)},\qquad
+  \lambda_b=\frac{\Gamma(1+b)^2}{\Gamma(1+2b)}.
+\end{equation}
+Therefore the mismatch $|\lambda_a-\lambda_b|$ is a direct diagnostic of
+whether a fitted beta window is internally MCT-consistent. Cooling is encoded by
+a beta-clock law $t_\beta(T)=t_{\beta0}\exp[E_\beta\Delta(1/T)]$ and by a
+separate alpha time $\tau_\alpha(T)$, so the generated observable
+$\tau_\alpha/t_\beta$ measures beta-alpha time-scale separation. This closure
+upgrades the theory from merely having a cage plateau to reproducing the
+two-sided beta-window power laws, but it remains an effective diagnostic
+closure; the microscopic memory kernel and material-specific exponent parameter
+are still outside the renewal derivation.
+
 \section{Finite-Exchange Heterogeneity Extension}
 
 The Poisson renewal model is the minimal clock, but glass-forming systems also
@@ -861,6 +891,10 @@ The thermodynamic closure with $T_K=0.45$ and $s_c(T_0)=1.2$ drives an
 Adam-Gibbs renewal delay that grows by more than four orders of magnitude by
 $T=0.52$, while $s_c$ extrapolates toward zero and $\Delta c_p$ remains
 positive.
+The beta-window closure with $a=0.32$ and $b=0.60$ gives internally consistent
+power-law slopes around the cage plateau; over the same cooling interval
+$t_\beta$ grows by a factor of $9.17$ while the imposed alpha clock grows by a
+factor of $101$, increasing $\tau_\alpha/t_\beta$ from $7.5$ to $82.7$.
 The persistence-exchange extension keeps $D=0.35$ fixed while increasing
 $\tau_p/\tau_x$ from $1$ to $12$; the resulting $D\tau_\alpha$ grows from
 $1.01$ to $4.98$, while the late NGP falls from $1.21\times10^{-2}$ to
@@ -883,7 +917,8 @@ marks remaining gaps explicitly: the spatial four-point length is now a
 diffusive-front closure rather than a full facilitation-field theory
 \cite{lacevic2003fourpoint,berthier2024experimental}; the thermodynamic sector
 is an Adam-Gibbs/Kauzmann closure rather than a microscopic entropy derivation;
-and MCT beta-relaxation exponents are not derived.
+and the MCT beta window is an effective two-exponent closure rather than a
+derived memory-kernel calculation.
 
 \begin{figure}[h]
   \centering
@@ -990,6 +1025,15 @@ and MCT beta-relaxation exponents are not derived.
   entropy extrapolation and excess heat capacity are coupled to the renewal
   persistence clock through an Adam-Gibbs relaxation time, producing
   super-Arrhenius alpha slowdown while keeping the entropy law explicit.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_mct_beta_closure.pdf}
+  \caption{Effective MCT beta-window closure. The added envelope supplies the
+  critical approach and von Schweidler departure around the cage plateau,
+  together with a clock-separation diagnostic between beta and alpha
+  relaxation.}
 \end{figure}
 
 \begin{figure}[h]
