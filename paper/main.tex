@@ -1035,6 +1035,11 @@ and \texttt{F\_s} plus \texttt{sigma\_F\_s}; the van-Hove/NGP input requires
 \texttt{G\_s}, $\alpha_2$, diffusion, and their uncertainties. Thus the paper
 does not treat digitized curves as a full real-data fit until the uncertainty
 columns are supplied.
+The file
+\texttt{renewal\_cage\_raw\_curve\_diagnostic\_readiness.csv} then aggregates
+these observable-level contracts to the diagnostic level, so that the multi-$k$
+alpha-shape, van-Hove recovery, and combined alpha/van-Hove/transport closure
+each carry separate structural-readiness and uncertainty-readiness flags.
 
 \begin{figure}[h]
   \centering
@@ -1249,6 +1254,16 @@ columns are supplied.
   present for the synthetic machine-readable contract, but the
   uncertainty-weighted inversion remains blocked until the listed uncertainty
   columns are available.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_raw_curve_diagnostic_readiness.pdf}
+  \caption{Diagnostic-level readiness implied by the raw-curve ingestion
+  contract. The KA I/II fused benchmark has the structural columns needed for
+  the listed diagnostic protocols, but each protocol remains below the
+  uncertainty-weighted real-inversion threshold until the corresponding
+  uncertainty columns are supplied.}
 \end{figure}
 
 \begin{figure}[h]

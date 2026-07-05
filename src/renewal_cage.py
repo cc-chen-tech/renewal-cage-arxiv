@@ -1334,6 +1334,72 @@ def raw_curve_ingestion_contract(
     return rows
 
 
+def raw_curve_diagnostic_readiness(
+    *,
+    benchmark_id: str,
+    contract_rows: list[dict[str, float | str]],
+    diagnostic_observables: dict[str, list[str]],
+) -> list[dict[str, float | str]]:
+    """Aggregate raw-curve ingestion rows into diagnostic-level readiness."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not contract_rows:
+        raise ValueError("contract_rows must be nonempty")
+    if not diagnostic_observables:
+        raise ValueError("diagnostic_observables must be nonempty")
+
+    by_observable = {str(row["observable_id"]): row for row in contract_rows}
+    rows: list[dict[str, float | str]] = []
+    for diagnostic_id, observables in diagnostic_observables.items():
+        if not diagnostic_id:
+            raise ValueError("diagnostic ids must be nonempty")
+        if not observables:
+            raise ValueError("diagnostic observable lists must be nonempty")
+        if any(not observable for observable in observables):
+            raise ValueError("diagnostic observables must be nonempty strings")
+
+        unique_observables = list(dict.fromkeys(observables))
+        missing_observables = [
+            observable for observable in unique_observables if observable not in by_observable
+        ]
+        required_rows = [
+            by_observable[observable]
+            for observable in unique_observables
+            if observable in by_observable
+        ]
+        structural_ready = (
+            len(missing_observables) == 0
+            and all(float(row["structural_ingestion_ready"]) == 1.0 for row in required_rows)
+        )
+        uncertainty_ready = (
+            structural_ready
+            and all(float(row["uncertainty_ingestion_ready"]) == 1.0 for row in required_rows)
+        )
+        blockers: list[str] = []
+        blockers.extend(missing_observables)
+        for row in required_rows:
+            blocker = str(row["primary_blocker"])
+            if blocker != "none" and blocker not in blockers:
+                blockers.append(blocker)
+        primary_blocker = blockers[0] if blockers else "none"
+        rows.append(
+            {
+                "benchmark_id": benchmark_id,
+                "diagnostic_id": diagnostic_id,
+                "required_observables": ";".join(unique_observables),
+                "missing_observables": (
+                    ";".join(missing_observables) if missing_observables else "none"
+                ),
+                "structural_diagnostic_ready": float(structural_ready),
+                "uncertainty_diagnostic_ready": float(uncertainty_ready),
+                "blocking_observables_or_columns": ";".join(blockers) if blockers else "none",
+                "primary_blocker": primary_blocker,
+            }
+        )
+    return rows
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

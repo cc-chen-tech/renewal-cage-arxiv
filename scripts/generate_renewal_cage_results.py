@@ -87,6 +87,7 @@ from renewal_cage import (  # noqa: E402
     PersistenceExchangeParams,
     radial_van_hove_3d,
     raw_curve_ingestion_contract,
+    raw_curve_diagnostic_readiness,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     spatial_facilitation_chi4_scan,
@@ -2336,6 +2337,29 @@ def write_raw_curve_ingestion_contract_csv(path: Path) -> list[dict[str, float |
     return rows
 
 
+def write_raw_curve_diagnostic_readiness_csv(
+    path: Path,
+    contract_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Aggregate KA raw-curve ingestion contracts into diagnostic readiness."""
+
+    rows = raw_curve_diagnostic_readiness(
+        benchmark_id="kob_andersen_i_ii_dynamic_closure",
+        contract_rows=contract_rows,
+        diagnostic_observables={
+            "multi_k_alpha_shape": ["ka_self_intermediate_scattering"],
+            "van_hove_gaussian_recovery": ["ka_van_hove_ngp"],
+            "combined_alpha_vanhove_transport_closure": [
+                "ka_self_intermediate_scattering",
+                "ka_van_hove_ngp",
+                "ka_joint_transport_alpha",
+            ],
+        },
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_svg(
     path: Path,
     time: np.ndarray,
@@ -3660,6 +3684,45 @@ def write_raw_curve_ingestion_contract_svg(path: Path, rows: list[dict[str, floa
     path.write_text(svg)
 
 
+def write_raw_curve_diagnostic_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 450
+    left, top, bottom = 95, 105, 300
+    row_h = (bottom - top) / len(rows)
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        structural = int(float(row["structural_diagnostic_ready"]))
+        uncertainty = int(float(row["uncertainty_diagnostic_ready"]))
+        color = "#2f855a" if uncertainty else "#2b6cb0" if structural else "#c05621"
+        marks.append(
+            f'<text x="{left}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">{str(row["diagnostic_id"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 330}" y="{y + 2:.2f}" width="140" height="22" fill="{color}" opacity="0.9" />'
+        )
+        marks.append(
+            f'<text x="{left + 342}" y="{y + 17:.2f}" font-family="Arial, sans-serif" font-size="11" fill="#fff">struct/unc={structural}/{uncertainty}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">requires: {str(row["required_observables"])[:54]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 38:.2f}" font-family="Arial, sans-serif" font-size="10" fill="#555">block: {str(row["blocking_observables_or_columns"])[:72]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Raw-curve diagnostic readiness</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Column contracts are aggregated into protocol-level readiness before any real-data inversion claim.</text>
+  {"".join(marks)}
+  <rect x="95" y="365" width="14" height="14" fill="#2f855a" /><text x="116" y="377" font-family="Arial, sans-serif" font-size="12">uncertainty-weighted diagnostic ready</text>
+  <rect x="350" y="365" width="14" height="14" fill="#2b6cb0" /><text x="371" y="377" font-family="Arial, sans-serif" font-size="12">structural diagnostic only</text>
+  <rect x="560" y="365" width="14" height="14" fill="#c05621" /><text x="581" y="377" font-family="Arial, sans-serif" font-size="12">blocked diagnostic</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -4036,6 +4099,14 @@ def main() -> None:
     write_raw_curve_ingestion_contract_svg(
         FIGURE_DIR / "renewal_cage_raw_curve_ingestion_contract.svg",
         raw_curve_contract_rows,
+    )
+    raw_diagnostic_rows = write_raw_curve_diagnostic_readiness_csv(
+        DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv",
+        raw_curve_contract_rows,
+    )
+    write_raw_curve_diagnostic_readiness_svg(
+        FIGURE_DIR / "renewal_cage_raw_curve_diagnostic_readiness.svg",
+        raw_diagnostic_rows,
     )
 
     delay_values = [1.2, 2.0, 3.0, 5.0]

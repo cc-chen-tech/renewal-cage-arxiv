@@ -70,6 +70,7 @@ from renewal_cage import (  # noqa: E402
     observable_consistency_diagnostics,
     observable_falsification_matrix,
     raw_curve_ingestion_contract,
+    raw_curve_diagnostic_readiness,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
     van_hove_tail_benchmark_consistency,
@@ -1661,6 +1662,49 @@ class DelayedRenewalCageTests(unittest.TestCase):
         row = rows[0]
         self.assertEqual(row["structural_ingestion_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "temperature_grid_mismatch")
+
+    def test_raw_curve_diagnostic_readiness_aggregates_contract_blockers(self):
+        contract_rows = raw_curve_ingestion_contract(
+            benchmark_id="kob_andersen_i_ii_dynamic_closure",
+            observable_requirements={
+                "self_intermediate_scattering": {
+                    "required_columns": ["temperature", "wave_number", "time", "F_s"],
+                    "uncertainty_columns": ["sigma_F_s"],
+                    "target_diagnostic": "multi_k_alpha_shape",
+                },
+                "van_hove_ngp": {
+                    "required_columns": ["temperature", "time", "radius", "G_s", "alpha2", "diffusion"],
+                    "uncertainty_columns": ["sigma_G_s"],
+                    "target_diagnostic": "van_hove_gaussian_recovery",
+                },
+            },
+            available_columns_by_observable={
+                "self_intermediate_scattering": ["temperature", "wave_number", "time", "F_s"],
+                "van_hove_ngp": ["temperature", "time", "radius", "G_s", "alpha2", "diffusion", "sigma_G_s"],
+            },
+            machine_readable=True,
+            shared_temperature_grid=True,
+            shared_time_units=True,
+        )
+        rows = raw_curve_diagnostic_readiness(
+            benchmark_id="kob_andersen_i_ii_dynamic_closure",
+            contract_rows=contract_rows,
+            diagnostic_observables={
+                "multi_k_alpha_shape": ["self_intermediate_scattering"],
+                "van_hove_gaussian_recovery": ["van_hove_ngp"],
+                "combined_alpha_vanhove_closure": ["self_intermediate_scattering", "van_hove_ngp"],
+            },
+        )
+
+        by_diagnostic = {row["diagnostic_id"]: row for row in rows}
+        self.assertEqual(by_diagnostic["multi_k_alpha_shape"]["structural_diagnostic_ready"], 1.0)
+        self.assertEqual(by_diagnostic["multi_k_alpha_shape"]["uncertainty_diagnostic_ready"], 0.0)
+        self.assertEqual(by_diagnostic["multi_k_alpha_shape"]["primary_blocker"], "sigma_F_s")
+        self.assertEqual(by_diagnostic["van_hove_gaussian_recovery"]["uncertainty_diagnostic_ready"], 1.0)
+        self.assertEqual(by_diagnostic["van_hove_gaussian_recovery"]["primary_blocker"], "none")
+        self.assertEqual(by_diagnostic["combined_alpha_vanhove_closure"]["structural_diagnostic_ready"], 1.0)
+        self.assertEqual(by_diagnostic["combined_alpha_vanhove_closure"]["uncertainty_diagnostic_ready"], 0.0)
+        self.assertEqual(by_diagnostic["combined_alpha_vanhove_closure"]["primary_blocker"], "sigma_F_s")
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(
