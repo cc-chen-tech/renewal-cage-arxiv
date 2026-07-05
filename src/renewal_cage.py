@@ -1797,6 +1797,104 @@ def glass_phenomenon_audit(
     }
 
 
+def glass_signature_phase_diagram(
+    temperatures: np.ndarray,
+    base_cage_law: TemperatureLawParams,
+    base_exchange_law: FacilitatedExchangeLawParams,
+    *,
+    wave_number: float,
+    delay_barrier_gaps: list[float],
+    exchange_barrier_sums: list[float],
+) -> list[dict[str, float]]:
+    """Scan barrier controls for simultaneous glass-dynamics signatures.
+
+    ``delay_barrier_gap`` is ``E_d-E_lambda`` and controls growth of
+    ``lambda*tau_d``. ``exchange_barrier_sum`` is the total cooling barrier that
+    broadens and slows mobility exchange, controlling growth of
+    ``R_x/kappa_0``. A grid point has complete dynamic closure only when all
+    audited dynamical signatures are supported while the thermodynamic
+    transition flag remains zero.
+    """
+
+    _validate_temperature_law(base_cage_law)
+    _validate_facilitated_exchange_law(base_exchange_law)
+    if not delay_barrier_gaps:
+        raise ValueError("delay_barrier_gaps must not be empty")
+    if not exchange_barrier_sums:
+        raise ValueError("exchange_barrier_sums must not be empty")
+    if any(gap < 0.0 for gap in delay_barrier_gaps):
+        raise ValueError("delay_barrier_gaps must be nonnegative")
+    if any(total < 0.0 for total in exchange_barrier_sums):
+        raise ValueError("exchange_barrier_sums must be nonnegative")
+    base_exchange_sum = base_exchange_law.shape_broadening_barrier + base_exchange_law.exchange_slowing_barrier
+    if base_exchange_sum > 0.0:
+        shape_fraction = base_exchange_law.shape_broadening_barrier / base_exchange_sum
+    else:
+        shape_fraction = 0.5
+
+    rows: list[dict[str, float]] = []
+    for delay_gap in delay_barrier_gaps:
+        cage_law = TemperatureLawParams(
+            reference_temperature=base_cage_law.reference_temperature,
+            cage_variance_ref=base_cage_law.cage_variance_ref,
+            cage_tau_ref=base_cage_law.cage_tau_ref,
+            jump_to_cage_ref=base_cage_law.jump_to_cage_ref,
+            renewal_rate_ref=base_cage_law.renewal_rate_ref,
+            renewal_delay_ref=base_cage_law.renewal_delay_ref,
+            rate_activation=base_cage_law.rate_activation,
+            delay_activation=base_cage_law.rate_activation + delay_gap,
+            cage_stiffening=base_cage_law.cage_stiffening,
+            jump_to_cage_growth=base_cage_law.jump_to_cage_growth,
+            cage_tau_activation=base_cage_law.cage_tau_activation,
+        )
+        for exchange_sum in exchange_barrier_sums:
+            exchange_law = FacilitatedExchangeLawParams(
+                reference_temperature=base_exchange_law.reference_temperature,
+                shape_ref=base_exchange_law.shape_ref,
+                exchange_renewal_count_ref=base_exchange_law.exchange_renewal_count_ref,
+                shape_broadening_barrier=shape_fraction * exchange_sum,
+                exchange_slowing_barrier=(1.0 - shape_fraction) * exchange_sum,
+            )
+            audit = glass_phenomenon_audit(
+                temperatures,
+                cage_law,
+                exchange_law,
+                wave_number=wave_number,
+            )
+            audit_rows = audit["rows"]
+            cold = audit_rows[-1]
+            hot = audit_rows[0]
+            complete = (
+                audit["supported_dynamic_signatures"] == audit["tested_dynamic_signatures"]
+                and audit["thermodynamic_transition"] == 0.0
+            )
+            rows.append(
+                {
+                    "delay_barrier_gap": float(delay_gap),
+                    "exchange_barrier_sum": float(exchange_sum),
+                    "complete_dynamic_closure": 1.0 if complete else 0.0,
+                    "supported_dynamic_signatures": float(audit["supported_dynamic_signatures"]),
+                    "tested_dynamic_signatures": float(audit["tested_dynamic_signatures"]),
+                    "diffusion_slowdown": float(audit["diffusion_slowdown"]),
+                    "alpha_slowdown": float(audit["alpha_slowdown"]),
+                    "ngp_peak_shift": float(audit["ngp_peak_shift"]),
+                    "stokes_einstein_violation": float(audit["stokes_einstein_violation"]),
+                    "fragility_growth": float(audit["fragility_growth"]),
+                    "heterogeneity_growth": float(audit["heterogeneity_growth"]),
+                    "stretched_alpha_window": float(audit["stretched_alpha_window"]),
+                    "chi4_peak_growth": float(audit["chi4_peak_growth"]),
+                    "gaussian_recovery": float(audit["gaussian_recovery"]),
+                    "thermodynamic_transition": float(audit["thermodynamic_transition"]),
+                    "cold_tau_alpha_ratio": cold["tau_alpha_exchange"] / hot["tau_alpha_exchange"],
+                    "cold_se_product_ratio": cold["normalized_stokes_einstein_product"],
+                    "cold_heterogeneity_growth_ratio": cold["heterogeneity_ratio"] / hot["heterogeneity_ratio"],
+                    "cold_chi4_peak_ratio": cold["chi4_peak"] / hot["chi4_peak"],
+                    "minimum_alpha_window_beta": min(row["median_alpha_window_beta"] for row in audit_rows),
+                }
+            )
+    return rows
+
+
 def poisson_weights(mean: float, *, max_count: int) -> np.ndarray:
     """Stable Poisson weights from n=0 to max_count with tail folded into max_count."""
 

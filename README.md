@@ -19,8 +19,9 @@ The model combines:
   diagnostics, NGP peak/alpha-relaxation coupling, finite-exchange
   heterogeneity diagnostics, a temperature-dependent facilitated-exchange law,
   a static-gamma mobility-disorder null model, late-time mechanism-selection
-  diagnostics, a glass-dynamics phenomenon audit, finite-time consistency
-  diagnostics, and observable inversion/falsifiability criteria.
+  diagnostics, a glass-dynamics phenomenon audit, barrier-facilitation
+  signature phase diagrams, finite-time consistency diagnostics, and observable
+  inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -120,6 +121,7 @@ figures/renewal_cage_temperature.svg
 figures/renewal_cage_alpha_shape.svg
 figures/renewal_cage_facilitated_exchange.svg
 figures/renewal_cage_glass_audit.svg
+figures/renewal_cage_glass_phase_diagram.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
 figures/renewal_cage_heterogeneity_map.svg
@@ -139,6 +141,7 @@ data/renewal_cage_temperature.csv
 data/renewal_cage_alpha_shape.csv
 data/renewal_cage_facilitated_exchange.csv
 data/renewal_cage_glass_audit.csv
+data/renewal_cage_glass_phase_diagram.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv

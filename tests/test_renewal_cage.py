@@ -27,6 +27,7 @@ from renewal_cage import (  # noqa: E402
     fractional_stokes_einstein_exponents,
     gamma_exchange_temperature_scan,
     glass_phenomenon_audit,
+    glass_signature_phase_diagram,
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
@@ -1076,6 +1077,56 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(audit["supported_dynamic_signatures"], 8.0)
         self.assertGreater(rows[-1]["tau_alpha_exchange"] / rows[0]["tau_alpha_exchange"], 10.0)
         self.assertGreater(rows[-1]["chi4_peak"] / rows[0]["chi4_peak"], 1.0)
+
+    def test_glass_signature_phase_diagram_identifies_barrier_facilitation_window(self):
+        base_cage_law = TemperatureLawParams(
+            reference_temperature=1.0,
+            cage_variance_ref=1.0,
+            cage_tau_ref=0.7,
+            jump_to_cage_ref=0.8,
+            renewal_rate_ref=0.18,
+            renewal_delay_ref=3.0,
+            rate_activation=2.0,
+            delay_activation=2.0,
+            cage_stiffening=0.2,
+            jump_to_cage_growth=0.25,
+        )
+        base_exchange_law = FacilitatedExchangeLawParams(
+            reference_temperature=1.0,
+            shape_ref=0.4,
+            exchange_renewal_count_ref=10.0,
+            shape_broadening_barrier=1.5,
+            exchange_slowing_barrier=2.5,
+        )
+
+        rows = glass_signature_phase_diagram(
+            np.array([1.0, 0.85, 0.72, 0.62]),
+            base_cage_law,
+            base_exchange_law,
+            wave_number=1.1,
+            delay_barrier_gaps=[0.0, 1.5, 3.0],
+            exchange_barrier_sums=[0.0, 2.0, 4.0],
+        )
+
+        self.assertEqual(len(rows), 9)
+        weak = next(row for row in rows if row["delay_barrier_gap"] == 0.0 and row["exchange_barrier_sum"] == 0.0)
+        strong = next(row for row in rows if row["delay_barrier_gap"] == 3.0 and row["exchange_barrier_sum"] == 4.0)
+        same_exchange_stronger_delay = next(
+            row for row in rows if row["delay_barrier_gap"] == 3.0 and row["exchange_barrier_sum"] == 0.0
+        )
+        same_delay_stronger_exchange = next(
+            row for row in rows if row["delay_barrier_gap"] == 0.0 and row["exchange_barrier_sum"] == 4.0
+        )
+
+        self.assertEqual(weak["complete_dynamic_closure"], 0.0)
+        self.assertEqual(strong["complete_dynamic_closure"], 1.0)
+        self.assertEqual(strong["thermodynamic_transition"], 0.0)
+        self.assertGreater(strong["supported_dynamic_signatures"], weak["supported_dynamic_signatures"])
+        self.assertGreater(same_exchange_stronger_delay["cold_se_product_ratio"], weak["cold_se_product_ratio"])
+        self.assertGreater(
+            same_delay_stronger_exchange["cold_heterogeneity_growth_ratio"],
+            weak["cold_heterogeneity_growth_ratio"],
+        )
 
     def test_fractional_stokes_einstein_exponents_recover_power_law_slope(self):
         tau_alpha = np.array([2.0, 4.0, 8.0, 16.0, 32.0])

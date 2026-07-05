@@ -38,6 +38,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
     glass_phenomenon_audit,
+    glass_signature_phase_diagram,
     infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
     infer_renewal_correlation_size,
@@ -318,6 +319,28 @@ def write_glass_audit_csv(
                 "flag_value": value,
             }
         )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_glass_phase_diagram_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    base_cage_law: TemperatureLawParams,
+    base_exchange_law: FacilitatedExchangeLawParams,
+    *,
+    wave_number: float,
+    delay_barrier_gaps: list[float],
+    exchange_barrier_sums: list[float],
+) -> list[dict[str, float]]:
+    rows = glass_signature_phase_diagram(
+        temperatures,
+        base_cage_law,
+        base_exchange_law,
+        wave_number=wave_number,
+        delay_barrier_gaps=delay_barrier_gaps,
+        exchange_barrier_sums=exchange_barrier_sums,
+    )
     write_sweep_csv(path, rows)
     return rows
 
@@ -1356,6 +1379,86 @@ def write_glass_audit_svg(path: Path, rows: list[dict[str, float | str]]) -> Non
     path.write_text(svg)
 
 
+def write_glass_phase_diagram_svg(path: Path, rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 620
+    left, top, right, bottom = 95, 95, 690, 500
+    panel_b_left, panel_b_right = 780, 1110
+    gaps = sorted({row["delay_barrier_gap"] for row in rows})
+    exchange_sums = sorted({row["exchange_barrier_sum"] for row in rows})
+    row_map = {(row["delay_barrier_gap"], row["exchange_barrier_sum"]): row for row in rows}
+    cell_w = (right - left) / len(exchange_sums)
+    cell_h = (bottom - top) / len(gaps)
+    max_signatures = max(row["tested_dynamic_signatures"] for row in rows)
+    max_se = max(row["cold_se_product_ratio"] for row in rows)
+    max_het = max(row["cold_heterogeneity_growth_ratio"] for row in rows)
+
+    cells = []
+    for i, gap in enumerate(gaps):
+        y = bottom - (i + 1) * cell_h
+        cells.append(
+            f'<text x="35" y="{y + cell_h / 2 + 4:.2f}" font-family="Arial, sans-serif" font-size="12">gap={gap:g}</text>'
+        )
+        for j, exchange_sum in enumerate(exchange_sums):
+            row = row_map[(gap, exchange_sum)]
+            x = left + j * cell_w
+            fraction = row["supported_dynamic_signatures"] / max_signatures
+            green = int(180 - 95 * fraction)
+            fill = "#2f855a" if row["complete_dynamic_closure"] == 1.0 else f"rgb(220,{green},130)"
+            cells.append(
+                f'<rect x="{x:.2f}" y="{y:.2f}" width="{cell_w - 3:.2f}" height="{cell_h - 3:.2f}" fill="{fill}" stroke="#ffffff" />'
+            )
+            cells.append(
+                f'<text x="{x + 14:.2f}" y="{y + cell_h / 2 + 4:.2f}" font-family="Arial, sans-serif" font-size="12" fill="#111">{row["supported_dynamic_signatures"]:.0f}/{row["tested_dynamic_signatures"]:.0f}</text>'
+            )
+    x_labels = []
+    for j, exchange_sum in enumerate(exchange_sums):
+        x = left + j * cell_w + 12
+        x_labels.append(
+            f'<text x="{x:.2f}" y="{bottom + 28}" font-family="Arial, sans-serif" font-size="12">{exchange_sum:g}</text>'
+        )
+
+    def mini_plot(metric: str, y0: int, title: str, scale_max: float, color: str) -> str:
+        bars = [
+            row
+            for row in rows
+            if row["delay_barrier_gap"] == max(gaps)
+        ]
+        bar_w = (panel_b_right - panel_b_left) / len(bars) - 10
+        out = [
+            f'<text x="{panel_b_left}" y="{y0 - 18}" font-family="Arial, sans-serif" font-size="15" font-weight="700">{title}</text>',
+            f'<line x1="{panel_b_left}" y1="{y0 + 125}" x2="{panel_b_right}" y2="{y0 + 125}" stroke="#222" />',
+            f'<line x1="{panel_b_left}" y1="{y0 + 125}" x2="{panel_b_left}" y2="{y0}" stroke="#222" />',
+        ]
+        for idx, row in enumerate(bars):
+            height_value = 120.0 * row[metric] / scale_max if scale_max > 0.0 else 0.0
+            x = panel_b_left + idx * (bar_w + 10) + 6
+            out.append(
+                f'<rect x="{x:.2f}" y="{y0 + 125 - height_value:.2f}" width="{bar_w:.2f}" height="{height_value:.2f}" fill="{color}" opacity="0.85" />'
+            )
+            out.append(
+                f'<text x="{x:.2f}" y="{y0 + 145}" font-family="Arial, sans-serif" font-size="10">{row["exchange_barrier_sum"]:g}</text>'
+            )
+        return "\n".join(out)
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="80" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Barrier-facilitation signature phase diagram</text>
+  <text x="80" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cells show supported dynamic signatures. Full closure needs delay-barrier growth and finite-exchange growth.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Dynamic-signature closure grid</text>
+  {"".join(cells)}
+  {"".join(x_labels)}
+  <text x="{left + 185}" y="{bottom + 55}" font-family="Arial, sans-serif" font-size="13">exchange barrier sum</text>
+  <text x="18" y="315" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 18 315)">delay barrier gap</text>
+  {mini_plot("cold_se_product_ratio", 140, "B. Cold SE product at largest delay gap", max_se, "#2b6cb0")}
+  {mini_plot("cold_heterogeneity_growth_ratio", 360, "C. Heterogeneity growth at largest delay gap", max_het, "#c05621")}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -1867,6 +1970,31 @@ def main() -> None:
         wave_number=1.1,
     )
     write_glass_audit_svg(FIGURE_DIR / "renewal_cage_glass_audit.svg", glass_audit_rows)
+    glass_phase_rows = write_glass_phase_diagram_csv(
+        DATA_DIR / "renewal_cage_glass_phase_diagram.csv",
+        temperatures,
+        TemperatureLawParams(
+            reference_temperature=temperature_law.reference_temperature,
+            cage_variance_ref=temperature_law.cage_variance_ref,
+            cage_tau_ref=temperature_law.cage_tau_ref,
+            jump_to_cage_ref=temperature_law.jump_to_cage_ref,
+            renewal_rate_ref=temperature_law.renewal_rate_ref,
+            renewal_delay_ref=temperature_law.renewal_delay_ref,
+            rate_activation=temperature_law.rate_activation,
+            delay_activation=temperature_law.rate_activation,
+            cage_stiffening=temperature_law.cage_stiffening,
+            jump_to_cage_growth=temperature_law.jump_to_cage_growth,
+            cage_tau_activation=temperature_law.cage_tau_activation,
+        ),
+        exchange_law,
+        wave_number=1.1,
+        delay_barrier_gaps=[0.0, 1.5, 3.0],
+        exchange_barrier_sums=[0.0, 2.0, 4.0],
+    )
+    write_glass_phase_diagram_svg(
+        FIGURE_DIR / "renewal_cage_glass_phase_diagram.svg",
+        glass_phase_rows,
+    )
 
     barrier = ActivatedBarrierParams(
         reference_temperature=1.0,
