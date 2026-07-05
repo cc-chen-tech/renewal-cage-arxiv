@@ -534,6 +534,25 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(float(peak["chi4_overlap"]), 0.1)
         self.assertGreater(float(peak["ngp"]), 0.0)
 
+    def test_trajectory_csv_adapter_demo_gates_file_metadata_and_exports_observables(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_csv_adapter_demo.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        self.assertGreaterEqual(len(rows), 4)
+        for row in rows:
+            self.assertEqual(row["adapter_source"], "synthetic_local_csv_file")
+            self.assertEqual(row["adapter_stage"], "local_csv_trajectory_ready")
+            self.assertEqual(float(row["adapter_ready"]), 1.0)
+            self.assertEqual(row["missing_metadata_fields"], "none")
+            self.assertEqual(row["units_metadata"], "reduced_LJ_units")
+            self.assertEqual(float(row["row_count"]), 108.0)
+            self.assertIn("frame", row["csv_columns"])
+            self.assertIn("particle_id", row["csv_columns"])
+        peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+        self.assertGreater(float(peak["chi4_overlap"]), 0.1)
+
     def test_trajectory_uncertainty_protocol_exports_jackknife_sigmas(self):
         path = ROOT / "data" / "renewal_cage_trajectory_uncertainty_protocol.csv"
         self.assertTrue(path.exists())

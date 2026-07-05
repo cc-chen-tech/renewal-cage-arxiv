@@ -114,6 +114,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_adapter_contract,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
+    trajectory_table_csv_adapter,
     trajectory_table_adapter,
     trajectory_inversion_readiness_gate,
     TranslationRotationExchangeParams,
@@ -3455,6 +3456,50 @@ def write_trajectory_adapter_demo_csv(path: Path) -> list[dict[str, float | str]
     return rows
 
 
+def write_trajectory_csv_adapter_demo_csv(path: Path) -> list[dict[str, float | str]]:
+    """Extract trajectory observables through a local CSV file adapter."""
+
+    source_path = DATA_DIR / "renewal_cage_trajectory_csv_adapter_source.csv"
+    source_records = synthetic_intermittent_trajectory_table()
+    write_sweep_csv(source_path, source_records)
+    adapted = trajectory_table_csv_adapter(
+        csv_path=source_path,
+        frame_column="frame",
+        time_column="time",
+        particle_column="particle_id",
+        coordinate_columns=["x"],
+        metadata={
+            "box_geometry": "one_dimensional_periodic_fixture",
+            "temperature_or_state_point": "synthetic_intermittent_state",
+            "species_labels": "A",
+            "units_metadata": "reduced_LJ_units",
+        },
+    )
+    rows = trajectory_observable_protocol(
+        positions=adapted["positions"],
+        times=adapted["times"],
+        lag_indices=[1, 2, 3, 4],
+        wave_numbers=[0.7, 1.1, 1.6],
+        overlap_radius=0.5,
+    )
+    for row in rows:
+        row["benchmark_id"] = "synthetic_intermittent_trajectory_csv"
+        row["adapter_source"] = "synthetic_local_csv_file"
+        row["adapter_stage"] = adapted["adapter_stage"]
+        row["adapter_ready"] = adapted["adapter_ready"]
+        row["missing_metadata_fields"] = adapted["missing_metadata_fields"]
+        row["primary_blocker"] = adapted["primary_blocker"]
+        row["row_count"] = adapted["row_count"]
+        row["csv_columns"] = adapted["csv_columns"]
+        row["box_geometry"] = adapted["box_geometry"]
+        row["temperature_or_state_point"] = adapted["temperature_or_state_point"]
+        row["species_labels"] = adapted["species_labels"]
+        row["units_metadata"] = adapted["units_metadata"]
+        row["target_protocol"] = "csv_file_adapter_to_observable_bridge"
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, float | str]]:
     """Estimate trajectory-observable uncertainties from time-origin jackknife blocks."""
 
@@ -6542,6 +6587,9 @@ def main() -> None:
     )
     write_trajectory_adapter_demo_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_demo.csv"
+    )
+    write_trajectory_csv_adapter_demo_csv(
+        DATA_DIR / "renewal_cage_trajectory_csv_adapter_demo.csv"
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

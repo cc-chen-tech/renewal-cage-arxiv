@@ -1,5 +1,7 @@
+import csv
 import math
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -123,6 +125,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_inversion_readiness_gate,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
+    trajectory_table_csv_adapter,
     trajectory_table_adapter,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
@@ -2602,6 +2605,73 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 particle_column="particle_id",
                 coordinate_columns=["x"],
             )
+
+    def test_trajectory_table_csv_adapter_loads_file_and_metadata(self):
+        rows = [
+            {"frame": 1, "time": 1.0, "particle_id": "b", "x": 2.0, "y": 0.0},
+            {"frame": 0, "time": 0.0, "particle_id": "a", "x": 0.0, "y": 0.0},
+            {"frame": 1, "time": 1.0, "particle_id": "a", "x": 1.0, "y": 0.0},
+            {"frame": 0, "time": 0.0, "particle_id": "b", "x": 0.0, "y": 1.0},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "trajectory.csv"
+            with path.open("w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["frame", "time", "particle_id", "x", "y"])
+                writer.writeheader()
+                writer.writerows(rows)
+
+            adapted = trajectory_table_csv_adapter(
+                csv_path=path,
+                frame_column="frame",
+                time_column="time",
+                particle_column="particle_id",
+                coordinate_columns=["x", "y"],
+                metadata={
+                    "box_geometry": "orthorhombic",
+                    "temperature_or_state_point": "synthetic_T_0.45",
+                    "species_labels": "A;B",
+                    "units_metadata": "reduced_LJ_units",
+                },
+            )
+
+        self.assertEqual(adapted["adapter_stage"], "local_csv_trajectory_ready")
+        self.assertEqual(adapted["adapter_ready"], 1.0)
+        self.assertEqual(adapted["row_count"], 4.0)
+        self.assertEqual(adapted["missing_metadata_fields"], "none")
+        self.assertEqual(adapted["primary_blocker"], "none")
+        np.testing.assert_allclose(adapted["times"], np.array([0.0, 1.0]))
+        np.testing.assert_allclose(adapted["positions"][1, 1], np.array([2.0, 0.0]))
+
+    def test_trajectory_table_csv_adapter_blocks_missing_units_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "trajectory.csv"
+            with path.open("w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["frame", "time", "particle_id", "x"])
+                writer.writeheader()
+                writer.writerows(
+                    [
+                        {"frame": 0, "time": 0.0, "particle_id": "a", "x": 0.0},
+                        {"frame": 1, "time": 1.0, "particle_id": "a", "x": 1.0},
+                    ]
+                )
+
+            adapted = trajectory_table_csv_adapter(
+                csv_path=path,
+                frame_column="frame",
+                time_column="time",
+                particle_column="particle_id",
+                coordinate_columns=["x"],
+                metadata={
+                    "box_geometry": "orthorhombic",
+                    "temperature_or_state_point": "synthetic_T_0.45",
+                    "species_labels": "A",
+                },
+            )
+
+        self.assertEqual(adapted["adapter_stage"], "metadata_incomplete_csv_adapter")
+        self.assertEqual(adapted["adapter_ready"], 0.0)
+        self.assertEqual(adapted["primary_blocker"], "units_metadata")
+        self.assertIn("units_metadata", adapted["missing_metadata_fields"])
 
     def test_trajectory_observable_uncertainty_protocol_adds_jackknife_sigmas(self):
         times = np.arange(6.0)

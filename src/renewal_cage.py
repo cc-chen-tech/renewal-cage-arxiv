@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -2761,6 +2763,81 @@ def trajectory_table_adapter(
         "dimension": float(len(coordinate_names)),
         "adapter_ready": 1.0,
     }
+
+
+def trajectory_table_csv_adapter(
+    *,
+    csv_path: object,
+    frame_column: str,
+    time_column: str,
+    particle_column: str,
+    coordinate_columns: Sequence[str],
+    metadata: dict[str, object] | None = None,
+    required_metadata_fields: Sequence[str] = (
+        "box_geometry",
+        "temperature_or_state_point",
+        "species_labels",
+        "units_metadata",
+    ),
+) -> dict[str, object]:
+    """Load a local trajectory CSV and gate metadata before observable extraction."""
+
+    path = Path(csv_path)
+    if not str(path):
+        raise ValueError("csv_path must be nonempty")
+    if not path.exists():
+        raise ValueError(f"csv_path does not exist: {path}")
+    if not required_metadata_fields:
+        raise ValueError("required_metadata_fields must be nonempty")
+    if any(not field for field in required_metadata_fields):
+        raise ValueError("required_metadata_fields must contain nonempty strings")
+
+    with path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames:
+            raise ValueError("trajectory CSV must include a header")
+        records = list(reader)
+
+    adapted = trajectory_table_adapter(
+        records=records,
+        frame_column=frame_column,
+        time_column=time_column,
+        particle_column=particle_column,
+        coordinate_columns=coordinate_columns,
+    )
+    metadata_values = dict(metadata or {})
+    required_metadata = list(dict.fromkeys(required_metadata_fields))
+    missing_metadata = [
+        field
+        for field in required_metadata
+        if field not in metadata_values or metadata_values[field] in {"", None}
+    ]
+    adapter_ready = not missing_metadata
+    stage = "local_csv_trajectory_ready" if adapter_ready else "metadata_incomplete_csv_adapter"
+    blocker = "none" if adapter_ready else missing_metadata[0]
+
+    out = dict(adapted)
+    out.update(
+        {
+            "csv_path": str(path),
+            "csv_columns": ";".join(reader.fieldnames),
+            "row_count": float(len(records)),
+            "required_metadata_fields": ";".join(required_metadata),
+            "available_metadata_fields": ";".join(
+                field for field in required_metadata if field in metadata_values and metadata_values[field] not in {"", None}
+            )
+            or "none",
+            "missing_metadata_fields": ";".join(missing_metadata) if missing_metadata else "none",
+            "box_geometry": str(metadata_values.get("box_geometry", "none")),
+            "temperature_or_state_point": str(metadata_values.get("temperature_or_state_point", "none")),
+            "species_labels": str(metadata_values.get("species_labels", "none")),
+            "units_metadata": str(metadata_values.get("units_metadata", "none")),
+            "adapter_ready": float(adapter_ready),
+            "primary_blocker": blocker,
+            "adapter_stage": stage,
+        }
+    )
+    return out
 
 
 def trajectory_observable_protocol(

@@ -1093,6 +1093,12 @@ frame--particle--coordinate tensor before the MSD, NGP, self-intermediate
 scattering, and overlap-$\chi_4$ extraction is run. This makes the remaining
 GlassBench step a concrete column/path mapping problem for an extracted archive,
 rather than an unspecified data-ingestion task.
+The file-level dry run
+\texttt{renewal\_cage\_trajectory\_csv\_adapter\_demo.csv} goes one step
+closer to that use case: the source table is first written as
+\texttt{renewal\_cage\_trajectory\_csv\_adapter\_source.csv}, then reloaded by
+path with explicit frame, time, particle, coordinate, box, state-point, species,
+and unit metadata checks before the same observable extraction is applied.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the
