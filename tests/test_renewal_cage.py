@@ -129,6 +129,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_table_adapter,
     trajectory_observable_curve_bridge,
     trajectory_curve_persistence_exchange_gate,
+    trajectory_pe_heldout_prediction_gate,
     TranslationRotationExchangeParams,
     translation_rotation_decoupling_diagnostic,
     translation_rotation_inversion_protocol,
@@ -2711,6 +2712,73 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertEqual(gate["gate_stage"], "trajectory_curve_bridge_incomplete")
         self.assertEqual(gate["trajectory_pe_protocol_ready"], 0.0)
+        self.assertEqual(gate["primary_blocker"], "alpha_threshold_crossing")
+
+    def test_trajectory_pe_heldout_prediction_gate_scores_unfitted_observables(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=7.0,
+            exchange_mean=1.0,
+        )
+        heldout_wave_number = 1.35
+        heldout_time = 120.0 * params.persistence_mean
+        pe_gate_row = {
+            "benchmark_id": "synthetic_bridge_pe_protocol_ready",
+            "gate_stage": "trajectory_persistence_exchange_protocol_ready",
+            "trajectory_pe_protocol_ready": 1.0,
+            "exchange_mean": params.exchange_mean,
+            "persistence_mean": params.persistence_mean,
+        }
+
+        gate = trajectory_pe_heldout_prediction_gate(
+            pe_gate_row=pe_gate_row,
+            jump_variance=params.jump_variance,
+            heldout_wave_number=heldout_wave_number,
+            observed_heldout_tau_alpha=persistence_exchange_alpha_relaxation_time(
+                heldout_wave_number,
+                params,
+            ),
+            heldout_tau_alpha_relative_error=0.03,
+            heldout_late_time=heldout_time,
+            observed_heldout_late_ngp=float(
+                persistence_exchange_ngp_1d(np.array([heldout_time]), params)[0]
+            ),
+            heldout_late_ngp_relative_error=0.05,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=3.0,
+        )
+
+        self.assertEqual(gate["prediction_stage"], "trajectory_pe_heldout_prediction_ready")
+        self.assertEqual(gate["heldout_prediction_ready"], 1.0)
+        self.assertEqual(gate["primary_blocker"], "none")
+        self.assertEqual(gate["heldout_predictions_pass"], 1.0)
+        self.assertLess(gate["heldout_tau_alpha_z"], 1.0)
+        self.assertLess(gate["heldout_late_ngp_z"], 1.0)
+        self.assertGreater(gate["predicted_heldout_tau_alpha"], 0.0)
+        self.assertGreater(gate["predicted_heldout_late_ngp"], 0.0)
+
+    def test_trajectory_pe_heldout_prediction_gate_blocks_incomplete_pe_gate(self):
+        gate = trajectory_pe_heldout_prediction_gate(
+            pe_gate_row={
+                "benchmark_id": "short_bridge",
+                "gate_stage": "trajectory_curve_bridge_incomplete",
+                "trajectory_pe_protocol_ready": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            },
+            jump_variance=0.7,
+            heldout_wave_number=1.35,
+            observed_heldout_tau_alpha=4.0,
+            heldout_tau_alpha_relative_error=0.03,
+            heldout_late_time=20.0,
+            observed_heldout_late_ngp=0.02,
+            heldout_late_ngp_relative_error=0.05,
+        )
+
+        self.assertEqual(gate["prediction_stage"], "trajectory_pe_gate_incomplete")
+        self.assertEqual(gate["heldout_prediction_ready"], 0.0)
         self.assertEqual(gate["primary_blocker"], "alpha_threshold_crossing")
 
     def test_trajectory_table_adapter_orders_frames_particles_and_extracts_arrays(self):

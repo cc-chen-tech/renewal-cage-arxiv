@@ -3164,6 +3164,103 @@ def trajectory_curve_persistence_exchange_gate(
     return out
 
 
+def trajectory_pe_heldout_prediction_gate(
+    *,
+    pe_gate_row: dict[str, object],
+    jump_variance: float,
+    heldout_wave_number: float,
+    observed_heldout_tau_alpha: float,
+    heldout_tau_alpha_relative_error: float,
+    heldout_late_time: float,
+    observed_heldout_late_ngp: float,
+    heldout_late_ngp_relative_error: float,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    z_threshold: float = 2.0,
+) -> dict[str, float | str]:
+    """Score held-out trajectory predictions after persistence/exchange inversion."""
+
+    benchmark_id = str(pe_gate_row.get("benchmark_id", "trajectory_pe_gate"))
+    pe_ready = float(pe_gate_row.get("trajectory_pe_protocol_ready", 0.0)) == 1.0
+    if not pe_ready:
+        blocker = str(pe_gate_row.get("primary_blocker", "trajectory_pe_protocol_ready"))
+        return {
+            "benchmark_id": benchmark_id,
+            "heldout_prediction_ready": 0.0,
+            "heldout_predictions_pass": 0.0,
+            "primary_blocker": blocker,
+            "prediction_stage": "trajectory_pe_gate_incomplete",
+        }
+    for name, value in {
+        "jump_variance": jump_variance,
+        "heldout_wave_number": heldout_wave_number,
+        "observed_heldout_tau_alpha": observed_heldout_tau_alpha,
+        "heldout_late_time": heldout_late_time,
+        "observed_heldout_late_ngp": observed_heldout_late_ngp,
+        "z_threshold": z_threshold,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    missing = [column for column in ["exchange_mean", "persistence_mean"] if column not in pe_gate_row]
+    if missing:
+        return {
+            "benchmark_id": benchmark_id,
+            "heldout_prediction_ready": 0.0,
+            "heldout_predictions_pass": 0.0,
+            "primary_blocker": missing[0],
+            "prediction_stage": "trajectory_pe_gate_incomplete",
+        }
+
+    params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=float(pe_gate_row["persistence_mean"]),
+        exchange_mean=float(pe_gate_row["exchange_mean"]),
+    )
+    predicted_tau = persistence_exchange_alpha_relaxation_time(
+        heldout_wave_number,
+        params,
+        threshold=threshold,
+    )
+    predicted_ngp = float(persistence_exchange_ngp_1d(np.array([heldout_late_time]), params)[0])
+    tau_sigma = _log_sigma_from_relative_error(
+        heldout_tau_alpha_relative_error,
+        "heldout_tau_alpha_relative_error",
+    )
+    ngp_sigma = _log_sigma_from_relative_error(
+        heldout_late_ngp_relative_error,
+        "heldout_late_ngp_relative_error",
+    )
+    tau_z = abs(math.log(observed_heldout_tau_alpha / predicted_tau)) / tau_sigma
+    ngp_z = abs(math.log(observed_heldout_late_ngp / predicted_ngp)) / ngp_sigma
+    tau_pass = tau_z <= z_threshold
+    ngp_pass = ngp_z <= z_threshold
+    predictions_pass = tau_pass and ngp_pass
+
+    return {
+        "benchmark_id": benchmark_id,
+        "heldout_wave_number": float(heldout_wave_number),
+        "observed_heldout_tau_alpha": float(observed_heldout_tau_alpha),
+        "predicted_heldout_tau_alpha": float(predicted_tau),
+        "heldout_tau_alpha_z": float(tau_z),
+        "heldout_late_time": float(heldout_late_time),
+        "observed_heldout_late_ngp": float(observed_heldout_late_ngp),
+        "predicted_heldout_late_ngp": float(predicted_ngp),
+        "heldout_late_ngp_z": float(ngp_z),
+        "z_threshold": float(z_threshold),
+        "heldout_tau_alpha_pass": float(tau_pass),
+        "heldout_late_ngp_pass": float(ngp_pass),
+        "heldout_predictions_pass": float(predictions_pass),
+        "heldout_prediction_ready": 1.0,
+        "primary_blocker": "none" if predictions_pass else "heldout_prediction_mismatch",
+        "prediction_stage": "trajectory_pe_heldout_prediction_ready"
+        if predictions_pass
+        else "trajectory_pe_heldout_prediction_failed",
+    }
+
+
 def trajectory_observable_uncertainty_protocol(
     *,
     positions: np.ndarray,

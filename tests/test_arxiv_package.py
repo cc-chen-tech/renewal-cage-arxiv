@@ -592,6 +592,25 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(blocked["trajectory_pe_protocol_ready"]), 0.0)
         self.assertEqual(blocked["primary_blocker"], "alpha_threshold_crossing")
 
+    def test_trajectory_pe_heldout_predictions_score_unfitted_observables(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_pe_heldout_predictions.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["benchmark_id"]: row for row in rows}
+        ready = by_id["synthetic_bridge_pe_protocol_ready"]
+        self.assertEqual(ready["prediction_stage"], "trajectory_pe_heldout_prediction_ready")
+        self.assertEqual(float(ready["heldout_prediction_ready"]), 1.0)
+        self.assertEqual(float(ready["heldout_predictions_pass"]), 1.0)
+        self.assertLess(float(ready["heldout_tau_alpha_z"]), 1.0)
+        self.assertLess(float(ready["heldout_late_ngp_z"]), 1.0)
+
+        blocked = by_id["synthetic_short_csv_bridge"]
+        self.assertEqual(blocked["prediction_stage"], "trajectory_pe_gate_incomplete")
+        self.assertEqual(float(blocked["heldout_prediction_ready"]), 0.0)
+        self.assertEqual(blocked["primary_blocker"], "alpha_threshold_crossing")
+
     def test_trajectory_uncertainty_protocol_exports_jackknife_sigmas(self):
         path = ROOT / "data" / "renewal_cage_trajectory_uncertainty_protocol.csv"
         self.assertTrue(path.exists())

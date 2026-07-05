@@ -1,0 +1,3 @@
+benchmark_id,heldout_wave_number,observed_heldout_tau_alpha,predicted_heldout_tau_alpha,heldout_tau_alpha_z,heldout_late_time,observed_heldout_late_ngp,predicted_heldout_late_ngp,heldout_late_ngp_z,z_threshold,heldout_tau_alpha_pass,heldout_late_ngp_pass,heldout_predictions_pass,heldout_prediction_ready,primary_blocker,prediction_stage
+synthetic_bridge_pe_protocol_ready,1.35,8.362875906858019,8.362875906858019,0.0,840.0,0.0012637173184420272,0.0012637173184420272,0.0,3.0,1.0,1.0,1.0,1.0,none,trajectory_pe_heldout_prediction_ready
+synthetic_short_csv_bridge,,,,,,,,,,,,0.0,0.0,alpha_threshold_crossing,trajectory_pe_gate_incomplete

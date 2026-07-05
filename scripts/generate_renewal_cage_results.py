@@ -116,6 +116,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_observable_uncertainty_protocol,
     trajectory_observable_curve_bridge,
     trajectory_curve_persistence_exchange_gate,
+    trajectory_pe_heldout_prediction_gate,
     trajectory_table_csv_adapter,
     trajectory_table_adapter,
     trajectory_inversion_readiness_gate,
@@ -3614,6 +3615,59 @@ def write_trajectory_curve_pe_gate_csv(
     return rows
 
 
+def write_trajectory_pe_heldout_predictions_csv(
+    path: Path,
+    pe_gate_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Score held-out trajectory predictions after persistence/exchange inversion."""
+
+    params = PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=0.2,
+        jump_variance=0.7,
+        persistence_mean=7.0,
+        exchange_mean=1.0,
+    )
+    heldout_wave_number = 1.35
+    heldout_time = 120.0 * params.persistence_mean
+    pe_by_id = {str(row["benchmark_id"]): row for row in pe_gate_rows}
+    rows = [
+        trajectory_pe_heldout_prediction_gate(
+            pe_gate_row=pe_by_id["synthetic_bridge_pe_protocol_ready"],
+            jump_variance=params.jump_variance,
+            heldout_wave_number=heldout_wave_number,
+            observed_heldout_tau_alpha=persistence_exchange_alpha_relaxation_time(
+                heldout_wave_number,
+                params,
+            ),
+            heldout_tau_alpha_relative_error=0.03,
+            heldout_late_time=heldout_time,
+            observed_heldout_late_ngp=float(
+                persistence_exchange_ngp_1d(np.array([heldout_time]), params)[0]
+            ),
+            heldout_late_ngp_relative_error=0.05,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=3.0,
+        ),
+        trajectory_pe_heldout_prediction_gate(
+            pe_gate_row=pe_by_id["synthetic_short_csv_bridge"],
+            jump_variance=params.jump_variance,
+            heldout_wave_number=heldout_wave_number,
+            observed_heldout_tau_alpha=4.0,
+            heldout_tau_alpha_relative_error=0.03,
+            heldout_late_time=heldout_time,
+            observed_heldout_late_ngp=0.02,
+            heldout_late_ngp_relative_error=0.05,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=3.0,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, float | str]]:
     """Estimate trajectory-observable uncertainties from time-origin jackknife blocks."""
 
@@ -6709,9 +6763,13 @@ def main() -> None:
         DATA_DIR / "renewal_cage_trajectory_curve_bridge.csv",
         trajectory_csv_adapter_rows,
     )
-    write_trajectory_curve_pe_gate_csv(
+    trajectory_curve_pe_gate_rows = write_trajectory_curve_pe_gate_csv(
         DATA_DIR / "renewal_cage_trajectory_curve_pe_gate.csv",
         trajectory_curve_bridge_rows,
+    )
+    write_trajectory_pe_heldout_predictions_csv(
+        DATA_DIR / "renewal_cage_trajectory_pe_heldout_predictions.csv",
+        trajectory_curve_pe_gate_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"
