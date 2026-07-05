@@ -103,6 +103,7 @@ from renewal_cage import (  # noqa: E402
     sota_archive_preflight_gate,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_glassbench_payload_index_gate,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
     sota_remote_zip_central_directory_gate,
@@ -3282,6 +3283,23 @@ def write_sota_remote_zip_central_directory_csv(path: Path) -> list[dict[str, fl
     return rows
 
 
+def write_sota_glassbench_payload_index_csv(path: Path) -> list[dict[str, float | str]]:
+    """Index GlassBench system payloads visible in the remote ZIP central directory."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "remote_zip_central_directory_10118191.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = sota_glassbench_payload_index_gate(
+        payload_index_id="glassbench_payload_index",
+        accession_id="glassbench_zenodo_10118191",
+        source_id="glassbench_zenodo_trajectory_release",
+        manifest=manifest,
+        systems=["KA", "KA2D"],
+        full_archive_cached=False,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_reanalysis_state_csv(
     path: Path,
     *,
@@ -5563,6 +5581,63 @@ def write_sota_remote_zip_central_directory_svg(path: Path, rows: list[dict[str,
     path.write_text(svg)
 
 
+def write_sota_glassbench_payload_index_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 410
+    left, top = 75, 112
+    row_h = 82
+    colors = {
+        "remote_payload_index_verified": "#2f855a",
+        "local_payload_index_ready": "#276749",
+        "remote_payload_missing_trajectory": "#c05621",
+        "remote_payload_missing_model": "#c05621",
+        "remote_payload_missing_results": "#c05621",
+        "remote_payload_temperature_mismatch": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["payload_stage"])
+        color = colors[stage]
+        payload_ready = int(float(row["payload_index_ready"]))
+        real_ready = int(float(row["real_reanalysis_ready"]))
+        traj_count = int(float(row["trajectory_payload_count"]))
+        model_count = int(float(row["model_payload_count"]))
+        result_count = int(float(row["result_curve_count"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{row["system_id"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 90}" y="{y - 4}" width="235" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 100}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:34]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 350}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">traj={traj_count}; model={model_count}; result={result_count}; index={payload_ready}; real={real_ready}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 90}" y="{y + 42}" font-family="Arial, sans-serif" font-size="9" fill="#555">common all: {row["common_temperatures"]}; model/result: {row["common_model_result_temperatures"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 90}" y="{y + 56}" font-family="Arial, sans-serif" font-size="9" fill="#555">trajectory T: {row["trajectory_temperatures"]}; model T: {row["model_temperatures"]}; result T: {row["result_temperatures"]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA GlassBench payload index</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Remote ZIP entries are converted into system-level trajectory, model, and result payload maps before any local trajectory reanalysis is claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">system</text>
+  <text x="{left + 90}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 350}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">payload counts and readiness</text>
+  {"".join(marks)}
+  <rect x="75" y="342" width="14" height="14" fill="#2f855a" /><text x="96" y="354" font-family="Arial, sans-serif" font-size="12">trajectory/model/result payload index visible remotely</text>
+  <rect x="455" y="342" width="14" height="14" fill="#c05621" /><text x="476" y="354" font-family="Arial, sans-serif" font-size="12">payload role missing from remote central directory</text>
+  <text x="795" y="354" font-family="Arial, sans-serif" font-size="12">full archive cache remains required for real fitting</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_readme_schema_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 380
@@ -6976,6 +7051,13 @@ def main() -> None:
     write_sota_remote_zip_central_directory_svg(
         FIGURE_DIR / "renewal_cage_sota_remote_zip_central_directory.svg",
         remote_zip_central_directory_rows,
+    )
+    glassbench_payload_index_rows = write_sota_glassbench_payload_index_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_payload_index.csv"
+    )
+    write_sota_glassbench_payload_index_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_payload_index.svg",
+        glassbench_payload_index_rows,
     )
     readme_digest_rows = write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"

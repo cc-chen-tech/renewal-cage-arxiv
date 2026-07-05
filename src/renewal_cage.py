@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import hashlib
 import math
 from pathlib import Path
+import re
 import zipfile
 
 import numpy as np
@@ -2547,6 +2548,139 @@ def sota_remote_zip_central_directory_gate(
         "primary_blocker": blocker,
         "remote_zip_structure_stage": stage,
     }
+
+
+def _glassbench_temperature_tokens(path: str) -> set[str]:
+    tokens = set(re.findall(r"T(\d+\.\d+)", path))
+    tokens.update(re.findall(r"times_(\d+\.\d+)", path))
+    return tokens
+
+
+def sota_glassbench_payload_index_gate(
+    *,
+    payload_index_id: str,
+    accession_id: str,
+    source_id: str,
+    manifest: dict,
+    systems: Sequence[str],
+    full_archive_cached: bool,
+) -> list[dict[str, float | str]]:
+    """Index GlassBench system payloads from a remote ZIP central-directory manifest."""
+
+    for name, value in {
+        "payload_index_id": payload_index_id,
+        "accession_id": accession_id,
+        "source_id": source_id,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    if not systems:
+        raise ValueError("systems must be nonempty")
+    if any(not system for system in systems):
+        raise ValueError("systems must contain nonempty strings")
+
+    entries_value = manifest.get("entries", [])
+    entries = [
+        str(entry).strip("/")
+        for entry in entries_value
+        if str(entry).strip("/")
+    ] if isinstance(entries_value, list) else []
+    rows: list[dict[str, float | str]] = []
+    for system in dict.fromkeys(systems):
+        trajectory_prefix = f"GlassBench/{system}_trajectories/"
+        model_prefix = f"GlassBench/{system}_models/"
+        result_prefix = f"GlassBench/{system}_results/"
+        trajectory_entries = [
+            entry
+            for entry in entries
+            if entry.startswith(trajectory_prefix)
+            and (entry.endswith(".tar.xz") or entry.endswith(".tar.gz") or entry.endswith(".zip"))
+        ]
+        model_entries = [
+            entry
+            for entry in entries
+            if entry.startswith(model_prefix)
+            and (entry.endswith(".tar.gz") or entry.endswith(".tar.xz") or entry.endswith(".zip"))
+        ]
+        result_entries = [
+            entry
+            for entry in entries
+            if entry.startswith(result_prefix)
+            and (entry.endswith(".dat") or entry.endswith(".g") or entry.endswith(".csv"))
+        ]
+        trajectory_temperatures = sorted(
+            {token for entry in trajectory_entries for token in _glassbench_temperature_tokens(entry)},
+            key=float,
+        )
+        model_temperatures = sorted(
+            {token for entry in model_entries for token in _glassbench_temperature_tokens(entry)},
+            key=float,
+        )
+        result_temperatures = sorted(
+            {token for entry in result_entries for token in _glassbench_temperature_tokens(entry)},
+            key=float,
+        )
+        common_temperatures = sorted(
+            set(trajectory_temperatures) & set(model_temperatures) & set(result_temperatures),
+            key=float,
+        )
+        common_model_result_temperatures = sorted(
+            set(model_temperatures) & set(result_temperatures),
+            key=float,
+        )
+        has_trajectory = bool(trajectory_entries)
+        has_model = bool(model_entries)
+        has_result = bool(result_entries)
+        payload_ready = has_trajectory and has_model and has_result and bool(common_temperatures)
+        model_result_ready = has_model and has_result and bool(common_model_result_temperatures)
+
+        if payload_ready and full_archive_cached:
+            stage = "local_payload_index_ready"
+            blocker = "local_adapter"
+        elif payload_ready:
+            stage = "remote_payload_index_verified"
+            blocker = "archive_cache"
+        elif not has_trajectory:
+            stage = "remote_payload_missing_trajectory"
+            blocker = "trajectory_payload"
+        elif not has_model:
+            stage = "remote_payload_missing_model"
+            blocker = "model_payload"
+        elif not has_result:
+            stage = "remote_payload_missing_results"
+            blocker = "result_curves"
+        else:
+            stage = "remote_payload_temperature_mismatch"
+            blocker = "temperature_grid"
+
+        rows.append(
+            {
+                "payload_index_id": f"{payload_index_id}_{system.lower()}",
+                "accession_id": accession_id,
+                "source_id": source_id,
+                "system_id": system,
+                "trajectory_payload_count": float(len(trajectory_entries)),
+                "model_payload_count": float(len(model_entries)),
+                "result_curve_count": float(len(result_entries)),
+                "trajectory_temperatures": ";".join(trajectory_temperatures)
+                if trajectory_temperatures
+                else "none",
+                "model_temperatures": ";".join(model_temperatures) if model_temperatures else "none",
+                "result_temperatures": ";".join(result_temperatures) if result_temperatures else "none",
+                "common_temperatures": ";".join(common_temperatures) if common_temperatures else "none",
+                "common_temperature_count": float(len(common_temperatures)),
+                "common_model_result_temperatures": ";".join(common_model_result_temperatures)
+                if common_model_result_temperatures
+                else "none",
+                "model_result_index_ready": float(model_result_ready),
+                "full_archive_cached": float(full_archive_cached),
+                "payload_index_ready": float(payload_ready),
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": blocker,
+                "payload_stage": stage,
+            }
+        )
+    return rows
 
 
 def sota_reanalysis_state_gate(

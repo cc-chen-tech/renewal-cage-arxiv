@@ -146,6 +146,11 @@ official GlassBench archive to verify the real ZIP64 entry roots
 `GlassBench/KA2D_trajectories`, `GlassBench/KA2D_models`, and
 `GlassBench/KA2D_results` without treating that as completed trajectory
 reanalysis.
+The GlassBench payload-index gate then maps those entries to concrete system
+targets: KA2D has common trajectory/model/result payload temperatures
+`0.23;0.30`, while KA has model/result temperatures `0.44;0.50;0.56;0.64`
+but no remote trajectory payload beyond the README in the central-directory
+cache.
 The SOTA README-schema gate checks systems, folder tokens, reuse license, and
 citation guidance before claiming that a remote dataset can support a local
 trajectory adapter.
@@ -232,6 +237,7 @@ figures/renewal_cage_sota_source_provenance.svg
 figures/renewal_cage_sota_data_accession.svg
 figures/renewal_cage_sota_zenodo_record_fingerprint.svg
 figures/renewal_cage_sota_remote_zip_central_directory.svg
+figures/renewal_cage_sota_glassbench_payload_index.svg
 figures/renewal_cage_sota_readme_schema.svg
 figures/renewal_cage_trajectory_adapter_contract.svg
 figures/renewal_cage_literature_inversion_readiness.svg
@@ -288,6 +294,7 @@ data/renewal_cage_sota_data_accession.csv
 data/renewal_cage_sota_zenodo_record_fingerprint.csv
 data/renewal_cage_sota_archive_preflight.csv
 data/renewal_cage_sota_remote_zip_central_directory.csv
+data/renewal_cage_sota_glassbench_payload_index.csv
 data/renewal_cage_sota_readme_digest.csv
 data/third_party/glassbench/zenodo_record_10118191.json
 data/third_party/glassbench/remote_zip_central_directory_10118191.json
@@ -354,6 +361,7 @@ paper/figures/renewal_cage_sota_source_provenance.pdf
 paper/figures/renewal_cage_sota_data_accession.pdf
 paper/figures/renewal_cage_sota_zenodo_record_fingerprint.pdf
 paper/figures/renewal_cage_sota_remote_zip_central_directory.pdf
+paper/figures/renewal_cage_sota_glassbench_payload_index.pdf
 paper/figures/renewal_cage_sota_readme_schema.pdf
 paper/figures/renewal_cage_trajectory_adapter_contract.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf

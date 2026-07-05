@@ -1128,6 +1128,17 @@ entries, and the verified roots are the actual archive paths
 \texttt{GlassBench/KA2D\_results}. This verifies remote archive structure, but
 the row still has \texttt{real\_reanalysis\_ready=0} because the coordinate
 payloads are not cached locally.
+The payload-index table
+\texttt{renewal\_cage\_sota\_glassbench\_payload\_index.csv} then converts
+those central-directory entries into system-level reanalysis targets. KA2D has
+remote trajectory archives, model archives, and result curves at common
+temperatures \texttt{0.23} and \texttt{0.30}, so it is the first concrete
+GlassBench trajectory-reanalysis candidate once the archive is cached. KA has
+model and result entries at \texttt{0.44}, \texttt{0.50}, \texttt{0.56}, and
+\texttt{0.64}, including a \texttt{chi4} result file, but the remote central
+directory does not expose a KA trajectory payload beyond the README. The KA row
+is therefore useful for model/result metadata planning but remains blocked by
+\texttt{trajectory\_payload} for trajectory-level inversion.
 The reanalysis-state ledger
 \texttt{renewal\_cage\_sota\_reanalysis\_state.csv} collapses these gates into
 a single claim boundary. The current GlassBench row has
@@ -1507,6 +1518,16 @@ rejected without refitting the clocks.
   the public GlassBench ZIP64 archive exposes KA and KA2D trajectory, model,
   and result roots without downloading the full 6.04 GB payload; local
   trajectory reanalysis remains blocked until those payloads are cached.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_payload_index.pdf}
+  \caption{SOTA GlassBench payload index. Remote central-directory entries are
+  converted into system-level trajectory, model, and result payload maps. KA2D
+  has common trajectory/model/result temperatures and becomes the first cached
+  trajectory-reanalysis target; KA currently has model/result temperatures but
+  remains blocked by the missing remote trajectory payload.}
 \end{figure}
 
 \begin{figure}[p]

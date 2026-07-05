@@ -119,6 +119,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_verdict,
     sota_local_cache_verification_gate,
     sota_readme_digest_gate,
+    sota_glassbench_payload_index_gate,
     sota_remote_zip_central_directory_gate,
     sota_zenodo_record_fingerprint_gate,
     sota_readme_schema_gate,
@@ -2306,6 +2307,58 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["full_archive_cached"], 0.0)
         self.assertEqual(row["real_reanalysis_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "archive_cache")
+
+    def test_sota_glassbench_payload_index_maps_system_temperatures_without_reanalysis(self):
+        manifest = {
+            "entries": [
+                "GlassBench/KA_results/times_0.44.dat",
+                "GlassBench/KA_results/times_0.50.dat",
+                "GlassBench/KA_results/times_0.56.dat",
+                "GlassBench/KA_results/times_0.64.dat",
+                "GlassBench/KA_results/chi4_KA_T0.44_update.dat",
+                "GlassBench/KA_trajectories/README",
+                "GlassBench/KA_models/T0.44.tar.gz",
+                "GlassBench/KA_models/T0.50.tar.gz",
+                "GlassBench/KA_models/T0.56.tar.gz",
+                "GlassBench/KA_models/T0.64.tar.gz",
+                "GlassBench/KA2D_results/times_0.23.dat",
+                "GlassBench/KA2D_results/times_0.30.dat",
+                "GlassBench/KA2D_results/rhomax_T0.30_MD.dat",
+                "GlassBench/KA2D_results/rhomax_T0.30_BB.dat",
+                "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "GlassBench/KA2D_models/T0.23.tar.gz",
+                "GlassBench/KA2D_models/T0.30.tar.gz",
+            ],
+        }
+
+        rows = sota_glassbench_payload_index_gate(
+            payload_index_id="glassbench_payload_index",
+            accession_id="glassbench_zenodo_10118191",
+            source_id="glassbench_zenodo_trajectory_release",
+            manifest=manifest,
+            systems=["KA", "KA2D"],
+            full_archive_cached=False,
+        )
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["payload_stage"], "remote_payload_index_verified")
+        self.assertEqual(ka2d["payload_index_ready"], 1.0)
+        self.assertEqual(ka2d["trajectory_payload_count"], 2.0)
+        self.assertEqual(ka2d["model_payload_count"], 2.0)
+        self.assertEqual(ka2d["result_curve_count"], 4.0)
+        self.assertEqual(ka2d["common_temperatures"], "0.23;0.30")
+        self.assertEqual(ka2d["real_reanalysis_ready"], 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "archive_cache")
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["payload_stage"], "remote_payload_missing_trajectory")
+        self.assertEqual(ka["payload_index_ready"], 0.0)
+        self.assertEqual(ka["trajectory_payload_count"], 0.0)
+        self.assertEqual(ka["model_result_index_ready"], 1.0)
+        self.assertEqual(ka["common_model_result_temperatures"], "0.44;0.50;0.56;0.64")
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
     def test_sota_reanalysis_state_gate_marks_metadata_verified_not_reanalysis(self):
         row = sota_reanalysis_state_gate(

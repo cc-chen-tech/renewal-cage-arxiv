@@ -490,6 +490,31 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(glassbench["real_reanalysis_ready"]), 0.0)
         self.assertEqual(glassbench["primary_blocker"], "archive_cache")
 
+    def test_sota_glassbench_payload_index_maps_remote_system_payloads(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_payload_index.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_system = {row["system_id"]: row for row in rows}
+        ka2d = by_system["KA2D"]
+        self.assertEqual(ka2d["payload_stage"], "remote_payload_index_verified")
+        self.assertEqual(float(ka2d["payload_index_ready"]), 1.0)
+        self.assertEqual(float(ka2d["trajectory_payload_count"]), 2.0)
+        self.assertEqual(float(ka2d["model_payload_count"]), 2.0)
+        self.assertIn("0.23", ka2d["common_temperatures"])
+        self.assertIn("0.30", ka2d["common_temperatures"])
+        self.assertEqual(float(ka2d["real_reanalysis_ready"]), 0.0)
+        self.assertEqual(ka2d["primary_blocker"], "archive_cache")
+
+        ka = by_system["KA"]
+        self.assertEqual(ka["payload_stage"], "remote_payload_missing_trajectory")
+        self.assertEqual(float(ka["payload_index_ready"]), 0.0)
+        self.assertEqual(float(ka["model_result_index_ready"]), 1.0)
+        self.assertEqual(float(ka["trajectory_payload_count"]), 0.0)
+        self.assertIn("0.44", ka["common_model_result_temperatures"])
+        self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
     def test_sota_reanalysis_state_summarizes_current_glassbench_blocker(self):
         path = ROOT / "data" / "renewal_cage_sota_reanalysis_state.csv"
         self.assertTrue(path.exists())
@@ -919,6 +944,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_data_accession.pdf", names)
             self.assertIn("figures/renewal_cage_sota_zenodo_record_fingerprint.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_zip_central_directory.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", names)
             self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
@@ -962,6 +988,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_data_accession.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_zenodo_record_fingerprint.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_zip_central_directory.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_payload_index.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", main_tex)
         self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
@@ -988,6 +1015,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_data_accession.pdf",
             "figures/renewal_cage_sota_zenodo_record_fingerprint.pdf",
             "figures/renewal_cage_sota_remote_zip_central_directory.pdf",
+            "figures/renewal_cage_sota_glassbench_payload_index.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
@@ -1118,6 +1146,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_sota_remote_zip_central_directory = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_zip_central_directory.pdf"
             ).read_bytes()
+            first_sota_glassbench_payload_index = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_payload_index.pdf"
+            ).read_bytes()
             first_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1235,6 +1266,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_remote_zip_central_directory = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_remote_zip_central_directory.pdf"
             ).read_bytes()
+            second_sota_glassbench_payload_index = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_glassbench_payload_index.pdf"
+            ).read_bytes()
             second_sota_readme_schema = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_readme_schema.pdf"
             ).read_bytes()
@@ -1318,6 +1352,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_data_accession, second_sota_data_accession)
         self.assertEqual(first_sota_zenodo_record_fingerprint, second_sota_zenodo_record_fingerprint)
         self.assertEqual(first_sota_remote_zip_central_directory, second_sota_remote_zip_central_directory)
+        self.assertEqual(first_sota_glassbench_payload_index, second_sota_glassbench_payload_index)
         self.assertEqual(first_sota_readme_schema, second_sota_readme_schema)
         self.assertEqual(first_trajectory_adapter_contract, second_trajectory_adapter_contract)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
