@@ -1,0 +1,3 @@
+scenario,true_persistence_exchange_ratio,inferred_persistence_exchange_ratio,observed_chi4_peak,predicted_chi4_peak,chi4_peak_log_residual,max_multik_tau_alpha_z,late_ngp_z,chi4_peak_z,z_threshold,multik_tau_alpha_z_consistent,late_ngp_z_consistent,chi4_peak_z_consistent,passes_uncertainty_protocol
+consistent,8.0,7.999999999999998,0.17979117201156522,0.17979117201156522,0.0,0.0,0.0,0.0,2.0,1.0,1.0,1.0,1.0
+chi4_peak_mismatch,8.0,7.999999999999998,0.35958234402313044,0.17979117201156522,0.6931471805599453,0.0,0.0,7.2725408973417185,2.0,1.0,1.0,0.0,0.0

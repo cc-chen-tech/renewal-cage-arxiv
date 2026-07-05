@@ -77,6 +77,7 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_count_pgf,
     persistence_exchange_count_moments,
     persistence_exchange_diffusion_coefficient,
+    persistence_exchange_data_protocol,
     persistence_exchange_joint_diagnostic,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
@@ -2020,6 +2021,88 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(diagnostic["max_multik_tau_alpha_abs_log_residual"], 0.02)
         self.assertEqual(diagnostic["multik_tau_alpha_consistent"], 0.0)
         self.assertEqual(diagnostic["passes_joint_protocol"], 0.0)
+
+    def test_persistence_exchange_data_protocol_scores_uncertainty_weighted_observables(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        observed_tau_alpha = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        time_grid = np.geomspace(0.05, 300.0, 260)
+        observed_chi4_peak = float(np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, params)))
+        late_time = 80.0 * params.persistence_mean
+
+        scored = persistence_exchange_data_protocol(
+            anchor_wave_number=1.1,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=observed_tau_alpha,
+            tau_alpha_relative_error_by_k={wave_number: 0.05 for wave_number in wave_numbers},
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            late_time=late_time,
+            observed_late_ngp=float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0]),
+            late_ngp_relative_error=0.08,
+            observed_chi4_peak=observed_chi4_peak,
+            chi4_peak_relative_error=0.1,
+            time_grid=time_grid,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=2.0,
+        )
+
+        self.assertLess(scored["max_multik_tau_alpha_z"], 1e-8)
+        self.assertLess(scored["late_ngp_z"], 1e-8)
+        self.assertLess(scored["chi4_peak_z"], 1e-8)
+        self.assertEqual(scored["multik_tau_alpha_z_consistent"], 1.0)
+        self.assertEqual(scored["late_ngp_z_consistent"], 1.0)
+        self.assertEqual(scored["chi4_peak_z_consistent"], 1.0)
+        self.assertEqual(scored["passes_uncertainty_protocol"], 1.0)
+
+    def test_persistence_exchange_data_protocol_rejects_chi4_mismatch_beyond_uncertainty(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        observed_tau_alpha = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        time_grid = np.geomspace(0.05, 300.0, 260)
+        predicted_chi4_peak = float(np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, params)))
+        late_time = 80.0 * params.persistence_mean
+
+        scored = persistence_exchange_data_protocol(
+            anchor_wave_number=1.1,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=observed_tau_alpha,
+            tau_alpha_relative_error_by_k={wave_number: 0.05 for wave_number in wave_numbers},
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            late_time=late_time,
+            observed_late_ngp=float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0]),
+            late_ngp_relative_error=0.08,
+            observed_chi4_peak=2.0 * predicted_chi4_peak,
+            chi4_peak_relative_error=0.1,
+            time_grid=time_grid,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=2.0,
+        )
+
+        self.assertGreater(scored["chi4_peak_z"], 2.0)
+        self.assertEqual(scored["chi4_peak_z_consistent"], 0.0)
+        self.assertEqual(scored["passes_uncertainty_protocol"], 0.0)
 
     def test_persistence_exchange_long_time_ngp_recovers_to_zero(self):
         params = PersistenceExchangeParams(

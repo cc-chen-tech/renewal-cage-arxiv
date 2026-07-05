@@ -721,6 +721,74 @@ def write_persistence_exchange_joint_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_persistence_exchange_uncertainty_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    scenarios = [row["scenario"].replace("_", " ") for row in rows]
+    z_threshold = float(rows[0]["z_threshold"])
+    z_values = np.array(
+        [
+            [float(row["max_multik_tau_alpha_z"]), float(row["late_ngp_z"]), float(row["chi4_peak_z"])]
+            for row in rows
+        ]
+    )
+    z_max = max(float(np.max(z_values)), z_threshold) * 1.12
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Uncertainty-weighted data protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "Observed alpha times, late NGP, and chi4 peak are scored by log-residual z scores.")
+
+    left, bottom, width, height = 65.0, 140.0, 680.0, 300.0
+    c.setStrokeColor(colors.black)
+    c.line(left, bottom, left + width, bottom)
+    c.line(left, bottom, left, bottom + height)
+
+    def y(value: float) -> float:
+        return bottom + value / z_max * height
+
+    c.setStrokeColor(colors.grey)
+    c.setDash(4, 3)
+    c.line(left, y(z_threshold), left + width, y(z_threshold))
+    c.setDash()
+    c.setFont("Helvetica", 7)
+    c.drawString(left + width - 46, y(z_threshold) + 4, f"z={z_threshold:g}")
+
+    x_groups = np.linspace(left + 170, left + width - 170, len(rows))
+    offsets = [-20, 0, 20]
+    labels = ["multi-k", "late NGP", "chi4"]
+    color_list = [colors.HexColor("#2b6cb0"), colors.HexColor("#2f855a"), colors.HexColor("#c05621")]
+    for idx, scenario in enumerate(scenarios):
+        for jdx, label in enumerate(labels):
+            value = z_values[idx, jdx]
+            x = float(x_groups[idx] + offsets[jdx])
+            c.setFillColor(color_list[jdx])
+            c.rect(x - 7, y(value), 14, bottom - y(value), fill=1, stroke=0)
+            c.setFont("Helvetica", 6)
+            c.drawCentredString(x, bottom - 42 - 11 * jdx, label)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(float(x_groups[idx]), bottom - 24, scenario)
+
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    consistent = rows[0]
+    mismatch = rows[1]
+    c.drawString(
+        65,
+        82,
+        "consistent: "
+        f"max z={max(float(consistent['max_multik_tau_alpha_z']), float(consistent['late_ngp_z']), float(consistent['chi4_peak_z'])):.2g}; "
+        "chi4 mismatch: "
+        f"z={float(mismatch['chi4_peak_z']):.2f}",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_glass_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_glass_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1514,6 +1582,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     persistence_exchange_joint_protocol_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange_joint_protocol.pdf"
     )
+    persistence_exchange_uncertainty_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.pdf"
+    )
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
@@ -1536,6 +1607,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_persistence_exchange_pdf(persistence_exchange_pdf)
     write_persistence_exchange_protocol_pdf(persistence_exchange_protocol_pdf)
     write_persistence_exchange_joint_protocol_pdf(persistence_exchange_joint_protocol_pdf)
+    write_persistence_exchange_uncertainty_protocol_pdf(persistence_exchange_uncertainty_protocol_pdf)
     write_glass_audit_pdf(glass_audit_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_spatial_chi4_pdf(spatial_chi4_pdf)
@@ -1565,6 +1637,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             persistence_exchange_joint_protocol_pdf,
             "figures/renewal_cage_persistence_exchange_joint_protocol.pdf",
+        )
+        archive.write(
+            persistence_exchange_uncertainty_protocol_pdf,
+            "figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf",
         )
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")

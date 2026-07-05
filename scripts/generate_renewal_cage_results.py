@@ -66,11 +66,13 @@ from renewal_cage import (  # noqa: E402
     peak_relaxation_coupling,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_benchmark_consistency,
+    persistence_exchange_data_protocol,
     persistence_exchange_diffusion_coefficient,
     persistence_exchange_joint_diagnostic,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
+    persistence_exchange_scattering_susceptibility,
     PersistenceExchangeParams,
     radial_van_hove_3d,
     renewal_scattering_susceptibility,
@@ -671,6 +673,78 @@ def write_persistence_exchange_joint_protocol_csv(
                     "tau_alpha_log_residual": math.log(tau_by_k[wave_number] / predicted_tau),
                 }
             )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_persistence_exchange_uncertainty_protocol_csv(
+    path: Path,
+    *,
+    anchor_wave_number: float,
+    wave_numbers: list[float],
+    jump_variance: float,
+    exchange_mean: float,
+    true_ratio: float,
+) -> list[dict[str, float | str]]:
+    params = PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=0.2,
+        jump_variance=jump_variance,
+        persistence_mean=true_ratio * exchange_mean,
+        exchange_mean=exchange_mean,
+    )
+    diffusion = persistence_exchange_diffusion_coefficient(params)
+    late_time = 80.0 * params.persistence_mean
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    observed_tau_alpha = {
+        wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+        for wave_number in wave_numbers
+    }
+    time_grid = np.geomspace(0.05, 300.0, 260)
+    predicted_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(anchor_wave_number, time_grid, params))
+    )
+    scenarios = [
+        ("consistent", predicted_chi4_peak),
+        ("chi4_peak_mismatch", 2.0 * predicted_chi4_peak),
+    ]
+    rows: list[dict[str, float | str]] = []
+    for scenario, observed_chi4_peak in scenarios:
+        scored = persistence_exchange_data_protocol(
+            anchor_wave_number=anchor_wave_number,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=observed_tau_alpha,
+            tau_alpha_relative_error_by_k={wave_number: 0.05 for wave_number in wave_numbers},
+            jump_variance=jump_variance,
+            diffusion_coefficient=diffusion,
+            late_time=late_time,
+            observed_late_ngp=observed_late_ngp,
+            late_ngp_relative_error=0.08,
+            observed_chi4_peak=observed_chi4_peak,
+            chi4_peak_relative_error=0.1,
+            time_grid=time_grid,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=2.0,
+        )
+        rows.append(
+            {
+                "scenario": scenario,
+                "true_persistence_exchange_ratio": true_ratio,
+                "inferred_persistence_exchange_ratio": scored["persistence_exchange_ratio"],
+                "observed_chi4_peak": observed_chi4_peak,
+                "predicted_chi4_peak": scored["predicted_chi4_peak"],
+                "chi4_peak_log_residual": scored["chi4_peak_log_residual"],
+                "max_multik_tau_alpha_z": scored["max_multik_tau_alpha_z"],
+                "late_ngp_z": scored["late_ngp_z"],
+                "chi4_peak_z": scored["chi4_peak_z"],
+                "z_threshold": scored["z_threshold"],
+                "multik_tau_alpha_z_consistent": scored["multik_tau_alpha_z_consistent"],
+                "late_ngp_z_consistent": scored["late_ngp_z_consistent"],
+                "chi4_peak_z_consistent": scored["chi4_peak_z_consistent"],
+                "passes_uncertainty_protocol": scored["passes_uncertainty_protocol"],
+            }
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -2766,6 +2840,57 @@ def write_persistence_exchange_joint_protocol_svg(path: Path, rows: list[dict[st
     path.write_text(svg)
 
 
+def write_persistence_exchange_uncertainty_protocol_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left, top, right, bottom = 90, 95, 1035, 425
+    scenarios = [str(row["scenario"]) for row in rows]
+    z_threshold = float(rows[0]["z_threshold"])
+    z_values = np.array(
+        [
+            [float(row["max_multik_tau_alpha_z"]), float(row["late_ngp_z"]), float(row["chi4_peak_z"])]
+            for row in rows
+        ]
+    )
+    z_max = max(float(np.max(z_values)), z_threshold) * 1.12
+
+    def y(value: float) -> float:
+        return bottom + value * (top - bottom) / z_max
+
+    x_groups = np.linspace(left + 170, right - 170, len(rows))
+    offsets = [-34, 0, 34]
+    colors = ["#2b6cb0", "#2f855a", "#c05621"]
+    labels = ["multi-k alpha", "late NGP", "chi4 peak"]
+    marks = []
+    for idx, row in enumerate(rows):
+        for jdx, label in enumerate(labels):
+            value = z_values[idx, jdx]
+            color = colors[jdx]
+            marks.append(
+                f'<rect x="{x_groups[idx] + offsets[jdx] - 12:.1f}" y="{y(value):.1f}" width="24" height="{bottom - y(value):.1f}" fill="{color}" />'
+            )
+            marks.append(
+                f'<text x="{x_groups[idx] + offsets[jdx] - 14:.1f}" y="{bottom + 50 + jdx * 16}" font-family="Arial, sans-serif" font-size="10" fill="{color}">{label}</text>'
+            )
+        marks.append(
+            f'<text x="{x_groups[idx] - 60:.1f}" y="{bottom + 34}" font-family="Arial, sans-serif" font-size="12">{scenarios[idx].replace("_", " ")}</text>'
+        )
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Uncertainty-weighted data protocol</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Observed alpha times, late NGP, and chi4 peak are scored by log-residual z scores.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="38" y="285" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 38 285)">absolute z score</text>
+  <line x1="{left}" y1="{y(z_threshold):.1f}" x2="{right}" y2="{y(z_threshold):.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{right - 82}" y="{y(z_threshold) - 8:.1f}" font-family="Arial, sans-serif" font-size="12" fill="#718096">z={z_threshold:g}</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -3416,6 +3541,18 @@ def main() -> None:
     write_persistence_exchange_joint_protocol_svg(
         FIGURE_DIR / "renewal_cage_persistence_exchange_joint_protocol.svg",
         persistence_exchange_joint_protocol_rows,
+    )
+    persistence_exchange_uncertainty_protocol_rows = write_persistence_exchange_uncertainty_protocol_csv(
+        DATA_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.csv",
+        anchor_wave_number=1.1,
+        wave_numbers=[0.7, 1.1, 1.6],
+        jump_variance=0.7,
+        exchange_mean=1.0,
+        true_ratio=8.0,
+    )
+    write_persistence_exchange_uncertainty_protocol_svg(
+        FIGURE_DIR / "renewal_cage_persistence_exchange_uncertainty_protocol.svg",
+        persistence_exchange_uncertainty_protocol_rows,
     )
 
     barrier = ActivatedBarrierParams(

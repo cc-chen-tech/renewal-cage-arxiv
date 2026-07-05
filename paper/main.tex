@@ -910,6 +910,10 @@ Stokes-Einstein product grows by a factor $3.56$ over the Poisson baseline, and
 the single-domain $\chi_4$ proxy grows by a factor $2.58$. Deliberately
 changing only the $k=1.6$ alpha time fails the multi-$k$ residual threshold,
 giving a direct falsification mode for future trajectory-level inversions.
+Adding $5\%$ alpha-time errors, an $8\%$ late-NGP error, and a $10\%$
+$\chi_4$-peak error turns the same protocol into a $z$-score test: the
+consistent case has negligible $z$ scores, while doubling only the observed
+$\chi_4$ peak gives $z=7.27$ and fails a $z<2$ criterion.
 
 The generated file \texttt{renewal\_cage\_sota\_comparison.csv} records a
 scope audit against representative experimental and simulation benchmarks.
@@ -1029,6 +1033,15 @@ model-versus-benchmark rows.
   and long-time diffusion infer the hidden clocks. The multi-$k$ alpha times,
   late NGP, and $\chi_4$ proxy are then held-out checks; the mismatched
   multi-$k$ case fails without refitting the clocks.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf}
+  \caption{Uncertainty-weighted persistence-exchange data protocol. Log
+  residuals for multi-$k$ alpha times, late NGP, and the $\chi_4$ peak are
+  divided by measurement-error estimates to give directly falsifiable
+  $z$-scores.}
 \end{figure}
 
 \begin{figure}[h]

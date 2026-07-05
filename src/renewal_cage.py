@@ -1498,6 +1498,106 @@ def persistence_exchange_joint_diagnostic(
     }
 
 
+def _log_sigma_from_relative_error(relative_error: float, name: str) -> float:
+    if relative_error <= 0.0:
+        raise ValueError(f"{name} must be positive")
+    return math.log1p(relative_error)
+
+
+def persistence_exchange_data_protocol(
+    *,
+    anchor_wave_number: float,
+    wave_numbers: list[float],
+    observed_tau_alpha_by_k: dict[float, float],
+    tau_alpha_relative_error_by_k: dict[float, float],
+    jump_variance: float,
+    diffusion_coefficient: float,
+    late_time: float,
+    observed_late_ngp: float,
+    late_ngp_relative_error: float,
+    observed_chi4_peak: float,
+    chi4_peak_relative_error: float,
+    time_grid: np.ndarray,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    z_threshold: float = 2.0,
+) -> dict[str, float]:
+    """Score a joint persistence/exchange inversion with measurement errors."""
+
+    if observed_chi4_peak <= 0.0:
+        raise ValueError("observed_chi4_peak must be positive")
+    if z_threshold <= 0.0:
+        raise ValueError("z_threshold must be positive")
+    if not wave_numbers:
+        raise ValueError("wave_numbers must be nonempty")
+    for wave_number in wave_numbers:
+        if wave_number not in tau_alpha_relative_error_by_k:
+            raise ValueError("tau_alpha_relative_error_by_k must include every wave number")
+        _log_sigma_from_relative_error(tau_alpha_relative_error_by_k[wave_number], "tau alpha relative errors")
+    late_ngp_sigma = _log_sigma_from_relative_error(late_ngp_relative_error, "late_ngp_relative_error")
+    chi4_sigma = _log_sigma_from_relative_error(chi4_peak_relative_error, "chi4_peak_relative_error")
+
+    base = persistence_exchange_joint_diagnostic(
+        anchor_wave_number=anchor_wave_number,
+        wave_numbers=wave_numbers,
+        observed_tau_alpha_by_k=observed_tau_alpha_by_k,
+        jump_variance=jump_variance,
+        diffusion_coefficient=diffusion_coefficient,
+        late_time=late_time,
+        observed_late_ngp=observed_late_ngp,
+        time_grid=time_grid,
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        threshold=threshold,
+    )
+    params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=base["persistence_mean"],
+        exchange_mean=base["exchange_mean"],
+    )
+
+    max_tau_z = 0.0
+    for wave_number in wave_numbers:
+        predicted_tau = persistence_exchange_alpha_relaxation_time(
+            wave_number,
+            params,
+            threshold=threshold,
+        )
+        residual = math.log(observed_tau_alpha_by_k[wave_number] / predicted_tau)
+        sigma = _log_sigma_from_relative_error(
+            tau_alpha_relative_error_by_k[wave_number],
+            "tau alpha relative errors",
+        )
+        max_tau_z = max(max_tau_z, abs(residual) / sigma)
+
+    late_ngp_z = abs(base["late_ngp_log_residual"]) / late_ngp_sigma
+    chi4_log_residual = math.log(observed_chi4_peak / base["chi4_peak"])
+    chi4_z = abs(chi4_log_residual) / chi4_sigma
+    multik_flag = max_tau_z <= z_threshold
+    late_flag = late_ngp_z <= z_threshold
+    chi4_flag = chi4_z <= z_threshold
+    out = dict(base)
+    out.update(
+        {
+            "observed_chi4_peak": observed_chi4_peak,
+            "predicted_chi4_peak": base["chi4_peak"],
+            "chi4_peak_log_residual": chi4_log_residual,
+            "max_multik_tau_alpha_z": max_tau_z,
+            "late_ngp_z": late_ngp_z,
+            "chi4_peak_z": chi4_z,
+            "z_threshold": z_threshold,
+            "multik_tau_alpha_z_consistent": float(multik_flag),
+            "late_ngp_z_consistent": float(late_flag),
+            "chi4_peak_z_consistent": float(chi4_flag),
+            "passes_uncertainty_protocol": float(multik_flag and late_flag and chi4_flag),
+        }
+    )
+    return out
+
+
 def persistence_exchange_scan(
     *,
     ratios: list[float],
