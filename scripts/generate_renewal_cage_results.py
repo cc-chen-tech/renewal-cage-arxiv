@@ -63,6 +63,7 @@ from renewal_cage import (  # noqa: E402
     radial_van_hove_3d,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
+    spatial_facilitation_chi4_scan,
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
@@ -659,6 +660,26 @@ def write_chi4_bridge_csv(
     return inferred
 
 
+def write_spatial_chi4_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    law: TemperatureLawParams,
+    *,
+    wave_number: float,
+    facilitation_diffusivity: float,
+    particle_density: float,
+) -> list[dict[str, float]]:
+    rows = spatial_facilitation_chi4_scan(
+        temperatures=temperatures,
+        law=law,
+        wave_number=wave_number,
+        facilitation_diffusivity=facilitation_diffusivity,
+        particle_density=particle_density,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_heterogeneity_csv(
     path: Path,
     time: np.ndarray,
@@ -1209,9 +1230,9 @@ def write_sota_comparison_csv(path: Path) -> list[dict[str, float | str]]:
             "phenomenon": "spatial_chi4_length",
             "benchmark_observable": "four-point susceptibility and dynamic correlation length grow",
             "benchmark_source": "lacevic2003fourpoint;berthier2011theoretical;berthier2024experimental",
-            "model_prediction": "renewal-count susceptibility maps to chi4 through external N_corr",
-            "model_status": "proxy_only",
-            "next_gap": "derive spatial facilitation fronts and chi4 length internally",
+            "model_prediction": "diffusive facilitation front maps persistence time to xi4 and N_corr",
+            "model_status": "partial",
+            "next_gap": "replace the compact-domain closure by a full spatial four-point field theory",
         },
         {
             "phenomenon": "mct_beta_relaxation",
@@ -1766,6 +1787,54 @@ def write_glass_phase_diagram_svg(path: Path, rows: list[dict[str, float]]) -> N
   <text x="18" y="315" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 18 315)">delay barrier gap</text>
   {mini_plot("cold_se_product_ratio", 140, "B. Cold SE product at largest delay gap", max_se, "#2b6cb0")}
   {mini_plot("cold_heterogeneity_growth_ratio", 360, "C. Heterogeneity growth at largest delay gap", max_het, "#c05621")}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_spatial_chi4_svg(path: Path, rows: list[dict[str, float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left_a, top, right_a, bottom = 75, 90, 520, 430
+    left_b, right_b = 660, 1040
+    inverse_shift = np.array([1.0 / row["temperature"] - 1.0 / rows[0]["temperature"] for row in rows])
+    length_growth = np.array([row["length_growth"] for row in rows])
+    size_growth = np.array([row["correlation_size_growth"] for row in rows])
+    chi4_growth = np.array([row["chi4_peak_growth"] for row in rows])
+    peak_times = np.array([row["chi4_peak_time"] for row in rows])
+    tau_alpha = np.array([row["tau_alpha"] for row in rows])
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 76}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    def plot(left: int, right: int, curves: list[tuple[str, np.ndarray, str]]) -> str:
+        x = scale(inverse_shift, left, right)
+        all_values = np.concatenate([curve for _, curve, _ in curves])
+        y_all = scale(all_values, bottom, top)
+        out = []
+        start = 0
+        for idx, (label, curve, color) in enumerate(curves):
+            segment = y_all[start : start + len(curve)]
+            out.append(polyline(x, segment, color))
+            out.append(
+                f'<text x="{left + 18}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
+            )
+            start += len(curve)
+        return "\n".join(out)
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Spatial facilitation chi4 closure</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A diffusive facilitation front turns the persistence clock into xi4 and Ncorr.</text>
+  {axes(left_a, right_a, "A. Clock-derived dynamic length", "inverse-temperature shift")}
+  {plot(left_a, right_a, [("xi4 / hot", length_growth, "#2b6cb0"), ("Ncorr / hot", size_growth, "#2f855a"), ("chi4 peak / hot", chi4_growth, "#c05621")])}
+  {axes(left_b, right_b, "B. Timing of the spatial susceptibility", "inverse-temperature shift")}
+  {plot(left_b, right_b, [("chi4 peak time", peak_times / peak_times[0], "#805ad5"), ("tau alpha", tau_alpha / tau_alpha[0], "#d69e2e")])}
 </svg>
 """
     path.write_text(svg)
@@ -2519,6 +2588,15 @@ def main() -> None:
         FIGURE_DIR / "renewal_cage_glass_phase_diagram.svg",
         glass_phase_rows,
     )
+    spatial_chi4_rows = write_spatial_chi4_csv(
+        DATA_DIR / "renewal_cage_spatial_chi4.csv",
+        temperatures,
+        temperature_law,
+        wave_number=1.1,
+        facilitation_diffusivity=0.04,
+        particle_density=0.85,
+    )
+    write_spatial_chi4_svg(FIGURE_DIR / "renewal_cage_spatial_chi4.svg", spatial_chi4_rows)
     cooling_interval = 1.0 / temperatures[-1] - 1.0 / temperatures[0]
     barrier_requirement_rows = write_barrier_requirements_csv(
         DATA_DIR / "renewal_cage_barrier_requirements.csv",

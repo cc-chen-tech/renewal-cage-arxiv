@@ -415,6 +415,22 @@ estimator
 This does not replace a spatial four-point calculation, but it gives a closed
 conversion between the analytically predicted renewal fluctuation and a measured
 dynamic-heterogeneity amplitude.
+A minimal spatial closure can make $N_{\rm corr}$ clock-derived rather than
+externally chosen. Suppose facilitation spreads diffusively during the local
+persistence time $\tau_p$ with effective diffusivity $D_f$ in dimension $d$.
+Then
+\begin{equation}
+  \xi_4(T)=\left[\ell_0^2+2dD_f\tau_p(T)\right]^{1/2},
+  \qquad
+  N_{\rm corr}(T)=\rho V_d\xi_4(T)^d,
+\end{equation}
+where $V_d=\pi^{d/2}/\Gamma(1+d/2)$ is the unit-ball volume and $\rho$ is the
+number density. In the present delayed-renewal reduction we use
+$\tau_p(T)\simeq\tau_d(T)$, so cooling that increases the persistence onset
+also grows a dynamic length and hence the four-point amplitude. This is still a
+compact-domain closure, not a microscopic spatial facilitation field, but it
+moves the $\chi_4$ amplitude from an arbitrary scale factor to a falsifiable
+clock-derived prediction.
 
 \section{Finite-Exchange Heterogeneity Extension}
 
@@ -805,6 +821,11 @@ dynamic-signature criterion in this parameter set, whereas no thermodynamic tran
 inferred. The closed barrier-threshold inversion gives minimum controls
 $E_d-E_\lambda=3.0$ and $E_{\rm hx}=4.0$ for the target growth factors used in
 the scan.
+With the diffusive spatial-facilitation closure and $D_f=0.04$, cooling from
+$T=1.00$ to $0.62$ increases the clock-derived $\xi_4$ by a factor of $3.09$
+and $N_{\rm corr}$ by a factor of $29.5$, raising the renewal contribution to
+the $\chi_4$ peak by a factor of $34.7$ without fitting an external domain
+size.
 The persistence-exchange extension keeps $D=0.35$ fixed while increasing
 $\tau_p/\tau_x$ from $1$ to $12$; the resulting $D\tau_\alpha$ grows from
 $1.01$ to $4.98$, while the late NGP falls from $1.21\times10^{-2}$ to
@@ -823,8 +844,8 @@ rusciano2022fickian}, self-intermediate-scattering alpha relaxation
 \cite{kob1995intermediate}, stretched-like relaxation and Stokes-Einstein
 decoupling \cite{ediger2000spatial,berthier2011theoretical}, and
 persistence/exchange decoupling \cite{hedges2007persistence}. The same audit
-marks three gaps explicitly: spatial four-point lengths remain a proxy through
-$N_{\rm corr}$ rather than an internally derived facilitation field
+marks remaining gaps explicitly: the spatial four-point length is now a
+diffusive-front closure rather than a full facilitation-field theory
 \cite{lacevic2003fourpoint,berthier2024experimental}; MCT beta-relaxation
 exponents are not derived; and thermodynamic glass-transition phenomena such
 as configurational entropy and heat-capacity anomalies are outside the present
@@ -916,6 +937,16 @@ renewal dynamics.
   \caption{Barrier-facilitation signature phase diagram. The scan separates
   delay-barrier growth from exchange-barrier growth and records when the
   dynamical closure criteria are jointly satisfied.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_spatial_chi4.pdf}
+  \caption{Spatial facilitation closure for the four-point amplitude. A
+  diffusive facilitation front converts the persistence clock into a dynamic
+  length $\xi_4$ and correlated renewal volume $N_{\rm corr}$, making the
+  renewal contribution to the $\chi_4$ peak grow on cooling without fitting an
+  external domain size.}
 \end{figure}
 
 \begin{figure}[h]

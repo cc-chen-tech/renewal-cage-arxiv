@@ -1606,6 +1606,114 @@ def infer_renewal_correlation_size(
     }
 
 
+def spatial_facilitation_domain(
+    *,
+    persistence_time: float,
+    dimension: int = 3,
+    particle_density: float = 1.0,
+    facilitation_diffusivity: float = 0.0,
+    microscopic_length: float = 1.0,
+) -> dict[str, float]:
+    """Convert a persistence clock into a facilitation-front correlation volume.
+
+    A minimal diffusive facilitation front explores
+    ``xi=(ell0^2+2 d D_f tau_p)^(1/2)`` during the persistence time. The
+    correlated renewal size is the expected particle count in a d-dimensional
+    ball of radius ``xi``.
+    """
+
+    if persistence_time <= 0.0:
+        raise ValueError("persistence_time must be positive")
+    if dimension <= 0:
+        raise ValueError("dimension must be positive")
+    if particle_density <= 0.0:
+        raise ValueError("particle_density must be positive")
+    if facilitation_diffusivity < 0.0:
+        raise ValueError("facilitation_diffusivity must be nonnegative")
+    if microscopic_length <= 0.0:
+        raise ValueError("microscopic_length must be positive")
+
+    length = math.sqrt(microscopic_length**2 + 2.0 * dimension * facilitation_diffusivity * persistence_time)
+    unit_ball_volume = math.pi ** (0.5 * dimension) / math.gamma(0.5 * dimension + 1.0)
+    correlation_volume = unit_ball_volume * length**dimension
+    return {
+        "persistence_time": persistence_time,
+        "dimension": float(dimension),
+        "particle_density": particle_density,
+        "facilitation_diffusivity": facilitation_diffusivity,
+        "microscopic_length": microscopic_length,
+        "front_dynamic_exponent": 2.0,
+        "dynamic_correlation_length": length,
+        "correlation_volume": correlation_volume,
+        "correlation_size": particle_density * correlation_volume,
+    }
+
+
+def spatial_facilitation_chi4_scan(
+    *,
+    temperatures: np.ndarray,
+    law: TemperatureLawParams,
+    wave_number: float,
+    facilitation_diffusivity: float,
+    particle_density: float = 1.0,
+    dimension: int = 3,
+    microscopic_length: float = 1.0,
+    time_points: int = 500,
+) -> list[dict[str, float]]:
+    """Temperature scan for clock-derived dynamic length and chi4 amplitude."""
+
+    _validate_temperature_law(law)
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if time_points < 50:
+        raise ValueError("time_points must be at least 50")
+    temperatures = np.asarray(temperatures, dtype=float)
+    if np.any(temperatures <= 0.0):
+        raise ValueError("temperatures must be positive")
+
+    rows: list[dict[str, float]] = []
+    reference_peak = None
+    reference_length = None
+    reference_size = None
+    for temperature in temperatures:
+        params = temperature_dependent_params(float(temperature), law)
+        domain = spatial_facilitation_domain(
+            persistence_time=params.renewal_delay,
+            dimension=dimension,
+            particle_density=particle_density,
+            facilitation_diffusivity=facilitation_diffusivity,
+            microscopic_length=microscopic_length,
+        )
+        tau_alpha = alpha_relaxation_time(wave_number, params)
+        upper = max(80.0 * params.renewal_delay, 10.0 * tau_alpha, 10.0 * params.cage_tau)
+        time_grid = np.linspace(0.0, upper, time_points)
+        single_particle = renewal_scattering_susceptibility(wave_number, time_grid, params)
+        chi4 = domain["correlation_size"] * single_particle
+        peak_index = int(np.argmax(chi4))
+        chi4_peak = float(chi4[peak_index])
+        if reference_peak is None:
+            reference_peak = chi4_peak
+            reference_length = domain["dynamic_correlation_length"]
+            reference_size = domain["correlation_size"]
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "renewal_delay": params.renewal_delay,
+                "renewal_rate": params.renewal_rate,
+                "tau_alpha": tau_alpha,
+                "dynamic_correlation_length": domain["dynamic_correlation_length"],
+                "correlation_size": domain["correlation_size"],
+                "single_particle_chi_peak": float(single_particle[peak_index]),
+                "chi4_peak": chi4_peak,
+                "chi4_peak_time": float(time_grid[peak_index]),
+                "length_growth": domain["dynamic_correlation_length"] / reference_length,
+                "correlation_size_growth": domain["correlation_size"] / reference_size,
+                "chi4_peak_growth": chi4_peak / reference_peak,
+            }
+        )
+    return rows
+
+
 def alpha_relaxation_time(
     wave_number: float,
     params: DelayedRenewalCageParams,

@@ -17,7 +17,8 @@ The model combines:
   fractional Stokes-Einstein exponents, apparent alpha-activation/fragility
   diagnostics, alpha-shape time-temperature-superposition collapse residuals,
   renewal-count susceptibility, renewal-domain chi4/cooperative-size
-  diagnostics, NGP peak/alpha-relaxation coupling, finite-exchange
+  diagnostics, spatial facilitation chi4-length closure,
+  NGP peak/alpha-relaxation coupling, finite-exchange
   heterogeneity diagnostics, a temperature-dependent facilitated-exchange law,
   a persistence/exchange renewal-clock decoupling diagnostic, a static-gamma
   mobility-disorder null model, late-time mechanism-selection diagnostics, a
@@ -129,6 +130,7 @@ figures/renewal_cage_persistence_exchange.svg
 figures/renewal_cage_persistence_exchange_protocol.svg
 figures/renewal_cage_glass_audit.svg
 figures/renewal_cage_glass_phase_diagram.svg
+figures/renewal_cage_spatial_chi4.svg
 figures/renewal_cage_barrier_requirements.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
@@ -153,6 +155,7 @@ data/renewal_cage_persistence_exchange.csv
 data/renewal_cage_persistence_exchange_protocol.csv
 data/renewal_cage_glass_audit.csv
 data/renewal_cage_glass_phase_diagram.csv
+data/renewal_cage_spatial_chi4.csv
 data/renewal_cage_barrier_requirements.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
@@ -176,6 +179,7 @@ paper/figures/renewal_cage_persistence_exchange.pdf
 paper/figures/renewal_cage_persistence_exchange_protocol.pdf
 paper/figures/renewal_cage_glass_audit.pdf
 paper/figures/renewal_cage_glass_phase_diagram.pdf
+paper/figures/renewal_cage_spatial_chi4.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf

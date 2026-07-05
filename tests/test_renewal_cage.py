@@ -875,6 +875,57 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 params=params,
             )
 
+    def test_spatial_facilitation_domain_maps_persistence_time_to_correlation_volume(self):
+        domain_fn = getattr(sys.modules["renewal_cage"], "spatial_facilitation_domain", None)
+        if domain_fn is None:
+            self.fail("spatial_facilitation_domain is missing")
+
+        domain = domain_fn(
+            persistence_time=9.0,
+            dimension=3,
+            particle_density=0.85,
+            facilitation_diffusivity=0.05,
+            microscopic_length=1.0,
+        )
+        expected_length = math.sqrt(1.0**2 + 2.0 * 3.0 * 0.05 * 9.0)
+        expected_volume = 4.0 * math.pi * expected_length**3 / 3.0
+
+        self.assertAlmostEqual(domain["dynamic_correlation_length"], expected_length)
+        self.assertAlmostEqual(domain["correlation_size"], 0.85 * expected_volume)
+        self.assertEqual(domain["front_dynamic_exponent"], 2.0)
+
+    def test_spatial_facilitation_chi4_scan_grows_on_cooling(self):
+        scan_fn = getattr(sys.modules["renewal_cage"], "spatial_facilitation_chi4_scan", None)
+        if scan_fn is None:
+            self.fail("spatial_facilitation_chi4_scan is missing")
+        law = TemperatureLawParams(
+            reference_temperature=1.0,
+            cage_variance_ref=1.0,
+            cage_tau_ref=0.25,
+            jump_to_cage_ref=0.8,
+            renewal_rate_ref=0.18,
+            renewal_delay_ref=3.0,
+            rate_activation=1.0,
+            delay_activation=2.5,
+        )
+
+        rows = scan_fn(
+            temperatures=np.array([1.0, 0.8, 0.65]),
+            law=law,
+            wave_number=1.1,
+            facilitation_diffusivity=0.04,
+            particle_density=0.85,
+            time_points=250,
+        )
+
+        lengths = [row["dynamic_correlation_length"] for row in rows]
+        sizes = [row["correlation_size"] for row in rows]
+        peaks = [row["chi4_peak"] for row in rows]
+        self.assertTrue(all(later > earlier for earlier, later in zip(lengths, lengths[1:])))
+        self.assertTrue(all(later > earlier for earlier, later in zip(sizes, sizes[1:])))
+        self.assertTrue(all(later > earlier for earlier, later in zip(peaks, peaks[1:])))
+        self.assertGreater(rows[-1]["chi4_peak_growth"], 1.0)
+
     def test_activated_barrier_gap_controls_delayed_renewal_product(self):
         barrier = ActivatedBarrierParams(
             reference_temperature=1.0,

@@ -777,6 +777,50 @@ def write_glass_phase_diagram_pdf(path: Path) -> None:
     c.save()
 
 
+def write_spatial_chi4_pdf(path: Path) -> None:
+    data = read_csv_columns(DATA_DIR / "renewal_cage_spatial_chi4.csv")
+    inverse_shift = 1.0 / data["temperature"] - 1.0 / data["temperature"][0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Spatial facilitation chi4 closure")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "A diffusive facilitation front turns the persistence clock into xi4 and Ncorr.")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("xi4 / hot", data["length_growth"], colors.HexColor("#2b6cb0")),
+            ("Ncorr / hot", data["correlation_size_growth"], colors.HexColor("#2f855a")),
+            ("chi4 peak / hot", data["chi4_peak_growth"], colors.HexColor("#c05621")),
+        ],
+        "AC. Clock-derived dynamic length",
+        xlabel="inverse-temperature shift",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        inverse_shift,
+        [
+            ("chi4 peak time / hot", data["chi4_peak_time"] / data["chi4_peak_time"][0], colors.HexColor("#805ad5")),
+            ("tau alpha / hot", data["tau_alpha"] / data["tau_alpha"][0], colors.HexColor("#d69e2e")),
+        ],
+        "AD. Timing of spatial susceptibility",
+        xlabel="inverse-temperature shift",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1179,6 +1223,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     persistence_exchange_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange_protocol.pdf"
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
+    spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1196,6 +1241,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_persistence_exchange_protocol_pdf(persistence_exchange_protocol_pdf)
     write_glass_audit_pdf(glass_audit_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
+    write_spatial_chi4_pdf(spatial_chi4_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1218,6 +1264,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(persistence_exchange_protocol_pdf, "figures/renewal_cage_persistence_exchange_protocol.pdf")
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
+        archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")
