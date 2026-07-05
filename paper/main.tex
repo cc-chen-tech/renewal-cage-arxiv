@@ -575,6 +575,26 @@ can be written as
   \qquad
   P[N(t)=0]=e^{-t/\tau_p}.
 \end{equation}
+Equivalently, the count probability-generating function is closed:
+\begin{equation}
+  G(z,t)=\langle z^{N(t)}\rangle
+  =e^{-t/\tau_p}
+  +\frac{z\tau_p^{-1}\left[
+    e^{(z-1)t/\tau_x}-e^{-t/\tau_p}
+  \right]}
+  {\tau_p^{-1}+(z-1)\tau_x^{-1}},
+\end{equation}
+where the removable singularity is evaluated by continuity. With
+$a_k=e^{-k^2q/2}$ this gives the cage-normalized alpha relaxation directly as
+\begin{equation}
+  \Phi_\alpha^{px}(k,t)=G(a_k,t),
+\end{equation}
+and the NGP remains a count-variance diagnostic,
+\begin{equation}
+  \alpha_2^{px}(t)=
+  \frac{q^2{\rm Var}\,N(t)}
+       {[L(t)+q\langle N(t)\rangle]^2}.
+\end{equation}
 The Poisson renewal model is recovered when $\tau_p=\tau_x$. When
 $\tau_p>\tau_x$, the long-time diffusion coefficient remains
 $D=q/(2\tau_x)$, but the cage-normalized alpha relaxation is delayed by the

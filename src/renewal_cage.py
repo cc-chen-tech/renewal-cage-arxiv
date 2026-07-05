@@ -397,19 +397,80 @@ def persistence_exchange_count_distribution(
     return rows
 
 
+def persistence_exchange_count_pgf(
+    z: float,
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+) -> np.ndarray:
+    """Probability-generating function for the persistence/exchange count.
+
+    For first-escape rate ``a=1/tau_p`` and exchange rate ``b=1/tau_x``,
+    ``G(z,t)=E[z^N]`` is
+
+        exp(-a t) + z a [exp(b(z-1)t)-exp(-a t)] / [a+b(z-1)].
+
+    The removable singularity is evaluated by its integral limit.
+    """
+
+    _validate_persistence_exchange(params)
+    if z < 0.0:
+        raise ValueError("z must be nonnegative")
+    t = np.asarray(t, dtype=float)
+    if np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative")
+    first_rate = 1.0 / params.persistence_mean
+    exchange_rate = 1.0 / params.exchange_mean
+    denominator = first_rate + exchange_rate * (z - 1.0)
+    unrenewed = np.exp(-first_rate * t)
+    if math.isclose(denominator, 0.0, rel_tol=1e-13, abs_tol=1e-13):
+        renewed = z * first_rate * t * unrenewed
+    else:
+        renewed = z * first_rate * (np.exp(exchange_rate * (z - 1.0) * t) - unrenewed) / denominator
+    return unrenewed + renewed
+
+
 def persistence_exchange_count_moments(
     t: np.ndarray,
     params: PersistenceExchangeParams,
     *,
     max_count: int = 300,
 ) -> dict[str, np.ndarray]:
-    """Mean and variance of the decoupled persistence/exchange renewal count."""
+    """Closed mean and variance of the decoupled persistence/exchange renewal count."""
+
+    _validate_persistence_exchange(params)
+    t = np.asarray(t, dtype=float)
+    if np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative")
+    first_rate = 1.0 / params.persistence_mean
+    exchange_rate = 1.0 / params.exchange_mean
+    if math.isclose(first_rate, exchange_rate, rel_tol=1e-13, abs_tol=1e-13):
+        mean = first_rate * t
+        return {"mean": mean, "variance": mean}
+
+    unrenewed = np.exp(-first_rate * t)
+    renewed_probability = 1.0 - unrenewed
+    first_elapsed_mean = t - renewed_probability / first_rate
+    first_elapsed_second = t**2 - 2.0 * t / first_rate + 2.0 * renewed_probability / first_rate**2
+    mean = renewed_probability + exchange_rate * first_elapsed_mean
+    second = renewed_probability + 3.0 * exchange_rate * first_elapsed_mean + exchange_rate**2 * first_elapsed_second
+    variance = second - mean**2
+    return {"mean": mean, "variance": np.maximum(variance, 0.0)}
+
+
+def persistence_exchange_count_moments_from_distribution(
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+    *,
+    max_count: int = 300,
+) -> dict[str, np.ndarray]:
+    """Numerical count moments from the explicit distribution, used as a check."""
 
     probability = persistence_exchange_count_distribution(t, params, max_count=max_count)
     counts = np.arange(probability.shape[1], dtype=float)
     mean = probability @ counts
     second = probability @ (counts**2)
     return {"mean": mean, "variance": second - mean**2}
+
 
 
 def persistence_exchange_diffusion_coefficient(params: PersistenceExchangeParams) -> float:
@@ -444,14 +505,12 @@ def persistence_exchange_ngp_1d(
 
     _validate_persistence_exchange(params)
     t = np.asarray(t, dtype=float)
-    probability = persistence_exchange_count_distribution(t, params, max_count=max_count)
-    counts = np.arange(probability.shape[1], dtype=float)
+    moments = persistence_exchange_count_moments(t, params)
     local = params.cage_variance * (1.0 - np.exp(-t / params.cage_tau))
-    variance_by_count = local[:, None] + params.jump_variance * counts[None, :]
-    mean_variance = np.sum(probability * variance_by_count, axis=1)
-    second_variance = np.sum(probability * variance_by_count**2, axis=1)
+    mean_variance = local + params.jump_variance * moments["mean"]
+    variance_of_variance = params.jump_variance**2 * moments["variance"]
     with np.errstate(divide="ignore", invalid="ignore"):
-        alpha = second_variance / mean_variance**2 - 1.0
+        alpha = variance_of_variance / mean_variance**2
     alpha[~np.isfinite(alpha)] = 0.0
     return alpha
 
@@ -467,10 +526,8 @@ def persistence_exchange_normalized_alpha_decay(
 
     if wave_number <= 0.0:
         raise ValueError("wave_number must be positive")
-    probability = persistence_exchange_count_distribution(t, params, max_count=max_count)
-    counts = np.arange(probability.shape[1], dtype=float)
-    jump_factor = np.exp(-0.5 * wave_number**2 * params.jump_variance * counts)
-    return probability @ jump_factor
+    jump_factor = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    return persistence_exchange_count_pgf(jump_factor, t, params)
 
 
 def persistence_exchange_alpha_relaxation_time(

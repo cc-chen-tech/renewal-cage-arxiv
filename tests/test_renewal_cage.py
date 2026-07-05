@@ -64,6 +64,7 @@ from renewal_cage import (  # noqa: E402
     PersistenceExchangeParams,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_count_distribution,
+    persistence_exchange_count_pgf,
     persistence_exchange_count_moments,
     persistence_exchange_diffusion_coefficient,
     persistence_exchange_ngp_1d,
@@ -1470,6 +1471,43 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         np.testing.assert_allclose(moments["mean"], times / 2.0, rtol=2e-5, atol=2e-5)
         np.testing.assert_allclose(moments["variance"], times / 2.0, rtol=2e-5, atol=2e-5)
+
+    def test_persistence_exchange_pgf_matches_alpha_decay(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        wave_number = 1.1
+        times = np.array([0.5, 5.0, 20.0])
+        jump_factor = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+
+        pgf = persistence_exchange_count_pgf(jump_factor, times, params)
+        decay = persistence_exchange_normalized_alpha_decay(wave_number, times, params, max_count=400)
+
+        np.testing.assert_allclose(pgf, decay, rtol=2e-5, atol=2e-8)
+        np.testing.assert_allclose(persistence_exchange_count_pgf(1.0, times, params), np.ones_like(times))
+
+    def test_persistence_exchange_closed_moments_match_distribution_moments(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        times = np.array([2.0, 8.0, 30.0])
+
+        probability = persistence_exchange_count_distribution(times, params, max_count=200)
+        counts = np.arange(probability.shape[1], dtype=float)
+        distribution_mean = probability @ counts
+        distribution_variance = probability @ (counts**2) - distribution_mean**2
+        closed = persistence_exchange_count_moments(times, params)
+
+        np.testing.assert_allclose(closed["mean"], distribution_mean, rtol=5e-5, atol=5e-6)
+        np.testing.assert_allclose(closed["variance"], distribution_variance, rtol=5e-5, atol=5e-6)
 
     def test_persistence_exchange_decoupling_increases_stokes_einstein_product(self):
         base = PersistenceExchangeParams(
