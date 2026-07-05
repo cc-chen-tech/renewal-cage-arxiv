@@ -190,6 +190,24 @@ class ArxivPackageTests(unittest.TestCase):
             "diffusion",
         )
 
+    def test_benchmark_fusion_readiness_keeps_cross_paper_splicing_honest(self):
+        path = ROOT / "data" / "renewal_cage_benchmark_fusion_readiness.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["fusion_id"]: row for row in rows}
+        self.assertIn("kob_andersen_i_ii_dynamic_closure", by_id)
+        self.assertIn("ka_lacevic_four_point_splice", by_id)
+        self.assertEqual(float(by_id["kob_andersen_i_ii_dynamic_closure"]["structural_fusion_ready"]), 1.0)
+        self.assertEqual(float(by_id["kob_andersen_i_ii_dynamic_closure"]["quantitative_fusion_ready"]), 0.0)
+        self.assertEqual(by_id["kob_andersen_i_ii_dynamic_closure"]["primary_blocker"], "machine_readable_data")
+        self.assertEqual(float(by_id["ka_lacevic_four_point_splice"]["shared_system_consistent"]), 1.0)
+        self.assertEqual(float(by_id["ka_lacevic_four_point_splice"]["shared_temperature_grid_consistent"]), 0.0)
+        self.assertEqual(float(by_id["ka_lacevic_four_point_splice"]["shared_ensemble_consistent"]), 0.0)
+        self.assertEqual(float(by_id["ka_lacevic_four_point_splice"]["structural_fusion_ready"]), 0.0)
+        self.assertEqual(by_id["ka_lacevic_four_point_splice"]["primary_blocker"], "temperature_grid_mismatch")
+
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             zip_path = build_arxiv_package(output_dir=Path(tmpdir))
@@ -219,6 +237,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", names)
+            self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -248,6 +267,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
         self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_barrier_requirements.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
@@ -291,6 +311,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_observable_falsification_matrix = (
                 ROOT / "paper" / "figures" / "renewal_cage_observable_falsification_matrix.pdf"
+            ).read_bytes()
+            first_benchmark_fusion_readiness = (
+                ROOT / "paper" / "figures" / "renewal_cage_benchmark_fusion_readiness.pdf"
             ).read_bytes()
             first_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
@@ -346,6 +369,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_observable_falsification_matrix = (
                 ROOT / "paper" / "figures" / "renewal_cage_observable_falsification_matrix.pdf"
             ).read_bytes()
+            second_benchmark_fusion_readiness = (
+                ROOT / "paper" / "figures" / "renewal_cage_benchmark_fusion_readiness.pdf"
+            ).read_bytes()
             second_barrier_requirements = (
                 ROOT / "paper" / "figures" / "renewal_cage_barrier_requirements.pdf"
             ).read_bytes()
@@ -384,6 +410,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_benchmark_consistency, second_sota_benchmark_consistency)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
         self.assertEqual(first_observable_falsification_matrix, second_observable_falsification_matrix)
+        self.assertEqual(first_benchmark_fusion_readiness, second_benchmark_fusion_readiness)
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)

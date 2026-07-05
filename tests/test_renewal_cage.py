@@ -21,6 +21,7 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_shape_curve,
     alpha_shape_superposition_residual,
     barrier_amplification_laws,
+    benchmark_fusion_readiness,
     cage_localization_benchmark_consistency,
     cage_localization_diagnostics,
     correlated_domain_susceptibility,
@@ -1511,6 +1512,89 @@ class DelayedRenewalCageTests(unittest.TestCase):
             "diffusion;persistence_time;exchange_time;late_ngp;chi4_peak",
         )
         self.assertEqual(by_diagnostic["joint_persistence_exchange_chi4"]["structural_falsification_ready"], 0.0)
+
+    def test_benchmark_fusion_readiness_requires_shared_system_and_grid(self):
+        row = benchmark_fusion_readiness(
+            fusion_id="kob_andersen_i_ii_dynamic_closure",
+            benchmark_sources=["kob1995vanhove", "kob1995intermediate"],
+            required_observables=[
+                "time_grid",
+                "van_hove_tail",
+                "ngp",
+                "diffusion",
+                "self_intermediate_scattering",
+                "tau_alpha",
+                "wave_numbers",
+            ],
+            available_observables_by_benchmark={
+                "kob1995vanhove": ["time_grid", "van_hove_tail", "ngp", "diffusion"],
+                "kob1995intermediate": [
+                    "time_grid",
+                    "self_intermediate_scattering",
+                    "tau_alpha",
+                    "wave_numbers",
+                ],
+            },
+            system_tags={
+                "kob1995vanhove": "kob_andersen_binary_lj",
+                "kob1995intermediate": "kob_andersen_binary_lj",
+            },
+            temperature_grid_tags={
+                "kob1995vanhove": "ka_1995_grid",
+                "kob1995intermediate": "ka_1995_grid",
+            },
+            ensemble_tags={
+                "kob1995vanhove": "ka_1995_simulation",
+                "kob1995intermediate": "ka_1995_simulation",
+            },
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+        )
+
+        self.assertEqual(row["missing_observables"], "none")
+        self.assertEqual(row["shared_system_consistent"], 1.0)
+        self.assertEqual(row["shared_temperature_grid_consistent"], 1.0)
+        self.assertEqual(row["shared_ensemble_consistent"], 1.0)
+        self.assertEqual(row["structural_fusion_ready"], 1.0)
+        self.assertEqual(row["quantitative_fusion_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "machine_readable_data")
+
+    def test_benchmark_fusion_readiness_rejects_cross_ensemble_splicing(self):
+        row = benchmark_fusion_readiness(
+            fusion_id="ka_lacevic_four_point_splice",
+            benchmark_sources=["kob1995intermediate", "lacevic2003fourpoint"],
+            required_observables=[
+                "self_intermediate_scattering",
+                "tau_alpha",
+                "chi4_peak",
+                "dynamic_length",
+            ],
+            available_observables_by_benchmark={
+                "kob1995intermediate": ["self_intermediate_scattering", "tau_alpha"],
+                "lacevic2003fourpoint": ["tau_alpha", "chi4_peak", "dynamic_length"],
+            },
+            system_tags={
+                "kob1995intermediate": "kob_andersen_binary_lj",
+                "lacevic2003fourpoint": "kob_andersen_binary_lj",
+            },
+            temperature_grid_tags={
+                "kob1995intermediate": "ka_1995_grid",
+                "lacevic2003fourpoint": "lacevic_2003_grid",
+            },
+            ensemble_tags={
+                "kob1995intermediate": "ka_1995_simulation",
+                "lacevic2003fourpoint": "lacevic_2003_simulation",
+            },
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+        )
+
+        self.assertEqual(row["missing_observables"], "none")
+        self.assertEqual(row["shared_system_consistent"], 1.0)
+        self.assertEqual(row["shared_temperature_grid_consistent"], 0.0)
+        self.assertEqual(row["shared_ensemble_consistent"], 0.0)
+        self.assertEqual(row["structural_fusion_ready"], 0.0)
+        self.assertEqual(row["primary_blocker"], "temperature_grid_mismatch")
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(

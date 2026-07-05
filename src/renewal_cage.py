@@ -1155,6 +1155,94 @@ def observable_falsification_matrix(
     return rows
 
 
+def benchmark_fusion_readiness(
+    *,
+    fusion_id: str,
+    benchmark_sources: list[str],
+    required_observables: list[str],
+    available_observables_by_benchmark: dict[str, list[str]],
+    system_tags: dict[str, str],
+    temperature_grid_tags: dict[str, str],
+    ensemble_tags: dict[str, str],
+    has_machine_readable_data: bool,
+    has_uncertainty_estimates: bool,
+) -> dict[str, float | str]:
+    """Check whether multiple benchmark sources can be fused for one diagnostic."""
+
+    if not fusion_id:
+        raise ValueError("fusion_id must be nonempty")
+    if not benchmark_sources:
+        raise ValueError("benchmark_sources must be nonempty")
+    if not required_observables:
+        raise ValueError("required_observables must be nonempty")
+    if any(not source for source in benchmark_sources):
+        raise ValueError("benchmark_sources must be nonempty strings")
+    if any(not observable for observable in required_observables):
+        raise ValueError("required_observables must be nonempty strings")
+
+    sources = list(dict.fromkeys(benchmark_sources))
+    required = list(dict.fromkeys(required_observables))
+    available: list[str] = []
+    for source in sources:
+        if source not in available_observables_by_benchmark:
+            raise ValueError(f"missing observables for {source}")
+        if source not in system_tags or source not in temperature_grid_tags or source not in ensemble_tags:
+            raise ValueError(f"missing compatibility tags for {source}")
+        source_observables = available_observables_by_benchmark[source]
+        if any(not observable for observable in source_observables):
+            raise ValueError("available observables must be nonempty strings")
+        available.extend(source_observables)
+
+    available_unique = list(dict.fromkeys(available))
+    available_set = set(available_unique)
+    missing = [observable for observable in required if observable not in available_set]
+    coverage = (len(required) - len(missing)) / len(required)
+    shared_system = len({system_tags[source] for source in sources}) == 1
+    shared_temperature_grid = len({temperature_grid_tags[source] for source in sources}) == 1
+    shared_ensemble = len({ensemble_tags[source] for source in sources}) == 1
+    structural_ready = (
+        len(missing) == 0
+        and shared_system
+        and shared_temperature_grid
+        and shared_ensemble
+    )
+    quantitative_ready = structural_ready and has_machine_readable_data and has_uncertainty_estimates
+    if missing:
+        blocker = missing[0]
+    elif not shared_system:
+        blocker = "system_mismatch"
+    elif not shared_temperature_grid:
+        blocker = "temperature_grid_mismatch"
+    elif not shared_ensemble:
+        blocker = "ensemble_mismatch"
+    elif not has_machine_readable_data:
+        blocker = "machine_readable_data"
+    elif not has_uncertainty_estimates:
+        blocker = "uncertainty_estimates"
+    else:
+        blocker = "none"
+
+    return {
+        "fusion_id": fusion_id,
+        "benchmark_sources": ";".join(sources),
+        "required_observables": ";".join(required),
+        "available_observables": ";".join(available_unique) if available_unique else "none",
+        "missing_observables": ";".join(missing) if missing else "none",
+        "observable_coverage_fraction": coverage,
+        "system_tags": ";".join(system_tags[source] for source in sources),
+        "temperature_grid_tags": ";".join(temperature_grid_tags[source] for source in sources),
+        "ensemble_tags": ";".join(ensemble_tags[source] for source in sources),
+        "shared_system_consistent": float(shared_system),
+        "shared_temperature_grid_consistent": float(shared_temperature_grid),
+        "shared_ensemble_consistent": float(shared_ensemble),
+        "has_machine_readable_data": float(has_machine_readable_data),
+        "has_uncertainty_estimates": float(has_uncertainty_estimates),
+        "structural_fusion_ready": float(structural_ready),
+        "quantitative_fusion_ready": float(quantitative_ready),
+        "primary_blocker": blocker,
+    }
+
+
 def van_hove_tail_benchmark_consistency(
     *,
     benchmark_id: str,

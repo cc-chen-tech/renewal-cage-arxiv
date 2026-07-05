@@ -1339,6 +1339,58 @@ def write_observable_falsification_matrix_pdf(path: Path) -> None:
     c.save()
 
 
+def write_benchmark_fusion_readiness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_benchmark_fusion_readiness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Cross-benchmark fusion readiness")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Multi-paper validation is allowed only when observables, system, temperature grid, and ensemble identity align.",
+    )
+    left, top = 55, page_h - 95
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top, "fusion")
+    c.drawString(left + 250, top, "coverage")
+    c.drawString(left + 345, top, "sys/grid/ens")
+    c.drawString(left + 455, top, "struct")
+    c.drawString(left + 505, top, "quant")
+    c.drawString(left + 555, top, "primary blocker")
+    c.setFont("Helvetica", 7.5)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 35
+        coverage = float(row["observable_coverage_fraction"])
+        structural = int(float(row["structural_fusion_ready"]))
+        quantitative = int(float(row["quantitative_fusion_ready"]))
+        color = colors.HexColor("#2f855a") if quantitative else colors.HexColor("#2b6cb0") if structural else colors.HexColor("#c05621")
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["fusion_id"][:38])
+        c.setStrokeColor(colors.HexColor("#cbd5e0"))
+        c.rect(left + 250, y - 3, 70, 9, stroke=1, fill=0)
+        c.setFillColor(color)
+        c.rect(left + 250, y - 3, 70 * coverage, 9, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.drawString(left + 325, y, f"{coverage:.2f}")
+        c.drawString(
+            left + 345,
+            y,
+            f"{int(float(row['shared_system_consistent']))}/"
+            f"{int(float(row['shared_temperature_grid_consistent']))}/"
+            f"{int(float(row['shared_ensemble_consistent']))}",
+        )
+        c.drawString(left + 468, y, str(structural))
+        c.drawString(left + 518, y, str(quantitative))
+        c.drawString(left + 555, y, row["primary_blocker"][:28])
+        c.drawString(left + 55, y - 12, f"sources: {row['benchmark_sources'][:85]}")
+    c.showPage()
+    c.save()
+
+
 def write_barrier_requirements_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_barrier_requirements.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1753,6 +1805,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
+    benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -1778,6 +1831,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
+    write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -1817,6 +1871,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             observable_falsification_matrix_pdf,
             "figures/renewal_cage_observable_falsification_matrix.pdf",
         )
+        archive.write(benchmark_fusion_readiness_pdf, "figures/renewal_cage_benchmark_fusion_readiness.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

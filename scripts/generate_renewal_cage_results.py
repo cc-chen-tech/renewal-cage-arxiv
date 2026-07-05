@@ -28,6 +28,7 @@ from renewal_cage import (  # noqa: E402
     activated_barrier_temperature_law,
     adam_gibbs_thermodynamic_scan,
     barrier_amplification_laws,
+    benchmark_fusion_readiness,
     cage_localization_benchmark_consistency,
     cage_localization_diagnostics,
     correlated_domain_susceptibility,
@@ -2079,7 +2080,7 @@ def write_literature_inversion_readiness_csv(path: Path) -> list[dict[str, float
             benchmark_id="kob_andersen_van_hove_1995",
             benchmark_source="kob1995vanhove",
             required_observables=["time_grid", "van_hove_tail", "ngp", "diffusion"],
-            available_observables=["time_grid", "van_hove_tail", "ngp"],
+            available_observables=["time_grid", "van_hove_tail", "ngp", "diffusion"],
             has_machine_readable_data=False,
             has_uncertainty_estimates=False,
             next_action="digitize van-Hove/NGP curves or rerun a KA trajectory simulation",
@@ -2176,6 +2177,113 @@ def write_observable_falsification_matrix_csv(
                 has_uncertainty_estimates=bool(float(literature_row["has_uncertainty_estimates"])),
             )
         )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_benchmark_fusion_readiness_csv(path: Path) -> list[dict[str, float | str]]:
+    """Record whether multi-paper benchmark fusions preserve joint-diagnostic identity."""
+
+    rows = [
+        benchmark_fusion_readiness(
+            fusion_id="kob_andersen_i_ii_dynamic_closure",
+            benchmark_sources=["kob1995vanhove", "kob1995intermediate"],
+            required_observables=[
+                "time_grid",
+                "van_hove_tail",
+                "ngp",
+                "diffusion",
+                "self_intermediate_scattering",
+                "tau_alpha",
+                "wave_numbers",
+            ],
+            available_observables_by_benchmark={
+                "kob1995vanhove": ["time_grid", "van_hove_tail", "ngp", "diffusion"],
+                "kob1995intermediate": [
+                    "time_grid",
+                    "self_intermediate_scattering",
+                    "tau_alpha",
+                    "wave_numbers",
+                ],
+            },
+            system_tags={
+                "kob1995vanhove": "kob_andersen_binary_lj",
+                "kob1995intermediate": "kob_andersen_binary_lj",
+            },
+            temperature_grid_tags={
+                "kob1995vanhove": "ka_1995_grid",
+                "kob1995intermediate": "ka_1995_grid",
+            },
+            ensemble_tags={
+                "kob1995vanhove": "ka_1995_simulation",
+                "kob1995intermediate": "ka_1995_simulation",
+            },
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+        ),
+        benchmark_fusion_readiness(
+            fusion_id="ka_lacevic_four_point_splice",
+            benchmark_sources=["kob1995intermediate", "lacevic2003fourpoint"],
+            required_observables=[
+                "self_intermediate_scattering",
+                "tau_alpha",
+                "chi4_peak",
+                "dynamic_length",
+            ],
+            available_observables_by_benchmark={
+                "kob1995intermediate": ["self_intermediate_scattering", "tau_alpha"],
+                "lacevic2003fourpoint": ["tau_alpha", "chi4_peak", "dynamic_length"],
+            },
+            system_tags={
+                "kob1995intermediate": "kob_andersen_binary_lj",
+                "lacevic2003fourpoint": "kob_andersen_binary_lj",
+            },
+            temperature_grid_tags={
+                "kob1995intermediate": "ka_1995_grid",
+                "lacevic2003fourpoint": "lacevic_2003_grid",
+            },
+            ensemble_tags={
+                "kob1995intermediate": "ka_1995_simulation",
+                "lacevic2003fourpoint": "lacevic_2003_simulation",
+            },
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+        ),
+        benchmark_fusion_readiness(
+            fusion_id="hedges_lacevic_exchange_chi4_splice",
+            benchmark_sources=["hedges2007persistence", "lacevic2003fourpoint", "kob1995vanhove"],
+            required_observables=[
+                "diffusion",
+                "tau_alpha",
+                "persistence_time",
+                "exchange_time",
+                "late_ngp",
+                "chi4_peak",
+            ],
+            available_observables_by_benchmark={
+                "hedges2007persistence": ["persistence_time", "exchange_time", "tau_alpha"],
+                "lacevic2003fourpoint": ["tau_alpha", "chi4_peak", "dynamic_length"],
+                "kob1995vanhove": ["time_grid", "ngp", "diffusion"],
+            },
+            system_tags={
+                "hedges2007persistence": "atomistic_glass_former",
+                "lacevic2003fourpoint": "kob_andersen_binary_lj",
+                "kob1995vanhove": "kob_andersen_binary_lj",
+            },
+            temperature_grid_tags={
+                "hedges2007persistence": "hedges_2007_grid",
+                "lacevic2003fourpoint": "lacevic_2003_grid",
+                "kob1995vanhove": "ka_1995_grid",
+            },
+            ensemble_tags={
+                "hedges2007persistence": "hedges_2007_simulation",
+                "lacevic2003fourpoint": "lacevic_2003_simulation",
+                "kob1995vanhove": "ka_1995_simulation",
+            },
+            has_machine_readable_data=False,
+            has_uncertainty_estimates=False,
+        ),
+    ]
     write_sweep_csv(path, rows)
     return rows
 
@@ -3418,6 +3526,50 @@ def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, f
     path.write_text(svg)
 
 
+def write_benchmark_fusion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 480
+    left, top, right, bottom = 95, 100, 1040, 330
+    row_h = (bottom - top) / len(rows)
+    bars = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        coverage = float(row["observable_coverage_fraction"])
+        structural = int(float(row["structural_fusion_ready"]))
+        quantitative = int(float(row["quantitative_fusion_ready"]))
+        color = "#2f855a" if quantitative else "#2b6cb0" if structural else "#c05621"
+        label = str(row["fusion_id"]).replace("_", " ")
+        bars.append(
+            f'<text x="{left}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">{label[:54]}</text>'
+        )
+        bars.append(
+            f'<rect x="{left + 360}" y="{y + 5:.2f}" width="270" height="15" fill="#edf2f7" stroke="#cbd5e0" />'
+        )
+        bars.append(
+            f'<rect x="{left + 360}" y="{y + 5:.2f}" width="{270 * coverage:.2f}" height="15" fill="{color}" />'
+        )
+        bars.append(
+            f'<text x="{left + 645}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">cov={coverage:.2f}</text>'
+        )
+        bars.append(
+            f'<text x="{left + 720}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">sys/grid/ens={int(float(row["shared_system_consistent"]))}/{int(float(row["shared_temperature_grid_consistent"]))}/{int(float(row["shared_ensemble_consistent"]))}</text>'
+        )
+        bars.append(
+            f'<text x="{left + 870}" y="{y + 18:.2f}" font-family="Arial, sans-serif" font-size="12">block: {str(row["primary_blocker"])[:24]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Cross-benchmark fusion readiness</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Multi-paper validation must preserve system, temperature-grid, and ensemble identity before shared diagnostics are claimed.</text>
+  {"".join(bars)}
+  <rect x="95" y="390" width="14" height="14" fill="#2f855a" /><text x="116" y="402" font-family="Arial, sans-serif" font-size="12">quantitative fusion ready</text>
+  <rect x="280" y="390" width="14" height="14" fill="#2b6cb0" /><text x="301" y="402" font-family="Arial, sans-serif" font-size="12">structural fusion only</text>
+  <rect x="455" y="390" width="14" height="14" fill="#c05621" /><text x="476" y="402" font-family="Arial, sans-serif" font-size="12">invalid splice or missing observables</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -3780,6 +3932,13 @@ def main() -> None:
     write_observable_falsification_matrix_svg(
         FIGURE_DIR / "renewal_cage_observable_falsification_matrix.svg",
         observable_falsification_rows,
+    )
+    benchmark_fusion_rows = write_benchmark_fusion_readiness_csv(
+        DATA_DIR / "renewal_cage_benchmark_fusion_readiness.csv"
+    )
+    write_benchmark_fusion_readiness_svg(
+        FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.svg",
+        benchmark_fusion_rows,
     )
 
     delay_values = [1.2, 2.0, 3.0, 5.0]

@@ -1018,6 +1018,14 @@ The file
 boundary by asking a stricter question: for each benchmark paper, which
 diagnostic protocols can be falsified from the observables actually reported,
 and which missing observable is the primary blocker?
+The companion
+\texttt{renewal\_cage\_benchmark\_fusion\_readiness.csv} adds the next
+constraint for multi-paper validation: observables may be fused only when
+system identity, temperature grid, and simulation or experimental ensemble are
+shared. Under this rule, Kob-Andersen parts I and II form a structural
+van-Hove/alpha benchmark, but splicing Hedges persistence clocks or
+La{\v{c}}evi{\'c} four-point data into the same quantitative diagnostic remains
+blocked unless the raw observables are remeasured on a common ensemble.
 
 \begin{figure}[h]
   \centering
@@ -1211,6 +1219,17 @@ and which missing observable is the primary blocker?
   falsification check but still lack machine-readable uncertainty estimates;
   yellow and red cells identify the first missing observable that blocks the
   corresponding diagnostic.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_benchmark_fusion_readiness.pdf}
+  \caption{Cross-benchmark fusion readiness. The first row shows that the two
+  Kob-Andersen papers have the shared system, temperature grid, and ensemble
+  needed for a structural van-Hove/alpha closure check, while the absence of
+  machine-readable curves and uncertainty estimates blocks quantitative
+  inversion. The remaining rows mark cross-paper splices that contain useful
+  observables but fail the shared-grid or shared-ensemble requirement.}
 \end{figure}
 
 \begin{figure}[h]
