@@ -412,6 +412,14 @@ class ArxivPackageTests(unittest.TestCase):
         barrier_index = main_tex.index("figures/renewal_cage_barrier_requirements.pdf")
         self.assertIn("\\clearpage", main_tex[raw_protocol_index:barrier_index])
 
+    def test_final_large_figures_are_page_floats_before_discussion(self):
+        main_tex = (ROOT / "paper" / "main.tex").read_text()
+        raw_protocol_index = main_tex.index(
+            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
+        )
+        discussion_index = main_tex.index("\\section{Discussion}")
+        self.assertNotIn("\\begin{figure}[h]", main_tex[raw_protocol_index:discussion_index])
+
     def test_final_comparison_table_is_not_a_late_float(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
         discussion_index = main_tex.index("Table~\\ref{tab:comparison}")
