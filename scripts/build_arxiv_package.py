@@ -911,21 +911,24 @@ def write_mct_beta_closure_pdf(path: Path) -> None:
 
 def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_benchmark_consistency.csv").open() as f:
-        row = next(csv.DictReader(f))
+        rows = list(csv.DictReader(f))
+    by_id = {row["benchmark_id"]: row for row in rows}
+    mct_row = by_id["kob_andersen_1995_beta_window"]
+    recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
     c.setFont("Helvetica-Bold", 14)
     c.drawString(42, page_h - 34, "SOTA benchmark consistency")
     c.setFont("Helvetica", 8)
-    c.drawString(42, page_h - 48, "Kob-Andersen beta-window conclusion encoded as a visibility diagnostic.")
+    c.drawString(42, page_h - 48, "Literature-level conclusions encoded as explicit model consistency diagnostics.")
 
     observed_model = np.array(
         [
-            float(row["observed_critical_decay"]),
-            float(row["model_predicts_visible_critical_decay"]),
-            float(row["observed_von_schweidler"]),
-            float(row["model_predicts_visible_von_schweidler"]),
+            float(mct_row["observed_critical_decay"]),
+            float(mct_row["model_predicts_visible_critical_decay"]),
+            float(mct_row["observed_von_schweidler"]),
+            float(mct_row["model_predicts_visible_von_schweidler"]),
         ]
     )
     draw_panel(
@@ -938,15 +941,15 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         [
             ("observed/model flags", observed_model, colors.HexColor("#2b6cb0")),
         ],
-        "AI. Literature claim vs model visibility",
+        "AI. MCT beta visibility",
         xlabel="critical obs/model, von obs/model",
         y_range=(0.0, 1.05),
     )
-    decades = np.array(
+    recovery_values = np.array(
         [
-            float(row["critical_window_decades"]),
-            float(row["von_schweidler_window_decades"]),
-            float(row["required_decades"]),
+            float(recovery_row["finite_exchange_late_ngp"]),
+            float(recovery_row["static_gamma_late_ngp"]),
+            float(recovery_row["recovery_threshold"]),
         ]
     )
     draw_panel(
@@ -955,15 +958,16 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         160,
         320,
         280,
-        np.arange(len(decades), dtype=float),
+        np.arange(len(recovery_values), dtype=float),
         [
-            ("visible decades", decades, colors.HexColor("#c05621")),
+            ("late NGP / threshold", recovery_values, colors.HexColor("#c05621")),
         ],
-        "AJ. Beta-window visibility",
-        xlabel="critical, von, required",
+        "AJ. Gaussian recovery mechanism",
+        xlabel="finite exchange, static, threshold",
     )
     c.setFont("Helvetica", 9)
-    c.drawString(45, 118, f"overall consistent = {int(float(row['overall_consistent']))}")
+    c.drawString(45, 118, f"MCT row consistent = {int(float(mct_row['overall_consistent']))}")
+    c.drawString(430, 118, f"recovery row consistent = {int(float(recovery_row['overall_consistent']))}")
     c.showPage()
     c.save()
 

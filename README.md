@@ -70,6 +70,9 @@ same `c_NGP`.
 A static-gamma null model gives `Var N=R+R^2/kappa0`,
 `alpha_2(t)->1/kappa0`, and `-log Phi_alpha/R->0`; it can broaden alpha
 relaxation but fails long-time Gaussian recovery.
+The SOTA benchmark consistency table turns selected literature-level claims
+into checkable rows, currently covering Kob-Andersen beta-window visibility and
+Gaussian-recovery mechanism selection against the static-disorder null.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 

@@ -535,6 +535,46 @@ def mct_beta_benchmark_consistency(
     }
 
 
+def gaussian_recovery_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_gaussian_recovery: bool,
+    finite_exchange_late_ngp: float,
+    static_gamma_late_ngp: float,
+    recovery_threshold: float,
+) -> dict[str, float | str]:
+    """Check Gaussian-recovery evidence against finite exchange and static disorder."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "finite_exchange_late_ngp": finite_exchange_late_ngp,
+        "static_gamma_late_ngp": static_gamma_late_ngp,
+        "recovery_threshold": recovery_threshold,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+
+    finite_exchange_recovers = finite_exchange_late_ngp < recovery_threshold
+    static_null_recovers = static_gamma_late_ngp < recovery_threshold
+    finite_exchange_consistent = finite_exchange_recovers == observed_gaussian_recovery
+    static_null_consistent = static_null_recovers == observed_gaussian_recovery
+    mechanism_selection_consistent = finite_exchange_consistent and not static_null_consistent
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_gaussian_recovery": float(observed_gaussian_recovery),
+        "finite_exchange_late_ngp": finite_exchange_late_ngp,
+        "static_gamma_late_ngp": static_gamma_late_ngp,
+        "recovery_threshold": recovery_threshold,
+        "model_predicts_gaussian_recovery": float(finite_exchange_recovers),
+        "static_null_predicts_gaussian_recovery": float(static_null_recovers),
+        "finite_exchange_recovery_consistent": float(finite_exchange_consistent),
+        "static_null_recovery_consistent": float(static_null_consistent),
+        "mechanism_selection_consistent": float(mechanism_selection_consistent),
+        "overall_consistent": float(mechanism_selection_consistent),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

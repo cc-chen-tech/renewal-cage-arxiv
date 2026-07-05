@@ -32,6 +32,7 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     gaussian_radial_3d,
+    gaussian_recovery_benchmark_consistency,
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
@@ -736,18 +737,65 @@ def write_mct_beta_closure_csv(
     return rows
 
 
-def write_sota_benchmark_consistency_csv(path: Path, beta: MCTBetaParams) -> list[dict[str, float | str]]:
+def write_sota_benchmark_consistency_csv(
+    path: Path,
+    beta: MCTBetaParams,
+    params: DelayedRenewalCageParams,
+    heterogeneity: GammaExchangeParams,
+) -> list[dict[str, float | str]]:
+    fieldnames = [
+        "benchmark_id",
+        "benchmark_family",
+        "observed_critical_decay",
+        "observed_von_schweidler",
+        "required_decades",
+        "critical_window_decades",
+        "von_schweidler_window_decades",
+        "model_predicts_visible_critical_decay",
+        "model_predicts_visible_von_schweidler",
+        "critical_decay_consistent",
+        "von_schweidler_consistent",
+        "observed_gaussian_recovery",
+        "finite_exchange_late_ngp",
+        "static_gamma_late_ngp",
+        "recovery_threshold",
+        "model_predicts_gaussian_recovery",
+        "static_null_predicts_gaussian_recovery",
+        "finite_exchange_recovery_consistent",
+        "static_null_recovery_consistent",
+        "mechanism_selection_consistent",
+        "overall_consistent",
+    ]
+
+    def normalize(row: dict[str, float | str], family: str) -> dict[str, float | str]:
+        normalized = {key: np.nan for key in fieldnames}
+        normalized.update(row)
+        normalized["benchmark_family"] = family
+        return normalized
+
+    mct_row = mct_beta_benchmark_consistency(
+        beta,
+        benchmark_id="kob_andersen_1995_beta_window",
+        observed_critical_decay=False,
+        observed_von_schweidler=True,
+        observation_min_time=0.85 * beta.beta_time,
+        observation_max_time=500.0 * beta.beta_time,
+        alpha_time=80.0 * beta.beta_time,
+        required_decades=0.5,
+    )
+    late_time = 30000.0
+    finite_exchange_late_ngp = float(gamma_exchange_ngp_1d(np.array([late_time]), params, heterogeneity)[0])
+    static_gamma_late_ngp = float(static_gamma_ngp_1d(np.array([late_time]), params, heterogeneity.shape)[0])
+    recovery_row = gaussian_recovery_benchmark_consistency(
+        benchmark_id="gaussian_recovery_finite_exchange_vs_static_disorder",
+        observed_gaussian_recovery=True,
+        finite_exchange_late_ngp=finite_exchange_late_ngp,
+        static_gamma_late_ngp=static_gamma_late_ngp,
+        recovery_threshold=0.05,
+    )
     rows = [
-        mct_beta_benchmark_consistency(
-            beta,
-            benchmark_id="kob_andersen_1995_beta_window",
-            observed_critical_decay=False,
-            observed_von_schweidler=True,
-            observation_min_time=0.85 * beta.beta_time,
-            observation_max_time=500.0 * beta.beta_time,
-            alpha_time=80.0 * beta.beta_time,
-            required_decades=0.5,
-        )
+        normalize(mct_row, "mct_beta_window"),
+        normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -2037,14 +2085,16 @@ def write_mct_beta_closure_svg(path: Path, rows: list[dict[str, float]], base: M
 def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 560
-    row = rows[0]
+    by_id = {str(row["benchmark_id"]): row for row in rows}
+    mct_row = by_id["kob_andersen_1995_beta_window"]
+    recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
-        ("obs critical", float(row["observed_critical_decay"]), "#718096"),
-        ("model critical", float(row["model_predicts_visible_critical_decay"]), "#2b6cb0"),
-        ("obs von", float(row["observed_von_schweidler"]), "#718096"),
-        ("model von", float(row["model_predicts_visible_von_schweidler"]), "#c05621"),
+        ("obs critical", float(mct_row["observed_critical_decay"]), "#718096"),
+        ("model critical", float(mct_row["model_predicts_visible_critical_decay"]), "#2b6cb0"),
+        ("obs von", float(mct_row["observed_von_schweidler"]), "#718096"),
+        ("model von", float(mct_row["model_predicts_visible_von_schweidler"]), "#c05621"),
     ]
     bars = []
     bar_w = 54
@@ -2056,41 +2106,42 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
         bars.append(
             f'<text x="{x - 8}" y="{bottom + 24}" font-family="Arial, sans-serif" font-size="11">{label}</text>'
         )
-    decade_values = np.array(
+    recovery_values = np.array(
         [
-            float(row["critical_window_decades"]),
-            float(row["von_schweidler_window_decades"]),
-            float(row["required_decades"]),
+            float(recovery_row["finite_exchange_late_ngp"]),
+            float(recovery_row["static_gamma_late_ngp"]),
+            float(recovery_row["recovery_threshold"]),
         ]
     )
-    x_decades = np.array([0.0, 1.0, 2.0])
-    x = scale(x_decades, left_b, right_b)
-    y = scale(decade_values, bottom, top)
-    decade_labels = [
-        ("critical window", "#2b6cb0"),
-        ("von window", "#c05621"),
-        ("required", "#555555"),
+    x_recovery = np.array([0.0, 1.0, 2.0])
+    x = scale(x_recovery, left_b, right_b)
+    y = scale(np.log10(recovery_values), bottom, top)
+    recovery_labels = [
+        ("finite exchange", "#2f855a"),
+        ("static disorder", "#805ad5"),
+        ("recovery threshold", "#555555"),
     ]
     points = []
-    for idx, ((label, color), xi, yi, value) in enumerate(zip(decade_labels, x, y, decade_values)):
+    for idx, ((label, color), xi, yi, value) in enumerate(zip(recovery_labels, x, y, recovery_values)):
         points.append(f'<circle cx="{xi:.2f}" cy="{yi:.2f}" r="5" fill="{color}" />')
         points.append(
-            f'<text x="{left_b + 12}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}: {value:.2f}</text>'
+            f'<text x="{left_b + 12}" y="{top + 25 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}: {value:.3g}</text>'
         )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />
   <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA benchmark consistency</text>
-  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Kob-Andersen beta-window conclusion: late von-Schweidler visible, early critical decay hidden in the observed window.</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Benchmark rows convert literature-level conclusions into explicit consistency checks.</text>
   <line x1="{left_a}" y1="{bottom}" x2="{right_a}" y2="{bottom}" stroke="#222" />
   <line x1="{left_a}" y1="{bottom}" x2="{left_a}" y2="{top}" stroke="#222" />
-  <text x="{left_a}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Literature claim vs model visibility</text>
+  <text x="{left_a}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. MCT beta visibility</text>
   {"".join(bars)}
-  <text x="{left_a}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">overall consistent = {int(float(row['overall_consistent']))}</text>
+  <text x="{left_a}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">MCT row consistent = {int(float(mct_row['overall_consistent']))}</text>
   <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
   <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
-  <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Visible beta-window decades</text>
+  <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>
   {polyline(x, y, "#222222", width=1.2)}
   {"".join(points)}
+  <text x="{left_b}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">recovery row consistent = {int(float(recovery_row['overall_consistent']))}</text>
 </svg>
 """
     path.write_text(svg)
@@ -2898,6 +2949,8 @@ def main() -> None:
     sota_benchmark_rows = write_sota_benchmark_consistency_csv(
         DATA_DIR / "renewal_cage_sota_benchmark_consistency.csv",
         mct_beta,
+        params,
+        GammaExchangeParams(shape=0.4, exchange_renewal_count=10.0),
     )
     write_sota_benchmark_consistency_svg(
         FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.svg",

@@ -30,6 +30,21 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(phenomena["mct_beta_relaxation"]["model_status"], "partial")
         self.assertGreaterEqual(len(rows), 10)
 
+    def test_sota_benchmark_consistency_contains_multiple_mechanism_checks(self):
+        path = ROOT / "data" / "renewal_cage_sota_benchmark_consistency.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["benchmark_id"]: row for row in rows}
+        self.assertIn("kob_andersen_1995_beta_window", by_id)
+        self.assertIn("gaussian_recovery_finite_exchange_vs_static_disorder", by_id)
+        self.assertEqual(float(by_id["kob_andersen_1995_beta_window"]["overall_consistent"]), 1.0)
+        self.assertEqual(
+            float(by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]["mechanism_selection_consistent"]),
+            1.0,
+        )
+
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             zip_path = build_arxiv_package(output_dir=Path(tmpdir))

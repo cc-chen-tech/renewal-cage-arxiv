@@ -46,6 +46,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_normalized_alpha_decay,
     gamma_exchange_scattering_susceptibility,
     gamma_exchange_self_intermediate_scattering,
+    gaussian_recovery_benchmark_consistency,
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
     late_mechanism_selection,
@@ -1146,6 +1147,22 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["model_predicts_visible_von_schweidler"], 1.0)
         self.assertEqual(row["critical_decay_consistent"], 1.0)
         self.assertEqual(row["von_schweidler_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+
+    def test_gaussian_recovery_benchmark_consistency_rejects_static_disorder(self):
+        row = gaussian_recovery_benchmark_consistency(
+            benchmark_id="gaussian_recovery_finite_exchange_vs_static_disorder",
+            observed_gaussian_recovery=True,
+            finite_exchange_late_ngp=0.0048,
+            static_gamma_late_ngp=2.5,
+            recovery_threshold=0.05,
+        )
+
+        self.assertEqual(row["model_predicts_gaussian_recovery"], 1.0)
+        self.assertEqual(row["static_null_predicts_gaussian_recovery"], 0.0)
+        self.assertEqual(row["finite_exchange_recovery_consistent"], 1.0)
+        self.assertEqual(row["static_null_recovery_consistent"], 0.0)
+        self.assertEqual(row["mechanism_selection_consistent"], 1.0)
         self.assertEqual(row["overall_consistent"], 1.0)
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
