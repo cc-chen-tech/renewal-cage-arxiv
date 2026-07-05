@@ -1206,6 +1206,21 @@ def persistence_exchange_normalized_alpha_decay(
     return persistence_exchange_count_pgf(jump_factor, t, params)
 
 
+def persistence_exchange_scattering_susceptibility(
+    wave_number: float,
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+) -> np.ndarray:
+    """Single-domain alpha susceptibility proxy for persistence/exchange clocks."""
+
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    jump_factor = math.exp(-0.5 * wave_number**2 * params.jump_variance)
+    mean = persistence_exchange_count_pgf(jump_factor, t, params)
+    second = persistence_exchange_count_pgf(jump_factor * jump_factor, t, params)
+    return np.maximum(second - mean * mean, 0.0)
+
+
 def persistence_exchange_alpha_relaxation_time(
     wave_number: float,
     params: PersistenceExchangeParams,
@@ -1361,6 +1376,125 @@ def infer_persistence_exchange_from_alpha_transport(
         "late_time": float(late_time) if late_time is not None else float("nan"),
         "predicted_late_ngp": predicted_late_ngp,
         "late_ngp_log_residual": late_ngp_log_residual,
+    }
+
+
+def persistence_exchange_joint_diagnostic(
+    *,
+    anchor_wave_number: float,
+    wave_numbers: list[float],
+    observed_tau_alpha_by_k: dict[float, float],
+    jump_variance: float,
+    diffusion_coefficient: float,
+    late_time: float,
+    observed_late_ngp: float,
+    time_grid: np.ndarray,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    max_multik_abs_log_residual: float = 0.05,
+    max_late_ngp_abs_log_residual: float = 0.1,
+    min_chi4_peak_growth: float = 1.0,
+) -> dict[str, float]:
+    """Jointly test persistence/exchange inversion against held-out observables.
+
+    The anchor alpha time and diffusion infer ``tau_p`` and ``tau_x``. Other
+    wave numbers, the late NGP, and the alpha-susceptibility proxy are then
+    predictions rather than fitted quantities.
+    """
+
+    if anchor_wave_number <= 0.0:
+        raise ValueError("anchor_wave_number must be positive")
+    if not wave_numbers:
+        raise ValueError("wave_numbers must be nonempty")
+    if anchor_wave_number not in observed_tau_alpha_by_k:
+        raise ValueError("observed_tau_alpha_by_k must include the anchor wave number")
+    for wave_number in wave_numbers:
+        if wave_number <= 0.0:
+            raise ValueError("wave_numbers must be positive")
+        if wave_number not in observed_tau_alpha_by_k:
+            raise ValueError("observed_tau_alpha_by_k must include every wave number")
+        if observed_tau_alpha_by_k[wave_number] <= 0.0:
+            raise ValueError("observed alpha times must be positive")
+    time_grid = np.asarray(time_grid, dtype=float)
+    if time_grid.ndim != 1 or time_grid.size == 0 or np.any(time_grid <= 0.0):
+        raise ValueError("time_grid must be a positive one-dimensional array")
+    if max_multik_abs_log_residual < 0.0 or max_late_ngp_abs_log_residual < 0.0:
+        raise ValueError("residual thresholds must be nonnegative")
+    if min_chi4_peak_growth <= 0.0:
+        raise ValueError("min_chi4_peak_growth must be positive")
+
+    anchor_tau_alpha = observed_tau_alpha_by_k[anchor_wave_number]
+    inferred = infer_persistence_exchange_from_alpha_transport(
+        wave_number=anchor_wave_number,
+        jump_variance=jump_variance,
+        diffusion_coefficient=diffusion_coefficient,
+        observed_tau_alpha=anchor_tau_alpha,
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        threshold=threshold,
+        late_time=late_time,
+        observed_late_ngp=observed_late_ngp,
+    )
+    params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=inferred["persistence_mean"],
+        exchange_mean=inferred["exchange_mean"],
+    )
+    poisson_params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=inferred["exchange_mean"],
+        exchange_mean=inferred["exchange_mean"],
+    )
+
+    max_abs_residual = 0.0
+    for wave_number in wave_numbers:
+        predicted_tau = persistence_exchange_alpha_relaxation_time(
+            wave_number,
+            params,
+            threshold=threshold,
+        )
+        residual = math.log(observed_tau_alpha_by_k[wave_number] / predicted_tau)
+        max_abs_residual = max(max_abs_residual, abs(residual))
+
+    chi4 = persistence_exchange_scattering_susceptibility(anchor_wave_number, time_grid, params)
+    poisson_chi4 = persistence_exchange_scattering_susceptibility(anchor_wave_number, time_grid, poisson_params)
+    chi4_peak = float(np.max(chi4))
+    poisson_chi4_peak = float(np.max(poisson_chi4))
+    chi4_growth = chi4_peak / poisson_chi4_peak
+    poisson_tau_alpha = persistence_exchange_alpha_relaxation_time(
+        anchor_wave_number,
+        poisson_params,
+        threshold=threshold,
+    )
+    se_growth = anchor_tau_alpha / poisson_tau_alpha
+    multik_flag = max_abs_residual <= max_multik_abs_log_residual
+    late_ngp_flag = abs(inferred["late_ngp_log_residual"]) <= max_late_ngp_abs_log_residual
+    chi4_flag = chi4_growth >= min_chi4_peak_growth
+    return {
+        "exchange_mean": inferred["exchange_mean"],
+        "persistence_mean": inferred["persistence_mean"],
+        "persistence_exchange_ratio": inferred["persistence_exchange_ratio"],
+        "anchor_wave_number": anchor_wave_number,
+        "anchor_tau_alpha": anchor_tau_alpha,
+        "poisson_tau_alpha": poisson_tau_alpha,
+        "stokes_einstein_growth_over_poisson": se_growth,
+        "max_multik_tau_alpha_abs_log_residual": max_abs_residual,
+        "late_time": late_time,
+        "observed_late_ngp": observed_late_ngp,
+        "predicted_late_ngp": inferred["predicted_late_ngp"],
+        "late_ngp_log_residual": inferred["late_ngp_log_residual"],
+        "chi4_peak": chi4_peak,
+        "poisson_chi4_peak": poisson_chi4_peak,
+        "chi4_peak_growth_over_poisson": chi4_growth,
+        "multik_tau_alpha_consistent": float(multik_flag),
+        "late_ngp_consistent": float(late_ngp_flag),
+        "chi4_proxy_growth_consistent": float(chi4_flag),
+        "passes_joint_protocol": float(multik_flag and late_ngp_flag and chi4_flag),
     }
 
 

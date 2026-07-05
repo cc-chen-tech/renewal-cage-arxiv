@@ -67,6 +67,7 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_benchmark_consistency,
     persistence_exchange_diffusion_coefficient,
+    persistence_exchange_joint_diagnostic,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
@@ -562,6 +563,112 @@ def write_persistence_exchange_protocol_csv(
                     "predicted_late_ngp": np.nan,
                     "late_ngp_log_residual": np.nan,
                     "tau_alpha_log_residual": np.nan,
+                }
+            )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_persistence_exchange_joint_protocol_csv(
+    path: Path,
+    *,
+    anchor_wave_number: float,
+    wave_numbers: list[float],
+    jump_variance: float,
+    exchange_mean: float,
+    true_ratio: float,
+) -> list[dict[str, float | str]]:
+    params = PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=0.2,
+        jump_variance=jump_variance,
+        persistence_mean=true_ratio * exchange_mean,
+        exchange_mean=exchange_mean,
+    )
+    diffusion = persistence_exchange_diffusion_coefficient(params)
+    late_time = 80.0 * params.persistence_mean
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    observed_tau_alpha = {
+        wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+        for wave_number in wave_numbers
+    }
+    scenarios = [
+        ("consistent", observed_tau_alpha),
+        (
+            "multik_alpha_mismatch",
+            {
+                wave_number: (1.25 * value if math.isclose(wave_number, max(wave_numbers)) else value)
+                for wave_number, value in observed_tau_alpha.items()
+            },
+        ),
+    ]
+    time_grid = np.geomspace(0.05, 300.0, 260)
+    rows: list[dict[str, float | str]] = []
+    for scenario, tau_by_k in scenarios:
+        diagnostic = persistence_exchange_joint_diagnostic(
+            anchor_wave_number=anchor_wave_number,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=tau_by_k,
+            jump_variance=jump_variance,
+            diffusion_coefficient=diffusion,
+            late_time=late_time,
+            observed_late_ngp=observed_late_ngp,
+            time_grid=time_grid,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            max_multik_abs_log_residual=0.02,
+            max_late_ngp_abs_log_residual=0.02,
+            min_chi4_peak_growth=1.5,
+        )
+        inferred_params = PersistenceExchangeParams(
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            jump_variance=jump_variance,
+            persistence_mean=diagnostic["persistence_mean"],
+            exchange_mean=diagnostic["exchange_mean"],
+        )
+        common = {
+            "scenario": scenario,
+            "true_persistence_exchange_ratio": true_ratio,
+            "inferred_persistence_exchange_ratio": diagnostic["persistence_exchange_ratio"],
+            "exchange_mean": diagnostic["exchange_mean"],
+            "persistence_mean": diagnostic["persistence_mean"],
+            "diffusion_coefficient": diffusion,
+            "anchor_wave_number": anchor_wave_number,
+            "late_time": late_time,
+            "observed_late_ngp": observed_late_ngp,
+            "predicted_late_ngp": diagnostic["predicted_late_ngp"],
+            "late_ngp_log_residual": diagnostic["late_ngp_log_residual"],
+            "max_multik_tau_alpha_abs_log_residual": diagnostic["max_multik_tau_alpha_abs_log_residual"],
+            "stokes_einstein_growth_over_poisson": diagnostic["stokes_einstein_growth_over_poisson"],
+            "chi4_peak": diagnostic["chi4_peak"],
+            "poisson_chi4_peak": diagnostic["poisson_chi4_peak"],
+            "chi4_peak_growth_over_poisson": diagnostic["chi4_peak_growth_over_poisson"],
+            "multik_tau_alpha_consistent": diagnostic["multik_tau_alpha_consistent"],
+            "late_ngp_consistent": diagnostic["late_ngp_consistent"],
+            "chi4_proxy_growth_consistent": diagnostic["chi4_proxy_growth_consistent"],
+            "passes_joint_protocol": diagnostic["passes_joint_protocol"],
+        }
+        rows.append(
+            {
+                "record_type": "summary",
+                **common,
+                "wave_number": np.nan,
+                "observed_tau_alpha": np.nan,
+                "predicted_tau_alpha": np.nan,
+                "tau_alpha_log_residual": np.nan,
+            }
+        )
+        for wave_number in wave_numbers:
+            predicted_tau = persistence_exchange_alpha_relaxation_time(wave_number, inferred_params)
+            rows.append(
+                {
+                    "record_type": "multik_alpha",
+                    **common,
+                    "wave_number": wave_number,
+                    "observed_tau_alpha": tau_by_k[wave_number],
+                    "predicted_tau_alpha": predicted_tau,
+                    "tau_alpha_log_residual": math.log(tau_by_k[wave_number] / predicted_tau),
                 }
             )
     write_sweep_csv(path, rows)
@@ -2578,6 +2685,87 @@ def write_persistence_exchange_protocol_svg(path: Path, rows: list[dict[str, flo
     path.write_text(svg)
 
 
+def write_persistence_exchange_joint_protocol_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 580
+    left_a, top, right_a, bottom = 75, 98, 520, 435
+    left_b, right_b = 660, 1040
+    summary_rows = [row for row in rows if row["record_type"] == "summary"]
+    multik_rows = [row for row in rows if row["record_type"] == "multik_alpha"]
+    scenarios = [str(row["scenario"]) for row in summary_rows]
+
+    x_a = np.linspace(left_a + 90, right_a - 90, len(summary_rows))
+    checks = [
+        ("multi-k alpha", "multik_tau_alpha_consistent", "#2b6cb0"),
+        ("late NGP", "late_ngp_consistent", "#2f855a"),
+        ("chi4 proxy", "chi4_proxy_growth_consistent", "#805ad5"),
+    ]
+    marker_rows = []
+    for idx, row in enumerate(summary_rows):
+        for check_idx, (label, key, color) in enumerate(checks):
+            cy = top + 70 + check_idx * 78
+            value = float(row[key])
+            fill = color if value > 0.5 else "#c05621"
+            marker_rows.append(f'<circle cx="{x_a[idx]:.1f}" cy="{cy:.1f}" r="12" fill="{fill}" />')
+            marker_rows.append(
+                f'<text x="{x_a[idx] - 34:.1f}" y="{cy + 30:.1f}" font-family="Arial, sans-serif" font-size="11">{label}</text>'
+            )
+        marker_rows.append(
+            f'<text x="{x_a[idx] - 55:.1f}" y="{bottom + 35}" font-family="Arial, sans-serif" font-size="12">{scenarios[idx].replace("_", " ")}</text>'
+        )
+
+    finite_residuals = np.array([abs(float(row["tau_alpha_log_residual"])) for row in multik_rows])
+    residual_values = np.concatenate([finite_residuals, np.array([0.02])])
+    residual_min = 0.0
+    residual_max = max(float(np.max(residual_values)), 0.03)
+
+    def y_residual(value: float) -> float:
+        return bottom + (value - residual_min) * (top - bottom) / (residual_max - residual_min)
+
+    x_positions_b = np.linspace(left_b + 95, right_b - 95, len(summary_rows))
+    k_values = sorted({float(row["wave_number"]) for row in multik_rows})
+    offsets = np.linspace(-28, 28, len(k_values))
+    residual_points = []
+    for idx, scenario in enumerate(scenarios):
+        for k_idx, wave_number in enumerate(k_values):
+            row = next(
+                row
+                for row in multik_rows
+                if str(row["scenario"]) == scenario and math.isclose(float(row["wave_number"]), wave_number)
+            )
+            residual = abs(float(row["tau_alpha_log_residual"]))
+            color = "#2b6cb0" if residual <= 0.02 else "#c05621"
+            residual_points.append(
+                f'<circle cx="{x_positions_b[idx] + offsets[k_idx]:.1f}" cy="{y_residual(residual):.1f}" r="7" fill="{color}" />'
+            )
+            residual_points.append(
+                f'<text x="{x_positions_b[idx] + offsets[k_idx] - 12:.1f}" y="{bottom + 50 + k_idx * 16}" font-family="Arial, sans-serif" font-size="10">k={wave_number:g}</text>'
+            )
+        residual_points.append(
+            f'<text x="{x_positions_b[idx] - 55:.1f}" y="{bottom + 35}" font-family="Arial, sans-serif" font-size="12">{scenario.replace("_", " ")}</text>'
+        )
+
+    consistent = summary_rows[0]
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Joint persistence/exchange inversion protocol</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">One anchor alpha time plus D infer clocks; multi-k alpha, late NGP, and chi4 proxy are held out.</text>
+  <line x1="{left_a}" y1="{bottom}" x2="{right_a}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_a}" y1="{bottom}" x2="{left_a}" y2="{top}" stroke="#222" />
+  <text x="{left_a}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Joint protocol pass/fail</text>
+  {"".join(marker_rows)}
+  <text x="{left_a + 12}" y="{bottom - 34}" font-family="Arial, sans-serif" font-size="12">consistent case: tau_p/tau_x={float(consistent['inferred_persistence_exchange_ratio']):.1f}, SE growth={float(consistent['stokes_einstein_growth_over_poisson']):.2f}, chi4 growth={float(consistent['chi4_peak_growth_over_poisson']):.2f}</text>
+  <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
+  <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Held-out multi-k alpha residual</text>
+  <line x1="{left_b}" y1="{y_residual(0.02):.1f}" x2="{right_b}" y2="{y_residual(0.02):.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{left_b + 12}" y="{y_residual(0.02) - 8:.1f}" font-family="Arial, sans-serif" font-size="12" fill="#718096">|log residual|=0.02</text>
+  {"".join(residual_points)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -3216,6 +3404,18 @@ def main() -> None:
     write_persistence_exchange_protocol_svg(
         FIGURE_DIR / "renewal_cage_persistence_exchange_protocol.svg",
         persistence_exchange_protocol_rows,
+    )
+    persistence_exchange_joint_protocol_rows = write_persistence_exchange_joint_protocol_csv(
+        DATA_DIR / "renewal_cage_persistence_exchange_joint_protocol.csv",
+        anchor_wave_number=1.1,
+        wave_numbers=[0.7, 1.1, 1.6],
+        jump_variance=0.7,
+        exchange_mean=1.0,
+        true_ratio=8.0,
+    )
+    write_persistence_exchange_joint_protocol_svg(
+        FIGURE_DIR / "renewal_cage_persistence_exchange_joint_protocol.svg",
+        persistence_exchange_joint_protocol_rows,
     )
 
     barrier = ActivatedBarrierParams(

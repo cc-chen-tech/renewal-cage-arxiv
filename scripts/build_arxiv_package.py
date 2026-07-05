@@ -636,6 +636,91 @@ def write_persistence_exchange_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_persistence_exchange_joint_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_persistence_exchange_joint_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    summary = [row for row in rows if row["record_type"] == "summary"]
+    multik = [row for row in rows if row["record_type"] == "multik_alpha"]
+    scenarios = [row["scenario"].replace("_", " ") for row in summary]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Joint persistence/exchange inversion protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "Anchor alpha time plus D infer clocks; multi-k alpha, late NGP, and chi4 proxy are held out.")
+
+    left_a, left_b, bottom, width, height = 45.0, 430.0, 150.0, 320.0, 280.0
+    for left, title in [(left_a, "AC. Joint pass/fail checks"), (left_b, "AD. Held-out multi-k alpha residual")]:
+        c.setStrokeColor(colors.black)
+        c.line(left, bottom, left + width, bottom)
+        c.line(left, bottom, left, bottom + height)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(left, bottom + height + 13, title)
+
+    checks = [
+        ("multi-k", "multik_tau_alpha_consistent", colors.HexColor("#2b6cb0")),
+        ("late NGP", "late_ngp_consistent", colors.HexColor("#2f855a")),
+        ("chi4", "chi4_proxy_growth_consistent", colors.HexColor("#805ad5")),
+    ]
+    x_positions_a = np.linspace(left_a + 70, left_a + width - 70, len(summary))
+    for idx, row in enumerate(summary):
+        for check_idx, (label, key, good_color) in enumerate(checks):
+            y = bottom + height - 62 - check_idx * 62
+            color = good_color if float(row[key]) > 0.5 else colors.HexColor("#c05621")
+            c.setFillColor(color)
+            c.circle(float(x_positions_a[idx]), y, 6.5, fill=1, stroke=0)
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica", 6.5)
+            c.drawCentredString(float(x_positions_a[idx]), y - 17, label)
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(float(x_positions_a[idx]), bottom - 24, scenarios[idx])
+
+    finite_residual = np.array([abs(float(row["tau_alpha_log_residual"])) for row in multik])
+    residual_max = max(float(np.max(finite_residual)), 0.03)
+
+    def y_residual(value: float) -> float:
+        return bottom + value / residual_max * height
+
+    c.setStrokeColor(colors.grey)
+    c.setDash(4, 3)
+    c.line(left_b, y_residual(0.02), left_b + width, y_residual(0.02))
+    c.setDash()
+    c.setFont("Helvetica", 7)
+    c.drawString(left_b + 8, y_residual(0.02) + 4, "|log residual|=0.02")
+
+    k_values = sorted({float(row["wave_number"]) for row in multik})
+    offsets = np.linspace(-20, 20, len(k_values))
+    x_positions_b = np.linspace(left_b + 80, left_b + width - 80, len(summary))
+    for idx, scenario in enumerate([row["scenario"] for row in summary]):
+        for k_idx, wave_number in enumerate(k_values):
+            row = next(
+                row
+                for row in multik
+                if row["scenario"] == scenario and math.isclose(float(row["wave_number"]), wave_number)
+            )
+            residual = abs(float(row["tau_alpha_log_residual"]))
+            c.setFillColor(colors.HexColor("#2b6cb0") if residual <= 0.02 else colors.HexColor("#c05621"))
+            c.circle(float(x_positions_b[idx] + offsets[k_idx]), y_residual(residual), 4.5, fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(float(x_positions_b[idx]), bottom - 24, scenario.replace("_", " "))
+
+    consistent = summary[0]
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        45,
+        92,
+        "consistent: "
+        f"tau_p/tau_x={float(consistent['inferred_persistence_exchange_ratio']):.1f}; "
+        f"SE growth={float(consistent['stokes_einstein_growth_over_poisson']):.2f}; "
+        f"chi4 growth={float(consistent['chi4_peak_growth_over_poisson']):.2f}",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_glass_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_glass_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1426,6 +1511,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     facilitated_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_facilitated_exchange.pdf"
     persistence_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange.pdf"
     persistence_exchange_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange_protocol.pdf"
+    persistence_exchange_joint_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange_joint_protocol.pdf"
+    )
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
@@ -1447,6 +1535,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_facilitated_exchange_pdf(facilitated_exchange_pdf)
     write_persistence_exchange_pdf(persistence_exchange_pdf)
     write_persistence_exchange_protocol_pdf(persistence_exchange_protocol_pdf)
+    write_persistence_exchange_joint_protocol_pdf(persistence_exchange_joint_protocol_pdf)
     write_glass_audit_pdf(glass_audit_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_spatial_chi4_pdf(spatial_chi4_pdf)
@@ -1473,6 +1562,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(facilitated_exchange_pdf, "figures/renewal_cage_facilitated_exchange.pdf")
         archive.write(persistence_exchange_pdf, "figures/renewal_cage_persistence_exchange.pdf")
         archive.write(persistence_exchange_protocol_pdf, "figures/renewal_cage_persistence_exchange_protocol.pdf")
+        archive.write(
+            persistence_exchange_joint_protocol_pdf,
+            "figures/renewal_cage_persistence_exchange_joint_protocol.pdf",
+        )
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")

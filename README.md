@@ -27,7 +27,8 @@ The model combines:
   mobility-disorder null model, late-time mechanism-selection diagnostics, a
   glass-dynamics phenomenon audit, barrier-facilitation signature phase
   diagrams, closed barrier-threshold requirements, finite-time consistency
-  diagnostics, and observable inversion/falsifiability criteria.
+  diagnostics, joint persistence/exchange inversion protocols, and observable
+  inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -60,6 +61,9 @@ held-out consistency check.
 The persistence/exchange inversion uses `D` to fix `tau_x=q/(2D)`, solves
 `G(a_k,tau_alpha;tau_p,tau_x)=h` for `tau_p`, and leaves late NGP recovery as a
 held-out falsification observable.
+The joint persistence/exchange protocol uses one anchor alpha time plus `D` to
+infer the clocks, then holds out multi-`k` alpha times, late NGP recovery, and a
+single-domain `chi4` proxy.
 The finite-exchange protocol adds a second data-level residual: late NGP gives
 `c_NGP=R_l alpha_2(t_l)-1`, the alpha slope gives `c_alpha` through
 `log(1+Gamma_k c_alpha)/c_alpha`, and `log(c_alpha/c_NGP)` tests whether both
@@ -139,6 +143,7 @@ figures/renewal_cage_alpha_shape.svg
 figures/renewal_cage_facilitated_exchange.svg
 figures/renewal_cage_persistence_exchange.svg
 figures/renewal_cage_persistence_exchange_protocol.svg
+figures/renewal_cage_persistence_exchange_joint_protocol.svg
 figures/renewal_cage_glass_audit.svg
 figures/renewal_cage_glass_phase_diagram.svg
 figures/renewal_cage_spatial_chi4.svg
@@ -167,6 +172,7 @@ data/renewal_cage_alpha_shape.csv
 data/renewal_cage_facilitated_exchange.csv
 data/renewal_cage_persistence_exchange.csv
 data/renewal_cage_persistence_exchange_protocol.csv
+data/renewal_cage_persistence_exchange_joint_protocol.csv
 data/renewal_cage_glass_audit.csv
 data/renewal_cage_glass_phase_diagram.csv
 data/renewal_cage_spatial_chi4.csv
@@ -194,6 +200,7 @@ paper/figures/renewal_cage_alpha_shape.pdf
 paper/figures/renewal_cage_facilitated_exchange.pdf
 paper/figures/renewal_cage_persistence_exchange.pdf
 paper/figures/renewal_cage_persistence_exchange_protocol.pdf
+paper/figures/renewal_cage_persistence_exchange_joint_protocol.pdf
 paper/figures/renewal_cage_glass_audit.pdf
 paper/figures/renewal_cage_glass_phase_diagram.pdf
 paper/figures/renewal_cage_spatial_chi4.pdf

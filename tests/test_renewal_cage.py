@@ -77,9 +77,11 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_count_pgf,
     persistence_exchange_count_moments,
     persistence_exchange_diffusion_coefficient,
+    persistence_exchange_joint_diagnostic,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
+    persistence_exchange_scattering_susceptibility,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     static_gamma_asymptotic_diagnostics,
@@ -1925,6 +1927,99 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 cage_variance=poisson_params.cage_variance,
                 cage_tau=poisson_params.cage_tau,
             )
+
+    def test_persistence_exchange_joint_diagnostic_predicts_multik_late_ngp_and_chi4_proxy(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        observed_tau_alpha = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        diffusion = persistence_exchange_diffusion_coefficient(params)
+        late_time = 80.0 * params.persistence_mean
+        observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+        time_grid = np.geomspace(0.05, 300.0, 260)
+
+        diagnostic = persistence_exchange_joint_diagnostic(
+            anchor_wave_number=1.1,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=observed_tau_alpha,
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=diffusion,
+            late_time=late_time,
+            observed_late_ngp=observed_late_ngp,
+            time_grid=time_grid,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            max_multik_abs_log_residual=0.02,
+            max_late_ngp_abs_log_residual=0.02,
+            min_chi4_peak_growth=1.5,
+        )
+        poisson = PersistenceExchangeParams(
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            jump_variance=params.jump_variance,
+            persistence_mean=params.exchange_mean,
+            exchange_mean=params.exchange_mean,
+        )
+        inferred = PersistenceExchangeParams(
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            jump_variance=params.jump_variance,
+            persistence_mean=diagnostic["persistence_mean"],
+            exchange_mean=diagnostic["exchange_mean"],
+        )
+        predicted_chi4 = np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, inferred))
+        poisson_chi4 = np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, poisson))
+
+        self.assertAlmostEqual(diagnostic["persistence_exchange_ratio"], 8.0, places=7)
+        self.assertLess(diagnostic["max_multik_tau_alpha_abs_log_residual"], 1e-8)
+        self.assertLess(abs(diagnostic["late_ngp_log_residual"]), 1e-8)
+        self.assertGreater(diagnostic["stokes_einstein_growth_over_poisson"], 2.0)
+        self.assertGreater(diagnostic["chi4_peak_growth_over_poisson"], 1.5)
+        self.assertAlmostEqual(diagnostic["chi4_peak"], predicted_chi4, places=10)
+        self.assertAlmostEqual(diagnostic["poisson_chi4_peak"], poisson_chi4, places=10)
+        self.assertEqual(diagnostic["passes_joint_protocol"], 1.0)
+
+    def test_persistence_exchange_joint_diagnostic_rejects_multik_alpha_mismatch(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        observed_tau_alpha = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        observed_tau_alpha[1.6] *= 1.25
+        diagnostic = persistence_exchange_joint_diagnostic(
+            anchor_wave_number=1.1,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=observed_tau_alpha,
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            late_time=80.0 * params.persistence_mean,
+            observed_late_ngp=float(persistence_exchange_ngp_1d(np.array([80.0 * params.persistence_mean]), params)[0]),
+            time_grid=np.geomspace(0.05, 300.0, 260),
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            max_multik_abs_log_residual=0.02,
+            max_late_ngp_abs_log_residual=0.02,
+            min_chi4_peak_growth=1.5,
+        )
+
+        self.assertGreater(diagnostic["max_multik_tau_alpha_abs_log_residual"], 0.02)
+        self.assertEqual(diagnostic["multik_tau_alpha_consistent"], 0.0)
+        self.assertEqual(diagnostic["passes_joint_protocol"], 0.0)
 
     def test_persistence_exchange_long_time_ngp_recovers_to_zero(self):
         params = PersistenceExchangeParams(

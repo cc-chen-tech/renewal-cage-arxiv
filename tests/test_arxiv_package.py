@@ -105,6 +105,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_persistence_exchange_joint_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -130,6 +131,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_mechanism_selection.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange_protocol.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_persistence_exchange_joint_protocol.pdf", main_tex)
         self.assertIn("figures/renewal_cage_inversion.pdf", main_tex)
         self.assertNotIn(".svg", main_tex)
 
@@ -174,6 +176,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_persistence_exchange_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_persistence_exchange_protocol.pdf"
             ).read_bytes()
+            first_persistence_exchange_joint_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_persistence_exchange_joint_protocol.pdf"
+            ).read_bytes()
             first_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
             time.sleep(1.1)
@@ -216,6 +221,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_persistence_exchange_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_persistence_exchange_protocol.pdf"
             ).read_bytes()
+            second_persistence_exchange_joint_protocol = (
+                ROOT / "paper" / "figures" / "renewal_cage_persistence_exchange_joint_protocol.pdf"
+            ).read_bytes()
             second_inversion = (ROOT / "paper" / "figures" / "renewal_cage_inversion.pdf").read_bytes()
 
         self.assertEqual(first_results, second_results)
@@ -238,6 +246,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)
         self.assertEqual(first_persistence_exchange, second_persistence_exchange)
         self.assertEqual(first_persistence_exchange_protocol, second_persistence_exchange_protocol)
+        self.assertEqual(first_persistence_exchange_joint_protocol, second_persistence_exchange_joint_protocol)
         self.assertEqual(first_inversion, second_inversion)
 
 

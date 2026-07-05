@@ -903,6 +903,13 @@ with $\tau_p/\tau_x=9$ recovers $\tau_x=1.00$, $\tau_p=9.00$, and predicts the
 held-out late NGP $1.56\times10^{-3}$ with zero log residual; replacing only
 the late NGP fails this residual check. This separates Stokes-Einstein
 violation from permanent non-Gaussianity.
+A joint inversion protocol using one anchor alpha time, diffusion, and the same
+late NGP check recovers $\tau_p/\tau_x=8.00$ in the consistent synthetic case;
+the held-out multi-$k$ alpha residual is below $10^{-8}$, the
+Stokes-Einstein product grows by a factor $3.56$ over the Poisson baseline, and
+the single-domain $\chi_4$ proxy grows by a factor $2.58$. Deliberately
+changing only the $k=1.6$ alpha time fails the multi-$k$ residual threshold,
+giving a direct falsification mode for future trajectory-level inversions.
 
 The generated file \texttt{renewal\_cage\_sota\_comparison.csv} records a
 scope audit against representative experimental and simulation benchmarks.
@@ -1013,6 +1020,15 @@ model-versus-benchmark rows.
   clocks. The late NGP is not fitted; it is a held-out falsification observable
   that accepts the consistent synthetic case and rejects a mismatched late-NGP
   case.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_persistence_exchange_joint_protocol.pdf}
+  \caption{Joint persistence-exchange inversion protocol. An anchor alpha time
+  and long-time diffusion infer the hidden clocks. The multi-$k$ alpha times,
+  late NGP, and $\chi_4$ proxy are then held-out checks; the mismatched
+  multi-$k$ case fails without refitting the clocks.}
 \end{figure}
 
 \begin{figure}[h]
