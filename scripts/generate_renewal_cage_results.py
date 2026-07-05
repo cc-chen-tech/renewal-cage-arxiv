@@ -142,6 +142,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_observable_uncertainty_protocol,
     trajectory_observable_curve_bridge,
     trajectory_curve_persistence_exchange_gate,
+    trajectory_member_ensemble_uncertainty_protocol,
     trajectory_pe_heldout_prediction_gate,
     trajectory_prediction_falsification_gate,
     trajectory_table_csv_adapter,
@@ -4500,11 +4501,56 @@ def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, floa
     return rows
 
 
+def write_trajectory_member_ensemble_uncertainty_csv(path: Path) -> list[dict[str, float | str]]:
+    """Estimate trajectory-observable uncertainties across independent members."""
+
+    member_rows: list[dict[str, float | str]] = []
+    base_rows = [
+        (1.0, 1.0, 0.62, [0.82, 0.70, 0.58], 0.4),
+        (2.0, 3.8, 0.31, [0.44, 0.28, 0.18], 1.5),
+        (4.0, 8.4, 0.11, [0.20, 0.08, 0.035], 0.7),
+    ]
+    for member_index in range(4):
+        scale_factor = 1.0 + 0.04 * member_index
+        for lag_time, msd, ngp, fs_values, chi4 in base_rows:
+            member_rows.append(
+                {
+                    "member_id": f"synthetic_member_{member_index}",
+                    "lag_index": lag_time,
+                    "lag_time": lag_time,
+                    "time_origin_count": 8.0,
+                    "particle_count": 64.0,
+                    "dimension": 2.0,
+                    "msd": msd * scale_factor,
+                    "ngp": ngp / scale_factor,
+                    "wave_numbers": "0.7;1.1;1.6",
+                    "self_intermediate_scattering_by_k": ";".join(
+                        f"{value / scale_factor:.12g}" for value in fs_values
+                    ),
+                    "self_intermediate_scattering": fs_values[0] / scale_factor,
+                    "overlap_radius": 0.5,
+                    "overlap_mean": 0.3 / scale_factor,
+                    "chi4_overlap": chi4 * scale_factor,
+                }
+            )
+    rows = trajectory_member_ensemble_uncertainty_protocol(
+        member_rows=member_rows,
+        min_member_count=4,
+    )
+    for row in rows:
+        row["benchmark_id"] = "synthetic_member_ensemble_trajectory"
+        row["target_protocol"] = "member_ensemble_uncertainty_to_raw_curve_bridge"
+        row["machine_readable_trajectory_members"] = 1.0
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_trajectory_inversion_readiness_csv(
     path: Path,
     *,
     observable_rows: list[dict[str, float | str]],
     uncertainty_rows: list[dict[str, float | str]],
+    member_ensemble_rows: list[dict[str, float | str]],
 ) -> list[dict[str, float | str]]:
     """Gate trajectory-derived observables before promoting them to inversion."""
 
@@ -4531,6 +4577,16 @@ def write_trajectory_inversion_readiness_csv(
             source_key="synthetic_trajectory_reanalysis",
             target_protocol="trajectory_alpha_vanhove_chi4_transport",
             trajectory_rows=observable_rows,
+            required_observables=required_observables,
+            required_uncertainty_columns=required_uncertainty_columns,
+            has_shared_time_grid=True,
+            has_shared_particle_identity=True,
+        ),
+        trajectory_inversion_readiness_gate(
+            benchmark_id="synthetic_member_ensemble_trajectory_uncertainty",
+            source_key="synthetic_member_ensemble_trajectory",
+            target_protocol="trajectory_alpha_vanhove_chi4_transport",
+            trajectory_rows=member_ensemble_rows,
             required_observables=required_observables,
             required_uncertainty_columns=required_uncertainty_columns,
             has_shared_time_grid=True,
@@ -7668,6 +7724,56 @@ def write_trajectory_uncertainty_protocol_svg(
     path.write_text(svg)
 
 
+def write_trajectory_member_ensemble_uncertainty_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left, top, right, bottom = 90, 95, 1035, 420
+    lag = np.array([float(row["lag_time"]) for row in rows])
+    sigma_msd = np.array([float(row["sigma_msd"]) for row in rows])
+    sigma_ngp = np.array([float(row["sigma_ngp"]) for row in rows])
+    sigma_fs = np.array([float(row["sigma_self_intermediate_scattering"]) for row in rows])
+    sigma_chi4 = np.array([float(row["sigma_chi4_overlap"]) for row in rows])
+
+    def x(values: np.ndarray) -> np.ndarray:
+        return scale(values, left, right)
+
+    def y(values: np.ndarray) -> np.ndarray:
+        return scale(values, bottom, top)
+
+    curves = [
+        ("member sigma MSD", sigma_msd, "#2b6cb0"),
+        ("member sigma NGP", sigma_ngp, "#c05621"),
+        ("member sigma F_s", sigma_fs, "#2f855a"),
+        ("member sigma chi4", sigma_chi4, "#805ad5"),
+    ]
+    marks = []
+    for idx, (label, values, color) in enumerate(curves):
+        marks.append(polyline(x(lag), y(values), color, width=2.5))
+        marks.append(
+            f'<text x="{left + 18 + idx * 210}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12" fill="{color}">{label}</text>'
+        )
+        for xx, yy in zip(x(lag), y(values)):
+            marks.append(f'<circle cx="{xx:.1f}" cy="{yy:.1f}" r="4" fill="{color}" />')
+    peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Trajectory member-ensemble uncertainty</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Independent trajectory members supply standard-error columns before uncertainty-weighted persistence/exchange inversion.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{(left + right) / 2 - 42}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">lag time</text>
+  <text x="38" y="300" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 38 300)">scaled member uncertainty</text>
+  {"".join(marks)}
+  <text x="{left}" y="{bottom + 90}" font-family="Arial, sans-serif" font-size="11">method: {peak["uncertainty_method"]}; members = {int(float(peak["member_count"]))}; blocker = {peak["primary_blocker"]}</text>
+  <text x="{left}" y="{bottom + 108}" font-family="Arial, sans-serif" font-size="11">stage: {peak["ensemble_stage"]}; threshold = {int(float(peak["min_member_count"]))}; target = {peak["target_protocol"]}</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_trajectory_inversion_readiness_svg(
     path: Path,
     rows: list[dict[str, float | str]],
@@ -8791,10 +8897,18 @@ def main() -> None:
         FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.svg",
         trajectory_uncertainty_rows,
     )
+    trajectory_member_ensemble_uncertainty_rows = write_trajectory_member_ensemble_uncertainty_csv(
+        DATA_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.csv"
+    )
+    write_trajectory_member_ensemble_uncertainty_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.svg",
+        trajectory_member_ensemble_uncertainty_rows,
+    )
     trajectory_inversion_readiness_rows = write_trajectory_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_trajectory_inversion_readiness.csv",
         observable_rows=trajectory_observable_rows,
         uncertainty_rows=trajectory_uncertainty_rows,
+        member_ensemble_rows=trajectory_member_ensemble_uncertainty_rows,
     )
     write_trajectory_inversion_readiness_svg(
         FIGURE_DIR / "renewal_cage_trajectory_inversion_readiness.svg",

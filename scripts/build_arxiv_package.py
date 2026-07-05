@@ -3742,6 +3742,75 @@ def write_trajectory_uncertainty_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_member_ensemble_uncertainty_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Trajectory member-ensemble uncertainty")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Independent trajectory members supply standard-error columns before uncertainty-weighted inversion.",
+    )
+    left, bottom = 80, 105
+    plot_w, plot_h = 640, 300
+    lag = np.array([float(row["lag_time"]) for row in rows])
+    series = [
+        ("member sigma MSD", np.array([float(row["sigma_msd"]) for row in rows]), colors.HexColor("#2b6cb0")),
+        ("member sigma NGP", np.array([float(row["sigma_ngp"]) for row in rows]), colors.HexColor("#c05621")),
+        (
+            "member sigma F_s",
+            np.array([float(row["sigma_self_intermediate_scattering"]) for row in rows]),
+            colors.HexColor("#2f855a"),
+        ),
+        (
+            "member sigma chi4",
+            np.array([float(row["sigma_chi4_overlap"]) for row in rows]),
+            colors.HexColor("#805ad5"),
+        ),
+    ]
+
+    def scaled_x(values: np.ndarray) -> np.ndarray:
+        return left + (values - np.min(values)) * plot_w / max(float(np.max(values) - np.min(values)), 1e-12)
+
+    def scaled_y(values: np.ndarray) -> np.ndarray:
+        span = max(float(np.max(values) - np.min(values)), 1e-12)
+        return bottom + (values - np.min(values)) * plot_h / span
+
+    c.setStrokeColor(colors.black)
+    c.line(left, bottom, left + plot_w, bottom)
+    c.line(left, bottom, left, bottom + plot_h)
+    c.setFont("Helvetica", 7.5)
+    for idx, (label, values, color) in enumerate(series):
+        xs = scaled_x(lag)
+        ys = scaled_y(values)
+        c.setStrokeColor(color)
+        c.setFillColor(color)
+        for j in range(len(xs) - 1):
+            c.line(float(xs[j]), float(ys[j]), float(xs[j + 1]), float(ys[j + 1]))
+        for x, y in zip(xs, ys):
+            c.circle(float(x), float(y), 2.6, stroke=0, fill=1)
+        c.drawString(left + idx * 120, bottom - 35, label)
+    peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+    c.setFillColor(colors.black)
+    c.drawString(
+        left,
+        bottom - 58,
+        f"method={peak['uncertainty_method']}; members={int(float(peak['member_count']))}; threshold={int(float(peak['min_member_count']))}; blocker={peak['primary_blocker']}",
+    )
+    c.drawString(
+        left,
+        bottom - 72,
+        f"stage={peak['ensemble_stage']}; target={peak['target_protocol']}",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_trajectory_inversion_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_trajectory_inversion_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3946,6 +4015,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     trajectory_observable_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.pdf"
     trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
+    trajectory_member_ensemble_uncertainty_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.pdf"
+    )
     trajectory_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_inversion_readiness.pdf"
     benchmark_publication_ladder_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_publication_ladder.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
@@ -4019,6 +4091,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_raw_curve_persistence_exchange_protocol_pdf(raw_curve_persistence_exchange_protocol_pdf)
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
     write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
+    write_trajectory_member_ensemble_uncertainty_pdf(trajectory_member_ensemble_uncertainty_pdf)
     write_trajectory_inversion_readiness_pdf(trajectory_inversion_readiness_pdf)
     write_benchmark_publication_ladder_pdf(benchmark_publication_ladder_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
@@ -4159,6 +4232,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         )
         archive.write(trajectory_observable_protocol_pdf, "figures/renewal_cage_trajectory_observable_protocol.pdf")
         archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
+        archive.write(
+            trajectory_member_ensemble_uncertainty_pdf,
+            "figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf",
+        )
         archive.write(trajectory_inversion_readiness_pdf, "figures/renewal_cage_trajectory_inversion_readiness.pdf")
         archive.write(benchmark_publication_ladder_pdf, "figures/renewal_cage_benchmark_publication_ladder.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")

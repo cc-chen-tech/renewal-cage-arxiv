@@ -1438,13 +1438,21 @@ trajectory-derived observables. Its columns
 \texttt{sigma\_msd}, \texttt{sigma\_ngp}, \texttt{sigma\_self\_intermediate\_scattering},
 and \texttt{sigma\_chi4\_overlap} are the uncertainty estimates required by the
 downstream raw-curve and persistence/exchange protocols.
+The member-ensemble counterpart
+\texttt{renewal\_cage\_trajectory\_member\_ensemble\_uncertainty.csv} performs the
+same promotion with independent trajectory members: lag-resolved member
+observables are averaged only into standard-error rows, not into a completed
+real-data fit. This is the route required for a future GlassBench-style
+multi-\texttt{npz} reanalysis once physical time units and enough independent
+members are available.
 The gate
 \texttt{renewal\_cage\_trajectory\_inversion\_readiness.csv} then separates a
 trajectory source that is merely structurally usable from one that is ready for
 uncertainty-weighted inversion. Promotion requires the required observable set,
 a shared lag grid, shared particle identity, and positive uncertainty columns;
 the structural-only example is deliberately blocked by the missing
-\texttt{sigma\_*} fields.
+\texttt{sigma\_*} fields, while both the time-origin and independent-member
+synthetic canaries reach the uncertainty-weighted protocol stage.
 The publication ladder
 \texttt{renewal\_cage\_benchmark\_publication\_ladder.csv} then collapses the
 metadata, readiness, and held-out prediction gates into manuscript-safe claim

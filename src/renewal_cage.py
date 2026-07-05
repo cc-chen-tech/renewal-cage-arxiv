@@ -6401,6 +6401,146 @@ def trajectory_observable_uncertainty_protocol(
     return out
 
 
+def trajectory_member_ensemble_uncertainty_protocol(
+    *,
+    member_rows: Sequence[dict[str, object]],
+    min_member_count: int,
+) -> list[dict[str, float | str]]:
+    """Aggregate independent trajectory-member observables into uncertainty rows."""
+
+    if not member_rows:
+        raise ValueError("member_rows must be nonempty")
+    if int(min_member_count) != min_member_count or min_member_count < 2:
+        raise ValueError("min_member_count must be an integer at least two")
+
+    required_columns = {
+        "member_id",
+        "lag_time",
+        "time_origin_count",
+        "particle_count",
+        "dimension",
+        "msd",
+        "ngp",
+        "wave_numbers",
+        "self_intermediate_scattering_by_k",
+        "self_intermediate_scattering",
+        "overlap_radius",
+        "overlap_mean",
+        "chi4_overlap",
+    }
+    missing = sorted(required_columns.difference(member_rows[0]))
+    if missing:
+        raise ValueError(f"member rows are missing required columns: {';'.join(missing)}")
+
+    grouped: dict[float, list[dict[str, object]]] = {}
+    for row in member_rows:
+        missing = sorted(required_columns.difference(row))
+        if missing:
+            raise ValueError(f"member rows are missing required columns: {';'.join(missing)}")
+        lag_time = float(row["lag_time"])
+        if lag_time <= 0.0:
+            raise ValueError("lag_time values must be positive")
+        grouped.setdefault(lag_time, []).append(row)
+
+    def mean_and_standard_error(values: Sequence[float]) -> tuple[float, float]:
+        array = np.asarray(values, dtype=float)
+        if array.size == 0:
+            raise ValueError("cannot aggregate an empty value set")
+        if not np.all(np.isfinite(array)):
+            raise ValueError("member observable values must be finite")
+        mean = float(np.mean(array))
+        if array.size < 2:
+            return mean, 0.0
+        sigma = float(np.std(array, ddof=1) / math.sqrt(array.size))
+        return mean, sigma
+
+    out: list[dict[str, float | str]] = []
+    for lag_time in sorted(grouped):
+        group = grouped[lag_time]
+        members = sorted({str(row["member_id"]) for row in group if str(row["member_id"])})
+        member_count = len(members)
+        wave_numbers = str(group[0]["wave_numbers"])
+        dimension = float(group[0]["dimension"])
+        particle_count = float(group[0]["particle_count"])
+        overlap_radius = float(group[0]["overlap_radius"])
+        if dimension <= 0.0 or particle_count <= 0.0 or overlap_radius <= 0.0:
+            raise ValueError("dimension, particle_count, and overlap_radius must be positive")
+        fs_by_member: list[list[float]] = []
+        for row in group:
+            if str(row["wave_numbers"]) != wave_numbers:
+                raise ValueError("all members at a lag must share the same wave_numbers")
+            if float(row["dimension"]) != dimension:
+                raise ValueError("all members at a lag must share the same dimension")
+            if float(row["particle_count"]) != particle_count:
+                raise ValueError("all members at a lag must share the same particle_count")
+            values = _parse_semicolon_float_values(
+                row["self_intermediate_scattering_by_k"],
+                name="self_intermediate_scattering_by_k",
+            )
+            if any(not np.isfinite(value) for value in values):
+                raise ValueError("self_intermediate_scattering_by_k values must be finite")
+            fs_by_member.append(values)
+        fs_lengths = {len(values) for values in fs_by_member}
+        if len(fs_lengths) != 1:
+            raise ValueError("all members at a lag must have the same number of Fs values")
+
+        msd, sigma_msd = mean_and_standard_error([float(row["msd"]) for row in group])
+        ngp, sigma_ngp = mean_and_standard_error([float(row["ngp"]) for row in group])
+        fs, sigma_fs = mean_and_standard_error(
+            [float(row["self_intermediate_scattering"]) for row in group]
+        )
+        overlap_mean, sigma_overlap = mean_and_standard_error(
+            [float(row["overlap_mean"]) for row in group]
+        )
+        chi4, sigma_chi4 = mean_and_standard_error([float(row["chi4_overlap"]) for row in group])
+        fs_array = np.asarray(fs_by_member, dtype=float)
+        fs_means = np.mean(fs_array, axis=0)
+        if member_count < 2:
+            fs_sigmas = np.zeros(fs_array.shape[1])
+        else:
+            fs_sigmas = np.std(fs_array, axis=0, ddof=1) / math.sqrt(member_count)
+        ready = member_count >= int(min_member_count)
+        out.append(
+            {
+                "lag_index": float(group[0].get("lag_index", lag_time)),
+                "lag_time": float(lag_time),
+                "member_ids": ";".join(members) if members else "none",
+                "member_count": float(member_count),
+                "min_member_count": float(min_member_count),
+                "time_origin_count_mean": float(
+                    np.mean([float(row["time_origin_count"]) for row in group])
+                ),
+                "particle_count": float(particle_count),
+                "dimension": float(dimension),
+                "msd": msd,
+                "ngp": ngp,
+                "wave_numbers": wave_numbers,
+                "self_intermediate_scattering_by_k": ";".join(f"{value:.12g}" for value in fs_means),
+                "self_intermediate_scattering": fs,
+                "overlap_radius": float(overlap_radius),
+                "overlap_mean": overlap_mean,
+                "chi4_overlap": chi4,
+                "sigma_msd": sigma_msd,
+                "sigma_ngp": sigma_ngp,
+                "sigma_self_intermediate_scattering_by_k": ";".join(
+                    f"{value:.12g}" for value in fs_sigmas
+                ),
+                "sigma_self_intermediate_scattering": sigma_fs,
+                "sigma_overlap_mean": sigma_overlap,
+                "sigma_chi4_overlap": sigma_chi4,
+                "structural_observable_set": "msd;ngp;self_intermediate_scattering;overlap_chi4",
+                "uncertainty_method": "member_ensemble_standard_error",
+                "ensemble_uncertainty_ready": float(ready),
+                "uncertainty_estimates": float(ready),
+                "primary_blocker": "none" if ready else "member_count",
+                "ensemble_stage": "member_ensemble_uncertainty_ready"
+                if ready
+                else "member_ensemble_below_threshold",
+            }
+        )
+    return out
+
+
 def trajectory_inversion_readiness_gate(
     *,
     benchmark_id: str,

@@ -1278,6 +1278,22 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(float(peak["sigma_self_intermediate_scattering"]), 0.0)
         self.assertGreaterEqual(float(peak["sigma_chi4_overlap"]), 0.0)
 
+    def test_trajectory_member_ensemble_uncertainty_exports_member_sigmas(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_member_ensemble_uncertainty.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        self.assertEqual(len(rows), 3)
+        peak = max(rows, key=lambda row: float(row["chi4_overlap"]))
+        self.assertEqual(peak["uncertainty_method"], "member_ensemble_standard_error")
+        self.assertEqual(float(peak["member_count"]), 4.0)
+        self.assertEqual(float(peak["ensemble_uncertainty_ready"]), 1.0)
+        self.assertEqual(peak["primary_blocker"], "none")
+        self.assertGreater(float(peak["sigma_msd"]), 0.0)
+        self.assertGreater(float(peak["sigma_self_intermediate_scattering"]), 0.0)
+        self.assertGreater(float(peak["sigma_chi4_overlap"]), 0.0)
+
     def test_trajectory_inversion_readiness_gate_promotes_uncertainty_weighted_trajectory_rows(self):
         path = ROOT / "data" / "renewal_cage_trajectory_inversion_readiness.csv"
         self.assertTrue(path.exists())
@@ -1292,6 +1308,9 @@ class ArxivPackageTests(unittest.TestCase):
         structural = by_id["synthetic_intermittent_trajectory_structural_only"]
         self.assertEqual(structural["readiness_stage"], "structural_trajectory_only")
         self.assertEqual(structural["primary_blocker"], "sigma_msd")
+        member_ensemble = by_id["synthetic_member_ensemble_trajectory_uncertainty"]
+        self.assertEqual(member_ensemble["readiness_stage"], "uncertainty_weighted_trajectory_inversion")
+        self.assertEqual(float(member_ensemble["uncertainty_weighted_ready"]), 1.0)
 
     def test_translation_rotation_protocol_detects_rotational_decoupling_gap(self):
         path = ROOT / "data" / "renewal_cage_translation_rotation_protocol.csv"
@@ -1374,6 +1393,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_uncertainty_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_benchmark_publication_ladder.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
@@ -1520,6 +1540,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
+            "figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf",
             "figures/renewal_cage_trajectory_inversion_readiness.pdf",
             "figures/renewal_cage_barrier_requirements.pdf",
             "figures/renewal_cage_barrier.pdf",
@@ -1691,6 +1712,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
+            ).read_bytes()
+            first_trajectory_member_ensemble_uncertainty = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_member_ensemble_uncertainty.pdf"
             ).read_bytes()
             first_trajectory_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_inversion_readiness.pdf"
@@ -1869,6 +1893,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
             ).read_bytes()
+            second_trajectory_member_ensemble_uncertainty = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_member_ensemble_uncertainty.pdf"
+            ).read_bytes()
             second_trajectory_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_inversion_readiness.pdf"
             ).read_bytes()
@@ -1987,6 +2014,10 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(first_trajectory_observable_protocol, second_trajectory_observable_protocol)
         self.assertEqual(first_trajectory_uncertainty_protocol, second_trajectory_uncertainty_protocol)
+        self.assertEqual(
+            first_trajectory_member_ensemble_uncertainty,
+            second_trajectory_member_ensemble_uncertainty,
+        )
         self.assertEqual(first_trajectory_inversion_readiness, second_trajectory_inversion_readiness)
         self.assertEqual(first_barrier_requirements, second_barrier_requirements)
         self.assertEqual(first_mechanism_selection, second_mechanism_selection)

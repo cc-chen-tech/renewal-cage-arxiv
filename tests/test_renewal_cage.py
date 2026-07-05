@@ -155,6 +155,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_table_adapter,
     trajectory_observable_curve_bridge,
     trajectory_curve_persistence_exchange_gate,
+    trajectory_member_ensemble_uncertainty_protocol,
     trajectory_pe_heldout_prediction_gate,
     trajectory_prediction_falsification_gate,
     TranslationRotationExchangeParams,
@@ -4637,6 +4638,85 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(gate["primary_blocker"], "sigma_ngp")
         self.assertEqual(gate["structural_trajectory_ready"], 1.0)
         self.assertEqual(gate["uncertainty_weighted_ready"], 0.0)
+
+    def test_trajectory_member_ensemble_uncertainty_protocol_adds_member_sigmas(self):
+        member_rows = []
+        for member_index in range(4):
+            for lag_time, msd, ngp, fs_values, chi4 in [
+                (1.0, 1.0, 0.62, [0.82, 0.70], 0.4),
+                (2.0, 3.8, 0.31, [0.44, 0.28], 1.5),
+                (4.0, 8.4, 0.11, [0.20, 0.08], 0.7),
+            ]:
+                scale = 1.0 + 0.04 * member_index
+                member_rows.append(
+                    {
+                        "member_id": f"traj_{member_index}",
+                        "lag_index": lag_time,
+                        "lag_time": lag_time,
+                        "time_origin_count": 8.0,
+                        "particle_count": 64.0,
+                        "dimension": 2.0,
+                        "msd": msd * scale,
+                        "ngp": ngp / scale,
+                        "wave_numbers": "0.7;1.1",
+                        "self_intermediate_scattering_by_k": ";".join(
+                            f"{value / scale:.12g}" for value in fs_values
+                        ),
+                        "self_intermediate_scattering": fs_values[0] / scale,
+                        "overlap_radius": 0.5,
+                        "overlap_mean": 0.3 / scale,
+                        "chi4_overlap": chi4 * scale,
+                    }
+                )
+
+        rows = trajectory_member_ensemble_uncertainty_protocol(
+            member_rows=member_rows,
+            min_member_count=4,
+        )
+
+        self.assertEqual(len(rows), 3)
+        middle = rows[1]
+        self.assertEqual(middle["member_count"], 4.0)
+        self.assertEqual(middle["ensemble_uncertainty_ready"], 1.0)
+        self.assertEqual(middle["primary_blocker"], "none")
+        self.assertGreater(middle["sigma_msd"], 0.0)
+        self.assertGreater(middle["sigma_ngp"], 0.0)
+        self.assertGreater(middle["sigma_self_intermediate_scattering"], 0.0)
+        self.assertGreater(middle["sigma_chi4_overlap"], 0.0)
+        self.assertEqual(middle["uncertainty_method"], "member_ensemble_standard_error")
+        self.assertEqual(middle["ensemble_stage"], "member_ensemble_uncertainty_ready")
+        self.assertIn(";", middle["sigma_self_intermediate_scattering_by_k"])
+
+    def test_trajectory_member_ensemble_uncertainty_protocol_blocks_small_ensemble(self):
+        member_rows = [
+            {
+                "member_id": f"traj_{member_index}",
+                "lag_index": 1.0,
+                "lag_time": 1.0,
+                "time_origin_count": 8.0,
+                "particle_count": 64.0,
+                "dimension": 2.0,
+                "msd": 1.0 + 0.1 * member_index,
+                "ngp": 0.5,
+                "wave_numbers": "0.7",
+                "self_intermediate_scattering_by_k": f"{0.8 - 0.05 * member_index:.12g}",
+                "self_intermediate_scattering": 0.8 - 0.05 * member_index,
+                "overlap_radius": 0.5,
+                "overlap_mean": 0.3,
+                "chi4_overlap": 0.4,
+            }
+            for member_index in range(3)
+        ]
+
+        rows = trajectory_member_ensemble_uncertainty_protocol(
+            member_rows=member_rows,
+            min_member_count=4,
+        )
+
+        self.assertEqual(rows[0]["member_count"], 3.0)
+        self.assertEqual(rows[0]["ensemble_uncertainty_ready"], 0.0)
+        self.assertEqual(rows[0]["primary_blocker"], "member_count")
+        self.assertEqual(rows[0]["ensemble_stage"], "member_ensemble_below_threshold")
 
     def test_van_hove_tail_benchmark_consistency_detects_transient_tail_and_recovery(self):
         row = van_hove_tail_benchmark_consistency(

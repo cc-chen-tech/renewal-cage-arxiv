@@ -114,6 +114,10 @@ The companion trajectory-uncertainty protocol uses time-origin block jackknife
 estimates to attach uncertainty columns to those trajectory-derived observables,
 turning the trajectory bridge into a quantitative pre-inversion input rather
 than only a structural observable extractor.
+The member-ensemble uncertainty protocol adds the independent-trajectory
+version of the same pre-inversion layer: member-resolved trajectory observables
+are aggregated into standard-error columns before persistence/exchange
+inversion is allowed.
 The trajectory inversion readiness gate then promotes trajectory-derived rows
 only when the required structural observables, shared lag grid, shared particle
 identity, and positive uncertainty columns are all present; otherwise it keeps
@@ -348,6 +352,7 @@ figures/renewal_cage_raw_curve_diagnostic_readiness.svg
 figures/renewal_cage_raw_curve_persistence_exchange_protocol.svg
 figures/renewal_cage_trajectory_observable_protocol.svg
 figures/renewal_cage_trajectory_uncertainty_protocol.svg
+figures/renewal_cage_trajectory_member_ensemble_uncertainty.svg
 figures/renewal_cage_trajectory_inversion_readiness.svg
 figures/renewal_cage_benchmark_publication_ladder.svg
 figures/renewal_cage_barrier_requirements.svg
@@ -443,6 +448,7 @@ data/renewal_cage_trajectory_curve_pe_gate.csv
 data/renewal_cage_trajectory_pe_heldout_predictions.csv
 data/renewal_cage_trajectory_prediction_falsification.csv
 data/renewal_cage_trajectory_uncertainty_protocol.csv
+data/renewal_cage_trajectory_member_ensemble_uncertainty.csv
 data/renewal_cage_trajectory_inversion_readiness.csv
 data/renewal_cage_benchmark_publication_ladder.csv
 data/renewal_cage_barrier_requirements.csv
@@ -511,6 +517,7 @@ paper/figures/renewal_cage_raw_curve_diagnostic_readiness.pdf
 paper/figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf
 paper/figures/renewal_cage_trajectory_observable_protocol.pdf
 paper/figures/renewal_cage_trajectory_uncertainty_protocol.pdf
+paper/figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf
 paper/figures/renewal_cage_trajectory_inversion_readiness.pdf
 paper/figures/renewal_cage_benchmark_publication_ladder.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf
