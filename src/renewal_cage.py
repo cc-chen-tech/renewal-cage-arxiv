@@ -3972,6 +3972,129 @@ def trajectory_prediction_falsification_gate(
     return base
 
 
+def benchmark_publication_ladder(
+    *,
+    ladder_id: str,
+    source_key: str,
+    source_class: str,
+    evidence_grade: str,
+    reanalysis_stage: str,
+    readiness_stage: str,
+    falsification_stage: str,
+    primary_blocker: str,
+) -> dict[str, float | str]:
+    """Collapse benchmark gates into manuscript-safe publication claim levels."""
+
+    for name, value in {
+        "ladder_id": ladder_id,
+        "source_key": source_key,
+        "source_class": source_class,
+        "evidence_grade": evidence_grade,
+        "reanalysis_stage": reanalysis_stage,
+        "readiness_stage": readiness_stage,
+        "falsification_stage": falsification_stage,
+        "primary_blocker": primary_blocker,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    allowed_source_classes = {"real_public_data", "synthetic_canary", "thermodynamic_boundary"}
+    allowed_evidence = {
+        "direct_dynamical_support",
+        "closure_assisted_support",
+        "thermodynamic_scope_boundary",
+        "pending_trajectory_reanalysis",
+        "overclaimed_or_forbidden",
+        "not_supported",
+    }
+    if source_class not in allowed_source_classes:
+        raise ValueError("source_class is not recognized")
+    if evidence_grade not in allowed_evidence:
+        raise ValueError("evidence_grade is not recognized")
+
+    readiness_ready = readiness_stage == "uncertainty_weighted_trajectory_inversion"
+    falsification_passed = falsification_stage == "trajectory_prediction_falsification_passed"
+    fit_only_risk = falsification_stage == "fit_only_overclaim_risk"
+    awaiting_reanalysis = reanalysis_stage.startswith("awaiting_")
+
+    if evidence_grade == "overclaimed_or_forbidden" or fit_only_risk:
+        stage = "fit_only_overclaim_blocked" if fit_only_risk else "forbidden_claim_blocked"
+        allowed_claim = "do_not_claim_prediction"
+        protocol_evidence = False
+        real_comparison = False
+        overreach = True
+        next_action = "add_heldout_predictions_before_claiming_fit"
+    elif evidence_grade == "thermodynamic_scope_boundary" or source_class == "thermodynamic_boundary":
+        stage = "thermodynamic_scope_boundary"
+        allowed_claim = "scope_boundary_only"
+        protocol_evidence = True
+        real_comparison = False
+        overreach = False
+        next_action = "do_not_convert_closure_to_thermodynamic_derivation"
+    elif source_class == "synthetic_canary" and readiness_ready and falsification_passed:
+        stage = "synthetic_prediction_canary_passed"
+        allowed_claim = "protocol_canary_passed"
+        protocol_evidence = True
+        real_comparison = False
+        overreach = False
+        next_action = "repeat_protocol_on_real_public_trajectory"
+    elif source_class == "real_public_data" and readiness_ready and falsification_passed:
+        stage = "uncertainty_weighted_real_reanalysis"
+        allowed_claim = "real_data_quantitative_comparison"
+        protocol_evidence = True
+        real_comparison = True
+        overreach = False
+        next_action = "report_uncertainty_weighted_residuals"
+    elif evidence_grade == "pending_trajectory_reanalysis" or awaiting_reanalysis:
+        stage = "metadata_verified_not_reanalysis"
+        allowed_claim = "metadata_readiness_only"
+        protocol_evidence = False
+        real_comparison = False
+        overreach = True
+        next_action = (
+            "cache_full_archive_and_verify_checksum"
+            if "archive" in primary_blocker or "cache" in reanalysis_stage
+            else "complete_trajectory_reanalysis_gate"
+        )
+    elif not readiness_ready:
+        stage = "structural_or_uncertainty_gate_incomplete"
+        allowed_claim = "readiness_gap_only"
+        protocol_evidence = False
+        real_comparison = False
+        overreach = True
+        next_action = primary_blocker
+    elif not falsification_passed:
+        stage = "heldout_prediction_not_passed"
+        allowed_claim = "do_not_claim_prediction"
+        protocol_evidence = False
+        real_comparison = False
+        overreach = True
+        next_action = primary_blocker
+    else:
+        stage = "not_supported"
+        allowed_claim = "do_not_claim"
+        protocol_evidence = False
+        real_comparison = False
+        overreach = True
+        next_action = primary_blocker
+
+    return {
+        "ladder_id": ladder_id,
+        "source_key": source_key,
+        "source_class": source_class,
+        "evidence_grade": evidence_grade,
+        "reanalysis_stage": reanalysis_stage,
+        "readiness_stage": readiness_stage,
+        "falsification_stage": falsification_stage,
+        "primary_blocker": primary_blocker,
+        "publication_stage": stage,
+        "allowed_manuscript_claim": allowed_claim,
+        "publishable_protocol_evidence": float(protocol_evidence),
+        "real_data_quantitative_comparison": float(real_comparison),
+        "claim_overreach_if_called_fit": float(overreach),
+        "next_required_action": next_action,
+    }
+
+
 def trajectory_observable_uncertainty_protocol(
     *,
     positions: np.ndarray,

@@ -1222,6 +1222,15 @@ uncertainty-weighted inversion. Promotion requires the required observable set,
 a shared lag grid, shared particle identity, and positive uncertainty columns;
 the structural-only example is deliberately blocked by the missing
 \texttt{sigma\_*} fields.
+The publication ladder
+\texttt{renewal\_cage\_benchmark\_publication\_ladder.csv} then collapses the
+metadata, readiness, and held-out prediction gates into manuscript-safe claim
+levels. The current GlassBench row is allowed only as
+\texttt{metadata\_readiness\_only}; the synthetic trajectory canary is allowed
+as \texttt{protocol\_canary\_passed} but not as a real-data fit; and the
+fit-only negative control is blocked as \texttt{do\_not\_claim\_prediction}.
+This is the publication guard that separates a reproducible inversion
+protocol from a completed SOTA trajectory reanalysis.
 Finally,
 \texttt{renewal\_cage\_raw\_curve\_ingestion\_contract.csv} specifies the
 column-level contract for turning the structurally valid Kob-Andersen I/II
@@ -1539,6 +1548,16 @@ rejected without refitting the clocks.
   reduced to observable clocks and scored with the uncertainty-weighted
   persistence/exchange protocol. The consistent raw curves pass all held-out
   checks, while a late-NGP mismatch fails without refitting.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_benchmark_publication_ladder.pdf}
+  \caption{Benchmark publication claim ladder. Metadata verification,
+  trajectory-readiness gates, and held-out prediction outcomes are collapsed
+  into manuscript-safe claim levels. The ladder separates current GlassBench
+  metadata readiness, synthetic protocol-canary evidence, fit-only overclaim
+  blockers, and thermodynamic scope boundaries.}
 \end{figure}
 
 \clearpage

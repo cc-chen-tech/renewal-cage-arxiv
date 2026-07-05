@@ -118,6 +118,10 @@ The trajectory inversion readiness gate then promotes trajectory-derived rows
 only when the required structural observables, shared lag grid, shared particle
 identity, and positive uncertainty columns are all present; otherwise it keeps
 the source at the structural-trajectory-only stage.
+The benchmark publication ladder collapses metadata, readiness, and held-out
+prediction gates into manuscript-safe claim levels, separating current
+GlassBench metadata readiness from synthetic protocol-canary evidence and
+fit-only overclaim risks.
 The cross-observable prediction ledger separates calibration inputs from
 held-out predictions and external closures, making fit-only overclaims visible.
 The inversion-identifiability audit then checks fit-rank margins, held-out
@@ -227,6 +231,7 @@ figures/renewal_cage_raw_curve_persistence_exchange_protocol.svg
 figures/renewal_cage_trajectory_observable_protocol.svg
 figures/renewal_cage_trajectory_uncertainty_protocol.svg
 figures/renewal_cage_trajectory_inversion_readiness.svg
+figures/renewal_cage_benchmark_publication_ladder.svg
 figures/renewal_cage_barrier_requirements.svg
 figures/renewal_cage_barrier.svg
 figures/renewal_cage_heterogeneity.svg
@@ -292,6 +297,7 @@ data/renewal_cage_trajectory_pe_heldout_predictions.csv
 data/renewal_cage_trajectory_prediction_falsification.csv
 data/renewal_cage_trajectory_uncertainty_protocol.csv
 data/renewal_cage_trajectory_inversion_readiness.csv
+data/renewal_cage_benchmark_publication_ladder.csv
 data/renewal_cage_barrier_requirements.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
@@ -341,6 +347,7 @@ paper/figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf
 paper/figures/renewal_cage_trajectory_observable_protocol.pdf
 paper/figures/renewal_cage_trajectory_uncertainty_protocol.pdf
 paper/figures/renewal_cage_trajectory_inversion_readiness.pdf
+paper/figures/renewal_cage_benchmark_publication_ladder.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf
 paper/figures/renewal_cage_barrier.pdf
 paper/figures/renewal_cage_heterogeneity.pdf

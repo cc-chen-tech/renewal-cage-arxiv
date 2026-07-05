@@ -2741,6 +2741,59 @@ def write_trajectory_inversion_readiness_pdf(path: Path) -> None:
     c.save()
 
 
+def write_benchmark_publication_ladder_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_benchmark_publication_ladder.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Benchmark publication claim ladder")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Readiness, reanalysis, and held-out prediction gates are collapsed into manuscript-safe claim levels.",
+    )
+    left, top = 42, page_h - 92
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top, "ladder row")
+    c.drawString(left + 215, top, "publication stage")
+    c.drawString(left + 405, top, "allowed claim")
+    c.drawString(left + 565, top, "real")
+    c.drawString(left + 608, top, "overreach")
+    c.drawString(left + 680, top, "next action")
+    palette = {
+        "metadata_verified_not_reanalysis": colors.HexColor("#d69e2e"),
+        "synthetic_prediction_canary_passed": colors.HexColor("#2f855a"),
+        "fit_only_overclaim_blocked": colors.HexColor("#b83280"),
+        "thermodynamic_scope_boundary": colors.HexColor("#805ad5"),
+        "uncertainty_weighted_real_reanalysis": colors.HexColor("#276749"),
+        "structural_or_uncertainty_gate_incomplete": colors.HexColor("#2b6cb0"),
+        "heldout_prediction_not_passed": colors.HexColor("#c05621"),
+        "forbidden_claim_blocked": colors.HexColor("#b83280"),
+        "not_supported": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 38
+        stage = row["publication_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["ladder_id"].replace("_", " ")[:31])
+        c.setFillColor(palette[stage])
+        c.rect(left + 215, y - 4, 172, 13, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 220, y, stage.replace("_", " ")[:28])
+        c.setFillColor(colors.black)
+        c.drawString(left + 405, y, row["allowed_manuscript_claim"].replace("_", " ")[:27])
+        c.drawString(left + 570, y, str(int(float(row["real_data_quantitative_comparison"]))))
+        c.drawString(left + 625, y, str(int(float(row["claim_overreach_if_called_fit"]))))
+        c.drawString(left + 680, y, row["next_required_action"].replace("_", " ")[:34])
+        c.drawString(left + 215, y - 11, f"source: {row['source_key'].replace('_', ' ')[:72]}")
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -2796,6 +2849,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     trajectory_observable_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.pdf"
     trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
     trajectory_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_inversion_readiness.pdf"
+    benchmark_publication_ladder_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_publication_ladder.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
     mechanism_selection_pdf = PAPER_FIGURE_DIR / "renewal_cage_mechanism_selection.pdf"
     barrier_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier.pdf"
@@ -2840,6 +2894,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
     write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
     write_trajectory_inversion_readiness_pdf(trajectory_inversion_readiness_pdf)
+    write_benchmark_publication_ladder_pdf(benchmark_publication_ladder_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
     write_mechanism_selection_pdf(mechanism_selection_pdf)
     write_barrier_pdf(barrier_pdf)
@@ -2910,6 +2965,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(trajectory_observable_protocol_pdf, "figures/renewal_cage_trajectory_observable_protocol.pdf")
         archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
         archive.write(trajectory_inversion_readiness_pdf, "figures/renewal_cage_trajectory_inversion_readiness.pdf")
+        archive.write(benchmark_publication_ladder_pdf, "figures/renewal_cage_benchmark_publication_ladder.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")
         archive.write(mechanism_selection_pdf, "figures/renewal_cage_mechanism_selection.pdf")
         archive.write(barrier_pdf, "figures/renewal_cage_barrier.pdf")

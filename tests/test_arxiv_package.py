@@ -758,6 +758,30 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(fit_only["heldout_count"]), 0.0)
         self.assertEqual(fit_only["primary_blocker"], "heldout_observables")
 
+    def test_benchmark_publication_ladder_separates_real_reanalysis_from_protocol_canary(self):
+        path = ROOT / "data" / "renewal_cage_benchmark_publication_ladder.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["ladder_id"]: row for row in rows}
+        glassbench = by_id["glassbench_current_publication_state"]
+        self.assertEqual(glassbench["publication_stage"], "metadata_verified_not_reanalysis")
+        self.assertEqual(glassbench["allowed_manuscript_claim"], "metadata_readiness_only")
+        self.assertEqual(float(glassbench["real_data_quantitative_comparison"]), 0.0)
+        self.assertEqual(float(glassbench["claim_overreach_if_called_fit"]), 1.0)
+
+        canary = by_id["synthetic_trajectory_canary"]
+        self.assertEqual(canary["publication_stage"], "synthetic_prediction_canary_passed")
+        self.assertEqual(canary["allowed_manuscript_claim"], "protocol_canary_passed")
+        self.assertEqual(float(canary["publishable_protocol_evidence"]), 1.0)
+        self.assertEqual(float(canary["real_data_quantitative_comparison"]), 0.0)
+
+        fit_only = by_id["fit_only_negative_control_publication_state"]
+        self.assertEqual(fit_only["publication_stage"], "fit_only_overclaim_blocked")
+        self.assertEqual(fit_only["allowed_manuscript_claim"], "do_not_claim_prediction")
+        self.assertEqual(float(fit_only["claim_overreach_if_called_fit"]), 1.0)
+
     def test_trajectory_uncertainty_protocol_exports_jackknife_sigmas(self):
         path = ROOT / "data" / "renewal_cage_trajectory_uncertainty_protocol.csv"
         self.assertTrue(path.exists())
@@ -852,6 +876,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_inversion_readiness.pdf", names)
+            self.assertIn("figures/renewal_cage_benchmark_publication_ladder.pdf", names)
             self.assertIn("figures/renewal_cage_barrier_requirements.pdf", names)
             self.assertIn("figures/renewal_cage_mechanism_selection.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange.pdf", names)
@@ -888,6 +913,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_ingestion_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_benchmark_publication_ladder.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange_protocol.pdf", main_tex)
@@ -912,6 +938,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_raw_curve_ingestion_contract.pdf",
             "figures/renewal_cage_raw_curve_diagnostic_readiness.pdf",
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
+            "figures/renewal_cage_benchmark_publication_ladder.pdf",
         ]
         for figure in readiness_figures:
             figure_index = main_tex.index(figure)

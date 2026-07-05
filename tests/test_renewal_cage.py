@@ -129,6 +129,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_gamma_exchange,
     temperature_scan,
     trajectory_adapter_contract,
+    benchmark_publication_ladder,
     trajectory_inversion_readiness_gate,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
@@ -3220,6 +3221,53 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["trajectory_falsification_ready"], 0.0)
         self.assertEqual(row["fit_only_overclaim_risk"], 1.0)
         self.assertEqual(row["primary_blocker"], "heldout_observables")
+
+    def test_benchmark_publication_ladder_separates_metadata_canary_and_overclaim(self):
+        glassbench = benchmark_publication_ladder(
+            ladder_id="glassbench_current_publication_state",
+            source_key="glassbench_zenodo_10118191",
+            source_class="real_public_data",
+            evidence_grade="pending_trajectory_reanalysis",
+            reanalysis_stage="awaiting_full_archive_cache",
+            readiness_stage="none",
+            falsification_stage="none",
+            primary_blocker="archive_path",
+        )
+        self.assertEqual(glassbench["publication_stage"], "metadata_verified_not_reanalysis")
+        self.assertEqual(glassbench["allowed_manuscript_claim"], "metadata_readiness_only")
+        self.assertEqual(float(glassbench["real_data_quantitative_comparison"]), 0.0)
+        self.assertEqual(float(glassbench["claim_overreach_if_called_fit"]), 1.0)
+        self.assertEqual(glassbench["next_required_action"], "cache_full_archive_and_verify_checksum")
+
+        canary = benchmark_publication_ladder(
+            ladder_id="synthetic_trajectory_canary",
+            source_key="synthetic_intermittent_trajectory",
+            source_class="synthetic_canary",
+            evidence_grade="direct_dynamical_support",
+            reanalysis_stage="ready_for_trajectory_observable_protocol",
+            readiness_stage="uncertainty_weighted_trajectory_inversion",
+            falsification_stage="trajectory_prediction_falsification_passed",
+            primary_blocker="none",
+        )
+        self.assertEqual(canary["publication_stage"], "synthetic_prediction_canary_passed")
+        self.assertEqual(canary["allowed_manuscript_claim"], "protocol_canary_passed")
+        self.assertEqual(float(canary["publishable_protocol_evidence"]), 1.0)
+        self.assertEqual(float(canary["real_data_quantitative_comparison"]), 0.0)
+
+        fit_only = benchmark_publication_ladder(
+            ladder_id="fit_only_negative_control",
+            source_key="synthetic_intermittent_trajectory",
+            source_class="synthetic_canary",
+            evidence_grade="direct_dynamical_support",
+            reanalysis_stage="ready_for_trajectory_observable_protocol",
+            readiness_stage="uncertainty_weighted_trajectory_inversion",
+            falsification_stage="fit_only_overclaim_risk",
+            primary_blocker="heldout_observables",
+        )
+        self.assertEqual(fit_only["publication_stage"], "fit_only_overclaim_blocked")
+        self.assertEqual(fit_only["allowed_manuscript_claim"], "do_not_claim_prediction")
+        self.assertEqual(float(fit_only["publishable_protocol_evidence"]), 0.0)
+        self.assertEqual(float(fit_only["claim_overreach_if_called_fit"]), 1.0)
 
     def test_trajectory_table_adapter_orders_frames_particles_and_extracts_arrays(self):
         records = [

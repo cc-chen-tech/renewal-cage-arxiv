@@ -29,6 +29,7 @@ from renewal_cage import (  # noqa: E402
     adam_gibbs_thermodynamic_scan,
     barrier_amplification_laws,
     benchmark_fusion_readiness,
+    benchmark_publication_ladder,
     cage_localization_benchmark_consistency,
     cage_localization_diagnostics,
     correlated_domain_susceptibility,
@@ -4001,6 +4002,68 @@ def write_trajectory_prediction_falsification_csv(
     return rows
 
 
+def write_benchmark_publication_ladder_csv(
+    path: Path,
+    *,
+    reanalysis_state_rows: list[dict[str, float | str]],
+    trajectory_readiness_rows: list[dict[str, float | str]],
+    trajectory_falsification_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Collapse readiness and held-out prediction gates into manuscript claim levels."""
+
+    reanalysis_by_id = {str(row["state_id"]): row for row in reanalysis_state_rows}
+    readiness_by_id = {str(row["benchmark_id"]): row for row in trajectory_readiness_rows}
+    falsification_by_id = {str(row["protocol_id"]): row for row in trajectory_falsification_rows}
+    glassbench = reanalysis_by_id["glassbench_reanalysis_state"]
+    synthetic_ready = readiness_by_id["synthetic_intermittent_trajectory_uncertainty"]
+    synthetic_falsification = falsification_by_id["synthetic_trajectory_pe_heldout_protocol"]
+    fit_only = falsification_by_id["fit_only_negative_control"]
+    rows = [
+        benchmark_publication_ladder(
+            ladder_id="glassbench_current_publication_state",
+            source_key="glassbench_zenodo_10118191",
+            source_class="real_public_data",
+            evidence_grade="pending_trajectory_reanalysis",
+            reanalysis_stage=str(glassbench["reanalysis_stage"]),
+            readiness_stage="none",
+            falsification_stage="none",
+            primary_blocker=str(glassbench["primary_blocker"]),
+        ),
+        benchmark_publication_ladder(
+            ladder_id="synthetic_trajectory_canary",
+            source_key="synthetic_intermittent_trajectory",
+            source_class="synthetic_canary",
+            evidence_grade="direct_dynamical_support",
+            reanalysis_stage="ready_for_trajectory_observable_protocol",
+            readiness_stage=str(synthetic_ready["readiness_stage"]),
+            falsification_stage=str(synthetic_falsification["falsification_stage"]),
+            primary_blocker=str(synthetic_falsification["primary_blocker"]),
+        ),
+        benchmark_publication_ladder(
+            ladder_id="fit_only_negative_control_publication_state",
+            source_key="synthetic_intermittent_trajectory",
+            source_class="synthetic_canary",
+            evidence_grade="direct_dynamical_support",
+            reanalysis_stage="ready_for_trajectory_observable_protocol",
+            readiness_stage=str(synthetic_ready["readiness_stage"]),
+            falsification_stage=str(fit_only["falsification_stage"]),
+            primary_blocker=str(fit_only["primary_blocker"]),
+        ),
+        benchmark_publication_ladder(
+            ladder_id="thermodynamic_scope_publication_boundary",
+            source_key="kauzmann_adam_gibbs_entropy_boundary",
+            source_class="thermodynamic_boundary",
+            evidence_grade="thermodynamic_scope_boundary",
+            reanalysis_stage="not_a_trajectory_reanalysis",
+            readiness_stage="none",
+            falsification_stage="none",
+            primary_blocker="renewal_dynamics_not_thermodynamic_theory",
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_trajectory_uncertainty_protocol_csv(path: Path) -> list[dict[str, float | str]]:
     """Estimate trajectory-observable uncertainties from time-origin jackknife blocks."""
 
@@ -6274,6 +6337,66 @@ def write_trajectory_inversion_readiness_svg(
     path.write_text(svg)
 
 
+def write_benchmark_publication_ladder_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1140, 455
+    left, top = 72, 108
+    row_h = 70
+    colors_by_stage = {
+        "metadata_verified_not_reanalysis": "#d69e2e",
+        "synthetic_prediction_canary_passed": "#2f855a",
+        "fit_only_overclaim_blocked": "#b83280",
+        "thermodynamic_scope_boundary": "#805ad5",
+        "uncertainty_weighted_real_reanalysis": "#276749",
+        "structural_or_uncertainty_gate_incomplete": "#2b6cb0",
+        "heldout_prediction_not_passed": "#c05621",
+        "forbidden_claim_blocked": "#b83280",
+        "not_supported": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["publication_stage"])
+        color = colors_by_stage[stage]
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["ladder_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 300}" y="{y}" width="235" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 310}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:38]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 560}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["allowed_manuscript_claim"]).replace("_", " ")[:34]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 815}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">real={int(float(row["real_data_quantitative_comparison"]))}; overreach={int(float(row["claim_overreach_if_called_fit"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 300}" y="{y + 43}" font-family="Arial, sans-serif" font-size="10" fill="#555">next: {str(row["next_required_action"]).replace("_", " ")[:92]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Benchmark publication claim ladder</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Existing gates are collapsed into manuscript-safe claim levels, separating real-data fits from protocol canaries and scope boundaries.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">ladder row</text>
+  <text x="{left + 300}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">publication stage</text>
+  <text x="{left + 560}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">allowed claim</text>
+  <text x="{left + 815}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">fit guard</text>
+  {"".join(marks)}
+  <rect x="72" y="402" width="14" height="14" fill="#d69e2e" /><text x="94" y="414" font-family="Arial, sans-serif" font-size="12">metadata verified, not reanalysis</text>
+  <rect x="302" y="402" width="14" height="14" fill="#2f855a" /><text x="324" y="414" font-family="Arial, sans-serif" font-size="12">protocol canary passed</text>
+  <rect x="500" y="402" width="14" height="14" fill="#b83280" /><text x="522" y="414" font-family="Arial, sans-serif" font-size="12">overclaim blocked</text>
+  <rect x="680" y="402" width="14" height="14" fill="#805ad5" /><text x="702" y="414" font-family="Arial, sans-serif" font-size="12">thermodynamic scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -7130,7 +7253,7 @@ def main() -> None:
         DATA_DIR / "renewal_cage_trajectory_pe_heldout_predictions.csv",
         trajectory_curve_pe_gate_rows,
     )
-    write_trajectory_prediction_falsification_csv(
+    trajectory_falsification_rows = write_trajectory_prediction_falsification_csv(
         DATA_DIR / "renewal_cage_trajectory_prediction_falsification.csv",
         trajectory_heldout_prediction_rows,
     )
@@ -7149,6 +7272,16 @@ def main() -> None:
     write_trajectory_inversion_readiness_svg(
         FIGURE_DIR / "renewal_cage_trajectory_inversion_readiness.svg",
         trajectory_inversion_readiness_rows,
+    )
+    benchmark_publication_ladder_rows = write_benchmark_publication_ladder_csv(
+        DATA_DIR / "renewal_cage_benchmark_publication_ladder.csv",
+        reanalysis_state_rows=reanalysis_state_rows,
+        trajectory_readiness_rows=trajectory_inversion_readiness_rows,
+        trajectory_falsification_rows=trajectory_falsification_rows,
+    )
+    write_benchmark_publication_ladder_svg(
+        FIGURE_DIR / "renewal_cage_benchmark_publication_ladder.svg",
+        benchmark_publication_ladder_rows,
     )
 
     barrier = ActivatedBarrierParams(
