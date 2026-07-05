@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560">
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="590" viewBox="0 0 1120 590">
   <rect width="100%" height="100%" fill="#ffffff" />
   <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA benchmark consistency</text>
   <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Benchmark rows convert literature-level conclusions into explicit consistency checks.</text>
@@ -16,4 +16,5 @@
   <text x="660" y="504" font-family="Arial, sans-serif" font-size="12">SE row consistent = 1; D tau growth = 2.03, xi_SE = 0.581</text>
   <text x="660" y="522" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = 1; xi4 growth = 3.09, chi4 growth = 34.7</text>
   <text x="660" y="540" font-family="Arial, sans-serif" font-size="12">TTS row consistent = 1; residual = 0.611, C growth = 6.44</text>
+  <text x="660" y="558" font-family="Arial, sans-serif" font-size="12">persistence/exchange row consistent = 1; tau_p/tau_x = 9.0, late residual = 0</text>
 </svg>

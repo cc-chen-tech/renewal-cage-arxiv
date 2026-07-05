@@ -58,6 +58,7 @@ from renewal_cage import (  # noqa: E402
     mct_beta_benchmark_consistency,
     mct_beta_temperature_scan,
     observable_consistency_diagnostics,
+    persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
     local_cage_variance,
     moments_1d,
@@ -1220,6 +1221,25 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["overall_consistent"], 1.0)
         self.assertGreater(row["cold_shape_residual"], row["residual_threshold"])
         self.assertGreater(row["alpha_shape_control_growth"], row["min_control_growth"])
+
+    def test_persistence_exchange_benchmark_consistency_checks_inversion_protocol(self):
+        row = persistence_exchange_benchmark_consistency(
+            benchmark_id="persistence_exchange_transport_inversion",
+            observed_persistence_exchange_decoupling=True,
+            inferred_persistence_exchange_ratio=9.0,
+            late_ngp_log_residual=0.0,
+            invalid_poisson_alpha_rejected=True,
+            min_persistence_exchange_ratio=2.0,
+            max_late_ngp_abs_log_residual=0.1,
+        )
+
+        self.assertEqual(row["model_predicts_persistence_exchange_decoupling"], 1.0)
+        self.assertEqual(row["persistence_exchange_ratio_consistent"], 1.0)
+        self.assertEqual(row["persistence_exchange_late_ngp_consistent"], 1.0)
+        self.assertEqual(row["persistence_exchange_rejection_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+        self.assertGreater(row["inferred_persistence_exchange_ratio"], row["min_persistence_exchange_ratio"])
+        self.assertLess(abs(row["late_ngp_log_residual_benchmark"]), row["max_late_ngp_abs_log_residual"])
 
     def test_facilitated_exchange_law_grows_exchange_ratio_on_cooling(self):
         law = FacilitatedExchangeLawParams(

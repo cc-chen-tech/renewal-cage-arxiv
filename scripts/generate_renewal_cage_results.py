@@ -64,6 +64,7 @@ from renewal_cage import (  # noqa: E402
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
     persistence_exchange_alpha_relaxation_time,
+    persistence_exchange_benchmark_consistency,
     persistence_exchange_diffusion_coefficient,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
@@ -799,6 +800,16 @@ def write_sota_benchmark_consistency_csv(
         "model_predicts_tts_breakdown",
         "tts_residual_consistent",
         "tts_control_consistent",
+        "observed_persistence_exchange_decoupling",
+        "inferred_persistence_exchange_ratio",
+        "min_persistence_exchange_ratio",
+        "late_ngp_log_residual_benchmark",
+        "max_late_ngp_abs_log_residual",
+        "invalid_poisson_alpha_rejected",
+        "model_predicts_persistence_exchange_decoupling",
+        "persistence_exchange_ratio_consistent",
+        "persistence_exchange_late_ngp_consistent",
+        "persistence_exchange_rejection_consistent",
         "overall_consistent",
     ]
 
@@ -864,12 +875,63 @@ def write_sota_benchmark_consistency_csv(
         residual_threshold=0.25,
         min_control_growth=2.0,
     )
+    px_params = PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=0.2,
+        jump_variance=0.7,
+        persistence_mean=9.0,
+        exchange_mean=1.0,
+    )
+    wave_number = 1.1
+    px_late_time = 80.0 * px_params.persistence_mean
+    diffusion = persistence_exchange_diffusion_coefficient(px_params)
+    tau_alpha = persistence_exchange_alpha_relaxation_time(wave_number, px_params)
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([px_late_time]), px_params)[0])
+    inferred = infer_persistence_exchange_from_alpha_transport(
+        wave_number=wave_number,
+        jump_variance=px_params.jump_variance,
+        diffusion_coefficient=diffusion,
+        observed_tau_alpha=tau_alpha,
+        cage_variance=px_params.cage_variance,
+        cage_tau=px_params.cage_tau,
+        late_time=px_late_time,
+        observed_late_ngp=observed_late_ngp,
+    )
+    poisson_params = PersistenceExchangeParams(
+        cage_variance=px_params.cage_variance,
+        cage_tau=px_params.cage_tau,
+        jump_variance=px_params.jump_variance,
+        persistence_mean=px_params.exchange_mean,
+        exchange_mean=px_params.exchange_mean,
+    )
+    invalid_poisson_alpha_rejected = False
+    try:
+        infer_persistence_exchange_from_alpha_transport(
+            wave_number=wave_number,
+            jump_variance=poisson_params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(poisson_params),
+            observed_tau_alpha=0.8 * persistence_exchange_alpha_relaxation_time(wave_number, poisson_params),
+            cage_variance=poisson_params.cage_variance,
+            cage_tau=poisson_params.cage_tau,
+        )
+    except ValueError:
+        invalid_poisson_alpha_rejected = True
+    persistence_exchange_row = persistence_exchange_benchmark_consistency(
+        benchmark_id="persistence_exchange_transport_inversion",
+        observed_persistence_exchange_decoupling=True,
+        inferred_persistence_exchange_ratio=inferred["persistence_exchange_ratio"],
+        late_ngp_log_residual=inferred["late_ngp_log_residual"],
+        invalid_poisson_alpha_rejected=invalid_poisson_alpha_rejected,
+        min_persistence_exchange_ratio=2.0,
+        max_late_ngp_abs_log_residual=0.1,
+    )
     rows = [
         normalize(mct_row, "mct_beta_window"),
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
         normalize(se_row, "stokes_einstein_fractional_decoupling"),
         normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
         normalize(tts_row, "alpha_tts_breakdown"),
+        normalize(persistence_exchange_row, "persistence_exchange_inversion"),
     ]
     write_sweep_csv(path, rows)
     return rows
@@ -2158,13 +2220,14 @@ def write_mct_beta_closure_svg(path: Path, rows: list[dict[str, float]], base: M
 
 def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    width, height = 1120, 560
+    width, height = 1120, 590
     by_id = {str(row["benchmark_id"]): row for row in rows}
     mct_row = by_id["kob_andersen_1995_beta_window"]
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
+    persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
     left_a, top, right_a, bottom = 90, 105, 520, 430
     left_b, right_b = 660, 1040
     metrics = [
@@ -2222,6 +2285,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_b}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">SE row consistent = {int(float(se_row['overall_consistent']))}; D tau growth = {float(se_row['se_product_growth']):.2f}, xi_SE = {float(se_row['cold_fractional_exponent']):.3f}</text>
   <text x="{left_b}" y="{bottom + 92}" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = {int(float(heterogeneity_row['overall_consistent']))}; xi4 growth = {float(heterogeneity_row['length_growth']):.2f}, chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}</text>
   <text x="{left_b}" y="{bottom + 110}" font-family="Arial, sans-serif" font-size="12">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 128}" font-family="Arial, sans-serif" font-size="12">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
 </svg>
 """
     path.write_text(svg)

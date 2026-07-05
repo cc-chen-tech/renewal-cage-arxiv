@@ -713,6 +713,58 @@ def alpha_tts_benchmark_consistency(
     }
 
 
+def persistence_exchange_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_persistence_exchange_decoupling: bool,
+    inferred_persistence_exchange_ratio: float,
+    late_ngp_log_residual: float,
+    invalid_poisson_alpha_rejected: bool,
+    min_persistence_exchange_ratio: float,
+    max_late_ngp_abs_log_residual: float,
+) -> dict[str, float | str]:
+    """Check persistence/exchange inversion against held-out falsification tests."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "inferred_persistence_exchange_ratio": inferred_persistence_exchange_ratio,
+        "min_persistence_exchange_ratio": min_persistence_exchange_ratio,
+        "max_late_ngp_abs_log_residual": max_late_ngp_abs_log_residual,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if not math.isfinite(late_ngp_log_residual):
+        raise ValueError("late_ngp_log_residual must be finite")
+
+    ratio_flag = inferred_persistence_exchange_ratio >= min_persistence_exchange_ratio
+    late_ngp_flag = abs(late_ngp_log_residual) <= max_late_ngp_abs_log_residual
+    rejection_flag = invalid_poisson_alpha_rejected
+    model_flag = ratio_flag and late_ngp_flag and rejection_flag
+    ratio_consistent = ratio_flag == observed_persistence_exchange_decoupling
+    late_ngp_consistent = late_ngp_flag == observed_persistence_exchange_decoupling
+    rejection_consistent = rejection_flag == observed_persistence_exchange_decoupling
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_persistence_exchange_decoupling": float(observed_persistence_exchange_decoupling),
+        "inferred_persistence_exchange_ratio": inferred_persistence_exchange_ratio,
+        "min_persistence_exchange_ratio": min_persistence_exchange_ratio,
+        "late_ngp_log_residual_benchmark": late_ngp_log_residual,
+        "max_late_ngp_abs_log_residual": max_late_ngp_abs_log_residual,
+        "invalid_poisson_alpha_rejected": float(invalid_poisson_alpha_rejected),
+        "model_predicts_persistence_exchange_decoupling": float(model_flag),
+        "persistence_exchange_ratio_consistent": float(ratio_consistent),
+        "persistence_exchange_late_ngp_consistent": float(late_ngp_consistent),
+        "persistence_exchange_rejection_consistent": float(rejection_consistent),
+        "overall_consistent": float(
+            model_flag == observed_persistence_exchange_decoupling
+            and ratio_consistent
+            and late_ngp_consistent
+            and rejection_consistent
+        ),
+    }
+
+
 def temperature_dependent_gamma_exchange(
     temperature: float,
     law: FacilitatedExchangeLawParams,

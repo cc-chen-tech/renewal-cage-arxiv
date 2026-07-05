@@ -918,6 +918,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
+    persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=landscape(letter))
     page_w, page_h = landscape(letter)
@@ -994,6 +995,14 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
         f"{int(float(tts_row['overall_consistent']))}; "
         f"residual = {float(tts_row['cold_shape_residual']):.3f}; "
         f"C growth = {float(tts_row['alpha_shape_control_growth']):.2f}",
+    )
+    c.drawString(
+        430,
+        62,
+        "persistence/exchange row consistent = "
+        f"{int(float(persistence_exchange_row['overall_consistent']))}; "
+        f"tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}; "
+        f"late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}",
     )
     c.showPage()
     c.save()

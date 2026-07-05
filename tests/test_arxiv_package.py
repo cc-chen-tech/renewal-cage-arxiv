@@ -42,6 +42,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("stokes_einstein_fractional_decoupling", by_id)
         self.assertIn("dynamic_heterogeneity_chi4_growth", by_id)
         self.assertIn("alpha_tts_breakdown_shape_residual", by_id)
+        self.assertIn("persistence_exchange_transport_inversion", by_id)
         self.assertEqual(float(by_id["kob_andersen_1995_beta_window"]["overall_consistent"]), 1.0)
         self.assertEqual(
             float(by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]["mechanism_selection_consistent"]),
@@ -52,6 +53,15 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(by_id["alpha_tts_breakdown_shape_residual"]["overall_consistent"]), 1.0)
         self.assertGreater(float(by_id["alpha_tts_breakdown_shape_residual"]["cold_shape_residual"]), 0.25)
         self.assertGreater(float(by_id["alpha_tts_breakdown_shape_residual"]["alpha_shape_control_growth"]), 2.0)
+        self.assertEqual(float(by_id["persistence_exchange_transport_inversion"]["overall_consistent"]), 1.0)
+        self.assertGreater(
+            float(by_id["persistence_exchange_transport_inversion"]["inferred_persistence_exchange_ratio"]),
+            2.0,
+        )
+        self.assertLess(
+            abs(float(by_id["persistence_exchange_transport_inversion"]["late_ngp_log_residual_benchmark"])),
+            0.1,
+        )
 
     def test_build_arxiv_package_creates_source_zip_with_pdf_figures(self):
         with tempfile.TemporaryDirectory() as tmpdir:
