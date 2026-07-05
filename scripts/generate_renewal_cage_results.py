@@ -53,6 +53,12 @@ from renewal_cage import (  # noqa: E402
     observable_consistency_diagnostics,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
+    persistence_exchange_alpha_relaxation_time,
+    persistence_exchange_diffusion_coefficient,
+    persistence_exchange_ngp_1d,
+    persistence_exchange_normalized_alpha_decay,
+    persistence_exchange_scan,
+    PersistenceExchangeParams,
     radial_van_hove_3d,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
@@ -396,6 +402,64 @@ def write_barrier_requirements_csv(
             **requirements,
         }
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_persistence_exchange_csv(
+    path: Path,
+    *,
+    ratios: list[float],
+    exchange_mean: float,
+    wave_number: float,
+) -> list[dict[str, float | str]]:
+    rows: list[dict[str, float | str]] = []
+    summary = persistence_exchange_scan(
+        ratios=ratios,
+        exchange_mean=exchange_mean,
+        wave_number=wave_number,
+    )
+    for row in summary:
+        rows.append(
+            {
+                "record_type": "summary",
+                **row,
+                "time": np.nan,
+                "ngp": np.nan,
+                "alpha_decay": np.nan,
+            }
+        )
+
+    time = np.geomspace(0.03, 650.0, 260)
+    for ratio in [ratios[0], ratios[-1]]:
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=ratio * exchange_mean,
+            exchange_mean=exchange_mean,
+        )
+        alpha = persistence_exchange_ngp_1d(time, params, max_count=700)
+        decay = persistence_exchange_normalized_alpha_decay(wave_number, time, params, max_count=700)
+        tau_alpha = persistence_exchange_alpha_relaxation_time(wave_number, params)
+        diffusion = persistence_exchange_diffusion_coefficient(params)
+        for idx, value in enumerate(time):
+            rows.append(
+                {
+                    "record_type": "curve",
+                    "persistence_exchange_ratio": float(ratio),
+                    "persistence_mean": params.persistence_mean,
+                    "exchange_mean": params.exchange_mean,
+                    "diffusion_coefficient": diffusion,
+                    "tau_alpha": tau_alpha,
+                    "stokes_einstein_product": diffusion * tau_alpha,
+                    "late_time": np.nan,
+                    "late_ngp": np.nan,
+                    "time": float(value),
+                    "ngp": float(alpha[idx]),
+                    "alpha_decay": float(decay[idx]),
+                }
+            )
     write_sweep_csv(path, rows)
     return rows
 
@@ -1596,6 +1660,66 @@ def write_barrier_requirements_svg(path: Path, rows: list[dict[str, float | str]
     path.write_text(svg)
 
 
+def write_persistence_exchange_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left_a, top, right_a, bottom = 75, 90, 520, 430
+    left_b, right_b = 660, 1040
+    summary_rows = [row for row in rows if row["record_type"] == "summary"]
+    curve_rows = [row for row in rows if row["record_type"] == "curve"]
+
+    ratios = np.array([float(row["persistence_exchange_ratio"]) for row in summary_rows])
+    se_product = np.array([float(row["stokes_einstein_product"]) for row in summary_rows])
+    late_ngp = np.array([float(row["late_ngp"]) for row in summary_rows])
+
+    def axes(left: int, right: int, title: str, xlabel: str) -> str:
+        return f"""
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+  <text x="{(left + right) / 2 - 80}" y="{bottom + 38}" font-family="Arial, sans-serif" font-size="13">{xlabel}</text>
+"""
+
+    x_a = scale(ratios, left_a, right_a)
+    y_a = scale(se_product / se_product[0], bottom, top)
+    y_late = scale(late_ngp / late_ngp[0], bottom, top)
+
+    labels = sorted({float(row["persistence_exchange_ratio"]) for row in curve_rows})
+    curve_lines = []
+    colors = ["#2b6cb0", "#c05621"]
+    all_curve_values = np.concatenate(
+        [
+            np.array([float(row["ngp"]) for row in curve_rows if float(row["persistence_exchange_ratio"]) == label])
+            for label in labels
+        ]
+    )
+    for idx, label in enumerate(labels):
+        label_rows = [row for row in curve_rows if float(row["persistence_exchange_ratio"]) == label]
+        time = np.array([float(row["time"]) for row in label_rows])
+        alpha = np.array([float(row["ngp"]) for row in label_rows])
+        x = scale(np.log10(time), left_b, right_b)
+        y = scale(alpha, bottom, top)
+        curve_lines.append(polyline(x, y, colors[idx % len(colors)]))
+        curve_lines.append(
+            f'<text x="{left_b + 20}" y="{top + 28 + idx * 18}" font-family="Arial, sans-serif" font-size="12" fill="{colors[idx % len(colors)]}">tau_p/tau_x={label:g}</text>'
+        )
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Persistence/exchange renewal diagnostic</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">First cage persistence slows alpha relaxation while the exchange clock fixes long-time diffusion.</text>
+  {axes(left_a, right_a, "A. SE decoupling at fixed diffusion", "persistence / exchange mean")}
+  {polyline(x_a, y_a, "#805ad5")}
+  {polyline(x_a, y_late, "#a0aec0")}
+  <text x="{left_a + 20}" y="{top + 28}" font-family="Arial, sans-serif" font-size="12" fill="#805ad5">D tau_alpha / Poisson limit</text>
+  <text x="{left_a + 20}" y="{top + 46}" font-family="Arial, sans-serif" font-size="12" fill="#a0aec0">late NGP / Poisson limit</text>
+  {axes(left_b, right_b, "B. NGP recovery despite delayed persistence", "log10 time")}
+  {"".join(curve_lines)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -2145,6 +2269,16 @@ def main() -> None:
     write_barrier_requirements_svg(
         FIGURE_DIR / "renewal_cage_barrier_requirements.svg",
         barrier_requirement_rows,
+    )
+    persistence_exchange_rows = write_persistence_exchange_csv(
+        DATA_DIR / "renewal_cage_persistence_exchange.csv",
+        ratios=[1.0, 2.0, 4.0, 8.0, 12.0],
+        exchange_mean=1.0,
+        wave_number=1.1,
+    )
+    write_persistence_exchange_svg(
+        FIGURE_DIR / "renewal_cage_persistence_exchange.svg",
+        persistence_exchange_rows,
     )
 
     barrier = ActivatedBarrierParams(

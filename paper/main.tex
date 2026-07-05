@@ -45,7 +45,10 @@ renewal count regularizes the short-time behavior of jump models while
 preserving analytic tractability and long-time Gaussian recovery. A
 finite-exchange gamma extension then gives a closed criterion for
 stretched-like alpha decay without leaving residual long-time non-Gaussianity,
-and its predictions are contrasted with a static gamma-disorder null model.
+and its predictions are contrasted with a static gamma-disorder null model. A
+persistence-exchange extension separates first cage escape from subsequent
+exchange, producing Stokes-Einstein decoupling at fixed long-time diffusion
+while preserving Gaussian recovery.
 \end{abstract}
 
 \maketitle
@@ -557,6 +560,31 @@ $c_{\rm NGP}$. A valid finite-exchange renewal description therefore requires
 the set $\{c_\alpha(k)\}$ to collapse to the same value and to agree with
 $c_{\rm NGP}$ within propagated errors.
 
+\section{Persistence-Exchange Decoupling}
+
+The delayed Poisson clock above captures a smooth onset, but glassy dynamics
+often separates the first persistence time from the subsequent exchange time
+\cite{hedges2007persistence}.
+To isolate that effect, let the first cage escape have mean $\tau_p$ and all
+later exchanges have mean $\tau_x$. For $n\ge1$ the renewal-count distribution
+can be written as
+\begin{equation}
+  P[N(t)=n]=
+  \int_0^t \frac{e^{-(t-u)/\tau_p}}{\tau_p}
+  e^{-u/\tau_x}\frac{(u/\tau_x)^{n-1}}{(n-1)!}\,du,
+  \qquad
+  P[N(t)=0]=e^{-t/\tau_p}.
+\end{equation}
+The Poisson renewal model is recovered when $\tau_p=\tau_x$. When
+$\tau_p>\tau_x$, the long-time diffusion coefficient remains
+$D=q/(2\tau_x)$, but the cage-normalized alpha relaxation is delayed by the
+first-persistence clock. Thus $D\tau_\alpha$ grows with $\tau_p/\tau_x$ even at
+fixed diffusion. This gives a sharper Stokes-Einstein diagnostic than changing
+one renewal rate: alpha relaxation probes first escape, while transport probes
+the post-escape exchange clock. Because $\langle N(t)\rangle\sim t/\tau_x$ and
+${\rm Var}\,N(t)/\langle N(t)\rangle^2\to0$, the long-time NGP still recovers
+to zero.
+
 \section{Asymptotics and Peak Condition}
 
 At short times,
@@ -735,6 +763,11 @@ closure criterion in this parameter set, whereas no thermodynamic transition is
 inferred. The closed barrier-threshold inversion gives minimum controls
 $E_d-E_\lambda=3.0$ and $E_{\rm hx}=4.0$ for the target growth factors used in
 the scan.
+The persistence-exchange extension keeps $D=0.35$ fixed while increasing
+$\tau_p/\tau_x$ from $1$ to $12$; the resulting $D\tau_\alpha$ grows from
+$1.01$ to $4.98$, while the late NGP falls from $1.21\times10^{-2}$ to
+$2.58\times10^{-9}$ at the diagnostic late time. This separates
+Stokes-Einstein violation from permanent non-Gaussianity.
 
 \begin{figure}[h]
   \centering
@@ -786,6 +819,15 @@ the scan.
   the instantaneous mobility distribution and slows exchange between mobility
   environments, producing a growing exchange ratio $c=R_x/\kappa_0$, enhanced
   late NGP amplitude, and a reduced alpha decay per renewal.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_persistence_exchange.pdf}
+  \caption{Persistence-exchange renewal diagnostic. The first cage escape time
+  and subsequent exchange time are separated. Increasing $\tau_p/\tau_x$ at
+  fixed exchange time leaves the long-time diffusion coefficient fixed but
+  increases $D\tau_\alpha$ and still permits long-time NGP recovery.}
 \end{figure}
 
 \begin{figure}[h]

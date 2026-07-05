@@ -487,6 +487,70 @@ def write_facilitated_exchange_pdf(path: Path) -> None:
     c.save()
 
 
+def write_persistence_exchange_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_persistence_exchange.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    summary = [row for row in rows if row["record_type"] == "summary"]
+    curves = [row for row in rows if row["record_type"] == "curve"]
+
+    ratios = np.array([float(row["persistence_exchange_ratio"]) for row in summary])
+    se_product = np.array([float(row["stokes_einstein_product"]) for row in summary])
+    late_ngp = np.array([float(row["late_ngp"]) for row in summary])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Persistence/exchange renewal diagnostic")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "First cage persistence slows alpha relaxation while exchange fixes long-time diffusion.")
+
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        ratios,
+        [
+            ("D tau_alpha / Poisson", se_product / se_product[0], colors.HexColor("#805ad5")),
+            ("late NGP / Poisson", late_ngp / late_ngp[0], colors.grey),
+        ],
+        "Y. SE decoupling at fixed diffusion",
+        xlabel="persistence / exchange mean",
+    )
+
+    labels = sorted({float(row["persistence_exchange_ratio"]) for row in curves})
+    series = []
+    colors_list = [colors.HexColor("#2b6cb0"), colors.HexColor("#c05621")]
+    first_time = None
+    for idx, label in enumerate(labels):
+        label_rows = [row for row in curves if float(row["persistence_exchange_ratio"]) == label]
+        time = np.array([float(row["time"]) for row in label_rows])
+        if first_time is None:
+            first_time = np.log10(time)
+        series.append(
+            (
+                f"tau_p/tau_x={label:g}",
+                np.array([float(row["ngp"]) for row in label_rows]),
+                colors_list[idx % len(colors_list)],
+            )
+        )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        first_time,
+        series,
+        "Z. NGP recovery after persistence delay",
+        xlabel="log10 time",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_glass_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_glass_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1026,6 +1090,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
     alpha_shape_pdf = PAPER_FIGURE_DIR / "renewal_cage_alpha_shape.pdf"
     facilitated_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_facilitated_exchange.pdf"
+    persistence_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange.pdf"
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
@@ -1041,6 +1106,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_temperature_pdf(temperature_pdf)
     write_alpha_shape_pdf(alpha_shape_pdf)
     write_facilitated_exchange_pdf(facilitated_exchange_pdf)
+    write_persistence_exchange_pdf(persistence_exchange_pdf)
     write_glass_audit_pdf(glass_audit_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
@@ -1061,6 +1127,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")
         archive.write(alpha_shape_pdf, "figures/renewal_cage_alpha_shape.pdf")
         archive.write(facilitated_exchange_pdf, "figures/renewal_cage_facilitated_exchange.pdf")
+        archive.write(persistence_exchange_pdf, "figures/renewal_cage_persistence_exchange.pdf")
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")

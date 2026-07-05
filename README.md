@@ -18,10 +18,11 @@ The model combines:
   renewal-count susceptibility, renewal-domain chi4/cooperative-size
   diagnostics, NGP peak/alpha-relaxation coupling, finite-exchange
   heterogeneity diagnostics, a temperature-dependent facilitated-exchange law,
-  a static-gamma mobility-disorder null model, late-time mechanism-selection
-  diagnostics, a glass-dynamics phenomenon audit, barrier-facilitation
-  signature phase diagrams, closed barrier-threshold requirements, finite-time
-  consistency diagnostics, and observable inversion/falsifiability criteria.
+  a persistence/exchange renewal-clock decoupling diagnostic, a static-gamma
+  mobility-disorder null model, late-time mechanism-selection diagnostics, a
+  glass-dynamics phenomenon audit, barrier-facilitation signature phase
+  diagrams, closed barrier-threshold requirements, finite-time consistency
+  diagnostics, and observable inversion/falsifiability criteria.
 
 The core one-dimensional and three-dimensional NGP result is
 
@@ -120,6 +121,7 @@ figures/renewal_cage_scattering.svg
 figures/renewal_cage_temperature.svg
 figures/renewal_cage_alpha_shape.svg
 figures/renewal_cage_facilitated_exchange.svg
+figures/renewal_cage_persistence_exchange.svg
 figures/renewal_cage_glass_audit.svg
 figures/renewal_cage_glass_phase_diagram.svg
 figures/renewal_cage_barrier_requirements.svg
@@ -141,6 +143,7 @@ data/renewal_cage_peak_relaxation.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_alpha_shape.csv
 data/renewal_cage_facilitated_exchange.csv
+data/renewal_cage_persistence_exchange.csv
 data/renewal_cage_glass_audit.csv
 data/renewal_cage_glass_phase_diagram.csv
 data/renewal_cage_barrier_requirements.csv
@@ -162,6 +165,7 @@ paper/figures/renewal_cage_scattering.pdf
 paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_alpha_shape.pdf
 paper/figures/renewal_cage_facilitated_exchange.pdf
+paper/figures/renewal_cage_persistence_exchange.pdf
 paper/figures/renewal_cage_glass_audit.pdf
 paper/figures/renewal_cage_glass_phase_diagram.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf

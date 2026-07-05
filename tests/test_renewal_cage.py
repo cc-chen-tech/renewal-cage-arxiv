@@ -61,6 +61,14 @@ from renewal_cage import (  # noqa: E402
     plateau_ngp_branches,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
+    PersistenceExchangeParams,
+    persistence_exchange_alpha_relaxation_time,
+    persistence_exchange_count_distribution,
+    persistence_exchange_count_moments,
+    persistence_exchange_diffusion_coefficient,
+    persistence_exchange_ngp_1d,
+    persistence_exchange_normalized_alpha_decay,
+    persistence_exchange_scan,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     static_gamma_asymptotic_diagnostics,
@@ -1431,6 +1439,96 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(classify_delay_exponent(0.5), "singular_origin")
         self.assertEqual(classify_delay_exponent(1.0), "finite_origin")
         self.assertEqual(classify_delay_exponent(2.0), "regular_zero_origin")
+
+    def test_persistence_exchange_distribution_normalizes_and_starts_unrenewed(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+
+        probability = persistence_exchange_count_distribution(np.array([0.0, 4.0, 20.0]), params, max_count=80)
+
+        self.assertAlmostEqual(probability[0, 0], 1.0)
+        self.assertTrue(np.allclose(np.sum(probability, axis=1), 1.0, atol=1e-8))
+        self.assertGreater(probability[1, 0], 0.55)
+        self.assertLess(probability[2, 0], 0.1)
+
+    def test_persistence_exchange_poisson_limit_recovers_count_moments(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=2.0,
+            exchange_mean=2.0,
+        )
+        times = np.array([1.0, 3.0, 7.0])
+
+        moments = persistence_exchange_count_moments(times, params, max_count=80)
+
+        np.testing.assert_allclose(moments["mean"], times / 2.0, rtol=2e-5, atol=2e-5)
+        np.testing.assert_allclose(moments["variance"], times / 2.0, rtol=2e-5, atol=2e-5)
+
+    def test_persistence_exchange_decoupling_increases_stokes_einstein_product(self):
+        base = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=1.0,
+            exchange_mean=1.0,
+        )
+        decoupled = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=12.0,
+            exchange_mean=1.0,
+        )
+        wave_number = 1.1
+
+        base_tau = persistence_exchange_alpha_relaxation_time(wave_number, base)
+        decoupled_tau = persistence_exchange_alpha_relaxation_time(wave_number, decoupled)
+
+        self.assertAlmostEqual(persistence_exchange_diffusion_coefficient(base), persistence_exchange_diffusion_coefficient(decoupled))
+        self.assertGreater(decoupled_tau / base_tau, 3.0)
+        self.assertGreater(
+            persistence_exchange_diffusion_coefficient(decoupled) * decoupled_tau,
+            3.0 * persistence_exchange_diffusion_coefficient(base) * base_tau,
+        )
+
+    def test_persistence_exchange_long_time_ngp_recovers_to_zero(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=12.0,
+            exchange_mean=1.0,
+        )
+        times = np.array([8.0, 30.0, 650.0])
+
+        alpha = persistence_exchange_ngp_1d(times, params, max_count=500)
+        decay = persistence_exchange_normalized_alpha_decay(1.1, times, params, max_count=500)
+
+        self.assertGreater(alpha[0], 0.05)
+        self.assertLess(alpha[-1], alpha[0] / 20.0)
+        self.assertLess(decay[-1], 1e-20)
+
+    def test_persistence_exchange_scan_identifies_ratio_as_se_control(self):
+        rows = persistence_exchange_scan(
+            ratios=[1.0, 2.0, 4.0, 8.0, 12.0],
+            exchange_mean=1.0,
+            wave_number=1.1,
+        )
+
+        ratios = np.array([row["persistence_exchange_ratio"] for row in rows])
+        se_products = np.array([row["stokes_einstein_product"] for row in rows])
+        late_ngp = np.array([row["late_ngp"] for row in rows])
+
+        np.testing.assert_allclose(ratios, [1.0, 2.0, 4.0, 8.0, 12.0])
+        self.assertTrue(np.all(np.diff(se_products) > 0.0))
+        self.assertLess(late_ngp[-1], 0.02)
 
 
 if __name__ == "__main__":

@@ -98,6 +98,22 @@ class FacilitatedExchangeLawParams:
     exchange_slowing_barrier: float
 
 
+@dataclass(frozen=True)
+class PersistenceExchangeParams:
+    """Persistence/exchange renewal cage parameters.
+
+    The first cage escape has mean ``persistence_mean``. After the first escape,
+    subsequent cage exchanges have mean ``exchange_mean``. This makes the
+    structural relaxation clock separable from the long-time diffusion clock.
+    """
+
+    cage_variance: float
+    cage_tau: float
+    jump_variance: float
+    persistence_mean: float
+    exchange_mean: float
+
+
 def _validate(params: DelayedRenewalCageParams) -> None:
     for name in ("cage_variance", "cage_tau", "jump_variance", "renewal_rate", "renewal_delay"):
         value = getattr(params, name)
@@ -145,6 +161,13 @@ def _validate_facilitated_exchange_law(law: FacilitatedExchangeLawParams) -> Non
         value = getattr(law, name)
         if value < 0.0:
             raise ValueError(f"{name} must be nonnegative")
+
+
+def _validate_persistence_exchange(params: PersistenceExchangeParams) -> None:
+    for name in ("cage_variance", "cage_tau", "jump_variance", "persistence_mean", "exchange_mean"):
+        value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
 
 
 def activated_barrier_temperature_law(barrier: ActivatedBarrierParams) -> TemperatureLawParams:
@@ -307,6 +330,217 @@ def ngp_3d(t: np.ndarray, params: DelayedRenewalCageParams) -> np.ndarray:
     mask = r2 > 0.0
     out[mask] = 3.0 * r4[mask] / (5.0 * r2[mask] ** 2) - 1.0
     return out
+
+
+def _persistence_exchange_poisson_row(mean: float, max_count: int) -> np.ndarray:
+    row = np.zeros(max_count + 1, dtype=float)
+    row[0] = math.exp(-mean)
+    for count in range(1, max_count):
+        row[count] = row[count - 1] * mean / count
+    row[max_count] = max(0.0, 1.0 - float(np.sum(row[:max_count])))
+    return row
+
+
+def _persistence_exchange_row(
+    time: float,
+    first_rate: float,
+    exchange_rate: float,
+    max_count: int,
+) -> np.ndarray:
+    if time == 0.0:
+        row = np.zeros(max_count + 1, dtype=float)
+        row[0] = 1.0
+        return row
+    grid_size = max(800, int(math.ceil(30.0 * time)))
+    elapsed_after_first = np.linspace(0.0, time, grid_size)
+    first_density = first_rate * np.exp(-first_rate * (time - elapsed_after_first))
+    exchange_mean = exchange_rate * elapsed_after_first
+    poisson = np.exp(-exchange_mean)
+    cumulative = poisson.copy()
+    row = np.zeros(max_count + 1, dtype=float)
+    row[0] = math.exp(-first_rate * time)
+    row[1] = float(np.trapezoid(first_density * poisson, elapsed_after_first))
+    for count in range(2, max_count):
+        poisson = poisson * exchange_mean / (count - 1)
+        cumulative += poisson
+        row[count] = float(np.trapezoid(first_density * poisson, elapsed_after_first))
+    tail = np.maximum(0.0, 1.0 - cumulative)
+    row[max_count] = float(np.trapezoid(first_density * tail, elapsed_after_first))
+    total = float(np.sum(row))
+    if total <= 0.0:
+        raise RuntimeError("persistence-exchange count distribution failed to normalize")
+    return row / total
+
+
+def persistence_exchange_count_distribution(
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+    *,
+    max_count: int = 300,
+) -> np.ndarray:
+    """Count law for a process with decoupled first-persistence and exchange clocks."""
+
+    _validate_persistence_exchange(params)
+    if max_count < 2:
+        raise ValueError("max_count must be at least two")
+    t = np.asarray(t, dtype=float)
+    if np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative")
+    first_rate = 1.0 / params.persistence_mean
+    exchange_rate = 1.0 / params.exchange_mean
+    rows = np.zeros((len(t), max_count + 1), dtype=float)
+    for index, time in enumerate(t):
+        if math.isclose(first_rate, exchange_rate, rel_tol=1e-13, abs_tol=1e-13):
+            rows[index] = _persistence_exchange_poisson_row(first_rate * float(time), max_count)
+        else:
+            rows[index] = _persistence_exchange_row(float(time), first_rate, exchange_rate, max_count)
+    return rows
+
+
+def persistence_exchange_count_moments(
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+    *,
+    max_count: int = 300,
+) -> dict[str, np.ndarray]:
+    """Mean and variance of the decoupled persistence/exchange renewal count."""
+
+    probability = persistence_exchange_count_distribution(t, params, max_count=max_count)
+    counts = np.arange(probability.shape[1], dtype=float)
+    mean = probability @ counts
+    second = probability @ (counts**2)
+    return {"mean": mean, "variance": second - mean**2}
+
+
+def persistence_exchange_diffusion_coefficient(params: PersistenceExchangeParams) -> float:
+    """Long-time one-dimensional diffusion coefficient set by exchange events."""
+
+    _validate_persistence_exchange(params)
+    return params.jump_variance / (2.0 * params.exchange_mean)
+
+
+def persistence_exchange_msd(
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+    *,
+    max_count: int = 300,
+) -> np.ndarray:
+    """MSD for the persistence/exchange renewal cage."""
+
+    _validate_persistence_exchange(params)
+    t = np.asarray(t, dtype=float)
+    moments = persistence_exchange_count_moments(t, params, max_count=max_count)
+    local = params.cage_variance * (1.0 - np.exp(-t / params.cage_tau))
+    return local + params.jump_variance * moments["mean"]
+
+
+def persistence_exchange_ngp_1d(
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+    *,
+    max_count: int = 300,
+) -> np.ndarray:
+    """One-dimensional NGP for the persistence/exchange renewal count."""
+
+    _validate_persistence_exchange(params)
+    t = np.asarray(t, dtype=float)
+    probability = persistence_exchange_count_distribution(t, params, max_count=max_count)
+    counts = np.arange(probability.shape[1], dtype=float)
+    local = params.cage_variance * (1.0 - np.exp(-t / params.cage_tau))
+    variance_by_count = local[:, None] + params.jump_variance * counts[None, :]
+    mean_variance = np.sum(probability * variance_by_count, axis=1)
+    second_variance = np.sum(probability * variance_by_count**2, axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        alpha = second_variance / mean_variance**2 - 1.0
+    alpha[~np.isfinite(alpha)] = 0.0
+    return alpha
+
+
+def persistence_exchange_normalized_alpha_decay(
+    wave_number: float,
+    t: np.ndarray,
+    params: PersistenceExchangeParams,
+    *,
+    max_count: int = 300,
+) -> np.ndarray:
+    """Cage-normalized self-intermediate scattering decay."""
+
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    probability = persistence_exchange_count_distribution(t, params, max_count=max_count)
+    counts = np.arange(probability.shape[1], dtype=float)
+    jump_factor = np.exp(-0.5 * wave_number**2 * params.jump_variance * counts)
+    return probability @ jump_factor
+
+
+def persistence_exchange_alpha_relaxation_time(
+    wave_number: float,
+    params: PersistenceExchangeParams,
+    *,
+    threshold: float = math.exp(-1.0),
+    max_count: int = 600,
+) -> float:
+    """Solve the alpha time after removing the local cage Debye-Waller factor."""
+
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must be between zero and one")
+    lower = 0.0
+    upper = max(params.persistence_mean, params.exchange_mean)
+    while persistence_exchange_normalized_alpha_decay(wave_number, np.array([upper]), params, max_count=max_count)[0] > threshold:
+        upper *= 2.0
+        if upper > 1.0e7:
+            raise RuntimeError("alpha relaxation time bracket failed")
+    for _ in range(70):
+        mid = 0.5 * (lower + upper)
+        value = persistence_exchange_normalized_alpha_decay(wave_number, np.array([mid]), params, max_count=max_count)[0]
+        if value > threshold:
+            lower = mid
+        else:
+            upper = mid
+    return 0.5 * (lower + upper)
+
+
+def persistence_exchange_scan(
+    *,
+    ratios: list[float],
+    exchange_mean: float,
+    wave_number: float,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    jump_variance: float = 0.7,
+) -> list[dict[str, float]]:
+    """Scan first-persistence/exchange decoupling at fixed long-time diffusion."""
+
+    if exchange_mean <= 0.0:
+        raise ValueError("exchange_mean must be positive")
+    rows: list[dict[str, float]] = []
+    for ratio in ratios:
+        if ratio <= 0.0:
+            raise ValueError("ratios must be positive")
+        params = PersistenceExchangeParams(
+            cage_variance=cage_variance,
+            cage_tau=cage_tau,
+            jump_variance=jump_variance,
+            persistence_mean=ratio * exchange_mean,
+            exchange_mean=exchange_mean,
+        )
+        tau_alpha = persistence_exchange_alpha_relaxation_time(wave_number, params)
+        diffusion = persistence_exchange_diffusion_coefficient(params)
+        late_time = 80.0 * params.persistence_mean
+        late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params, max_count=1200)[0])
+        rows.append(
+            {
+                "persistence_exchange_ratio": float(ratio),
+                "persistence_mean": params.persistence_mean,
+                "exchange_mean": params.exchange_mean,
+                "diffusion_coefficient": diffusion,
+                "tau_alpha": tau_alpha,
+                "stokes_einstein_product": diffusion * tau_alpha,
+                "late_time": late_time,
+                "late_ngp": late_ngp,
+            }
+        )
+    return rows
 
 
 def self_intermediate_scattering(
