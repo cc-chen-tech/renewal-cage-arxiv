@@ -551,6 +551,91 @@ def write_persistence_exchange_pdf(path: Path) -> None:
     c.save()
 
 
+def write_persistence_exchange_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_persistence_exchange_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+
+    labels = [row["scenario"].replace("_", " ") for row in rows]
+    valid = np.array([float(row["valid_alpha_transport"]) for row in rows])
+    passes = np.array([float(row["passes_late_ngp"]) for row in rows])
+    true_ratio = float(rows[0]["true_persistence_exchange_ratio"])
+    inferred_ratio = np.array(
+        [
+            float(row["inferred_persistence_exchange_ratio"]) if float(row["valid_alpha_transport"]) > 0.5 else np.nan
+            for row in rows
+        ]
+    )
+    residual = np.array(
+        [
+            abs(float(row["late_ngp_log_residual"])) if float(row["valid_alpha_transport"]) > 0.5 else np.nan
+            for row in rows
+        ]
+    )
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Persistence/exchange inversion protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 48, "D and alpha time infer hidden clocks; late NGP is a held-out falsification observable.")
+
+    def draw_protocol_panel(left: float, bottom: float, width: float, height: float, title: str) -> None:
+        c.setStrokeColor(colors.black)
+        c.line(left, bottom, left + width, bottom)
+        c.line(left, bottom, left, bottom + height)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(left, bottom + height + 13, title)
+
+    left_a, left_b, bottom, width, height = 45.0, 430.0, 150.0, 320.0, 280.0
+    draw_protocol_panel(left_a, bottom, width, height, "AA. Hidden-clock inversion")
+    draw_protocol_panel(left_b, bottom, width, height, "AB. Held-out late NGP residual")
+
+    finite_ratio = inferred_ratio[np.isfinite(inferred_ratio)]
+    ratio_min = min(float(np.min(finite_ratio)), true_ratio)
+    ratio_max = max(float(np.max(finite_ratio)), true_ratio)
+    if math.isclose(ratio_min, ratio_max):
+        ratio_min -= 1.0
+        ratio_max += 1.0
+    finite_residual = residual[np.isfinite(residual)]
+    residual_max = max(float(np.max(finite_residual)), 0.1)
+
+    def y_ratio(value: float) -> float:
+        return bottom + (value - ratio_min) / (ratio_max - ratio_min) * height
+
+    def y_residual(value: float) -> float:
+        return bottom + value / residual_max * height
+
+    c.setStrokeColor(colors.grey)
+    c.setDash(4, 3)
+    c.line(left_a, y_ratio(true_ratio), left_a + width, y_ratio(true_ratio))
+    c.line(left_b, y_residual(0.1), left_b + width, y_residual(0.1))
+    c.setDash()
+    c.setFont("Helvetica", 7)
+    c.drawString(left_a + 8, y_ratio(true_ratio) + 4, "true ratio")
+    c.drawString(left_b + 8, y_residual(0.1) + 4, "|log residual|=0.1")
+
+    x_positions_a = np.linspace(left_a + 55, left_a + width - 55, len(rows))
+    x_positions_b = np.linspace(left_b + 55, left_b + width - 55, len(rows))
+    for idx, label in enumerate(labels):
+        color = colors.HexColor("#2f855a") if passes[idx] > 0.5 else colors.HexColor("#c05621")
+        c.setFillColor(color)
+        if valid[idx] > 0.5:
+            c.circle(float(x_positions_a[idx]), y_ratio(float(inferred_ratio[idx])), 4.5, fill=1, stroke=0)
+            c.circle(float(x_positions_b[idx]), y_residual(float(residual[idx])), 4.5, fill=1, stroke=0)
+        else:
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(float(x_positions_a[idx] - 4), bottom - 42, "x")
+            c.drawString(float(x_positions_b[idx] - 4), bottom - 42, "x")
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(float(x_positions_a[idx]), bottom - 24, label)
+        c.drawCentredString(float(x_positions_b[idx]), bottom - 24, label)
+
+    c.showPage()
+    c.save()
+
+
 def write_glass_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_glass_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -1091,6 +1176,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     alpha_shape_pdf = PAPER_FIGURE_DIR / "renewal_cage_alpha_shape.pdf"
     facilitated_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_facilitated_exchange.pdf"
     persistence_exchange_pdf = PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange.pdf"
+    persistence_exchange_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_persistence_exchange_protocol.pdf"
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     barrier_requirements_pdf = PAPER_FIGURE_DIR / "renewal_cage_barrier_requirements.pdf"
@@ -1107,6 +1193,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_alpha_shape_pdf(alpha_shape_pdf)
     write_facilitated_exchange_pdf(facilitated_exchange_pdf)
     write_persistence_exchange_pdf(persistence_exchange_pdf)
+    write_persistence_exchange_protocol_pdf(persistence_exchange_protocol_pdf)
     write_glass_audit_pdf(glass_audit_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_barrier_requirements_pdf(barrier_requirements_pdf)
@@ -1128,6 +1215,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(alpha_shape_pdf, "figures/renewal_cage_alpha_shape.pdf")
         archive.write(facilitated_exchange_pdf, "figures/renewal_cage_facilitated_exchange.pdf")
         archive.write(persistence_exchange_pdf, "figures/renewal_cage_persistence_exchange.pdf")
+        archive.write(persistence_exchange_protocol_pdf, "figures/renewal_cage_persistence_exchange_protocol.pdf")
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(barrier_requirements_pdf, "figures/renewal_cage_barrier_requirements.pdf")

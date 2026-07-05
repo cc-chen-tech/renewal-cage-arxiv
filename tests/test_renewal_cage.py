@@ -1536,6 +1536,64 @@ class DelayedRenewalCageTests(unittest.TestCase):
             3.0 * persistence_exchange_diffusion_coefficient(base) * base_tau,
         )
 
+    def test_persistence_exchange_transport_alpha_inversion_predicts_late_ngp(self):
+        inference_fn = getattr(sys.modules["renewal_cage"], "infer_persistence_exchange_from_alpha_transport", None)
+        if inference_fn is None:
+            self.fail("infer_persistence_exchange_from_alpha_transport is missing")
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=9.0,
+            exchange_mean=1.0,
+        )
+        wave_number = 1.1
+        tau_alpha = persistence_exchange_alpha_relaxation_time(wave_number, params)
+        diffusion = persistence_exchange_diffusion_coefficient(params)
+        late_time = 80.0 * params.persistence_mean
+        observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+
+        inferred = inference_fn(
+            wave_number=wave_number,
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=diffusion,
+            observed_tau_alpha=tau_alpha,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            late_time=late_time,
+            observed_late_ngp=observed_late_ngp,
+        )
+
+        self.assertAlmostEqual(inferred["exchange_mean"], params.exchange_mean, places=10)
+        self.assertAlmostEqual(inferred["persistence_mean"], params.persistence_mean, places=8)
+        self.assertAlmostEqual(inferred["persistence_exchange_ratio"], 9.0, places=8)
+        self.assertAlmostEqual(inferred["predicted_late_ngp"], observed_late_ngp, places=10)
+        self.assertLess(abs(inferred["late_ngp_log_residual"]), 1e-8)
+
+    def test_persistence_exchange_transport_alpha_inversion_rejects_too_fast_alpha(self):
+        inference_fn = getattr(sys.modules["renewal_cage"], "infer_persistence_exchange_from_alpha_transport", None)
+        if inference_fn is None:
+            self.fail("infer_persistence_exchange_from_alpha_transport is missing")
+        poisson_params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=1.0,
+            exchange_mean=1.0,
+        )
+        wave_number = 1.1
+        poisson_tau = persistence_exchange_alpha_relaxation_time(wave_number, poisson_params)
+
+        with self.assertRaises(ValueError):
+            inference_fn(
+                wave_number=wave_number,
+                jump_variance=poisson_params.jump_variance,
+                diffusion_coefficient=persistence_exchange_diffusion_coefficient(poisson_params),
+                observed_tau_alpha=0.8 * poisson_tau,
+                cage_variance=poisson_params.cage_variance,
+                cage_tau=poisson_params.cage_tau,
+            )
+
     def test_persistence_exchange_long_time_ngp_recovers_to_zero(self):
         params = PersistenceExchangeParams(
             cage_variance=1.0,

@@ -557,6 +557,137 @@ def persistence_exchange_alpha_relaxation_time(
     return 0.5 * (lower + upper)
 
 
+def infer_persistence_exchange_from_alpha_transport(
+    *,
+    wave_number: float,
+    jump_variance: float,
+    diffusion_coefficient: float,
+    observed_tau_alpha: float,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    late_time: float | None = None,
+    observed_late_ngp: float | None = None,
+) -> dict[str, float]:
+    """Infer persistence/exchange clocks from transport and alpha relaxation.
+
+    Long-time diffusion fixes the post-escape exchange mean,
+    ``tau_x=q/(2D)``. If the observed alpha time is slower than the Poisson
+    ``tau_p=tau_x`` baseline, the first-persistence mean is the unique
+    ``tau_p>=tau_x`` for which the cage-normalized alpha decay reaches the
+    requested threshold at ``observed_tau_alpha``. A late NGP value, when
+    supplied, is a held-out falsification observable rather than a fitted input.
+    """
+
+    if wave_number <= 0.0:
+        raise ValueError("wave_number must be positive")
+    if jump_variance <= 0.0:
+        raise ValueError("jump_variance must be positive")
+    if diffusion_coefficient <= 0.0:
+        raise ValueError("diffusion_coefficient must be positive")
+    if observed_tau_alpha <= 0.0:
+        raise ValueError("observed_tau_alpha must be positive")
+    if cage_variance <= 0.0 or cage_tau <= 0.0:
+        raise ValueError("cage parameters must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must be between zero and one")
+    if late_time is not None and late_time <= 0.0:
+        raise ValueError("late_time must be positive")
+    if observed_late_ngp is not None and observed_late_ngp <= 0.0:
+        raise ValueError("observed_late_ngp must be positive")
+
+    exchange_mean = jump_variance / (2.0 * diffusion_coefficient)
+    poisson_params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=exchange_mean,
+        exchange_mean=exchange_mean,
+    )
+    poisson_tau_alpha = persistence_exchange_alpha_relaxation_time(
+        wave_number,
+        poisson_params,
+        threshold=threshold,
+    )
+    if observed_tau_alpha < poisson_tau_alpha and not math.isclose(
+        observed_tau_alpha,
+        poisson_tau_alpha,
+        rel_tol=1e-10,
+        abs_tol=1e-12,
+    ):
+        raise ValueError("observed_tau_alpha is faster than the Poisson exchange baseline")
+
+    def residual(persistence_mean: float) -> float:
+        params = PersistenceExchangeParams(
+            cage_variance=cage_variance,
+            cage_tau=cage_tau,
+            jump_variance=jump_variance,
+            persistence_mean=persistence_mean,
+            exchange_mean=exchange_mean,
+        )
+        return float(
+            persistence_exchange_normalized_alpha_decay(
+                wave_number,
+                np.array([observed_tau_alpha]),
+                params,
+            )[0]
+            - threshold
+        )
+
+    lower = exchange_mean
+    lower_residual = residual(lower)
+    if math.isclose(lower_residual, 0.0, rel_tol=1e-12, abs_tol=1e-12):
+        persistence_mean = lower
+    else:
+        upper = max(2.0 * lower, observed_tau_alpha, lower + 1.0e-12)
+        upper_residual = residual(upper)
+        while upper_residual < 0.0:
+            upper *= 2.0
+            upper_residual = residual(upper)
+            if upper > 1.0e10:
+                raise RuntimeError("persistence/exchange inversion bracket failed")
+        for _ in range(80):
+            mid = 0.5 * (lower + upper)
+            if residual(mid) < 0.0:
+                lower = mid
+            else:
+                upper = mid
+        persistence_mean = 0.5 * (lower + upper)
+
+    inferred_params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=persistence_mean,
+        exchange_mean=exchange_mean,
+    )
+    reconstructed_tau_alpha = persistence_exchange_alpha_relaxation_time(
+        wave_number,
+        inferred_params,
+        threshold=threshold,
+    )
+    predicted_late_ngp = float("nan")
+    late_ngp_log_residual = float("nan")
+    if late_time is not None:
+        predicted_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), inferred_params)[0])
+        if observed_late_ngp is not None:
+            late_ngp_log_residual = math.log(observed_late_ngp / predicted_late_ngp)
+
+    return {
+        "exchange_mean": exchange_mean,
+        "persistence_mean": persistence_mean,
+        "persistence_exchange_ratio": persistence_mean / exchange_mean,
+        "poisson_tau_alpha": poisson_tau_alpha,
+        "reconstructed_tau_alpha": reconstructed_tau_alpha,
+        "tau_alpha_log_residual": math.log(reconstructed_tau_alpha / observed_tau_alpha),
+        "diffusion_coefficient": diffusion_coefficient,
+        "stokes_einstein_product": diffusion_coefficient * observed_tau_alpha,
+        "late_time": float(late_time) if late_time is not None else float("nan"),
+        "predicted_late_ngp": predicted_late_ngp,
+        "late_ngp_log_residual": late_ngp_log_residual,
+    }
+
+
 def persistence_exchange_scan(
     *,
     ratios: list[float],
@@ -2102,8 +2233,8 @@ def glass_signature_phase_diagram(
     ``delay_barrier_gap`` is ``E_d-E_lambda`` and controls growth of
     ``lambda*tau_d``. ``exchange_barrier_sum`` is the total cooling barrier that
     broadens and slows mobility exchange, controlling growth of
-    ``R_x/kappa_0``. A grid point has complete dynamic closure only when all
-    audited dynamical signatures are supported while the thermodynamic
+    ``R_x/kappa_0``. A grid point passes the joint dynamic-signature criterion
+    only when all audited dynamical signatures are supported while the thermodynamic
     transition flag remains zero.
     """
 

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Persistence/exchange inversion protocol</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">D and alpha time infer hidden clocks; late NGP is a held-out falsification observable.</text>
+  
+  <line x1="75" y1="430" x2="520" y2="430" stroke="#222" />
+  <line x1="75" y1="430" x2="75" y2="95" stroke="#222" />
+  <text x="75" y="71" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Inferred persistence/exchange ratio</text>
+
+  <line x1="75" y1="262.5" x2="520" y2="262.5" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="89" y="254.5" font-family="Arial, sans-serif" font-size="12" fill="#718096">true ratio</text>
+  <circle cx="145.0" cy="262.5" r="7" fill="#2f855a" /><text x="103.0" y="464" font-family="Arial, sans-serif" font-size="11">consistent</text><circle cx="297.5" cy="262.5" r="7" fill="#c05621" /><text x="255.5" y="464" font-family="Arial, sans-serif" font-size="11">late ngp mismatch</text><text x="440.0" y="360" font-family="Arial, sans-serif" font-size="20" fill="#c05621">x</text><text x="408.0" y="464" font-family="Arial, sans-serif" font-size="11">alpha too fast</text>
+  
+  <line x1="660" y1="430" x2="1040" y2="430" stroke="#222" />
+  <line x1="660" y1="430" x2="660" y2="95" stroke="#222" />
+  <text x="660" y="71" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Held-out late NGP residual</text>
+
+  <line x1="660" y1="405.8" x2="1040" y2="405.8" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="674" y="397.8" font-family="Arial, sans-serif" font-size="12" fill="#718096">|log residual|=0.1</text>
+  <circle cx="730.0" cy="430.0" r="7" fill="#2f855a" /><text x="688.0" y="464" font-family="Arial, sans-serif" font-size="11">consistent</text><circle cx="850.0" cy="95.0" r="7" fill="#c05621" /><text x="808.0" y="464" font-family="Arial, sans-serif" font-size="11">late ngp mismatch</text><text x="960.0" y="360" font-family="Arial, sans-serif" font-size="20" fill="#c05621">x</text><text x="928.0" y="464" font-family="Arial, sans-serif" font-size="11">alpha too fast</text>
+</svg>

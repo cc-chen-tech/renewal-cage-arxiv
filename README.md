@@ -3,7 +3,8 @@
 [![CI](https://github.com/cc-chen-tech/renewal-cage-arxiv/actions/workflows/ci.yml/badge.svg)](https://github.com/cc-chen-tech/renewal-cage-arxiv/actions/workflows/ci.yml)
 
 This repository contains a reproducible theoretical note on a minimal delayed
-renewal cage model for non-Gaussian dynamics near glass transition.
+renewal cage model for dynamical glass signatures. It is an effective
+microdynamic diagnostic theory, not a thermodynamic glass-transition theory.
 
 The model combines:
 
@@ -52,6 +53,9 @@ existence margin `D tau_d F(tau_alpha/tau_d) k^2 / [-log h]` to exceed one.
 A fuller observable inversion uses `f_k`, `D`, NGP peak time, and NGP peak
 height to infer `A`, `q`, `lambda`, and `tau_d`, leaving `tau_alpha` as a
 held-out consistency check.
+The persistence/exchange inversion uses `D` to fix `tau_x=q/(2D)`, solves
+`G(a_k,tau_alpha;tau_p,tau_x)=h` for `tau_p`, and leaves late NGP recovery as a
+held-out falsification observable.
 The finite-exchange protocol adds a second data-level residual: late NGP gives
 `c_NGP=R_l alpha_2(t_l)-1`, the alpha slope gives `c_alpha` through
 `log(1+Gamma_k c_alpha)/c_alpha`, and `log(c_alpha/c_NGP)` tests whether both
@@ -122,6 +126,7 @@ figures/renewal_cage_temperature.svg
 figures/renewal_cage_alpha_shape.svg
 figures/renewal_cage_facilitated_exchange.svg
 figures/renewal_cage_persistence_exchange.svg
+figures/renewal_cage_persistence_exchange_protocol.svg
 figures/renewal_cage_glass_audit.svg
 figures/renewal_cage_glass_phase_diagram.svg
 figures/renewal_cage_barrier_requirements.svg
@@ -144,6 +149,7 @@ data/renewal_cage_temperature.csv
 data/renewal_cage_alpha_shape.csv
 data/renewal_cage_facilitated_exchange.csv
 data/renewal_cage_persistence_exchange.csv
+data/renewal_cage_persistence_exchange_protocol.csv
 data/renewal_cage_glass_audit.csv
 data/renewal_cage_glass_phase_diagram.csv
 data/renewal_cage_barrier_requirements.csv
@@ -166,6 +172,7 @@ paper/figures/renewal_cage_temperature.pdf
 paper/figures/renewal_cage_alpha_shape.pdf
 paper/figures/renewal_cage_facilitated_exchange.pdf
 paper/figures/renewal_cage_persistence_exchange.pdf
+paper/figures/renewal_cage_persistence_exchange_protocol.pdf
 paper/figures/renewal_cage_glass_audit.pdf
 paper/figures/renewal_cage_glass_phase_diagram.pdf
 paper/figures/renewal_cage_barrier_requirements.pdf

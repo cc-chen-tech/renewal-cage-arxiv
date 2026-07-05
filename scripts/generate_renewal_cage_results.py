@@ -43,6 +43,7 @@ from renewal_cage import (  # noqa: E402
     glass_signature_phase_diagram,
     infer_parameters_from_full_observables,
     infer_parameters_from_scattering_transport,
+    infer_persistence_exchange_from_alpha_transport,
     infer_renewal_correlation_size,
     late_mechanism_selection,
     minimal_barrier_requirements,
@@ -458,6 +459,95 @@ def write_persistence_exchange_csv(
                     "time": float(value),
                     "ngp": float(alpha[idx]),
                     "alpha_decay": float(decay[idx]),
+                }
+            )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_persistence_exchange_protocol_csv(
+    path: Path,
+    *,
+    wave_number: float,
+    jump_variance: float,
+    exchange_mean: float,
+    true_ratio: float,
+) -> list[dict[str, float | str]]:
+    params = PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=0.2,
+        jump_variance=jump_variance,
+        persistence_mean=true_ratio * exchange_mean,
+        exchange_mean=exchange_mean,
+    )
+    diffusion = persistence_exchange_diffusion_coefficient(params)
+    tau_alpha = persistence_exchange_alpha_relaxation_time(wave_number, params)
+    late_time = 80.0 * params.persistence_mean
+    predicted_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    scenarios = [
+        ("consistent", tau_alpha, predicted_late_ngp),
+        ("late_ngp_mismatch", tau_alpha, 4.0 * predicted_late_ngp),
+    ]
+    poisson_params = PersistenceExchangeParams(
+        cage_variance=params.cage_variance,
+        cage_tau=params.cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=exchange_mean,
+        exchange_mean=exchange_mean,
+    )
+    scenarios.append(
+        (
+            "alpha_too_fast",
+            0.8 * persistence_exchange_alpha_relaxation_time(wave_number, poisson_params),
+            predicted_late_ngp,
+        )
+    )
+
+    rows: list[dict[str, float | str]] = []
+    for scenario, observed_tau_alpha, observed_late_ngp in scenarios:
+        try:
+            inferred = infer_persistence_exchange_from_alpha_transport(
+                wave_number=wave_number,
+                jump_variance=jump_variance,
+                diffusion_coefficient=diffusion,
+                observed_tau_alpha=observed_tau_alpha,
+                late_time=late_time,
+                observed_late_ngp=observed_late_ngp,
+            )
+            late_residual = inferred["late_ngp_log_residual"]
+            rows.append(
+                {
+                    "scenario": scenario,
+                    "valid_alpha_transport": 1.0,
+                    "passes_late_ngp": float(abs(late_residual) < 0.1),
+                    "true_persistence_exchange_ratio": true_ratio,
+                    "inferred_persistence_exchange_ratio": inferred["persistence_exchange_ratio"],
+                    "diffusion_coefficient": diffusion,
+                    "observed_tau_alpha": observed_tau_alpha,
+                    "poisson_tau_alpha": inferred["poisson_tau_alpha"],
+                    "late_time": late_time,
+                    "observed_late_ngp": observed_late_ngp,
+                    "predicted_late_ngp": inferred["predicted_late_ngp"],
+                    "late_ngp_log_residual": late_residual,
+                    "tau_alpha_log_residual": inferred["tau_alpha_log_residual"],
+                }
+            )
+        except ValueError:
+            rows.append(
+                {
+                    "scenario": scenario,
+                    "valid_alpha_transport": 0.0,
+                    "passes_late_ngp": 0.0,
+                    "true_persistence_exchange_ratio": true_ratio,
+                    "inferred_persistence_exchange_ratio": np.nan,
+                    "diffusion_coefficient": diffusion,
+                    "observed_tau_alpha": observed_tau_alpha,
+                    "poisson_tau_alpha": persistence_exchange_alpha_relaxation_time(wave_number, poisson_params),
+                    "late_time": late_time,
+                    "observed_late_ngp": observed_late_ngp,
+                    "predicted_late_ngp": np.nan,
+                    "late_ngp_log_residual": np.nan,
+                    "tau_alpha_log_residual": np.nan,
                 }
             )
     write_sweep_csv(path, rows)
@@ -1720,6 +1810,75 @@ def write_persistence_exchange_svg(path: Path, rows: list[dict[str, float | str]
     path.write_text(svg)
 
 
+def write_persistence_exchange_protocol_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    left_a, top, right_a, bottom = 75, 95, 520, 430
+    left_b, right_b = 660, 1040
+    labels = [str(row["scenario"]) for row in rows]
+    x_positions_a = np.linspace(left_a + 70, right_a - 70, len(rows))
+    x_positions_b = np.linspace(left_b + 70, right_b - 70, len(rows))
+    valid_rows = [row for row in rows if float(row["valid_alpha_transport"]) > 0.5]
+    ratio_values = np.array([float(row["inferred_persistence_exchange_ratio"]) for row in valid_rows])
+    true_ratio = float(rows[0]["true_persistence_exchange_ratio"])
+    ratio_scale_values = np.concatenate([ratio_values, np.array([true_ratio])])
+    y_ratio = scale(ratio_scale_values, bottom, top)
+    ratio_y_by_value = dict(zip(ratio_scale_values, y_ratio))
+
+    residual_values = np.array(
+        [
+            abs(float(row["late_ngp_log_residual"])) if float(row["valid_alpha_transport"]) > 0.5 else np.nan
+            for row in rows
+        ]
+    )
+    finite_residual = residual_values[np.isfinite(residual_values)]
+    residual_scale_values = np.concatenate([finite_residual, np.array([0.1])])
+    y_residual = scale(residual_scale_values, bottom, top)
+    residual_y_by_value = dict(zip(residual_scale_values, y_residual))
+
+    def axes(left: int, right: int, title: str) -> str:
+        return f"""
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">{title}</text>
+"""
+
+    ratio_points = []
+    residual_points = []
+    for idx, row in enumerate(rows):
+        label = labels[idx].replace("_", " ")
+        valid = float(row["valid_alpha_transport"]) > 0.5
+        color = "#2f855a" if float(row["passes_late_ngp"]) > 0.5 else "#c05621"
+        if valid:
+            ratio_y = ratio_y_by_value[float(row["inferred_persistence_exchange_ratio"])]
+            ratio_points.append(f'<circle cx="{x_positions_a[idx]:.1f}" cy="{ratio_y:.1f}" r="7" fill="{color}" />')
+            residual_y = residual_y_by_value[abs(float(row["late_ngp_log_residual"]))]
+            residual_points.append(f'<circle cx="{x_positions_b[idx]:.1f}" cy="{residual_y:.1f}" r="7" fill="{color}" />')
+        else:
+            ratio_points.append(f'<text x="{x_positions_a[idx] - 10:.1f}" y="{bottom - 70}" font-family="Arial, sans-serif" font-size="20" fill="#c05621">x</text>')
+            residual_points.append(f'<text x="{x_positions_b[idx] - 10:.1f}" y="{bottom - 70}" font-family="Arial, sans-serif" font-size="20" fill="#c05621">x</text>')
+        ratio_points.append(f'<text x="{x_positions_a[idx] - 42:.1f}" y="{bottom + 34}" font-family="Arial, sans-serif" font-size="11">{label}</text>')
+        residual_points.append(f'<text x="{x_positions_b[idx] - 42:.1f}" y="{bottom + 34}" font-family="Arial, sans-serif" font-size="11">{label}</text>')
+
+    true_y = ratio_y_by_value[true_ratio]
+    threshold_y = residual_y_by_value[0.1]
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Persistence/exchange inversion protocol</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">D and alpha time infer hidden clocks; late NGP is a held-out falsification observable.</text>
+  {axes(left_a, right_a, "A. Inferred persistence/exchange ratio")}
+  <line x1="{left_a}" y1="{true_y:.1f}" x2="{right_a}" y2="{true_y:.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{left_a + 14}" y="{true_y - 8:.1f}" font-family="Arial, sans-serif" font-size="12" fill="#718096">true ratio</text>
+  {"".join(ratio_points)}
+  {axes(left_b, right_b, "B. Held-out late NGP residual")}
+  <line x1="{left_b}" y1="{threshold_y:.1f}" x2="{right_b}" y2="{threshold_y:.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{left_b + 14}" y="{threshold_y - 8:.1f}" font-family="Arial, sans-serif" font-size="12" fill="#718096">|log residual|=0.1</text>
+  {"".join(residual_points)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -2279,6 +2438,17 @@ def main() -> None:
     write_persistence_exchange_svg(
         FIGURE_DIR / "renewal_cage_persistence_exchange.svg",
         persistence_exchange_rows,
+    )
+    persistence_exchange_protocol_rows = write_persistence_exchange_protocol_csv(
+        DATA_DIR / "renewal_cage_persistence_exchange_protocol.csv",
+        wave_number=1.1,
+        jump_variance=0.7,
+        exchange_mean=1.0,
+        true_ratio=9.0,
+    )
+    write_persistence_exchange_protocol_svg(
+        FIGURE_DIR / "renewal_cage_persistence_exchange_protocol.svg",
+        persistence_exchange_protocol_rows,
     )
 
     barrier = ActivatedBarrierParams(

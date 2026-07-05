@@ -48,7 +48,9 @@ stretched-like alpha decay without leaving residual long-time non-Gaussianity,
 and its predictions are contrasted with a static gamma-disorder null model. A
 persistence-exchange extension separates first cage escape from subsequent
 exchange, producing Stokes-Einstein decoupling at fixed long-time diffusion
-while preserving Gaussian recovery.
+while preserving Gaussian recovery. The result is an effective diagnostic
+theory for dynamical glass signatures, not a thermodynamic theory of an ideal
+glass transition.
 \end{abstract}
 
 \maketitle
@@ -595,6 +597,26 @@ and the NGP remains a count-variance diagnostic,
   \frac{q^2{\rm Var}\,N(t)}
        {[L(t)+q\langle N(t)\rangle]^2}.
 \end{equation}
+This extension can also be inverted from directly measurable dynamical
+quantities. If $q$ is fixed from the MSD jump scale or from the preceding
+peak/scattering inversion, long-time diffusion gives
+\begin{equation}
+  \tau_x=\frac{q}{2D}.
+\end{equation}
+The first-persistence time is then the solution of the scalar equation
+\begin{equation}
+  G(a_k,\tau_\alpha;\tau_p,\tau_x)=h,
+\end{equation}
+with $\tau_p\ge\tau_x$. This inversion uses $D$ and the cage-normalized
+alpha time only. A late NGP measurement is therefore held out:
+\begin{equation}
+  \Delta_{\rm px}=
+  \log\frac{\alpha_{2,\mathrm{obs}}(t_\ell)}
+           {\alpha_{2,\mathrm{pred}}^{px}(t_\ell)}.
+\end{equation}
+Small $|\Delta_{\rm px}|$ supports a persistence/exchange interpretation,
+whereas a large residual rejects it even if the same $D\tau_\alpha$ product can
+be matched.
 The Poisson renewal model is recovered when $\tau_p=\tau_x$. When
 $\tau_p>\tau_x$, the long-time diffusion coefficient remains
 $D=q/(2\tau_x)$, but the cage-normalized alpha relaxation is delayed by the
@@ -778,16 +800,19 @@ diffusion slowdown, alpha slowdown, NGP peak shift, Stokes-Einstein violation,
 fragility growth, heterogeneity growth, stretched alpha relaxation, $\chi_4$
 peak growth, and Gaussian recovery, while the thermodynamic-transition flag is
 zero by construction. The associated barrier-facilitation scan shows that an
-exchange barrier sum of $2$ is already sufficient for the complete dynamic
-closure criterion in this parameter set, whereas no thermodynamic transition is
+exchange barrier sum of $2$ is already sufficient for the joint
+dynamic-signature criterion in this parameter set, whereas no thermodynamic transition is
 inferred. The closed barrier-threshold inversion gives minimum controls
 $E_d-E_\lambda=3.0$ and $E_{\rm hx}=4.0$ for the target growth factors used in
 the scan.
 The persistence-exchange extension keeps $D=0.35$ fixed while increasing
 $\tau_p/\tau_x$ from $1$ to $12$; the resulting $D\tau_\alpha$ grows from
 $1.01$ to $4.98$, while the late NGP falls from $1.21\times10^{-2}$ to
-$2.58\times10^{-9}$ at the diagnostic late time. This separates
-Stokes-Einstein violation from permanent non-Gaussianity.
+$1.21\times10^{-3}$ at the diagnostic late time. A synthetic inversion case
+with $\tau_p/\tau_x=9$ recovers $\tau_x=1.00$, $\tau_p=9.00$, and predicts the
+held-out late NGP $1.56\times10^{-3}$ with zero log residual; replacing only
+the late NGP fails this residual check. This separates Stokes-Einstein
+violation from permanent non-Gaussianity.
 
 \begin{figure}[h]
   \centering
@@ -848,6 +873,16 @@ Stokes-Einstein violation from permanent non-Gaussianity.
   and subsequent exchange time are separated. Increasing $\tau_p/\tau_x$ at
   fixed exchange time leaves the long-time diffusion coefficient fixed but
   increases $D\tau_\alpha$ and still permits long-time NGP recovery.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_persistence_exchange_protocol.pdf}
+  \caption{Persistence-exchange inversion protocol. Long-time diffusion and the
+  cage-normalized alpha time infer the hidden exchange and first-persistence
+  clocks. The late NGP is not fitted; it is a held-out falsification observable
+  that accepts the consistent synthetic case and rejects a mismatched late-NGP
+  case.}
 \end{figure}
 
 \begin{figure}[h]
