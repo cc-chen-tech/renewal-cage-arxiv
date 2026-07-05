@@ -50,6 +50,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_self_intermediate_scattering,
     fragility_benchmark_consistency,
     gaussian_recovery_benchmark_consistency,
+    infer_spatial_facilitation_diffusivity,
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
     late_mechanism_selection,
@@ -90,6 +91,7 @@ from renewal_cage import (  # noqa: E402
     static_gamma_count_moments,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
+    spatial_facilitation_growth_law_consistency,
     stokes_einstein_benchmark_consistency,
     stokes_einstein_product,
     temperature_dependent_params,
@@ -940,6 +942,55 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertTrue(all(later > earlier for earlier, later in zip(sizes, sizes[1:])))
         self.assertTrue(all(later > earlier for earlier, later in zip(peaks, peaks[1:])))
         self.assertGreater(rows[-1]["chi4_peak_growth"], 1.0)
+
+    def test_spatial_facilitation_diffusivity_inversion_recovers_constant_front_law(self):
+        persistence_times = np.array([3.0, 7.0, 15.0])
+        true_diffusivity = 0.04
+        observed_lengths = np.sqrt(1.0 + 2.0 * 3.0 * true_diffusivity * persistence_times)
+
+        inferred = infer_spatial_facilitation_diffusivity(
+            persistence_times=persistence_times,
+            observed_dynamic_lengths=observed_lengths,
+            dimension=3,
+            microscopic_length=1.0,
+        )
+        summary = spatial_facilitation_growth_law_consistency(
+            persistence_times=persistence_times,
+            observed_dynamic_lengths=observed_lengths,
+            observed_diffusive_front_growth=True,
+            dimension=3,
+            microscopic_length=1.0,
+            max_diffusivity_relative_std=1.0e-12,
+            min_length_growth=1.5,
+        )
+
+        self.assertTrue(all(abs(row["inferred_facilitation_diffusivity"] - true_diffusivity) < 1.0e-12 for row in inferred))
+        self.assertLess(summary["facilitation_diffusivity_relative_std"], 1.0e-12)
+        self.assertGreater(summary["length_growth"], 1.5)
+        self.assertEqual(summary["model_predicts_diffusive_front_growth"], 1.0)
+        self.assertEqual(summary["facilitation_growth_law_consistent"], 1.0)
+        self.assertEqual(summary["overall_consistent"], 1.0)
+
+    def test_spatial_facilitation_growth_law_rejects_nonconstant_front_diffusivity(self):
+        persistence_times = np.array([3.0, 7.0, 15.0])
+        true_diffusivity = 0.04
+        observed_lengths = np.sqrt(1.0 + 2.0 * 3.0 * true_diffusivity * persistence_times)
+        observed_lengths[-1] *= 1.25
+
+        summary = spatial_facilitation_growth_law_consistency(
+            persistence_times=persistence_times,
+            observed_dynamic_lengths=observed_lengths,
+            observed_diffusive_front_growth=True,
+            dimension=3,
+            microscopic_length=1.0,
+            max_diffusivity_relative_std=0.05,
+            min_length_growth=1.5,
+        )
+
+        self.assertGreater(summary["facilitation_diffusivity_relative_std"], 0.05)
+        self.assertEqual(summary["model_predicts_diffusive_front_growth"], 0.0)
+        self.assertEqual(summary["facilitation_growth_law_consistent"], 0.0)
+        self.assertEqual(summary["overall_consistent"], 0.0)
 
     def test_activated_barrier_gap_controls_delayed_renewal_product(self):
         barrier = ActivatedBarrierParams(

@@ -52,6 +52,7 @@ from renewal_cage import (  # noqa: E402
     infer_parameters_from_scattering_transport,
     infer_persistence_exchange_from_alpha_transport,
     infer_renewal_correlation_size,
+    infer_spatial_facilitation_diffusivity,
     late_mechanism_selection,
     minimal_barrier_requirements,
     local_alpha_stretching_exponent,
@@ -79,6 +80,7 @@ from renewal_cage import (  # noqa: E402
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     spatial_facilitation_chi4_scan,
+    spatial_facilitation_growth_law_consistency,
     static_gamma_asymptotic_diagnostics,
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
@@ -925,6 +927,55 @@ def write_mct_beta_closure_csv(
     return rows
 
 
+def write_spatial_facilitation_inversion_csv(
+    path: Path,
+    spatial_chi4_rows: list[dict[str, float]],
+    *,
+    dimension: int,
+    particle_density: float,
+    microscopic_length: float,
+    max_diffusivity_relative_std: float,
+    min_length_growth: float,
+) -> list[dict[str, float]]:
+    persistence_times = np.array([row["renewal_delay"] for row in spatial_chi4_rows], dtype=float)
+    observed_lengths = np.array([row["dynamic_correlation_length"] for row in spatial_chi4_rows], dtype=float)
+    inferred_rows = infer_spatial_facilitation_diffusivity(
+        persistence_times=persistence_times,
+        observed_dynamic_lengths=observed_lengths,
+        dimension=dimension,
+        particle_density=particle_density,
+        microscopic_length=microscopic_length,
+    )
+    summary = spatial_facilitation_growth_law_consistency(
+        persistence_times=persistence_times,
+        observed_dynamic_lengths=observed_lengths,
+        observed_diffusive_front_growth=True,
+        dimension=dimension,
+        particle_density=particle_density,
+        microscopic_length=microscopic_length,
+        max_diffusivity_relative_std=max_diffusivity_relative_std,
+        min_length_growth=min_length_growth,
+    )
+    rows = []
+    for source, inferred in zip(spatial_chi4_rows, inferred_rows):
+        rows.append(
+            {
+                "temperature": source["temperature"],
+                "inverse_temperature_shift": 1.0 / source["temperature"] - 1.0 / spatial_chi4_rows[0]["temperature"],
+                **inferred,
+                "length_growth": source["length_growth"],
+                "correlation_size_growth": source["correlation_size_growth"],
+                "chi4_peak_growth": source["chi4_peak_growth"],
+                "facilitation_diffusivity_mean": summary["facilitation_diffusivity_mean"],
+                "facilitation_diffusivity_relative_std": summary["facilitation_diffusivity_relative_std"],
+                "max_diffusivity_relative_std": summary["max_diffusivity_relative_std"],
+                "growth_law_overall_consistent": summary["overall_consistent"],
+            }
+        )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_benchmark_consistency_csv(
     path: Path,
     beta: MCTBetaParams,
@@ -989,6 +1040,16 @@ def write_sota_benchmark_consistency_csv(
         "length_growth_consistent",
         "correlation_size_growth_consistent",
         "chi4_peak_growth_consistent",
+        "observed_diffusive_front_growth",
+        "number_of_points",
+        "facilitation_diffusivity_mean",
+        "facilitation_diffusivity_std",
+        "facilitation_diffusivity_relative_std",
+        "max_diffusivity_relative_std",
+        "persistence_time_growth",
+        "model_predicts_diffusive_front_growth",
+        "constant_diffusivity_consistent",
+        "facilitation_growth_law_consistent",
         "observed_tts_breakdown",
         "cold_shape_residual",
         "alpha_shape_control_growth",
@@ -1097,6 +1158,22 @@ def write_sota_benchmark_consistency_csv(
         min_correlation_size_growth=2.0,
         min_chi4_peak_growth=2.0,
     )
+    spatial_front_row = {
+        "benchmark_id": "spatial_facilitation_constant_front_law",
+        **spatial_facilitation_growth_law_consistency(
+            persistence_times=np.array([row["renewal_delay"] for row in spatial_chi4_rows], dtype=float),
+            observed_dynamic_lengths=np.array(
+                [row["dynamic_correlation_length"] for row in spatial_chi4_rows],
+                dtype=float,
+            ),
+            observed_diffusive_front_growth=True,
+            dimension=3,
+            particle_density=0.85,
+            microscopic_length=1.0,
+            max_diffusivity_relative_std=0.05,
+            min_length_growth=1.5,
+        ),
+    }
     alpha_summary_by_temperature: dict[float, dict[str, float | str]] = {}
     for row in alpha_shape_rows:
         alpha_summary_by_temperature.setdefault(float(row["temperature"]), row)
@@ -1199,6 +1276,7 @@ def write_sota_benchmark_consistency_csv(
         normalize(recovery_row, "gaussian_recovery_mechanism_selection"),
         normalize(se_row, "stokes_einstein_fractional_decoupling"),
         normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
+        normalize(spatial_front_row, "spatial_facilitation_growth_law"),
         normalize(tts_row, "alpha_tts_breakdown"),
         normalize(persistence_exchange_row, "persistence_exchange_inversion"),
         normalize(van_hove_row, "van_hove_tail_recovery"),
@@ -2499,6 +2577,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     recovery_row = by_id["gaussian_recovery_finite_exchange_vs_static_disorder"]
     se_row = by_id["stokes_einstein_fractional_decoupling"]
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
+    spatial_front_row = by_id["spatial_facilitation_constant_front_law"]
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
@@ -2560,10 +2639,11 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_b}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">recovery row consistent = {int(float(recovery_row['overall_consistent']))}</text>
   <text x="{left_b}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">SE row consistent = {int(float(se_row['overall_consistent']))}; D tau growth = {float(se_row['se_product_growth']):.2f}, xi_SE = {float(se_row['cold_fractional_exponent']):.3f}</text>
   <text x="{left_b}" y="{bottom + 92}" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = {int(float(heterogeneity_row['overall_consistent']))}; xi4 growth = {float(heterogeneity_row['length_growth']):.2f}, chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}</text>
-  <text x="{left_b}" y="{bottom + 110}" font-family="Arial, sans-serif" font-size="12">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
-  <text x="{left_b}" y="{bottom + 128}" font-family="Arial, sans-serif" font-size="12">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
-  <text x="{left_b}" y="{bottom + 146}" font-family="Arial, sans-serif" font-size="12">van Hove row consistent = {int(float(van_hove_row['overall_consistent']))}; peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}, late tail = {float(van_hove_row['late_tail_ratio']):.2f}</text>
-  <text x="{left_b}" y="{bottom + 164}" font-family="Arial, sans-serif" font-size="12">fragility row consistent = {int(float(fragility_row['overall_consistent']))}; m growth = {float(fragility_row['fragility_index_growth']):.2f}, AG slowdown = {float(fragility_row['adam_gibbs_slowdown']):.2g}</text>
+  <text x="{left_b}" y="{bottom + 110}" font-family="Arial, sans-serif" font-size="12">front-law row consistent = {int(float(spatial_front_row['overall_consistent']))}; Df cv = {float(spatial_front_row['facilitation_diffusivity_relative_std']):.2g}, xi4 growth = {float(spatial_front_row['length_growth']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 128}" font-family="Arial, sans-serif" font-size="12">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 146}" font-family="Arial, sans-serif" font-size="12">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
+  <text x="{left_b}" y="{bottom + 164}" font-family="Arial, sans-serif" font-size="12">van Hove row consistent = {int(float(van_hove_row['overall_consistent']))}; peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}, late tail = {float(van_hove_row['late_tail_ratio']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 182}" font-family="Arial, sans-serif" font-size="12">fragility row consistent = {int(float(fragility_row['overall_consistent']))}; m growth = {float(fragility_row['fragility_index_growth']):.2f}, AG slowdown = {float(fragility_row['adam_gibbs_slowdown']):.2g}</text>
 </svg>
 """
     path.write_text(svg)
@@ -3458,6 +3538,15 @@ def main() -> None:
         particle_density=0.85,
     )
     write_spatial_chi4_svg(FIGURE_DIR / "renewal_cage_spatial_chi4.svg", spatial_chi4_rows)
+    write_spatial_facilitation_inversion_csv(
+        DATA_DIR / "renewal_cage_spatial_facilitation_inversion.csv",
+        spatial_chi4_rows,
+        dimension=3,
+        particle_density=0.85,
+        microscopic_length=1.0,
+        max_diffusivity_relative_std=0.05,
+        min_length_growth=1.5,
+    )
     thermodynamic_rows = write_thermodynamic_closure_csv(
         DATA_DIR / "renewal_cage_thermodynamic_closure.csv",
         np.array([1.0, 0.82, 0.68, 0.58, 0.52]),

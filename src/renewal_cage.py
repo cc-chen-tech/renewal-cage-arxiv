@@ -2593,6 +2593,126 @@ def spatial_facilitation_domain(
     }
 
 
+def infer_spatial_facilitation_diffusivity(
+    *,
+    persistence_times: np.ndarray,
+    observed_dynamic_lengths: np.ndarray | None = None,
+    observed_correlation_sizes: np.ndarray | None = None,
+    dimension: int = 3,
+    particle_density: float = 1.0,
+    microscopic_length: float = 1.0,
+) -> list[dict[str, float]]:
+    """Infer the diffusive facilitation-front coefficient from spatial data."""
+
+    if dimension <= 0:
+        raise ValueError("dimension must be positive")
+    if particle_density <= 0.0:
+        raise ValueError("particle_density must be positive")
+    if microscopic_length <= 0.0:
+        raise ValueError("microscopic_length must be positive")
+    if (observed_dynamic_lengths is None) == (observed_correlation_sizes is None):
+        raise ValueError("provide exactly one of observed_dynamic_lengths or observed_correlation_sizes")
+
+    persistence_times = np.asarray(persistence_times, dtype=float)
+    if persistence_times.ndim != 1 or persistence_times.size == 0:
+        raise ValueError("persistence_times must be a nonempty one-dimensional array")
+    if np.any(persistence_times <= 0.0):
+        raise ValueError("persistence_times must be positive")
+
+    unit_ball_volume = math.pi ** (0.5 * dimension) / math.gamma(0.5 * dimension + 1.0)
+    if observed_dynamic_lengths is not None:
+        lengths = np.asarray(observed_dynamic_lengths, dtype=float)
+        if lengths.shape != persistence_times.shape:
+            raise ValueError("observed_dynamic_lengths must match persistence_times")
+        if np.any(lengths <= 0.0):
+            raise ValueError("observed_dynamic_lengths must be positive")
+        correlation_sizes = particle_density * unit_ball_volume * lengths**dimension
+    else:
+        correlation_sizes = np.asarray(observed_correlation_sizes, dtype=float)
+        if correlation_sizes.shape != persistence_times.shape:
+            raise ValueError("observed_correlation_sizes must match persistence_times")
+        if np.any(correlation_sizes <= 0.0):
+            raise ValueError("observed_correlation_sizes must be positive")
+        lengths = (correlation_sizes / (particle_density * unit_ball_volume)) ** (1.0 / dimension)
+
+    diffusivities = (lengths**2 - microscopic_length**2) / (2.0 * dimension * persistence_times)
+    if np.any(diffusivities < -1.0e-14):
+        raise ValueError("observed lengths imply negative facilitation diffusivity")
+    diffusivities = np.maximum(diffusivities, 0.0)
+
+    rows: list[dict[str, float]] = []
+    for idx, persistence_time in enumerate(persistence_times):
+        rows.append(
+            {
+                "point_index": float(idx),
+                "persistence_time": float(persistence_time),
+                "dynamic_correlation_length": float(lengths[idx]),
+                "correlation_size": float(correlation_sizes[idx]),
+                "inferred_facilitation_diffusivity": float(diffusivities[idx]),
+                "front_dynamic_exponent": 2.0,
+            }
+        )
+    return rows
+
+
+def spatial_facilitation_growth_law_consistency(
+    *,
+    persistence_times: np.ndarray,
+    observed_diffusive_front_growth: bool,
+    observed_dynamic_lengths: np.ndarray | None = None,
+    observed_correlation_sizes: np.ndarray | None = None,
+    dimension: int = 3,
+    particle_density: float = 1.0,
+    microscopic_length: float = 1.0,
+    max_diffusivity_relative_std: float,
+    min_length_growth: float,
+) -> dict[str, float]:
+    """Check whether spatial growth is consistent with one diffusive front law."""
+
+    if max_diffusivity_relative_std < 0.0:
+        raise ValueError("max_diffusivity_relative_std must be nonnegative")
+    if min_length_growth <= 0.0:
+        raise ValueError("min_length_growth must be positive")
+    rows = infer_spatial_facilitation_diffusivity(
+        persistence_times=persistence_times,
+        observed_dynamic_lengths=observed_dynamic_lengths,
+        observed_correlation_sizes=observed_correlation_sizes,
+        dimension=dimension,
+        particle_density=particle_density,
+        microscopic_length=microscopic_length,
+    )
+    diffusivities = np.array([row["inferred_facilitation_diffusivity"] for row in rows], dtype=float)
+    lengths = np.array([row["dynamic_correlation_length"] for row in rows], dtype=float)
+    mean_diffusivity = float(np.mean(diffusivities))
+    diffusivity_std = float(np.std(diffusivities))
+    if mean_diffusivity > 0.0:
+        diffusivity_relative_std = diffusivity_std / mean_diffusivity
+    else:
+        diffusivity_relative_std = 0.0 if diffusivity_std == 0.0 else math.inf
+    length_growth = float(lengths[-1] / lengths[0])
+    clock_growth = float(np.asarray(persistence_times, dtype=float)[-1] / np.asarray(persistence_times, dtype=float)[0])
+    constant_front_flag = mean_diffusivity > 0.0 and diffusivity_relative_std <= max_diffusivity_relative_std
+    length_growth_flag = length_growth >= min_length_growth
+    model_flag = constant_front_flag and length_growth_flag
+    consistent = model_flag == observed_diffusive_front_growth
+    return {
+        "observed_diffusive_front_growth": float(observed_diffusive_front_growth),
+        "number_of_points": float(len(rows)),
+        "facilitation_diffusivity_mean": mean_diffusivity,
+        "facilitation_diffusivity_std": diffusivity_std,
+        "facilitation_diffusivity_relative_std": diffusivity_relative_std,
+        "max_diffusivity_relative_std": max_diffusivity_relative_std,
+        "length_growth": length_growth,
+        "persistence_time_growth": clock_growth,
+        "min_length_growth": min_length_growth,
+        "model_predicts_diffusive_front_growth": float(model_flag),
+        "constant_diffusivity_consistent": float(constant_front_flag == observed_diffusive_front_growth),
+        "length_growth_consistent": float(length_growth_flag == observed_diffusive_front_growth),
+        "facilitation_growth_law_consistent": float(consistent),
+        "overall_consistent": float(consistent),
+    }
+
+
 def spatial_facilitation_chi4_scan(
     *,
     temperatures: np.ndarray,
