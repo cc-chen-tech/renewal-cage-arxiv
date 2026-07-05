@@ -36,6 +36,7 @@ from renewal_cage import (  # noqa: E402
     fragility_benchmark_consistency,
     gaussian_radial_3d,
     gaussian_recovery_benchmark_consistency,
+    gamma_exchange_alpha_relaxation_time,
     gamma_exchange_asymptotic_diagnostics,
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
@@ -53,6 +54,7 @@ from renewal_cage import (  # noqa: E402
     infer_persistence_exchange_from_alpha_transport,
     infer_renewal_correlation_size,
     infer_spatial_facilitation_diffusivity,
+    kww_alpha_fit,
     late_mechanism_selection,
     minimal_barrier_requirements,
     local_alpha_stretching_exponent,
@@ -85,7 +87,9 @@ from renewal_cage import (  # noqa: E402
     static_gamma_ngp_1d,
     static_gamma_normalized_alpha_decay,
     stokes_einstein_benchmark_consistency,
+    stretched_alpha_benchmark_consistency,
     temperature_dependent_params,
+    temperature_dependent_gamma_exchange,
     temperature_scan,
     van_hove_tail_benchmark_consistency,
 )
@@ -268,6 +272,45 @@ def write_alpha_shape_csv(
                     "max_abs_log_shape_residual": residual["max_abs_log_shape_residual"],
                 }
             )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_kww_alpha_csv(
+    path: Path,
+    temperatures: np.ndarray,
+    law: TemperatureLawParams,
+    exchange_law: FacilitatedExchangeLawParams,
+    *,
+    wave_number: float,
+    min_decay: float,
+    max_decay: float,
+    time_points: int = 700,
+) -> list[dict[str, float]]:
+    if time_points < 50:
+        raise ValueError("time_points must be at least 50")
+    rows: list[dict[str, float]] = []
+    reference_temperature = float(temperatures[0])
+    for temperature in temperatures:
+        params = temperature_dependent_params(float(temperature), law)
+        heterogeneity = temperature_dependent_gamma_exchange(float(temperature), exchange_law)
+        tau_alpha = gamma_exchange_alpha_relaxation_time(wave_number, params, heterogeneity)
+        upper = max(50.0 * tau_alpha, 80.0 * params.renewal_delay, 10.0 * params.cage_tau)
+        time = np.logspace(-3.0, math.log10(upper), time_points)
+        decay = gamma_exchange_normalized_alpha_decay(wave_number, time, params, heterogeneity)
+        fit = kww_alpha_fit(time, decay, min_decay=min_decay, max_decay=max_decay)
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "inverse_temperature_shift": 1.0 / float(temperature) - 1.0 / reference_temperature,
+                "tau_alpha": tau_alpha,
+                "renewal_delay": params.renewal_delay,
+                "renewal_rate": params.renewal_rate,
+                "heterogeneity_shape": heterogeneity.shape,
+                "exchange_renewal_count": heterogeneity.exchange_renewal_count,
+                **fit,
+            }
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -985,6 +1028,7 @@ def write_sota_benchmark_consistency_csv(
     temperature_rows: list[dict[str, float]],
     spatial_chi4_rows: list[dict[str, float]],
     alpha_shape_rows: list[dict[str, float | str]],
+    kww_alpha_rows: list[dict[str, float]],
     tail_ratio_rows: list[dict[str, float | str]],
     thermodynamic_rows: list[dict[str, float]],
 ) -> list[dict[str, float | str]]:
@@ -1058,6 +1102,18 @@ def write_sota_benchmark_consistency_csv(
         "model_predicts_tts_breakdown",
         "tts_residual_consistent",
         "tts_control_consistent",
+        "observed_stretched_alpha",
+        "hot_kww_beta",
+        "cold_kww_beta",
+        "kww_beta_drop",
+        "min_beta_drop",
+        "max_cold_beta",
+        "cold_fit_residual",
+        "max_fit_residual",
+        "model_predicts_stretched_alpha",
+        "beta_drop_consistent",
+        "cold_beta_consistent",
+        "fit_quality_consistent",
         "observed_persistence_exchange_decoupling",
         "inferred_persistence_exchange_ratio",
         "min_persistence_exchange_ratio",
@@ -1191,6 +1247,20 @@ def write_sota_benchmark_consistency_csv(
         residual_threshold=0.25,
         min_control_growth=2.0,
     )
+    if not kww_alpha_rows:
+        raise ValueError("kww_alpha_rows must be nonempty")
+    hot_kww = kww_alpha_rows[0]
+    cold_kww = kww_alpha_rows[-1]
+    stretched_row = stretched_alpha_benchmark_consistency(
+        benchmark_id="kww_alpha_stretching_on_cooling",
+        observed_stretched_alpha=True,
+        hot_kww_beta=hot_kww["kww_beta"],
+        cold_kww_beta=cold_kww["kww_beta"],
+        min_beta_drop=0.05,
+        max_cold_beta=0.9,
+        max_fit_residual=0.08,
+        cold_fit_residual=cold_kww["rms_log_residual"],
+    )
     px_params = PersistenceExchangeParams(
         cage_variance=1.0,
         cage_tau=0.2,
@@ -1278,6 +1348,7 @@ def write_sota_benchmark_consistency_csv(
         normalize(heterogeneity_row, "dynamic_heterogeneity_chi4_growth"),
         normalize(spatial_front_row, "spatial_facilitation_growth_law"),
         normalize(tts_row, "alpha_tts_breakdown"),
+        normalize(stretched_row, "stretched_alpha_kww"),
         normalize(persistence_exchange_row, "persistence_exchange_inversion"),
         normalize(van_hove_row, "van_hove_tail_recovery"),
         normalize(fragility_row, "fragility_adam_gibbs"),
@@ -2579,6 +2650,7 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     spatial_front_row = by_id["spatial_facilitation_constant_front_law"]
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
+    stretched_row = by_id["kww_alpha_stretching_on_cooling"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
@@ -2636,14 +2708,15 @@ def write_sota_benchmark_consistency_svg(path: Path, rows: list[dict[str, float 
   <text x="{left_b}" y="{top - 24}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Gaussian recovery mechanism</text>
   {polyline(x, y, "#222222", width=1.2)}
   {"".join(points)}
-  <text x="{left_b}" y="{bottom + 56}" font-family="Arial, sans-serif" font-size="12">recovery row consistent = {int(float(recovery_row['overall_consistent']))}</text>
-  <text x="{left_b}" y="{bottom + 74}" font-family="Arial, sans-serif" font-size="12">SE row consistent = {int(float(se_row['overall_consistent']))}; D tau growth = {float(se_row['se_product_growth']):.2f}, xi_SE = {float(se_row['cold_fractional_exponent']):.3f}</text>
-  <text x="{left_b}" y="{bottom + 92}" font-family="Arial, sans-serif" font-size="12">chi4 row consistent = {int(float(heterogeneity_row['overall_consistent']))}; xi4 growth = {float(heterogeneity_row['length_growth']):.2f}, chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}</text>
-  <text x="{left_b}" y="{bottom + 110}" font-family="Arial, sans-serif" font-size="12">front-law row consistent = {int(float(spatial_front_row['overall_consistent']))}; Df cv = {float(spatial_front_row['facilitation_diffusivity_relative_std']):.2g}, xi4 growth = {float(spatial_front_row['length_growth']):.2f}</text>
-  <text x="{left_b}" y="{bottom + 128}" font-family="Arial, sans-serif" font-size="12">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
-  <text x="{left_b}" y="{bottom + 146}" font-family="Arial, sans-serif" font-size="12">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
-  <text x="{left_b}" y="{bottom + 164}" font-family="Arial, sans-serif" font-size="12">van Hove row consistent = {int(float(van_hove_row['overall_consistent']))}; peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}, late tail = {float(van_hove_row['late_tail_ratio']):.2f}</text>
-  <text x="{left_b}" y="{bottom + 182}" font-family="Arial, sans-serif" font-size="12">fragility row consistent = {int(float(fragility_row['overall_consistent']))}; m growth = {float(fragility_row['fragility_index_growth']):.2f}, AG slowdown = {float(fragility_row['adam_gibbs_slowdown']):.2g}</text>
+  <text x="{left_b}" y="{bottom + 52}" font-family="Arial, sans-serif" font-size="11">recovery row consistent = {int(float(recovery_row['overall_consistent']))}</text>
+  <text x="{left_b}" y="{bottom + 68}" font-family="Arial, sans-serif" font-size="11">SE row consistent = {int(float(se_row['overall_consistent']))}; D tau growth = {float(se_row['se_product_growth']):.2f}, xi_SE = {float(se_row['cold_fractional_exponent']):.3f}</text>
+  <text x="{left_b}" y="{bottom + 84}" font-family="Arial, sans-serif" font-size="11">chi4 row consistent = {int(float(heterogeneity_row['overall_consistent']))}; xi4 growth = {float(heterogeneity_row['length_growth']):.2f}, chi4 growth = {float(heterogeneity_row['chi4_peak_growth_benchmark']):.1f}</text>
+  <text x="{left_b}" y="{bottom + 100}" font-family="Arial, sans-serif" font-size="11">front-law row consistent = {int(float(spatial_front_row['overall_consistent']))}; Df cv = {float(spatial_front_row['facilitation_diffusivity_relative_std']):.2g}, xi4 growth = {float(spatial_front_row['length_growth']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 116}" font-family="Arial, sans-serif" font-size="11">TTS row consistent = {int(float(tts_row['overall_consistent']))}; residual = {float(tts_row['cold_shape_residual']):.3f}, C growth = {float(tts_row['alpha_shape_control_growth']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 132}" font-family="Arial, sans-serif" font-size="11">KWW row consistent = {int(float(stretched_row['overall_consistent']))}; beta hot/cold = {float(stretched_row['hot_kww_beta']):.2f}/{float(stretched_row['cold_kww_beta']):.2f}, residual = {float(stretched_row['cold_fit_residual']):.3f}</text>
+  <text x="{left_b}" y="{bottom + 148}" font-family="Arial, sans-serif" font-size="11">persistence/exchange row consistent = {int(float(persistence_exchange_row['overall_consistent']))}; tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}, late residual = {float(persistence_exchange_row['late_ngp_log_residual_benchmark']):.2g}</text>
+  <text x="{left_b}" y="{bottom + 164}" font-family="Arial, sans-serif" font-size="11">van Hove row consistent = {int(float(van_hove_row['overall_consistent']))}; peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}, late tail = {float(van_hove_row['late_tail_ratio']):.2f}</text>
+  <text x="{left_b}" y="{bottom + 180}" font-family="Arial, sans-serif" font-size="11">fragility row consistent = {int(float(fragility_row['overall_consistent']))}; m growth = {float(fragility_row['fragility_index_growth']):.2f}, AG slowdown = {float(fragility_row['adam_gibbs_slowdown']):.2g}</text>
 </svg>
 """
     path.write_text(svg)
@@ -3485,6 +3558,15 @@ def main() -> None:
         shape_broadening_barrier=1.5,
         exchange_slowing_barrier=2.5,
     )
+    kww_alpha_rows = write_kww_alpha_csv(
+        DATA_DIR / "renewal_cage_kww_alpha.csv",
+        np.array([1.0, 0.78, 0.62]),
+        temperature_law,
+        exchange_law,
+        wave_number=1.1,
+        min_decay=0.15,
+        max_decay=0.85,
+    )
     facilitated_exchange_rows = write_facilitated_exchange_csv(
         DATA_DIR / "renewal_cage_facilitated_exchange.csv",
         temperatures,
@@ -3598,6 +3680,7 @@ def main() -> None:
         temperature_rows,
         spatial_chi4_rows,
         alpha_shape_rows,
+        kww_alpha_rows,
         tail_ratio_rows,
         thermodynamic_rows,
     )

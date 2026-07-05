@@ -581,6 +581,16 @@ The local stretching diagnostic is
 Values $\beta_{\rm loc}<1$ in the alpha window are therefore produced by finite
 exchange of renewal mobility, while the same construction predicts the
 long-time return of $\alpha_2(t)$ toward zero.
+For a window-level comparison with the experimental stretched-exponential
+language, we also fit
+\begin{equation}
+  \Phi_\alpha^{\rm hx}(k,t)\simeq
+  \exp\left[-(t/\tau_{\rm KWW})^{\beta_{\rm KWW}}\right],
+\end{equation}
+by regressing $\log[-\log\Phi_\alpha]$ against $\log t$ over a fixed alpha
+decay window. This produces a falsifiable triple
+$(\beta_{\rm KWW},\tau_{\rm KWW},\epsilon_{\rm KWW})$ rather than a qualitative
+claim of stretching.
 It also gives two late-time consistency tests governed by the same ratio
 $c=R_x/\kappa_0$:
 \begin{equation}
@@ -965,7 +975,12 @@ $34.7$, consistent with the benchmark trend that dynamic heterogeneity grows on
 cooling. The companion spatial-front row inverts the same $\xi_4(T)$ values
 back to $D_f(T)$ and requires the relative standard deviation to remain below
 $5\%$; the generated scan gives a near-zero numerical spread because it was
-constructed from one front diffusivity. These are still not fits to raw
+constructed from one front diffusivity. A stretched-alpha row fits the same
+facilitated finite-exchange scan to a KWW window: cooling lowers
+$\beta_{\rm KWW}$ from $0.913$ to $0.715$ with cold-end residual $0.064$,
+consistent with stretched alpha relaxation while remaining a diagnostic fit,
+not a unique microscopic barrier-distribution derivation. These are still not
+fits to raw
 trajectory data; they are
 reproducible bridges from the SOTA comparison table to checkable
 model-versus-benchmark rows.
@@ -1120,12 +1135,14 @@ model-versus-benchmark rows.
   to a temperature-independent facilitation-front diffusivity. The seventh row
   checks alpha-shape TTS breakdown through the
   cold-end scaled-shape residual and the growth of
-  $C_k=\Gamma_k\lambda\tau_d$. The eighth row encodes the
+  $C_k=\Gamma_k\lambda\tau_d$. The eighth row checks KWW stretched-alpha
+  relaxation through the fitted $\beta_{\rm KWW}$ cooling trend and fit
+  residual. The ninth row encodes the
   persistence/exchange protocol: diffusion fixes $\tau_x$, $\tau_\alpha$
   inverts $\tau_p$, and late NGP remains a held-out falsification observable.
-  The ninth row checks that the self van Hove distribution has a transient
+  The tenth row checks that the self van Hove distribution has a transient
   peak-time tail excess while its late-time tail returns to a matched Gaussian.
-  The tenth row checks Angell/Adam-Gibbs fragility growth
+  The eleventh row checks Angell/Adam-Gibbs fragility growth
   \cite{angell1995formation,adam1965temperature} through apparent activation
   and local fragility growth while preserving the scope boundary that
   material-specific fragility origins are not derived.}

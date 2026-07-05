@@ -44,6 +44,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("dynamic_heterogeneity_chi4_growth", by_id)
         self.assertIn("spatial_facilitation_constant_front_law", by_id)
         self.assertIn("alpha_tts_breakdown_shape_residual", by_id)
+        self.assertIn("kww_alpha_stretching_on_cooling", by_id)
         self.assertIn("persistence_exchange_transport_inversion", by_id)
         self.assertIn("kob_andersen_van_hove_tail_recovery", by_id)
         self.assertIn("angell_adam_gibbs_fragility_growth", by_id)
@@ -67,6 +68,9 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(by_id["alpha_tts_breakdown_shape_residual"]["overall_consistent"]), 1.0)
         self.assertGreater(float(by_id["alpha_tts_breakdown_shape_residual"]["cold_shape_residual"]), 0.25)
         self.assertGreater(float(by_id["alpha_tts_breakdown_shape_residual"]["alpha_shape_control_growth"]), 2.0)
+        self.assertEqual(float(by_id["kww_alpha_stretching_on_cooling"]["overall_consistent"]), 1.0)
+        self.assertLess(float(by_id["kww_alpha_stretching_on_cooling"]["cold_kww_beta"]), 0.9)
+        self.assertGreater(float(by_id["kww_alpha_stretching_on_cooling"]["kww_beta_drop"]), 0.05)
         self.assertEqual(float(by_id["persistence_exchange_transport_inversion"]["overall_consistent"]), 1.0)
         self.assertGreater(
             float(by_id["persistence_exchange_transport_inversion"]["inferred_persistence_exchange_ratio"]),

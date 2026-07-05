@@ -82,9 +82,9 @@ MCT exponent-parameter consistency, Gaussian-recovery mechanism selection
 against the static-disorder null, fractional Stokes-Einstein decoupling,
 dynamic-heterogeneity chi4 growth, alpha-shape time-temperature-superposition
 breakdown, spatial facilitation-front growth-law inversion,
-persistence/exchange transport inversion with held-out late-NGP validation, a
-van Hove tail/recovery consistency check, and an Angell/Adam-Gibbs
-fragility-growth scope check.
+KWW stretched-alpha window fitting, persistence/exchange transport inversion
+with held-out late-NGP validation, a van Hove tail/recovery consistency check,
+and an Angell/Adam-Gibbs fragility-growth scope check.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 
@@ -173,6 +173,7 @@ data/renewal_cage_scattering.csv
 data/renewal_cage_peak_relaxation.csv
 data/renewal_cage_temperature.csv
 data/renewal_cage_alpha_shape.csv
+data/renewal_cage_kww_alpha.csv
 data/renewal_cage_facilitated_exchange.csv
 data/renewal_cage_persistence_exchange.csv
 data/renewal_cage_persistence_exchange_protocol.csv

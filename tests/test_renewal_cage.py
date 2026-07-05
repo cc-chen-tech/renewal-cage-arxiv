@@ -51,6 +51,7 @@ from renewal_cage import (  # noqa: E402
     fragility_benchmark_consistency,
     gaussian_recovery_benchmark_consistency,
     infer_spatial_facilitation_diffusivity,
+    kww_alpha_fit,
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
     late_mechanism_selection,
@@ -93,6 +94,7 @@ from renewal_cage import (  # noqa: E402
     static_gamma_normalized_alpha_decay,
     spatial_facilitation_growth_law_consistency,
     stokes_einstein_benchmark_consistency,
+    stretched_alpha_benchmark_consistency,
     stokes_einstein_product,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
@@ -1294,6 +1296,43 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["overall_consistent"], 1.0)
         self.assertGreater(row["cold_shape_residual"], row["residual_threshold"])
         self.assertGreater(row["alpha_shape_control_growth"], row["min_control_growth"])
+
+    def test_kww_alpha_fit_recovers_stretched_exponent_from_window(self):
+        time = np.logspace(-1.0, 2.0, 300)
+        tau = 7.5
+        beta = 0.62
+        decay = np.exp(-((time / tau) ** beta))
+
+        fit = kww_alpha_fit(
+            time,
+            decay,
+            min_decay=0.12,
+            max_decay=0.88,
+        )
+
+        self.assertAlmostEqual(fit["kww_beta"], beta, places=12)
+        self.assertAlmostEqual(fit["kww_tau"], tau, places=12)
+        self.assertLess(fit["rms_log_residual"], 1.0e-12)
+        self.assertGreaterEqual(fit["points_used"], 50)
+
+    def test_stretched_alpha_benchmark_consistency_detects_cooling_stretching(self):
+        row = stretched_alpha_benchmark_consistency(
+            benchmark_id="kww_alpha_stretching_on_cooling",
+            observed_stretched_alpha=True,
+            hot_kww_beta=0.92,
+            cold_kww_beta=0.62,
+            min_beta_drop=0.15,
+            max_cold_beta=0.8,
+            max_fit_residual=0.04,
+            cold_fit_residual=0.012,
+        )
+
+        self.assertEqual(row["model_predicts_stretched_alpha"], 1.0)
+        self.assertEqual(row["beta_drop_consistent"], 1.0)
+        self.assertEqual(row["cold_beta_consistent"], 1.0)
+        self.assertEqual(row["fit_quality_consistent"], 1.0)
+        self.assertEqual(row["overall_consistent"], 1.0)
+        self.assertAlmostEqual(row["kww_beta_drop"], 0.30)
 
     def test_persistence_exchange_benchmark_consistency_checks_inversion_protocol(self):
         row = persistence_exchange_benchmark_consistency(

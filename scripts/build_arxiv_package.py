@@ -1073,6 +1073,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     heterogeneity_row = by_id["dynamic_heterogeneity_chi4_growth"]
     spatial_front_row = by_id["spatial_facilitation_constant_front_law"]
     tts_row = by_id["alpha_tts_breakdown_shape_residual"]
+    stretched_row = by_id["kww_alpha_stretching_on_cooling"]
     persistence_exchange_row = by_id["persistence_exchange_transport_inversion"]
     van_hove_row = by_id["kob_andersen_van_hove_tail_recovery"]
     fragility_row = by_id["angell_adam_gibbs_fragility_growth"]
@@ -1163,7 +1164,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     )
     c.drawString(
         430,
-        66,
+        68,
         "TTS row consistent = "
         f"{int(float(tts_row['overall_consistent']))}; "
         f"residual = {float(tts_row['cold_shape_residual']):.3f}; "
@@ -1171,7 +1172,16 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     )
     c.drawString(
         430,
-        54,
+        56,
+        "KWW row consistent = "
+        f"{int(float(stretched_row['overall_consistent']))}; "
+        f"beta hot/cold = {float(stretched_row['hot_kww_beta']):.2f}/"
+        f"{float(stretched_row['cold_kww_beta']):.2f}; "
+        f"resid = {float(stretched_row['cold_fit_residual']):.3f}",
+    )
+    c.drawString(
+        430,
+        44,
         "persistence/exchange row consistent = "
         f"{int(float(persistence_exchange_row['overall_consistent']))}; "
         f"tau_p/tau_x = {float(persistence_exchange_row['inferred_persistence_exchange_ratio']):.1f}; "
@@ -1179,7 +1189,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     )
     c.drawString(
         430,
-        42,
+        32,
         "van Hove row consistent = "
         f"{int(float(van_hove_row['overall_consistent']))}; "
         f"peak tail = {float(van_hove_row['peak_tail_ratio']):.2f}; "
@@ -1187,7 +1197,7 @@ def write_sota_benchmark_consistency_pdf(path: Path) -> None:
     )
     c.drawString(
         430,
-        30,
+        20,
         "fragility row consistent = "
         f"{int(float(fragility_row['overall_consistent']))}; "
         f"m growth = {float(fragility_row['fragility_index_growth']):.2f}; "

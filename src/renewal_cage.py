@@ -2482,6 +2482,100 @@ def local_alpha_stretching_exponent(t: np.ndarray, decay: np.ndarray) -> np.ndar
     return exponent
 
 
+def kww_alpha_fit(
+    t: np.ndarray,
+    decay: np.ndarray,
+    *,
+    min_decay: float,
+    max_decay: float,
+) -> dict[str, float]:
+    """Fit a KWW alpha window, ``decay=exp[-(t/tau)^beta]``."""
+
+    t = np.asarray(t, dtype=float)
+    decay = np.asarray(decay, dtype=float)
+    if t.ndim != 1 or decay.ndim != 1:
+        raise ValueError("t and decay must be one-dimensional")
+    if t.size != decay.size:
+        raise ValueError("t and decay must have the same length")
+    if np.any(t <= 0.0):
+        raise ValueError("t values must be positive")
+    if np.any((decay <= 0.0) | (decay > 1.0)):
+        raise ValueError("decay values must lie in (0, 1]")
+    if not (0.0 < min_decay < max_decay < 1.0):
+        raise ValueError("min_decay and max_decay must satisfy 0 < min < max < 1")
+
+    mask = (decay >= min_decay) & (decay <= max_decay) & (-np.log(decay) > 0.0)
+    if np.count_nonzero(mask) < 3:
+        raise ValueError("KWW fit window must contain at least three points")
+    x = np.log(t[mask])
+    y = np.log(-np.log(decay[mask]))
+    beta, intercept = np.polyfit(x, y, 1)
+    if beta <= 0.0:
+        raise ValueError("fitted KWW beta must be positive")
+    tau = math.exp(-intercept / beta)
+    fitted = beta * x + intercept
+    residual = y - fitted
+    return {
+        "kww_beta": float(beta),
+        "kww_tau": float(tau),
+        "kww_intercept": float(intercept),
+        "rms_log_residual": float(math.sqrt(np.mean(residual**2))),
+        "points_used": float(np.count_nonzero(mask)),
+        "fit_min_decay": min_decay,
+        "fit_max_decay": max_decay,
+    }
+
+
+def stretched_alpha_benchmark_consistency(
+    *,
+    benchmark_id: str,
+    observed_stretched_alpha: bool,
+    hot_kww_beta: float,
+    cold_kww_beta: float,
+    min_beta_drop: float,
+    max_cold_beta: float,
+    max_fit_residual: float,
+    cold_fit_residual: float,
+) -> dict[str, float | str]:
+    """Check KWW stretching and cooling trend against benchmark expectations."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    for name, value in {
+        "hot_kww_beta": hot_kww_beta,
+        "cold_kww_beta": cold_kww_beta,
+        "max_cold_beta": max_cold_beta,
+        "max_fit_residual": max_fit_residual,
+        "cold_fit_residual": cold_fit_residual,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if min_beta_drop < 0.0:
+        raise ValueError("min_beta_drop must be nonnegative")
+
+    beta_drop = hot_kww_beta - cold_kww_beta
+    drop_flag = beta_drop >= min_beta_drop
+    cold_flag = cold_kww_beta <= max_cold_beta
+    fit_flag = cold_fit_residual <= max_fit_residual
+    model_flag = drop_flag and cold_flag and fit_flag
+    return {
+        "benchmark_id": benchmark_id,
+        "observed_stretched_alpha": float(observed_stretched_alpha),
+        "hot_kww_beta": hot_kww_beta,
+        "cold_kww_beta": cold_kww_beta,
+        "kww_beta_drop": beta_drop,
+        "min_beta_drop": min_beta_drop,
+        "max_cold_beta": max_cold_beta,
+        "cold_fit_residual": cold_fit_residual,
+        "max_fit_residual": max_fit_residual,
+        "model_predicts_stretched_alpha": float(model_flag),
+        "beta_drop_consistent": float(drop_flag == observed_stretched_alpha),
+        "cold_beta_consistent": float(cold_flag == observed_stretched_alpha),
+        "fit_quality_consistent": float(fit_flag == observed_stretched_alpha),
+        "overall_consistent": float(model_flag == observed_stretched_alpha),
+    }
+
+
 def renewal_scattering_susceptibility(
     wave_number: float,
     t: np.ndarray,
