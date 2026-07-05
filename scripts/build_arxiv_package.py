@@ -1534,6 +1534,58 @@ def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     c.save()
 
 
+def write_cross_observable_prediction_ledger_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_cross_observable_prediction_ledger.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Cross-observable prediction ledger")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Calibration inputs are separated from held-out predictions and closure variables.",
+    )
+    left, top = 42, page_h - 86
+    c.setFont("Helvetica-Bold", 7.2)
+    c.drawString(left, top, "protocol")
+    c.drawString(left + 215, top, "class")
+    c.drawString(left + 375, top, "fit")
+    c.drawString(left + 410, top, "held")
+    c.drawString(left + 455, top, "closure")
+    c.drawString(left + 505, top, "risk")
+    c.drawString(left + 555, top, "held-out predictions")
+    palette = {
+        "predictive_diagnostic": colors.HexColor("#2f855a"),
+        "closure_assisted_prediction": colors.HexColor("#2b6cb0"),
+        "underconstrained_fit": colors.HexColor("#c05621"),
+        "failed_prediction": colors.HexColor("#c53030"),
+        "scope_boundary": colors.HexColor("#805ad5"),
+        "not_supported": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 39
+        klass = row["prediction_class"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["protocol_id"].replace("_", " ")[:34])
+        c.setFillColor(palette[klass])
+        c.rect(left + 215, y - 4, 138, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 220, y, klass.replace("_", " ")[:24])
+        c.setFillColor(colors.black)
+        c.drawString(left + 380, y, str(int(float(row["calibration_count"]))))
+        c.drawString(left + 420, y, str(int(float(row["heldout_prediction_count"]))))
+        c.drawString(left + 468, y, str(int(float(row["closure_observable_count"]))))
+        c.drawString(left + 515, y, str(int(float(row["fit_only_overclaim_risk"]))))
+        c.drawString(left + 555, y, row["heldout_predictions"].replace("_", " ")[:42])
+        c.drawString(left + 80, y - 10, f"fit: {row['calibration_observables'].replace('_', ' ')[:80]}")
+    c.showPage()
+    c.save()
+
+
 def write_raw_curve_diagnostic_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_raw_curve_diagnostic_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -2075,6 +2127,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
+    cross_observable_prediction_ledger_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_cross_observable_prediction_ledger.pdf"
+    )
     literature_inversion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_literature_inversion_readiness.pdf"
     observable_falsification_matrix_pdf = PAPER_FIGURE_DIR / "renewal_cage_observable_falsification_matrix.pdf"
     benchmark_fusion_readiness_pdf = PAPER_FIGURE_DIR / "renewal_cage_benchmark_fusion_readiness.pdf"
@@ -2108,6 +2163,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
     write_sota_claim_alignment_pdf(sota_claim_alignment_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
+    write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_literature_inversion_readiness_pdf(literature_inversion_readiness_pdf)
     write_observable_falsification_matrix_pdf(observable_falsification_matrix_pdf)
     write_benchmark_fusion_readiness_pdf(benchmark_fusion_readiness_pdf)
@@ -2152,6 +2208,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             real_benchmark_assimilation_gate_pdf,
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
+        )
+        archive.write(
+            cross_observable_prediction_ledger_pdf,
+            "figures/renewal_cage_cross_observable_prediction_ledger.pdf",
         )
         archive.write(literature_inversion_readiness_pdf, "figures/renewal_cage_literature_inversion_readiness.pdf")
         archive.write(

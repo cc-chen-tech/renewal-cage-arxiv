@@ -101,6 +101,8 @@ The real-benchmark assimilation gate adds a stricter pre-fit check: a source
 must have the required observables, a shared system/temperature grid,
 machine-readable curves, and uncertainty estimates before it is promoted from
 qualitative SOTA agreement to uncertainty-weighted inversion.
+The cross-observable prediction ledger separates calibration inputs from
+held-out predictions and external closures, making fit-only overclaims visible.
 The alpha-shape TTS diagnostic rescales the cage-normalized alpha relaxation by
 `tau_alpha`:
 
@@ -172,6 +174,7 @@ figures/renewal_cage_mct_beta_closure.svg
 figures/renewal_cage_sota_benchmark_consistency.svg
 figures/renewal_cage_sota_claim_alignment.svg
 figures/renewal_cage_real_benchmark_assimilation_gate.svg
+figures/renewal_cage_cross_observable_prediction_ledger.svg
 figures/renewal_cage_literature_inversion_readiness.svg
 figures/renewal_cage_observable_falsification_matrix.svg
 figures/renewal_cage_benchmark_fusion_readiness.svg
@@ -212,6 +215,7 @@ data/renewal_cage_mct_beta_closure.csv
 data/renewal_cage_sota_benchmark_consistency.csv
 data/renewal_cage_sota_claim_alignment.csv
 data/renewal_cage_real_benchmark_assimilation_gate.csv
+data/renewal_cage_cross_observable_prediction_ledger.csv
 data/renewal_cage_literature_inversion_readiness.csv
 data/renewal_cage_observable_falsification_matrix.csv
 data/renewal_cage_benchmark_fusion_readiness.csv
@@ -249,6 +253,7 @@ paper/figures/renewal_cage_mct_beta_closure.pdf
 paper/figures/renewal_cage_sota_benchmark_consistency.pdf
 paper/figures/renewal_cage_sota_claim_alignment.pdf
 paper/figures/renewal_cage_real_benchmark_assimilation_gate.pdf
+paper/figures/renewal_cage_cross_observable_prediction_ledger.pdf
 paper/figures/renewal_cage_literature_inversion_readiness.pdf
 paper/figures/renewal_cage_observable_falsification_matrix.pdf
 paper/figures/renewal_cage_benchmark_fusion_readiness.pdf

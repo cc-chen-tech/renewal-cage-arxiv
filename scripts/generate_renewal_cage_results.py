@@ -35,6 +35,7 @@ from renewal_cage import (  # noqa: E402
     delayed_poisson_mean,
     delayed_renewal_shape,
     dimensionless_peak_prediction,
+    cross_observable_prediction_ledger,
     dynamic_heterogeneity_benchmark_consistency,
     fragility_benchmark_consistency,
     gaussian_radial_3d,
@@ -2354,6 +2355,80 @@ def write_real_benchmark_assimilation_gate_csv(path: Path) -> list[dict[str, flo
     return rows
 
 
+def write_cross_observable_prediction_ledger_csv(path: Path) -> list[dict[str, float | str]]:
+    """Separate fitted inputs from held-out predictions for each diagnostic protocol."""
+
+    rows = [
+        cross_observable_prediction_ledger(
+            protocol_id="alpha_vanhove_transport_raw_curves",
+            source_key="kob1995vanhove;kob1995intermediate",
+            model_scope="dynamical_signature",
+            support_level="derived",
+            calibration_observables=["diffusion", "debye_waller_plateau", "anchor_tau_alpha"],
+            heldout_predictions=["multi_k_tau_alpha", "late_ngp", "van_hove_tail_recovery"],
+            closure_observables=[],
+            failed_predictions=[],
+        ),
+        cross_observable_prediction_ledger(
+            protocol_id="joint_persistence_exchange_multik_chi4",
+            source_key="raw_curve_persistence_exchange_protocol",
+            model_scope="transport_decoupling",
+            support_level="derived",
+            calibration_observables=["diffusion", "anchor_tau_alpha"],
+            heldout_predictions=[
+                "multi_k_tau_alpha",
+                "late_ngp",
+                "stokes_einstein_product",
+                "chi4_peak_proxy",
+            ],
+            closure_observables=[],
+            failed_predictions=[],
+        ),
+        cross_observable_prediction_ledger(
+            protocol_id="late_mechanism_selection",
+            source_key="static_gamma_null;finite_exchange_renewal",
+            model_scope="dynamical_signature",
+            support_level="derived",
+            calibration_observables=["late_ngp_point_1", "late_ngp_point_2"],
+            heldout_predictions=["alpha_slope", "gaussian_recovery_class"],
+            closure_observables=[],
+            failed_predictions=[],
+        ),
+        cross_observable_prediction_ledger(
+            protocol_id="spatial_chi4_front_closure",
+            source_key="lacevic2003fourpoint;berthier2024experimental",
+            model_scope="spatial_heterogeneity",
+            support_level="effective_closure",
+            calibration_observables=["tau_alpha", "diffusion"],
+            heldout_predictions=["chi4_peak", "dynamic_length"],
+            closure_observables=["front_diffusivity"],
+            failed_predictions=[],
+        ),
+        cross_observable_prediction_ledger(
+            protocol_id="single_alpha_fit_only_null",
+            source_key="hypothetical_alpha_only_fit",
+            model_scope="dynamical_signature",
+            support_level="derived",
+            calibration_observables=["tau_alpha"],
+            heldout_predictions=[],
+            closure_observables=[],
+            failed_predictions=[],
+        ),
+        cross_observable_prediction_ledger(
+            protocol_id="thermodynamic_entropy_boundary",
+            source_key="kauzmann1948nature;adam1965temperature",
+            model_scope="thermodynamic_transition",
+            support_level="closure_only",
+            calibration_observables=["configurational_entropy", "temperature_grid"],
+            heldout_predictions=["heat_capacity_anomaly", "ideal_glass_transition"],
+            closure_observables=["entropy_law"],
+            failed_predictions=[],
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_observable_falsification_matrix_csv(
     path: Path,
     literature_rows: list[dict[str, float | str]],
@@ -3559,6 +3634,63 @@ def write_real_benchmark_assimilation_gate_svg(path: Path, rows: list[dict[str, 
     path.write_text(svg)
 
 
+def write_cross_observable_prediction_ledger_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 560
+    left, top = 70, 100
+    row_h = 58
+    colors = {
+        "predictive_diagnostic": "#2f855a",
+        "closure_assisted_prediction": "#2b6cb0",
+        "underconstrained_fit": "#c05621",
+        "failed_prediction": "#c53030",
+        "scope_boundary": "#805ad5",
+        "not_supported": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        klass = str(row["prediction_class"])
+        color = colors[klass]
+        calibration = int(float(row["calibration_count"]))
+        heldout = int(float(row["heldout_prediction_count"]))
+        closure = int(float(row["closure_observable_count"]))
+        risk = int(float(row["fit_only_overclaim_risk"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">{str(row["protocol_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 310}" y="{y - 4}" width="175" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 318}" y="{y + 11}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{klass.replace("_", " ")[:27]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 510}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11">fit={calibration}; held-out={heldout}; closure={closure}; risk={risk}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 70}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">fit: {str(row["calibration_observables"]).replace("_", " ")[:64]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 510}" y="{y + 34}" font-family="Arial, sans-serif" font-size="9" fill="#555">predict: {str(row["heldout_predictions"]).replace("_", " ")[:76]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Cross-observable prediction ledger</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Each protocol separates calibration inputs from held-out predictions and external closure variables.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">protocol</text>
+  <text x="{left + 310}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">prediction class</text>
+  <text x="{left + 510}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">ledger counts</text>
+  {"".join(marks)}
+  <rect x="70" y="510" width="14" height="14" fill="#2f855a" /><text x="92" y="522" font-family="Arial, sans-serif" font-size="12">held-out predictive diagnostic</text>
+  <rect x="285" y="510" width="14" height="14" fill="#2b6cb0" /><text x="307" y="522" font-family="Arial, sans-serif" font-size="12">closure-assisted prediction</text>
+  <rect x="500" y="510" width="14" height="14" fill="#c05621" /><text x="522" y="522" font-family="Arial, sans-serif" font-size="12">fit-only overclaim risk</text>
+  <rect x="690" y="510" width="14" height="14" fill="#805ad5" /><text x="712" y="522" font-family="Arial, sans-serif" font-size="12">scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_literature_inversion_readiness_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 520
@@ -4549,6 +4681,13 @@ def main() -> None:
     write_real_benchmark_assimilation_gate_svg(
         FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.svg",
         real_assimilation_rows,
+    )
+    prediction_ledger_rows = write_cross_observable_prediction_ledger_csv(
+        DATA_DIR / "renewal_cage_cross_observable_prediction_ledger.csv"
+    )
+    write_cross_observable_prediction_ledger_svg(
+        FIGURE_DIR / "renewal_cage_cross_observable_prediction_ledger.svg",
+        prediction_ledger_rows,
     )
     literature_readiness_rows = write_literature_inversion_readiness_csv(
         DATA_DIR / "renewal_cage_literature_inversion_readiness.csv"

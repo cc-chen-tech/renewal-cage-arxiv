@@ -73,6 +73,7 @@ from renewal_cage import (  # noqa: E402
     raw_curve_diagnostic_readiness,
     raw_curve_persistence_exchange_protocol,
     real_benchmark_assimilation_gate,
+    cross_observable_prediction_ledger,
     persistence_exchange_benchmark_consistency,
     radial_van_hove_3d,
     van_hove_tail_benchmark_consistency,
@@ -1540,6 +1541,57 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["structural_inversion_ready"], 0.0)
         self.assertEqual(row["uncertainty_weighted_ready"], 0.0)
         self.assertEqual(row["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
+
+    def test_cross_observable_prediction_ledger_marks_heldout_predictive_diagnostic(self):
+        row = cross_observable_prediction_ledger(
+            protocol_id="joint_persistence_exchange_multik_chi4",
+            source_key="synthetic_joint_protocol",
+            model_scope="dynamical_signature",
+            support_level="derived",
+            calibration_observables=["diffusion", "anchor_tau_alpha"],
+            heldout_predictions=["multi_k_tau_alpha", "late_ngp", "stokes_einstein_product"],
+            closure_observables=[],
+            failed_predictions=[],
+        )
+
+        self.assertEqual(row["prediction_class"], "predictive_diagnostic")
+        self.assertEqual(row["calibration_count"], 2.0)
+        self.assertEqual(row["heldout_prediction_count"], 3.0)
+        self.assertEqual(row["fit_only_overclaim_risk"], 0.0)
+        self.assertEqual(row["all_heldout_predictions_pass"], 1.0)
+
+    def test_cross_observable_prediction_ledger_flags_fit_only_overclaim_risk(self):
+        row = cross_observable_prediction_ledger(
+            protocol_id="single_alpha_fit_only",
+            source_key="hypothetical_alpha_fit",
+            model_scope="dynamical_signature",
+            support_level="derived",
+            calibration_observables=["tau_alpha"],
+            heldout_predictions=[],
+            closure_observables=[],
+            failed_predictions=[],
+        )
+
+        self.assertEqual(row["prediction_class"], "underconstrained_fit")
+        self.assertEqual(row["heldout_prediction_count"], 0.0)
+        self.assertEqual(row["fit_only_overclaim_risk"], 1.0)
+
+    def test_cross_observable_prediction_ledger_keeps_closure_boundary_separate(self):
+        row = cross_observable_prediction_ledger(
+            protocol_id="spatial_chi4_front_closure",
+            source_key="lacevic2003fourpoint",
+            model_scope="spatial_heterogeneity",
+            support_level="effective_closure",
+            calibration_observables=["tau_alpha", "diffusion"],
+            heldout_predictions=["chi4_peak", "dynamic_length"],
+            closure_observables=["front_diffusivity"],
+            failed_predictions=[],
+        )
+
+        self.assertEqual(row["prediction_class"], "closure_assisted_prediction")
+        self.assertEqual(row["closure_observable_count"], 1.0)
+        self.assertEqual(row["requires_external_closure"], 1.0)
+        self.assertEqual(row["fit_only_overclaim_risk"], 0.0)
 
     def test_sota_claim_alignment_scores_supported_dynamic_claim(self):
         row = sota_claim_alignment(

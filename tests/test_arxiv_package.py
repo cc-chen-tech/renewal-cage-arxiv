@@ -189,6 +189,30 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermo["assimilation_stage"], "scope_boundary_only")
         self.assertEqual(thermo["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
 
+    def test_cross_observable_prediction_ledger_separates_fit_inputs_from_predictions(self):
+        path = ROOT / "data" / "renewal_cage_cross_observable_prediction_ledger.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["protocol_id"]: row for row in rows}
+        joint = by_id["joint_persistence_exchange_multik_chi4"]
+        self.assertEqual(joint["prediction_class"], "predictive_diagnostic")
+        self.assertIn("diffusion", joint["calibration_observables"])
+        self.assertIn("late_ngp", joint["heldout_predictions"])
+        self.assertEqual(float(joint["fit_only_overclaim_risk"]), 0.0)
+
+        alpha_only = by_id["single_alpha_fit_only_null"]
+        self.assertEqual(alpha_only["prediction_class"], "underconstrained_fit")
+        self.assertEqual(float(alpha_only["fit_only_overclaim_risk"]), 1.0)
+
+        spatial = by_id["spatial_chi4_front_closure"]
+        self.assertEqual(spatial["prediction_class"], "closure_assisted_prediction")
+        self.assertEqual(float(spatial["requires_external_closure"]), 1.0)
+
+        thermo = by_id["thermodynamic_entropy_boundary"]
+        self.assertEqual(thermo["prediction_class"], "scope_boundary")
+
     def test_observable_falsification_matrix_maps_literature_to_diagnostic_blockers(self):
         path = ROOT / "data" / "renewal_cage_observable_falsification_matrix.csv"
         self.assertTrue(path.exists())
@@ -335,6 +359,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
             self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", names)
+            self.assertIn("figures/renewal_cage_cross_observable_prediction_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_literature_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", names)
@@ -408,6 +433,7 @@ class ArxivPackageTests(unittest.TestCase):
     def test_supplemental_large_figures_are_packaged_not_embedded(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
         supplemental_figures = [
+            "figures/renewal_cage_cross_observable_prediction_ledger.pdf",
             "figures/renewal_cage_barrier_requirements.pdf",
             "figures/renewal_cage_barrier.pdf",
             "figures/renewal_cage_heterogeneity.pdf",
@@ -461,6 +487,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
+            ).read_bytes()
+            first_cross_observable_prediction_ledger = (
+                ROOT / "paper" / "figures" / "renewal_cage_cross_observable_prediction_ledger.pdf"
             ).read_bytes()
             first_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
@@ -534,6 +563,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
             ).read_bytes()
+            second_cross_observable_prediction_ledger = (
+                ROOT / "paper" / "figures" / "renewal_cage_cross_observable_prediction_ledger.pdf"
+            ).read_bytes()
             second_literature_inversion_readiness = (
                 ROOT / "paper" / "figures" / "renewal_cage_literature_inversion_readiness.pdf"
             ).read_bytes()
@@ -590,6 +622,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_benchmark_consistency, second_sota_benchmark_consistency)
         self.assertEqual(first_sota_claim_alignment, second_sota_claim_alignment)
         self.assertEqual(first_real_benchmark_assimilation_gate, second_real_benchmark_assimilation_gate)
+        self.assertEqual(first_cross_observable_prediction_ledger, second_cross_observable_prediction_ledger)
         self.assertEqual(first_literature_inversion_readiness, second_literature_inversion_readiness)
         self.assertEqual(first_observable_falsification_matrix, second_observable_falsification_matrix)
         self.assertEqual(first_benchmark_fusion_readiness, second_benchmark_fusion_readiness)

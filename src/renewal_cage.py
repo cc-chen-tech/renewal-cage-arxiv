@@ -1217,6 +1217,95 @@ def real_benchmark_assimilation_gate(
     }
 
 
+def cross_observable_prediction_ledger(
+    *,
+    protocol_id: str,
+    source_key: str,
+    model_scope: str,
+    support_level: str,
+    calibration_observables: Sequence[str],
+    heldout_predictions: Sequence[str],
+    closure_observables: Sequence[str],
+    failed_predictions: Sequence[str],
+) -> dict[str, float | str]:
+    """Separate fit inputs, held-out predictions, and closure inputs."""
+
+    for name, value in {
+        "protocol_id": protocol_id,
+        "source_key": source_key,
+        "model_scope": model_scope,
+        "support_level": support_level,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+
+    allowed_scopes = {
+        "dynamical_signature",
+        "transport_decoupling",
+        "spatial_heterogeneity",
+        "thermodynamic_transition",
+    }
+    allowed_support = {"derived", "effective_closure", "closure_only", "not_supported"}
+    if model_scope not in allowed_scopes:
+        raise ValueError("model_scope is not recognized")
+    if support_level not in allowed_support:
+        raise ValueError("support_level is not recognized")
+    if not calibration_observables:
+        raise ValueError("calibration_observables must be nonempty")
+    for name, values in {
+        "calibration_observables": calibration_observables,
+        "heldout_predictions": heldout_predictions,
+        "closure_observables": closure_observables,
+        "failed_predictions": failed_predictions,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    calibration = list(dict.fromkeys(calibration_observables))
+    heldout = list(dict.fromkeys(heldout_predictions))
+    closures = list(dict.fromkeys(closure_observables))
+    failed = list(dict.fromkeys(failed_predictions))
+    unknown_failures = [prediction for prediction in failed if prediction not in set(heldout)]
+    if unknown_failures:
+        raise ValueError("failed_predictions must be a subset of heldout_predictions")
+    if model_scope == "thermodynamic_transition" and support_level == "derived":
+        raise ValueError("renewal dynamics cannot derive thermodynamic transition predictions")
+
+    requires_closure = support_level in {"effective_closure", "closure_only"} or bool(closures)
+    all_heldout_pass = bool(heldout) and not failed
+    fit_only_risk = not heldout and support_level == "derived"
+    if model_scope == "thermodynamic_transition":
+        prediction_class = "scope_boundary"
+    elif support_level == "not_supported":
+        prediction_class = "not_supported"
+    elif failed:
+        prediction_class = "failed_prediction"
+    elif support_level in {"effective_closure", "closure_only"} or closures:
+        prediction_class = "closure_assisted_prediction"
+    elif heldout:
+        prediction_class = "predictive_diagnostic"
+    else:
+        prediction_class = "underconstrained_fit"
+
+    return {
+        "protocol_id": protocol_id,
+        "source_key": source_key,
+        "model_scope": model_scope,
+        "support_level": support_level,
+        "calibration_observables": ";".join(calibration),
+        "heldout_predictions": ";".join(heldout) if heldout else "none",
+        "closure_observables": ";".join(closures) if closures else "none",
+        "failed_predictions": ";".join(failed) if failed else "none",
+        "calibration_count": float(len(calibration)),
+        "heldout_prediction_count": float(len(heldout)),
+        "closure_observable_count": float(len(closures)),
+        "all_heldout_predictions_pass": float(all_heldout_pass),
+        "requires_external_closure": float(requires_closure),
+        "fit_only_overclaim_risk": float(fit_only_risk),
+        "prediction_class": prediction_class,
+    }
+
+
 def sota_claim_alignment(
     *,
     claim_id: str,
