@@ -3188,6 +3188,72 @@ def write_sota_glassbench_trajectory_npz_member_index_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_trajectory_member_ensemble_observable_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench four-member frame-index observables")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The first four indexed KA2D trajectory members are aggregated into frame-index observable means and standard errors.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 62
+    colors_by_stage = {
+        "frame_index_member_ensemble_uncertainty_ready": colors.HexColor("#2b6cb0"),
+        "member_ensemble_below_threshold": colors.HexColor("#b7791f"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 92, top + 18, "uncertainty stage")
+    c.drawString(left + 370, top + 18, "frame-index observables")
+    frame_one_rows = [row for row in rows if int(float(row["frame_index"])) == 1]
+    for index, row in enumerate(frame_one_rows):
+        y = top - index * row_h
+        stage = row["ensemble_observable_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 92, y - 12, 250, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 100, y - 3, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 370,
+            y,
+            "members={}; MSD={:.5g} +/- {:.2g}; chi4={:.2f} +/- {:.2f}".format(
+                int(float(row["member_count"])),
+                float(row["msd"]),
+                float(row["sigma_msd"]),
+                float(row["chi4_overlap"]),
+                float(row["sigma_chi4_overlap"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            f'frame={int(float(row["frame_index"]))}; Fs(k)={row["self_intermediate_scattering_by_k"][:56]}',
+        )
+        c.drawString(left + 370, y - 27, f'blocker={row["primary_blocker"]}; next={row["next_required_action"]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a frame-index uncertainty gate only; physical lag times are still required before real inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4726,6 +4792,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_npz_member_index_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf"
     )
+    sota_glassbench_trajectory_member_ensemble_observable_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -4841,6 +4910,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_npz_member_index_pdf(
         sota_glassbench_trajectory_npz_member_index_pdf
+    )
+    write_sota_glassbench_trajectory_member_ensemble_observable_pdf(
+        sota_glassbench_trajectory_member_ensemble_observable_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -4992,6 +5064,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_npz_member_index_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf",
+        )
+        archive.write(
+            sota_glassbench_trajectory_member_ensemble_observable_pdf,
+            "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

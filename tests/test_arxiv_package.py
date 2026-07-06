@@ -981,6 +981,43 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_030["member_count_threshold_pass"]), 1.0)
         self.assertEqual(ka2d_030["member_index_stage"], "member_index_threshold_ready_extraction_pending")
 
+    def test_sota_glassbench_trajectory_member_ensemble_observable_records_uncertainties(self):
+        manifest_path = (
+            ROOT
+            / "data"
+            / "third_party"
+            / "glassbench"
+            / "trajectory_member_ensemble_observable_curve_10118191.json"
+        )
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.csv"
+        self.assertTrue(manifest_path.exists())
+        self.assertTrue(path.exists())
+
+        manifest = json.loads(manifest_path.read_text())
+        self.assertEqual(manifest["source"], "remote_zip_member_first_four_npz_observable_ensemble")
+        self.assertEqual(
+            manifest["structural_observable_method"],
+            "single_origin_minimal_image_from_frame0_member_ensemble",
+        )
+        self.assertEqual(len(manifest["entries"]), 2)
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {
+            (row["system_id"], row["temperature"], int(float(row["frame_index"]))): row
+            for row in rows
+        }
+        ka2d_030_frame1 = by_key[("KA2D", "0.30", 1)]
+        self.assertEqual(float(ka2d_030_frame1["member_count"]), 4.0)
+        self.assertEqual(float(ka2d_030_frame1["ensemble_member_threshold_pass"]), 1.0)
+        self.assertGreater(float(ka2d_030_frame1["sigma_msd"]), 0.0)
+        self.assertGreater(float(ka2d_030_frame1["sigma_chi4_overlap"]), 0.0)
+        self.assertEqual(float(ka2d_030_frame1["frame_index_uncertainty_ready"]), 1.0)
+        self.assertEqual(float(ka2d_030_frame1["physical_time_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030_frame1["sota_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_030_frame1["primary_blocker"], "physical_time_semantics")
+
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
         self.assertTrue(path.exists())
@@ -1658,6 +1695,10 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf", names)
+            self.assertIn(
+                "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
+                names,
+            )
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf", names)
@@ -1723,6 +1764,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf", main_tex)
+        self.assertIn(
+            "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
+            main_tex,
+        )
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
@@ -1758,6 +1803,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf",
+            "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
@@ -1957,6 +2003,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf"
             ).read_bytes()
+            first_sota_glassbench_trajectory_member_ensemble_observable = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf"
+            ).read_bytes()
             first_sota_glassbench_trajectory_npz_ensemble_horizon = (
                 ROOT
                 / "paper"
@@ -2146,6 +2198,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf"
             ).read_bytes()
+            second_sota_glassbench_trajectory_member_ensemble_observable = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf"
+            ).read_bytes()
             second_sota_glassbench_trajectory_npz_ensemble_horizon = (
                 ROOT
                 / "paper"
@@ -2293,6 +2351,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_glassbench_trajectory_npz_member_index,
             second_sota_glassbench_trajectory_npz_member_index,
+        )
+        self.assertEqual(
+            first_sota_glassbench_trajectory_member_ensemble_observable,
+            second_sota_glassbench_trajectory_member_ensemble_observable,
         )
         self.assertEqual(
             first_sota_glassbench_trajectory_npz_ensemble_horizon,

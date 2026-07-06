@@ -5030,6 +5030,141 @@ def sota_glassbench_trajectory_npz_member_index_gate(
     return out
 
 
+def sota_glassbench_trajectory_member_ensemble_observable_gate(
+    *,
+    ensemble_id: str,
+    accession_id: str,
+    member_observable_manifest: dict[str, object],
+    min_member_count: int,
+) -> list[dict[str, float | str]]:
+    """Aggregate frame-index GlassBench member observables with ensemble standard errors."""
+
+    if not ensemble_id:
+        raise ValueError("ensemble_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if int(min_member_count) != min_member_count or min_member_count < 2:
+        raise ValueError("min_member_count must be an integer at least two")
+    entries = member_observable_manifest.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("member_observable_manifest entries must be a nonempty list")
+
+    def member_id(path: str) -> str:
+        name = path.rsplit("/", 1)[-1]
+        return name[:-4] if name.endswith(".npz") else name
+
+    def mean_and_se(values: Sequence[float]) -> tuple[float, float]:
+        arr = np.asarray(values, dtype=float)
+        if arr.size == 0 or not np.all(np.isfinite(arr)):
+            raise ValueError("member observable values must be finite and nonempty")
+        mean = float(np.mean(arr))
+        if arr.size < 2:
+            return mean, 0.0
+        return mean, float(np.std(arr, ddof=1) / math.sqrt(arr.size))
+
+    out: list[dict[str, float | str]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("member observable entries must be dictionaries")
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        source_path = str(entry.get("source_path", "none"))
+        wave_numbers = [float(value) for value in entry.get("wave_numbers", [])]
+        if not wave_numbers:
+            raise ValueError("wave_numbers must be present")
+        wave_numbers_text = ";".join(f"{value:g}" for value in wave_numbers)
+        overlap_radius = float(entry.get("overlap_radius", 0.0))
+        members = entry.get("members", [])
+        if not isinstance(members, list) or not members:
+            raise ValueError("members must be a nonempty list")
+
+        by_frame: dict[float, list[dict[str, object]]] = {}
+        for member in members:
+            if not isinstance(member, dict):
+                raise ValueError("members must contain dictionaries")
+            member_name = str(member.get("member", "none"))
+            frame_indices = [float(frame) for frame in member.get("frame_indices", [])]
+            msd_values = [float(value) for value in member.get("msd", [])]
+            ngp_values = [float(value) for value in member.get("ngp_2d", [])]
+            fs_values = [str(value) for value in member.get("self_intermediate_scattering_by_k", [])]
+            chi4_values = [float(value) for value in member.get("chi4_overlap", [])]
+            lengths = {len(frame_indices), len(msd_values), len(ngp_values), len(fs_values), len(chi4_values)}
+            if len(lengths) != 1:
+                raise ValueError("member observable arrays must share a length")
+            for index, frame in enumerate(frame_indices):
+                fs_by_k = _parse_semicolon_float_values(
+                    fs_values[index],
+                    name="self_intermediate_scattering_by_k",
+                )
+                if len(fs_by_k) != len(wave_numbers):
+                    raise ValueError("Fs values must match wave_numbers length")
+                by_frame.setdefault(frame, []).append(
+                    {
+                        "member": member_name,
+                        "member_id": member_id(member_name),
+                        "msd": msd_values[index],
+                        "ngp_2d": ngp_values[index],
+                        "fs_by_k": fs_by_k,
+                        "chi4_overlap": chi4_values[index],
+                    }
+                )
+
+        for frame in sorted(by_frame):
+            group = by_frame[frame]
+            members_seen = sorted({str(row["member_id"]) for row in group})
+            member_count = len(members_seen)
+            threshold_pass = member_count >= int(min_member_count)
+            msd, sigma_msd = mean_and_se([float(row["msd"]) for row in group])
+            ngp, sigma_ngp = mean_and_se([float(row["ngp_2d"]) for row in group])
+            chi4, sigma_chi4 = mean_and_se([float(row["chi4_overlap"]) for row in group])
+            fs_matrix = np.asarray([row["fs_by_k"] for row in group], dtype=float)
+            fs_means = np.mean(fs_matrix, axis=0)
+            if fs_matrix.shape[0] < 2:
+                fs_sigmas = np.zeros(fs_matrix.shape[1])
+            else:
+                fs_sigmas = np.std(fs_matrix, axis=0, ddof=1) / math.sqrt(fs_matrix.shape[0])
+            fs_first, sigma_fs_first = mean_and_se([float(row["fs_by_k"][0]) for row in group])
+            ready = bool(threshold_pass)
+            out.append(
+                {
+                    "ensemble_id": f"{ensemble_id}_{system_id.lower()}_t{temperature.replace('.', '_')}_frame_{int(frame)}",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "frame_index": float(frame),
+                    "member_ids": ";".join(members_seen) if members_seen else "none",
+                    "member_count": float(member_count),
+                    "min_member_count": float(min_member_count),
+                    "ensemble_member_threshold_pass": float(threshold_pass),
+                    "msd": msd,
+                    "sigma_msd": sigma_msd,
+                    "ngp_2d": ngp,
+                    "sigma_ngp_2d": sigma_ngp,
+                    "wave_numbers": wave_numbers_text,
+                    "self_intermediate_scattering_by_k": ";".join(f"{value:.12g}" for value in fs_means),
+                    "sigma_self_intermediate_scattering_by_k": ";".join(f"{value:.12g}" for value in fs_sigmas),
+                    "self_intermediate_scattering": fs_first,
+                    "sigma_self_intermediate_scattering": sigma_fs_first,
+                    "overlap_radius": overlap_radius,
+                    "chi4_overlap": chi4,
+                    "sigma_chi4_overlap": sigma_chi4,
+                    "frame_index_uncertainty_ready": float(ready),
+                    "physical_time_ready": 0.0,
+                    "sota_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "physical_time_semantics" if ready else "member_count",
+                    "next_required_action": "attach_physical_lag_time_and_units"
+                    if ready
+                    else "extract_additional_npz_members",
+                    "ensemble_observable_stage": "frame_index_member_ensemble_uncertainty_ready"
+                    if ready
+                    else "member_ensemble_below_threshold",
+                }
+            )
+    return out
+
+
 def sota_glassbench_visible_member_ensemble_audit_gate(
     *,
     audit_id: str,

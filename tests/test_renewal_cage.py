@@ -129,6 +129,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
+    sota_glassbench_trajectory_member_ensemble_observable_gate,
     sota_glassbench_trajectory_npz_member_index_gate,
     sota_glassbench_short_window_trend_canary_gate,
     sota_glassbench_trajectory_timebase_bridge_gate,
@@ -3778,6 +3779,53 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["multi_npz_extraction_ready"]), 0.0)
         self.assertEqual(float(row["real_reanalysis_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "multi_npz_observable_extraction")
+
+    def test_sota_glassbench_trajectory_member_ensemble_observables_add_frame_uncertainties(self):
+        manifest = {
+            "source": "remote_zip_member_first_four_npz_observable_ensemble",
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "wave_numbers": [0.7, 1.1],
+                    "overlap_radius": 0.1,
+                    "members": [
+                        {
+                            "member": f"T0.30/train/N1290T0.30_{member_id}_tc01.npz",
+                            "frame_indices": [0, 1],
+                            "msd": [0.0, 0.004 + 0.001 * offset],
+                            "ngp_2d": [0.0, 0.05 + 0.01 * offset],
+                            "self_intermediate_scattering_by_k": ["1;1", f"{0.99 - 0.01 * offset};{0.98 - 0.01 * offset}"],
+                            "chi4_overlap": [0.0, 1.0 + offset],
+                        }
+                        for offset, member_id in enumerate([3, 10, 19, 28])
+                    ],
+                }
+            ],
+        }
+
+        rows = sota_glassbench_trajectory_member_ensemble_observable_gate(
+            ensemble_id="glassbench_member_ensemble_observable",
+            accession_id="glassbench_zenodo_10118191",
+            member_observable_manifest=manifest,
+            min_member_count=4,
+        )
+
+        by_frame = {float(row["frame_index"]): row for row in rows}
+        frame1 = by_frame[1.0]
+        self.assertEqual(float(frame1["member_count"]), 4.0)
+        self.assertEqual(float(frame1["ensemble_member_threshold_pass"]), 1.0)
+        self.assertAlmostEqual(float(frame1["msd"]), 0.0055)
+        self.assertGreater(float(frame1["sigma_msd"]), 0.0)
+        self.assertGreater(float(frame1["sigma_ngp_2d"]), 0.0)
+        self.assertEqual(frame1["wave_numbers"], "0.7;1.1")
+        self.assertEqual(frame1["self_intermediate_scattering_by_k"], "0.975;0.965")
+        self.assertGreater(float(frame1["sigma_chi4_overlap"]), 0.0)
+        self.assertEqual(float(frame1["frame_index_uncertainty_ready"]), 1.0)
+        self.assertEqual(float(frame1["physical_time_ready"]), 0.0)
+        self.assertEqual(float(frame1["sota_inversion_ready"]), 0.0)
+        self.assertEqual(frame1["primary_blocker"], "physical_time_semantics")
 
     def test_sota_glassbench_visible_member_ensemble_audit_blocks_first_member_only_prefix(self):
         rows = sota_glassbench_visible_member_ensemble_audit_gate(

@@ -234,14 +234,17 @@ The GlassBench real-inversion gap ledger then collapses these gates into one
 claim-level verdict. For both KA2D temperatures the allowed claim remains
 `short_window_coordinate_trend_only`: the coordinate canary passes and
 first-member `F_s`/overlap-chi4 proxies are cached, but the timebase gate
-fails, the ensemble prefix is one visible member short of the uncertainty
-threshold, and uncertainty columns are missing. This is the current SOTA
-comparison boundary before any real persistence/exchange inversion.
+fails and physical lag-time semantics are still missing. The later extended
+member-index and first-four-member observable gates add frame-index uncertainty
+columns, but they do not promote the result to a calibrated physical-time
+persistence/exchange inversion.
 The real-inversion unlock protocol turns that boundary into a minimum data
 payload: for each KA2D temperature it requires an explicit frame-time mapping,
-one more independent visible `.npz` member beyond the current prefix horizon,
-and positive uncertainty columns for MSD, NGP, multi-k `F_s`, and overlap
-`chi4`. Passing this protocol would promote the comparison to
+independent `.npz` members, and positive uncertainty columns for MSD, NGP,
+multi-k `F_s`, and overlap `chi4`. The frame-index member ensemble now
+satisfies the member and uncertainty parts of that payload for the extracted
+prefix members, while the physical timebase remains the promotion blocker.
+Passing the full protocol would promote the comparison to
 `uncertainty_weighted_real_trajectory_inversion`; it still would not enable a
 thermodynamic glass-transition claim.
 The first-NPZ inversion-readiness gate then turns that limitation into explicit
@@ -256,11 +259,16 @@ overstating the result. The earlier 1 MB inner-tar prefix exposed three KA2D
 indexes 9 valid `T=0.23` members and 10 valid `T=0.30` members. This passes
 the four-member threshold for a future ensemble uncertainty calculation, but
 no multi-member observable extraction or physical-time inversion is claimed.
+The first-four member observable gate now performs that extraction for the
+first four indexed members at each KA2D temperature and aggregates MSD, 2D NGP,
+multi-k `F_s(k,t)`, and overlap-`chi4` into frame-index means and standard
+errors. This upgrades the benchmark evidence from member-list visibility to
+member-resolved dynamical observables, while keeping physical-time inversion
+disabled until explicit lag times are attached.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
-gate ready for uncertainty extraction, while the real inversion remains blocked
-until member-resolved observables, uncertainty columns, and physical lag times
+gate ready, while the real inversion remains blocked until physical lag times
 are attached.
 The observable-coverage audit isolates the remaining real-inversion observable
 gap: both current KA2D first-NPZ rows now expose frame index, MSD, 2D NGP,
@@ -410,6 +418,7 @@ figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.svg
 figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.svg
+figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
 figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg
 figures/renewal_cage_sota_glassbench_observable_coverage_audit.svg
@@ -494,6 +503,7 @@ data/renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv
 data/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_member_index.csv
+data/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
 data/renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv
 data/renewal_cage_sota_glassbench_observable_coverage_audit.csv
@@ -597,6 +607,7 @@ paper/figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf
 paper/figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf
+paper/figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf
 paper/figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf

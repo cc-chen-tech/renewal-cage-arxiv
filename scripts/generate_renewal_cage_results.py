@@ -109,6 +109,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_visible_member_ensemble_audit_gate,
+    sota_glassbench_trajectory_member_ensemble_observable_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_npz_member_index_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
@@ -3859,6 +3860,20 @@ def write_sota_glassbench_visible_member_ensemble_audit_csv(
     return rows
 
 
+def write_sota_glassbench_trajectory_member_ensemble_observable_csv(path: Path) -> list[dict[str, float | str]]:
+    """Aggregate first-four GlassBench NPZ members into frame-index uncertainty curves."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "trajectory_member_ensemble_observable_curve_10118191.json"
+    rows = sota_glassbench_trajectory_member_ensemble_observable_gate(
+        ensemble_id="glassbench_member_ensemble_observable",
+        accession_id="glassbench_zenodo_10118191",
+        member_observable_manifest=json.loads(manifest_path.read_text(encoding="utf-8")),
+        min_member_count=4,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -7486,6 +7501,63 @@ def write_sota_glassbench_trajectory_npz_member_index_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_member_ensemble_observable_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 430
+    left, top = 75, 118
+    row_h = 76
+    frame_one_rows = [row for row in rows if int(float(row["frame_index"])) == 1]
+    colors = {
+        "frame_index_member_ensemble_uncertainty_ready": "#2b6cb0",
+        "member_ensemble_below_threshold": "#b7791f",
+    }
+    marks = []
+    for index, row in enumerate(frame_one_rows):
+        y = top + index * row_h
+        stage = str(row["ensemble_observable_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        member_count = int(float(row["member_count"]))
+        msd = float(row["msd"])
+        sigma_msd = float(row["sigma_msd"])
+        chi4 = float(row["chi4_overlap"])
+        sigma_chi4 = float(row["sigma_chi4_overlap"])
+        fs_by_k = str(row["self_intermediate_scattering_by_k"])[:40]
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 4}" width="340" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:47]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 485}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">members={member_count}; MSD={msd:.5g} +/- {sigma_msd:.2g}; chi4={chi4:.2f} +/- {sigma_chi4:.2f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 485}" y="{y + 34}" font-family="Arial, sans-serif" font-size="10" fill="#555">frame={int(float(row["frame_index"]))}; Fs(k)={fs_by_k}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 485}" y="{y + 52}" font-family="Arial, sans-serif" font-size="10" fill="#555">next: {str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench four-member frame-index observables</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The first four indexed KA2D trajectory members are extracted and aggregated into observable means with standard errors.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">uncertainty stage</text>
+  <text x="{left + 485}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">frame-index observables</text>
+  {"".join(marks)}
+  <rect x="75" y="358" width="14" height="14" fill="#2b6cb0" /><text x="96" y="370" font-family="Arial, sans-serif" font-size="12">four-member observable uncertainty ready in frame-index coordinates</text>
+  <text x="75" y="394" font-family="Arial, sans-serif" font-size="12">Physical lag time is still absent, so the gate does not enable real persistence/exchange inversion or thermodynamic claims.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9442,6 +9514,15 @@ def main() -> None:
     write_sota_glassbench_trajectory_npz_member_index_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_member_index.svg",
         glassbench_trajectory_npz_member_index_rows,
+    )
+    glassbench_trajectory_member_ensemble_observable_rows = (
+        write_sota_glassbench_trajectory_member_ensemble_observable_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.csv"
+        )
+    )
+    write_sota_glassbench_trajectory_member_ensemble_observable_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.svg",
+        glassbench_trajectory_member_ensemble_observable_rows,
     )
     glassbench_trajectory_npz_ensemble_horizon_rows = write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv",

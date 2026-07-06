@@ -1375,9 +1375,12 @@ The visible-member audit
 \texttt{renewal\_cage\_sota\_glassbench\_visible\_member\_ensemble\_audit.csv}
 adds an identity-level guardrail. The extended index exposes member ids and
 split labels at each KA2D temperature, so the member-list gate is ready for a
-future uncertainty extraction. The manuscript still keeps real inversion
-disabled until member-resolved observables, uncertainty columns, and physical
-lag times are attached.
+member-resolved uncertainty extraction. A follow-on observable gate now extracts
+the first four indexed members at each KA2D temperature and computes
+frame-index means and standard errors for MSD, the two-dimensional NGP,
+self-intermediate scattering at several wave numbers, and overlap-\(\chi_4\).
+The manuscript still keeps real inversion disabled until physical lag times are
+attached.
 
 \begin{figure}[p]
   \centering
@@ -1386,6 +1389,18 @@ lag times are attached.
   probe indexes more than four valid trajectory members at each KA2D
   temperature, resolving the member-list threshold while keeping multi-member
   observable extraction and uncertainty-weighted inversion as later gates.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf}
+  \caption{GlassBench four-member frame-index observable uncertainty gate. The
+  first four indexed KA2D members at each temperature are extracted and
+  aggregated into observable means with standard errors. This upgrades the
+  GlassBench evidence from member-list visibility to member-resolved dynamical
+  observables, but it remains a frame-index result: physical lag times are still
+  required before persistence/exchange inversion, Stokes--Einstein products, or
+  real-time alpha-relaxation claims are enabled.}
 \end{figure}
 
 \begin{figure}[p]
