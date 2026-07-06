@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+.worktrees/
 .pytest_cache/
 tmp/
 .tmp/
