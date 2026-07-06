@@ -102,6 +102,7 @@ from renewal_cage import (  # noqa: E402
     sota_claim_alignment,
     sota_archive_preflight_gate,
     sota_data_accession_gate,
+    sota_evidence_class_gate,
     sota_evidence_verdict,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
@@ -2538,6 +2539,156 @@ def write_sota_evidence_verdict_csv(
             reanalysis_stage=str(reanalysis["reanalysis_stage"]),
         )
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_evidence_class_csv(
+    path: Path,
+    *,
+    evidence_verdict_rows: list[dict[str, float | str]],
+    trajectory_readiness_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Separate simulations, experiments, repositories, and scope boundaries."""
+
+    verdict_by_id = {str(row["verdict_id"]): row for row in evidence_verdict_rows}
+    readiness_by_id = {str(row["benchmark_id"]): row for row in trajectory_readiness_rows}
+    synthetic_ready = readiness_by_id["synthetic_member_ensemble_trajectory_uncertainty"]
+    rows = [
+        sota_evidence_class_gate(
+            class_id="kob_andersen_simulation_structural_class",
+            source_key="kob1995vanhove;kob1995intermediate",
+            source_modality="simulation",
+            evidence_grade=str(verdict_by_id["kob_andersen_van_hove_caging_ngp_verdict"]["evidence_grade"]),
+            observed_signatures=["msd_plateau", "ngp_peak", "van_hove_tail", "alpha_relaxation"],
+            model_supported_signatures=["msd_plateau", "ngp_peak", "van_hove_tail", "alpha_relaxation"],
+            available_quantitative_inputs=["temperature_grid", "published_curves", "structural_observables"],
+            required_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+                "shared_ensemble",
+            ],
+            requires_external_closure=False,
+            has_machine_readable_curves=False,
+            has_uncertainties=False,
+            has_shared_ensemble=True,
+        ),
+        sota_evidence_class_gate(
+            class_id="weeks_colloid_cage_experiment_class",
+            source_key="weeks2002cage;guan2014fickian",
+            source_modality="experiment",
+            evidence_grade="direct_dynamical_support",
+            observed_signatures=["cage_rearrangements", "fickian_non_gaussian_window"],
+            model_supported_signatures=["cage_rearrangements", "fickian_non_gaussian_window"],
+            available_quantitative_inputs=["trend_direction", "particle_tracking_observables"],
+            required_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+                "shared_ensemble",
+            ],
+            requires_external_closure=False,
+            has_machine_readable_curves=False,
+            has_uncertainties=False,
+            has_shared_ensemble=False,
+        ),
+        sota_evidence_class_gate(
+            class_id="near_tg_experimental_heterogeneity_class",
+            source_key="berthier2024experimental",
+            source_modality="experiment",
+            evidence_grade="closure_assisted_support",
+            observed_signatures=["dynamic_heterogeneity_growth", "spatial_correlation_growth"],
+            model_supported_signatures=["dynamic_heterogeneity_growth"],
+            available_quantitative_inputs=["trend_direction", "temperature_series"],
+            required_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+                "shared_ensemble",
+            ],
+            requires_external_closure=True,
+            has_machine_readable_curves=False,
+            has_uncertainties=False,
+            has_shared_ensemble=False,
+        ),
+        sota_evidence_class_gate(
+            class_id="glassbench_repository_reanalysis_class",
+            source_key="glassbench_zenodo_trajectory_release",
+            source_modality="metadata_repository",
+            evidence_grade=str(verdict_by_id["glassbench_reanalysis_state_verdict"]["evidence_grade"]),
+            observed_signatures=["machine_readable_trajectory_repository", "ka2d_npz_payload"],
+            model_supported_signatures=["machine_readable_trajectory_repository", "ka2d_npz_payload"],
+            available_quantitative_inputs=[
+                "archive_metadata",
+                "particle_trajectories",
+                "npz_schema",
+                "first_npz_msd_ngp_curve",
+                "ngp",
+            ],
+            required_quantitative_inputs=[
+                "particle_trajectories",
+                "physical_time",
+                "multi_member_uncertainty",
+                "self_intermediate_scattering",
+                "ngp",
+                "shared_ensemble",
+            ],
+            requires_external_closure=True,
+            has_machine_readable_curves=True,
+            has_uncertainties=False,
+            has_shared_ensemble=False,
+        ),
+        sota_evidence_class_gate(
+            class_id="synthetic_member_ensemble_canary_class",
+            source_key="synthetic_member_ensemble_trajectory",
+            source_modality="synthetic_canary",
+            evidence_grade="direct_dynamical_support",
+            observed_signatures=["msd", "ngp", "self_intermediate_scattering", "chi4_overlap"],
+            model_supported_signatures=["msd", "ngp", "self_intermediate_scattering", "chi4_overlap"],
+            available_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+                "shared_ensemble",
+            ],
+            required_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+                "shared_ensemble",
+            ],
+            requires_external_closure=False,
+            has_machine_readable_curves=True,
+            has_uncertainties=float(synthetic_ready["uncertainty_weighted_ready"]) == 1.0,
+            has_shared_ensemble=True,
+        ),
+        sota_evidence_class_gate(
+            class_id="kauzmann_adam_gibbs_thermodynamic_class",
+            source_key="kauzmann1948nature;adam1965temperature",
+            source_modality="theory",
+            evidence_grade=str(
+                verdict_by_id["kauzmann_adam_gibbs_entropy_boundary_verdict"]["evidence_grade"]
+            ),
+            observed_signatures=["configurational_entropy", "heat_capacity_anomaly", "ideal_glass_extrapolation"],
+            model_supported_signatures=["adam_gibbs_slowdown_closure"],
+            available_quantitative_inputs=["entropy_trend", "relaxation_slowdown"],
+            required_quantitative_inputs=[
+                "configurational_entropy_from_dynamics",
+                "heat_capacity",
+                "microscopic_barriers",
+            ],
+            requires_external_closure=True,
+            has_machine_readable_curves=False,
+            has_uncertainties=False,
+            has_shared_ensemble=False,
+        ),
+    ]
     write_sweep_csv(path, rows)
     return rows
 
@@ -5452,6 +5603,64 @@ def write_sota_claim_alignment_svg(path: Path, rows: list[dict[str, float | str]
   <rect x="75" y="580" width="14" height="14" fill="#2f855a" /><text x="96" y="592" font-family="Arial, sans-serif" font-size="12">derived dynamical support</text>
   <rect x="260" y="580" width="14" height="14" fill="#2b6cb0" /><text x="281" y="592" font-family="Arial, sans-serif" font-size="12">effective closure or proxy</text>
   <rect x="455" y="580" width="14" height="14" fill="#805ad5" /><text x="476" y="592" font-family="Arial, sans-serif" font-size="12">explicit scope boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_evidence_class_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 560
+    left, top = 70, 98
+    row_h = 62
+    colors_by_class = {
+        "uncertainty_weighted_quantitative_test": "#2f855a",
+        "structural_simulation_support": "#2b6cb0",
+        "qualitative_experimental_trend": "#d69e2e",
+        "closure_assisted_experimental_constraint": "#805ad5",
+        "metadata_reanalysis_candidate": "#718096",
+        "thermodynamic_scope_boundary": "#b83280",
+        "closure_assisted_simulation_constraint": "#805ad5",
+        "not_supported": "#c05621",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        evidence_class = str(row["evidence_class"])
+        color = colors_by_class[evidence_class]
+        quantitative = int(float(row["quantitative_inversion_allowed"]))
+        trend = int(float(row["trend_comparison_allowed"]))
+        closure = int(float(row["requires_external_closure"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["source_key"])[:34]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 230}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["source_modality"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 360}" y="{y}" width="270" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 372}" y="{y + 16}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{evidence_class.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 650}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">trend={trend}; inversion={quantitative}; closure={closure}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 865}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">blocker: {str(row["primary_blocker"]).replace("_", " ")[:33]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 360}" y="{y + 40}" font-family="Arial, sans-serif" font-size="9" fill="#555">missing inputs: {str(row["missing_quantitative_inputs"]).replace("_", " ")[:88]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA evidence-class gate</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Representative simulations, experiments, repositories, canaries, and thermodynamic claims are separated before quantitative inversion is allowed.</text>
+  <text x="{left}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">source</text>
+  <text x="{left + 230}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">modality</text>
+  <text x="{left + 360}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">evidence class</text>
+  <text x="{left + 650}" y="{top - 20}" font-family="Arial, sans-serif" font-size="12" font-weight="700">allowed use</text>
+  {"".join(marks)}
 </svg>
 """
     path.write_text(svg)
@@ -8464,7 +8673,7 @@ def main() -> None:
         zip_structure_rows=zip_structure_rows,
         adapter_contract_rows=trajectory_adapter_contract_rows,
     )
-    write_sota_evidence_verdict_csv(
+    evidence_verdict_rows = write_sota_evidence_verdict_csv(
         DATA_DIR / "renewal_cage_sota_evidence_verdict.csv",
         claim_alignment_rows=sota_claim_alignment_rows,
         signed_constraint_rows=sota_signed_constraint_rows,
@@ -8913,6 +9122,15 @@ def main() -> None:
     write_trajectory_inversion_readiness_svg(
         FIGURE_DIR / "renewal_cage_trajectory_inversion_readiness.svg",
         trajectory_inversion_readiness_rows,
+    )
+    evidence_class_rows = write_sota_evidence_class_csv(
+        DATA_DIR / "renewal_cage_sota_evidence_class.csv",
+        evidence_verdict_rows=evidence_verdict_rows,
+        trajectory_readiness_rows=trajectory_inversion_readiness_rows,
+    )
+    write_sota_evidence_class_svg(
+        FIGURE_DIR / "renewal_cage_sota_evidence_class.svg",
+        evidence_class_rows,
     )
     benchmark_publication_ladder_rows = write_benchmark_publication_ladder_csv(
         DATA_DIR / "renewal_cage_benchmark_publication_ladder.csv",

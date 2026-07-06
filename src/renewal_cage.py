@@ -4972,6 +4972,133 @@ def sota_evidence_verdict(
     }
 
 
+def sota_evidence_class_gate(
+    *,
+    class_id: str,
+    source_key: str,
+    source_modality: str,
+    evidence_grade: str,
+    observed_signatures: Sequence[str],
+    model_supported_signatures: Sequence[str],
+    available_quantitative_inputs: Sequence[str],
+    required_quantitative_inputs: Sequence[str],
+    requires_external_closure: bool,
+    has_machine_readable_curves: bool,
+    has_uncertainties: bool,
+    has_shared_ensemble: bool,
+) -> dict[str, float | str]:
+    """Classify SOTA evidence before promoting trends to quantitative fits."""
+
+    for name, value in {
+        "class_id": class_id,
+        "source_key": source_key,
+        "source_modality": source_modality,
+        "evidence_grade": evidence_grade,
+    }.items():
+        if not value:
+            raise ValueError(f"{name} must be nonempty")
+    allowed_modalities = {
+        "simulation",
+        "experiment",
+        "mixed_simulation_experiment",
+        "theory",
+        "metadata_repository",
+        "synthetic_canary",
+    }
+    allowed_evidence = {
+        "direct_dynamical_support",
+        "closure_assisted_support",
+        "thermodynamic_scope_boundary",
+        "pending_trajectory_reanalysis",
+        "overclaimed_or_forbidden",
+        "not_supported",
+    }
+    if source_modality not in allowed_modalities:
+        raise ValueError("source_modality is not recognized")
+    if evidence_grade not in allowed_evidence:
+        raise ValueError("evidence_grade is not recognized")
+    for name, values in {
+        "observed_signatures": observed_signatures,
+        "model_supported_signatures": model_supported_signatures,
+        "available_quantitative_inputs": available_quantitative_inputs,
+        "required_quantitative_inputs": required_quantitative_inputs,
+    }.items():
+        if not values:
+            raise ValueError(f"{name} must be nonempty")
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    observed = list(dict.fromkeys(str(value) for value in observed_signatures))
+    supported = list(dict.fromkeys(str(value) for value in model_supported_signatures))
+    available_inputs = list(dict.fromkeys(str(value) for value in available_quantitative_inputs))
+    required_inputs = list(dict.fromkeys(str(value) for value in required_quantitative_inputs))
+    supported_set = set(supported)
+    available_set = set(available_inputs)
+    missing_supported = [signature for signature in observed if signature not in supported_set]
+    missing_inputs = [input_name for input_name in required_inputs if input_name not in available_set]
+
+    all_inputs_ready = (
+        not missing_inputs
+        and bool(has_machine_readable_curves)
+        and bool(has_uncertainties)
+        and bool(has_shared_ensemble)
+    )
+    trend_allowed = evidence_grade not in {"overclaimed_or_forbidden", "not_supported"}
+    if evidence_grade == "thermodynamic_scope_boundary" or source_modality == "theory":
+        evidence_class = "thermodynamic_scope_boundary"
+        quantitative_allowed = False
+        blocker = "renewal_dynamics_not_thermodynamic_theory"
+    elif evidence_grade == "pending_trajectory_reanalysis" or source_modality == "metadata_repository":
+        evidence_class = "metadata_reanalysis_candidate"
+        quantitative_allowed = False
+        blocker = missing_inputs[0] if missing_inputs else "completed_reanalysis_gate"
+    elif all_inputs_ready and not requires_external_closure and evidence_grade == "direct_dynamical_support":
+        evidence_class = "uncertainty_weighted_quantitative_test"
+        quantitative_allowed = True
+        blocker = "none"
+    elif source_modality in {"experiment", "mixed_simulation_experiment"} and requires_external_closure:
+        evidence_class = "closure_assisted_experimental_constraint"
+        quantitative_allowed = False
+        blocker = missing_inputs[0] if missing_inputs else "external_closure"
+    elif source_modality in {"experiment", "mixed_simulation_experiment"}:
+        evidence_class = "qualitative_experimental_trend"
+        quantitative_allowed = False
+        blocker = missing_inputs[0] if missing_inputs else "uncertainty_weighted_protocol"
+    elif evidence_grade == "direct_dynamical_support":
+        evidence_class = "structural_simulation_support"
+        quantitative_allowed = False
+        blocker = missing_inputs[0] if missing_inputs else "uncertainty_weighted_protocol"
+    elif evidence_grade == "closure_assisted_support":
+        evidence_class = "closure_assisted_simulation_constraint"
+        quantitative_allowed = False
+        blocker = missing_inputs[0] if missing_inputs else "external_closure"
+    else:
+        evidence_class = "not_supported"
+        quantitative_allowed = False
+        blocker = "source_support"
+
+    return {
+        "class_id": class_id,
+        "source_key": source_key,
+        "source_modality": source_modality,
+        "evidence_grade": evidence_grade,
+        "observed_signatures": ";".join(observed),
+        "model_supported_signatures": ";".join(supported),
+        "missing_model_supported_signatures": ";".join(missing_supported) if missing_supported else "none",
+        "available_quantitative_inputs": ";".join(available_inputs),
+        "required_quantitative_inputs": ";".join(required_inputs),
+        "missing_quantitative_inputs": ";".join(missing_inputs) if missing_inputs else "none",
+        "has_machine_readable_curves": float(has_machine_readable_curves),
+        "has_uncertainties": float(has_uncertainties),
+        "has_shared_ensemble": float(has_shared_ensemble),
+        "requires_external_closure": float(requires_external_closure),
+        "trend_comparison_allowed": float(trend_allowed),
+        "quantitative_inversion_allowed": float(quantitative_allowed),
+        "evidence_class": evidence_class,
+        "primary_blocker": blocker,
+    }
+
+
 def sota_signed_constraint_audit(
     *,
     constraint_id: str,

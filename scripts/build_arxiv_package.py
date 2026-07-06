@@ -1649,6 +1649,60 @@ def write_sota_evidence_verdict_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_evidence_class_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_evidence_class.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA evidence-class gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Simulations, experiments, repositories, canaries, and thermodynamic claims are separated before quantitative inversion.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "source")
+    c.drawString(left + 145, top, "modality")
+    c.drawString(left + 245, top, "evidence class")
+    c.drawString(left + 485, top, "trend")
+    c.drawString(left + 535, top, "invert")
+    c.drawString(left + 592, top, "closure")
+    c.drawString(left + 648, top, "blocker")
+    palette = {
+        "uncertainty_weighted_quantitative_test": colors.HexColor("#2f855a"),
+        "structural_simulation_support": colors.HexColor("#2b6cb0"),
+        "qualitative_experimental_trend": colors.HexColor("#d69e2e"),
+        "closure_assisted_experimental_constraint": colors.HexColor("#805ad5"),
+        "metadata_reanalysis_candidate": colors.HexColor("#718096"),
+        "thermodynamic_scope_boundary": colors.HexColor("#b83280"),
+        "closure_assisted_simulation_constraint": colors.HexColor("#805ad5"),
+        "not_supported": colors.HexColor("#c05621"),
+    }
+    c.setFont("Helvetica", 6.8)
+    for idx, row in enumerate(rows):
+        y = top - 18 - idx * 36
+        evidence_class = row["evidence_class"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["source_key"][:26])
+        c.drawString(left + 145, y, row["source_modality"].replace("_", " ")[:17])
+        c.setFillColor(palette[evidence_class])
+        c.rect(left + 245, y - 4, 220, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 250, y, evidence_class.replace("_", " ")[:38])
+        c.setFillColor(colors.black)
+        c.drawString(left + 495, y, str(int(float(row["trend_comparison_allowed"]))))
+        c.drawString(left + 548, y, str(int(float(row["quantitative_inversion_allowed"]))))
+        c.drawString(left + 606, y, str(int(float(row["requires_external_closure"]))))
+        c.drawString(left + 648, y, row["primary_blocker"].replace("_", " ")[:23])
+        c.drawString(left + 245, y - 10, f"missing inputs: {row['missing_quantitative_inputs'].replace('_', ' ')[:78]}")
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3939,6 +3993,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_claim_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_claim_alignment.pdf"
     sota_signed_constraints_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_signed_constraints.pdf"
     sota_evidence_verdict_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_verdict.pdf"
+    sota_evidence_class_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_class.pdf"
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -4047,6 +4102,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_claim_alignment_pdf(sota_claim_alignment_pdf)
     write_sota_signed_constraints_pdf(sota_signed_constraints_pdf)
     write_sota_evidence_verdict_pdf(sota_evidence_verdict_pdf)
+    write_sota_evidence_class_pdf(sota_evidence_class_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -4132,6 +4188,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(sota_claim_alignment_pdf, "figures/renewal_cage_sota_claim_alignment.pdf")
         archive.write(sota_signed_constraints_pdf, "figures/renewal_cage_sota_signed_constraints.pdf")
         archive.write(sota_evidence_verdict_pdf, "figures/renewal_cage_sota_evidence_verdict.pdf")
+        archive.write(sota_evidence_class_pdf, "figures/renewal_cage_sota_evidence_class.pdf")
         archive.write(
             real_benchmark_assimilation_gate_pdf,
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",

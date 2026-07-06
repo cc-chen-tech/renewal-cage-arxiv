@@ -117,6 +117,7 @@ from renewal_cage import (  # noqa: E402
     sota_claim_alignment,
     sota_data_accession_gate,
     sota_evidence_verdict,
+    sota_evidence_class_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
@@ -3597,6 +3598,84 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(pending["evidence_grade"], "pending_trajectory_reanalysis")
         self.assertEqual(pending["trajectory_reanalysis_required"], 1.0)
         self.assertEqual(pending["publishable_without_overclaim"], 0.0)
+
+    def test_sota_evidence_class_gate_separates_experimental_trends_from_quantitative_fit(self):
+        row = sota_evidence_class_gate(
+            class_id="near_tg_experimental_heterogeneity_class",
+            source_key="berthier2024experimental",
+            source_modality="experiment",
+            evidence_grade="closure_assisted_support",
+            observed_signatures=[
+                "dynamic_heterogeneity_growth",
+                "spatial_correlation_growth",
+            ],
+            model_supported_signatures=[
+                "dynamic_heterogeneity_growth",
+            ],
+            available_quantitative_inputs=[
+                "trend_direction",
+                "temperature_series",
+            ],
+            required_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+            ],
+            requires_external_closure=True,
+            has_machine_readable_curves=False,
+            has_uncertainties=False,
+            has_shared_ensemble=False,
+        )
+
+        self.assertEqual(row["evidence_class"], "closure_assisted_experimental_constraint")
+        self.assertEqual(row["quantitative_inversion_allowed"], 0.0)
+        self.assertEqual(row["trend_comparison_allowed"], 1.0)
+        self.assertEqual(row["primary_blocker"], "particle_trajectories")
+        self.assertIn("spatial_correlation_growth", row["missing_model_supported_signatures"])
+
+    def test_sota_evidence_class_gate_promotes_only_uncertainty_weighted_machine_readable_rows(self):
+        row = sota_evidence_class_gate(
+            class_id="synthetic_member_ensemble_class",
+            source_key="synthetic_member_ensemble_trajectory",
+            source_modality="simulation",
+            evidence_grade="direct_dynamical_support",
+            observed_signatures=[
+                "msd",
+                "ngp",
+                "self_intermediate_scattering",
+                "chi4_overlap",
+            ],
+            model_supported_signatures=[
+                "msd",
+                "ngp",
+                "self_intermediate_scattering",
+                "chi4_overlap",
+            ],
+            available_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+                "shared_ensemble",
+            ],
+            required_quantitative_inputs=[
+                "particle_trajectories",
+                "self_intermediate_scattering",
+                "ngp",
+                "uncertainty",
+                "shared_ensemble",
+            ],
+            requires_external_closure=False,
+            has_machine_readable_curves=True,
+            has_uncertainties=True,
+            has_shared_ensemble=True,
+        )
+
+        self.assertEqual(row["evidence_class"], "uncertainty_weighted_quantitative_test")
+        self.assertEqual(row["quantitative_inversion_allowed"], 1.0)
+        self.assertEqual(row["trend_comparison_allowed"], 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
 
     def test_sota_signed_constraint_audit_accepts_dynamic_signatures_without_forbidden_claims(self):
         row = sota_signed_constraint_audit(

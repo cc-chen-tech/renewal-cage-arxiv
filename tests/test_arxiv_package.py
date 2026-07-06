@@ -222,6 +222,33 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(pending["trajectory_reanalysis_required"]), 1.0)
         self.assertEqual(float(pending["publishable_without_overclaim"]), 0.0)
 
+    def test_sota_evidence_class_gate_separates_experiments_from_quantitative_inversion(self):
+        path = ROOT / "data" / "renewal_cage_sota_evidence_class.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["class_id"]: row for row in rows}
+        experiment = by_id["near_tg_experimental_heterogeneity_class"]
+        self.assertEqual(experiment["source_modality"], "experiment")
+        self.assertEqual(experiment["evidence_class"], "closure_assisted_experimental_constraint")
+        self.assertEqual(float(experiment["quantitative_inversion_allowed"]), 0.0)
+        self.assertEqual(float(experiment["trend_comparison_allowed"]), 1.0)
+        self.assertEqual(experiment["primary_blocker"], "particle_trajectories")
+
+        glassbench = by_id["glassbench_repository_reanalysis_class"]
+        self.assertEqual(glassbench["evidence_class"], "metadata_reanalysis_candidate")
+        self.assertEqual(glassbench["primary_blocker"], "physical_time")
+        self.assertEqual(float(glassbench["quantitative_inversion_allowed"]), 0.0)
+
+        canary = by_id["synthetic_member_ensemble_canary_class"]
+        self.assertEqual(canary["evidence_class"], "uncertainty_weighted_quantitative_test")
+        self.assertEqual(float(canary["quantitative_inversion_allowed"]), 1.0)
+
+        thermodynamic = by_id["kauzmann_adam_gibbs_thermodynamic_class"]
+        self.assertEqual(thermodynamic["evidence_class"], "thermodynamic_scope_boundary")
+        self.assertEqual(thermodynamic["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -1359,6 +1386,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_sota_signed_constraints.pdf", names)
             self.assertIn("figures/renewal_cage_sota_evidence_verdict.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_evidence_class.pdf", names)
             self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", names)
             self.assertIn("figures/renewal_cage_cross_observable_prediction_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_inversion_identifiability_audit.pdf", names)
@@ -1422,6 +1450,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_evidence_verdict.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_evidence_class.pdf", main_tex)
         self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_data_accession.pdf", main_tex)
@@ -1464,6 +1493,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_benchmark_consistency.pdf",
             "figures/renewal_cage_sota_claim_alignment.pdf",
             "figures/renewal_cage_sota_evidence_verdict.pdf",
+            "figures/renewal_cage_sota_evidence_class.pdf",
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
             "figures/renewal_cage_sota_source_provenance.pdf",
             "figures/renewal_cage_sota_data_accession.pdf",
@@ -1598,6 +1628,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_sota_evidence_verdict = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_evidence_verdict.pdf"
+            ).read_bytes()
+            first_sota_evidence_class = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_evidence_class.pdf"
             ).read_bytes()
             first_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
@@ -1779,6 +1812,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_sota_evidence_verdict = (
                 ROOT / "paper" / "figures" / "renewal_cage_sota_evidence_verdict.pdf"
             ).read_bytes()
+            second_sota_evidence_class = (
+                ROOT / "paper" / "figures" / "renewal_cage_sota_evidence_class.pdf"
+            ).read_bytes()
             second_real_benchmark_assimilation_gate = (
                 ROOT / "paper" / "figures" / "renewal_cage_real_benchmark_assimilation_gate.pdf"
             ).read_bytes()
@@ -1941,6 +1977,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(first_sota_claim_alignment, second_sota_claim_alignment)
         self.assertEqual(first_sota_signed_constraints, second_sota_signed_constraints)
         self.assertEqual(first_sota_evidence_verdict, second_sota_evidence_verdict)
+        self.assertEqual(first_sota_evidence_class, second_sota_evidence_class)
         self.assertEqual(first_real_benchmark_assimilation_gate, second_real_benchmark_assimilation_gate)
         self.assertEqual(first_cross_observable_prediction_ledger, second_cross_observable_prediction_ledger)
         self.assertEqual(first_inversion_identifiability_audit, second_inversion_identifiability_audit)
