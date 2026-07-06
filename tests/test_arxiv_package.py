@@ -1450,7 +1450,6 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_evidence_verdict.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_sota_evidence_class.pdf", main_tex)
         self.assertIn("figures/renewal_cage_real_benchmark_assimilation_gate.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_source_provenance.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_data_accession.pdf", main_tex)
@@ -1493,7 +1492,6 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_benchmark_consistency.pdf",
             "figures/renewal_cage_sota_claim_alignment.pdf",
             "figures/renewal_cage_sota_evidence_verdict.pdf",
-            "figures/renewal_cage_sota_evidence_class.pdf",
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
             "figures/renewal_cage_sota_source_provenance.pdf",
             "figures/renewal_cage_sota_data_accession.pdf",
@@ -1567,6 +1565,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_inversion_identifiability_audit.pdf",
             "figures/renewal_cage_frontier_benchmark_horizon.pdf",
             "figures/renewal_cage_sota_signed_constraints.pdf",
+            "figures/renewal_cage_sota_evidence_class.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
