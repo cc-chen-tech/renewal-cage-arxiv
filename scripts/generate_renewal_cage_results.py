@@ -49,6 +49,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_diagnostic_map,
     gamma_exchange_temperature_scan,
     glassbench_timecode_curve_bridge,
+    glassbench_timecode_signature_support_gate,
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
@@ -3906,6 +3907,23 @@ def write_sota_glassbench_timecode_curve_bridge_csv(
     return rows
 
 
+def write_sota_glassbench_timecode_signature_support_csv(
+    path: Path,
+    timecode_rows: list[dict[str, float | str]],
+    bridge_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Score real GlassBench time-code curves against dynamical glass signatures."""
+
+    rows = glassbench_timecode_signature_support_gate(
+        support_id="glassbench_ka2d_timecode_signature_support",
+        timecode_rows=timecode_rows,
+        bridge_rows=bridge_rows,
+        anchor_wave_number=1.1,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -7704,6 +7722,63 @@ def write_sota_glassbench_timecode_curve_bridge_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_timecode_signature_support_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "real_curve_dynamic_signature_support_and_inversion_ready": "#2f855a",
+        "real_curve_dynamic_signature_support_preinversion": "#b7791f",
+        "timecode_curve_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["signature_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        supported = int(float(row["supported_dynamical_signature_count"]))
+        msd_growth = float(row["msd_growth_factor"])
+        fs_decay = float(row["self_intermediate_decay"])
+        ngp_recovery = float(row["ngp_late_recovery_fraction"])
+        chi4_recovery = float(row["chi4_late_recovery_fraction"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="360" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">supported={supported}/4; real curve={int(float(row["real_time_observable_curve_ready"]))}; PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">MSD growth={msd_growth:.3g}; Fs decay={fs_decay:.3g}; alpha crossed={int(float(row["alpha_threshold_crossed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">NGP peak t={float(row["ngp_peak_time"]):.4g}, recovery={ngp_recovery:.2f}; chi4 peak t={float(row["chi4_peak_time"]):.4g}, recovery={chi4_recovery:.2f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 75}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench time-code signature support</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Real KA2D time-code curves are scored for dynamical signatures before any persistence/exchange inversion is claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">signature stage</text>
+  <text x="{left + 515}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">real-curve dynamical support</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9684,6 +9759,15 @@ def main() -> None:
     write_sota_glassbench_timecode_curve_bridge_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.svg",
         glassbench_timecode_curve_bridge_rows,
+    )
+    glassbench_timecode_signature_support_rows = write_sota_glassbench_timecode_signature_support_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.csv",
+        glassbench_ka2d_timecode_semantics_rows,
+        glassbench_timecode_curve_bridge_rows,
+    )
+    write_sota_glassbench_timecode_signature_support_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.svg",
+        glassbench_timecode_signature_support_rows,
     )
     glassbench_trajectory_npz_ensemble_horizon_rows = write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv",

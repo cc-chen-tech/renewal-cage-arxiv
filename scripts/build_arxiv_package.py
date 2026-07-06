@@ -3397,6 +3397,86 @@ def write_sota_glassbench_timecode_curve_bridge_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_timecode_signature_support_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench time-code signature support")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real KA2D time-code curves are scored for dynamical signatures before persistence/exchange inversion is claimed.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "real_curve_dynamic_signature_support_and_inversion_ready": colors.HexColor("#2f855a"),
+        "real_curve_dynamic_signature_support_preinversion": colors.HexColor("#b7791f"),
+        "timecode_curve_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "signature stage")
+    c.drawString(left + 360, top + 24, "real-curve dynamical support")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["signature_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 244, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:43])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 360,
+            y,
+            "supported={}/4; real curve={}; PE inversion={}; blocker={}".format(
+                int(float(row["supported_dynamical_signature_count"])),
+                int(float(row["real_time_observable_curve_ready"])),
+                int(float(row["real_pe_inversion_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 360,
+            y - 14,
+            "MSD growth={:.3g}; Fs decay={:.3g}; alpha crossed={}".format(
+                float(row["msd_growth_factor"]),
+                float(row["self_intermediate_decay"]),
+                int(float(row["alpha_threshold_crossed"])),
+            ),
+        )
+        c.drawString(
+            left + 360,
+            y - 27,
+            "NGP peak t={:.4g}, recovery={:.2f}; chi4 peak t={:.4g}, recovery={:.2f}".format(
+                float(row["ngp_peak_time"]),
+                float(row["ngp_late_recovery_fraction"]),
+                float(row["chi4_peak_time"]),
+                float(row["chi4_late_recovery_fraction"]),
+            ),
+        )
+        c.drawString(left + 360, y - 40, f'next={row["next_required_action"][:66]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The score supports dynamical glass signatures only; thermodynamic glass-transition claims remain disallowed.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4944,6 +5024,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_timecode_curve_bridge_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.pdf"
     )
+    sota_glassbench_timecode_signature_support_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -5068,6 +5151,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_timecode_curve_bridge_pdf(
         sota_glassbench_timecode_curve_bridge_pdf
+    )
+    write_sota_glassbench_timecode_signature_support_pdf(
+        sota_glassbench_timecode_signature_support_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5231,6 +5317,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_timecode_curve_bridge_pdf,
             "figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf",
+        )
+        archive.write(
+            sota_glassbench_timecode_signature_support_pdf,
+            "figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

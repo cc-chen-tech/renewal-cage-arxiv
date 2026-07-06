@@ -1446,6 +1446,27 @@ GlassBench fit or any thermodynamic transition.
   window; the \(T=0.30\) row remains blocked by sparse time-code coverage.}
 \end{figure}
 
+Even before parameter inversion, the same real curve can be used as a
+model-independent SOTA signature check. The \(T=0.23\) GlassBench row supports
+four dynamical signatures on the corrected physical-time grid: MSD grows by
+about \(3.4\times 10^2\), the anchor \(F_s(k=1.1,t)\) decays substantially,
+the two-dimensional NGP has a transient peak followed by partial recovery, and
+the overlap-\(\chi_4\) proxy also peaks and partially relaxes. These are the
+same qualitative dynamical signatures targeted by the renewal diagnostic
+theory. The row is still marked pre-inversion because \(F_s(k=1.1,t)\) has not
+crossed \(e^{-1}\), and the gate again carries
+\texttt{thermodynamic\_claim\_allowed=0}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf}
+  \caption{GlassBench time-code signature support. The corrected \(T=0.23\)
+  curve supports MSD growth, self-intermediate-scattering decay, a transient
+  NGP peak, and a transient overlap-\(\chi_4\) proxy peak, while remaining
+  blocked from real persistence/exchange inversion by the missing alpha
+  threshold crossing.}
+\end{figure}
+
 \begin{figure}[p]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf}

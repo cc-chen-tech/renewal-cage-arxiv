@@ -132,6 +132,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
+    glassbench_timecode_signature_support_gate,
     glassbench_timecode_curve_bridge,
     sota_glassbench_ka2d_timecode_semantics_gate,
     sota_glassbench_observable_coverage_audit_gate,
@@ -258,6 +259,77 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["lag_count"]), 2.0)
         self.assertGreater(float(row["latest_lag_time_over_tau_alpha"]), 1.0)
         self.assertGreater(float(row["latest_self_intermediate_scattering_anchor"]), math.exp(-1.0))
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_timecode_signature_support_scores_real_dynamic_signatures(self):
+        timecode_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc05",
+                "lag_time": 0.1,
+                "timecode_curve_ready": 1.0,
+                "msd": 0.003,
+                "ngp_2d": 0.01,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.999;0.998;0.996",
+                "chi4_overlap_replica": 0.05,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc35",
+                "lag_time": 142587.0,
+                "timecode_curve_ready": 1.0,
+                "msd": 0.15,
+                "ngp_2d": 5.2,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.98;0.96;0.93",
+                "chi4_overlap_replica": 5.7,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "timecode_curve_ready": 1.0,
+                "msd": 1.2,
+                "ngp_2d": 1.9,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.88;0.76;0.64",
+                "chi4_overlap_replica": 3.2,
+            },
+        ]
+        bridge_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+
+        row = glassbench_timecode_signature_support_gate(
+            support_id="glassbench_signature_support",
+            timecode_rows=timecode_rows,
+            bridge_rows=bridge_rows,
+            anchor_wave_number=1.1,
+        )[0]
+
+        self.assertEqual(row["signature_stage"], "real_curve_dynamic_signature_support_preinversion")
+        self.assertEqual(float(row["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["msd_growth_signature"]), 1.0)
+        self.assertEqual(float(row["self_intermediate_decay_signature"]), 1.0)
+        self.assertEqual(float(row["transient_ngp_peak_signature"]), 1.0)
+        self.assertEqual(float(row["transient_chi4_peak_signature"]), 1.0)
+        self.assertEqual(float(row["alpha_threshold_crossed"]), 0.0)
+        self.assertGreaterEqual(float(row["supported_dynamical_signature_count"]), 4.0)
+        self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_langevin_bare_diffusion_and_ou_cage_follow_einstein_and_equipartition(self):

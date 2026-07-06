@@ -5631,6 +5631,185 @@ def glassbench_timecode_curve_bridge(
     return out
 
 
+def glassbench_timecode_signature_support_gate(
+    *,
+    support_id: str,
+    timecode_rows: Sequence[dict[str, object]],
+    bridge_rows: Sequence[dict[str, object]],
+    anchor_wave_number: float,
+    alpha_threshold: float = math.exp(-1.0),
+    min_msd_growth_factor: float = 10.0,
+    min_fs_decay: float = 0.05,
+    min_peak_to_initial_factor: float = 3.0,
+    min_late_recovery_fraction: float = 0.1,
+) -> list[dict[str, float | str]]:
+    """Score real GlassBench time-code curves against dynamical glass signatures."""
+
+    if not support_id:
+        raise ValueError("support_id must be nonempty")
+    if not timecode_rows:
+        raise ValueError("timecode_rows must be nonempty")
+    if not bridge_rows:
+        raise ValueError("bridge_rows must be nonempty")
+    for name, value in {
+        "anchor_wave_number": anchor_wave_number,
+        "alpha_threshold": alpha_threshold,
+        "min_msd_growth_factor": min_msd_growth_factor,
+        "min_fs_decay": min_fs_decay,
+        "min_peak_to_initial_factor": min_peak_to_initial_factor,
+        "min_late_recovery_fraction": min_late_recovery_fraction,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if alpha_threshold >= 1.0:
+        raise ValueError("alpha_threshold must be below one")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in timecode_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+    bridge_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in bridge_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("lag_time", 0.0)))
+        bridge = bridge_by_key.get((system_id, temperature), {})
+        real_curve_ready = (
+            bool(sorted_group)
+            and all(float(row.get("timecode_curve_ready", 0.0)) == 1.0 for row in sorted_group)
+            and float(bridge.get("real_time_observable_curve_ready", 0.0)) == 1.0
+        )
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        if not real_curve_ready:
+            blocker = str(bridge.get("primary_blocker", sorted_group[0].get("primary_blocker", "timecode_curve_ready")))
+            out.append(
+                {
+                    "support_id": support_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_paths": ";".join(source_paths) if source_paths else "none",
+                    "lag_count": float(len(sorted_group)),
+                    "real_time_observable_curve_ready": 0.0,
+                    "real_pe_inversion_ready": float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0),
+                    "msd_growth_factor": 0.0,
+                    "msd_growth_signature": 0.0,
+                    "self_intermediate_decay": 0.0,
+                    "self_intermediate_decay_signature": 0.0,
+                    "ngp_peak_time": 0.0,
+                    "ngp_peak_value": 0.0,
+                    "ngp_late_recovery_fraction": 0.0,
+                    "transient_ngp_peak_signature": 0.0,
+                    "chi4_peak_time": 0.0,
+                    "chi4_peak_value": 0.0,
+                    "chi4_late_recovery_fraction": 0.0,
+                    "transient_chi4_peak_signature": 0.0,
+                    "latest_self_intermediate_scattering_anchor": 0.0,
+                    "alpha_threshold_crossed": 0.0,
+                    "supported_dynamical_signature_count": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": "complete_timecode_curve_before_signature_scoring",
+                    "signature_stage": "timecode_curve_upstream_incomplete",
+                }
+            )
+            continue
+
+        lag_times = np.asarray([float(row["lag_time"]) for row in sorted_group], dtype=float)
+        msd = np.asarray([float(row["msd"]) for row in sorted_group], dtype=float)
+        ngp = np.asarray([float(row["ngp_2d"]) for row in sorted_group], dtype=float)
+        chi4 = np.asarray([float(row["chi4_overlap_replica"]) for row in sorted_group], dtype=float)
+        fs_anchor: list[float] = []
+        for row in sorted_group:
+            wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
+            fs_values = _parse_semicolon_float_values(
+                row["self_intermediate_scattering_by_k"],
+                name="self_intermediate_scattering_by_k",
+            )
+            if len(wave_numbers) != len(fs_values):
+                raise ValueError("GlassBench wave_numbers and Fs lengths must match")
+            lookup = {float(wave): float(value) for wave, value in zip(wave_numbers, fs_values)}
+            if float(anchor_wave_number) not in lookup:
+                raise ValueError("anchor_wave_number must be present in every time-code row")
+            fs_anchor.append(lookup[float(anchor_wave_number)])
+        fs = np.asarray(fs_anchor, dtype=float)
+        if np.any(msd <= 0.0) or np.any(fs <= 0.0) or np.any(chi4 < 0.0) or np.any(ngp < 0.0):
+            raise ValueError("GlassBench signature observables must be nonnegative with positive MSD and Fs")
+
+        msd_growth_factor = float(msd[-1] / msd[0])
+        fs_decay = float(fs[0] - fs[-1])
+        ngp_peak_index = int(np.argmax(ngp))
+        ngp_peak_value = float(ngp[ngp_peak_index])
+        ngp_late_recovery = (
+            (ngp_peak_value - float(ngp[-1])) / ngp_peak_value if ngp_peak_value > 0.0 else 0.0
+        )
+        chi4_peak_index = int(np.argmax(chi4))
+        chi4_peak_value = float(chi4[chi4_peak_index])
+        chi4_late_recovery = (
+            (chi4_peak_value - float(chi4[-1])) / chi4_peak_value if chi4_peak_value > 0.0 else 0.0
+        )
+        msd_signature = msd_growth_factor >= min_msd_growth_factor
+        fs_signature = fs_decay >= min_fs_decay
+        ngp_signature = (
+            ngp_peak_index < len(ngp) - 1
+            and ngp_peak_value >= min_peak_to_initial_factor * max(float(ngp[0]), 1e-15)
+            and ngp_late_recovery >= min_late_recovery_fraction
+        )
+        chi4_signature = (
+            chi4_peak_index < len(chi4) - 1
+            and chi4_peak_value >= min_peak_to_initial_factor * max(float(chi4[0]), 1e-15)
+            and chi4_late_recovery >= min_late_recovery_fraction
+        )
+        alpha_crossed = float(fs[-1] <= alpha_threshold)
+        supported_count = float(sum([msd_signature, fs_signature, ngp_signature, chi4_signature]))
+        real_pe_ready = float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0)
+        if real_pe_ready == 1.0:
+            stage = "real_curve_dynamic_signature_support_and_inversion_ready"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        else:
+            stage = "real_curve_dynamic_signature_support_preinversion"
+            blocker = str(bridge.get("primary_blocker", "persistence_exchange_inversion"))
+            next_action = str(bridge.get("next_required_action", "extend_real_timecode_curve"))
+
+        out.append(
+            {
+                "support_id": support_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "lag_count": float(len(sorted_group)),
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": real_pe_ready,
+                "msd_growth_factor": msd_growth_factor,
+                "msd_growth_signature": float(msd_signature),
+                "self_intermediate_decay": fs_decay,
+                "self_intermediate_decay_signature": float(fs_signature),
+                "ngp_peak_time": float(lag_times[ngp_peak_index]),
+                "ngp_peak_value": ngp_peak_value,
+                "ngp_late_recovery_fraction": float(ngp_late_recovery),
+                "transient_ngp_peak_signature": float(ngp_signature),
+                "chi4_peak_time": float(lag_times[chi4_peak_index]),
+                "chi4_peak_value": chi4_peak_value,
+                "chi4_late_recovery_fraction": float(chi4_late_recovery),
+                "transient_chi4_peak_signature": float(chi4_signature),
+                "latest_self_intermediate_scattering_anchor": float(fs[-1]),
+                "alpha_threshold_crossed": alpha_crossed,
+                "supported_dynamical_signature_count": supported_count,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "signature_stage": stage,
+            }
+        )
+    return out
+
+
 def sota_glassbench_visible_member_ensemble_audit_gate(
     *,
     audit_id: str,
