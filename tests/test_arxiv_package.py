@@ -1120,6 +1120,35 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
 
+    def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
+        path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_signature = {row["signature"]: row for row in rows}
+        ngp = by_signature["transient_ngp_peak"]
+        self.assertEqual(ngp["alignment_stage"], "real_curve_supported")
+        self.assertEqual(float(ngp["model_support"]), 1.0)
+        self.assertEqual(float(ngp["literature_qualitative_support"]), 1.0)
+        self.assertEqual(float(ngp["real_glassbench_support"]), 1.0)
+
+        alpha = by_signature["self_intermediate_alpha"]
+        self.assertEqual(alpha["alignment_stage"], "real_curve_supported_pre_alpha_threshold")
+        self.assertEqual(float(alpha["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(alpha["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(alpha["primary_blocker"], "alpha_threshold_crossing")
+
+        pe = by_signature["persistence_exchange_decoupling"]
+        self.assertEqual(pe["alignment_stage"], "model_literature_supported_real_inversion_blocked")
+        self.assertEqual(float(pe["real_glassbench_support"]), 0.0)
+        self.assertEqual(pe["primary_blocker"], "alpha_threshold_crossing")
+
+        thermo = by_signature["thermodynamic_transition"]
+        self.assertEqual(thermo["alignment_stage"], "scope_boundary_not_explained")
+        self.assertEqual(float(thermo["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(thermo["real_glassbench_support"]), 0.0)
+
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
         self.assertTrue(path.exists())
@@ -1804,6 +1833,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf", names)
@@ -1876,6 +1906,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)

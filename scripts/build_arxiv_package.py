@@ -3477,6 +3477,71 @@ def write_sota_glassbench_timecode_signature_support_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA dynamic-signature alignment")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Model diagnostics, literature claims, and current GlassBench evidence are aligned without promoting thermodynamic or fit claims.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 45
+    colors_by_stage = {
+        "real_curve_supported": colors.HexColor("#2f855a"),
+        "real_curve_supported_pre_alpha_threshold": colors.HexColor("#b7791f"),
+        "real_proxy_supported_spatial_boundary": colors.HexColor("#805ad5"),
+        "model_literature_supported_real_inversion_blocked": colors.HexColor("#c05621"),
+        "scope_boundary_not_explained": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "signature")
+    c.drawString(left + 170, top + 18, "alignment stage")
+    c.drawString(left + 420, top + 18, "support and blocker")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["alignment_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#2b6cb0"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.8)
+        c.drawString(left, y, row["signature"].replace("_", " ")[:30])
+        c.setFillColor(color)
+        c.rect(left + 170, y - 12, 232, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 178, y - 3, stage.replace("_", " ")[:40])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 420,
+            y,
+            "model={:.1g}; literature={}; real={}; inversion={}; thermo={}".format(
+                float(row["model_support"]),
+                int(float(row["literature_qualitative_support"])),
+                int(float(row["real_glassbench_support"])),
+                int(float(row["real_quantitative_inversion_ready"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(left + 420, y - 14, f'phenomenon={row["phenomenon"].replace("_", " ")[:64]}')
+        c.drawString(left + 420, y - 27, f'blocker={row["primary_blocker"].replace("_", " ")[:64]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Rows with real support are dynamical signatures only; persistence/exchange inversion and thermodynamic claims remain separately gated.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5027,6 +5092,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_timecode_signature_support_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.pdf"
     )
+    sota_dynamic_signature_alignment_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -5154,6 +5222,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_timecode_signature_support_pdf(
         sota_glassbench_timecode_signature_support_pdf
+    )
+    write_sota_dynamic_signature_alignment_pdf(
+        sota_dynamic_signature_alignment_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5321,6 +5392,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_timecode_signature_support_pdf,
             "figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf",
+        )
+        archive.write(
+            sota_dynamic_signature_alignment_pdf,
+            "figures/renewal_cage_sota_dynamic_signature_alignment.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

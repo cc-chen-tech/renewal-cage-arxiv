@@ -38,6 +38,7 @@ from renewal_cage import (  # noqa: E402
     glass_phenomenon_audit,
     glass_signature_phase_diagram,
     dynamic_heterogeneity_benchmark_consistency,
+    dynamic_signature_alignment_ledger,
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
@@ -331,6 +332,80 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreaterEqual(float(row["supported_dynamical_signature_count"]), 4.0)
         self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
+        claim_rows = [
+            {
+                "phenomenon": "cage_plateau_transient_ngp_van_hove_tail",
+                "claim_alignment": "supported",
+                "model_support_level": "derived",
+                "primary_blocker": "uncertainty_columns",
+            },
+            {
+                "phenomenon": "self_intermediate_scattering_alpha_relaxation",
+                "claim_alignment": "supported",
+                "model_support_level": "derived",
+                "primary_blocker": "uncertainty_columns",
+            },
+            {
+                "phenomenon": "persistence_exchange_decoupling",
+                "claim_alignment": "supported",
+                "model_support_level": "derived",
+                "primary_blocker": "machine_readable_joint_curves",
+            },
+            {
+                "phenomenon": "chi4_peak_and_dynamic_length_growth",
+                "claim_alignment": "partial",
+                "model_support_level": "effective_closure",
+                "primary_blocker": "shared_transport_and_four_point_grid",
+            },
+            {
+                "phenomenon": "configurational_entropy_and_ideal_glass_scope",
+                "claim_alignment": "scope_boundary",
+                "model_support_level": "closure_only",
+                "primary_blocker": "thermodynamic_input_law",
+            },
+        ]
+        literature_rows = [
+            {"benchmark_source": "kob1995vanhove", "qualitative_comparison_ready": 1.0},
+            {"benchmark_source": "kob1995intermediate", "qualitative_comparison_ready": 1.0},
+            {"benchmark_source": "hedges2007persistence", "qualitative_comparison_ready": 1.0},
+            {"benchmark_source": "lacevic2003fourpoint", "qualitative_comparison_ready": 1.0},
+        ]
+        glassbench_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "msd_growth_signature": 1.0,
+                "self_intermediate_decay_signature": 1.0,
+                "transient_ngp_peak_signature": 1.0,
+                "transient_chi4_peak_signature": 1.0,
+                "alpha_threshold_crossed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+
+        rows = dynamic_signature_alignment_ledger(
+            alignment_id="sota_dynamic_signature_alignment",
+            claim_rows=claim_rows,
+            literature_rows=literature_rows,
+            glassbench_signature_rows=glassbench_rows,
+        )
+        by_signature = {row["signature"]: row for row in rows}
+
+        self.assertEqual(by_signature["transient_ngp_peak"]["alignment_stage"], "real_curve_supported")
+        self.assertEqual(float(by_signature["transient_ngp_peak"]["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(by_signature["transient_ngp_peak"]["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(
+            by_signature["self_intermediate_alpha"]["alignment_stage"],
+            "real_curve_supported_pre_alpha_threshold",
+        )
+        self.assertEqual(by_signature["persistence_exchange_decoupling"]["alignment_stage"], "model_literature_supported_real_inversion_blocked")
+        self.assertEqual(by_signature["persistence_exchange_decoupling"]["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(by_signature["thermodynamic_transition"]["alignment_stage"], "scope_boundary_not_explained")
+        self.assertEqual(float(by_signature["thermodynamic_transition"]["real_glassbench_support"]), 0.0)
 
     def test_langevin_bare_diffusion_and_ou_cage_follow_einstein_and_equipartition(self):
         landscape = LangevinCageLandscapeParams(

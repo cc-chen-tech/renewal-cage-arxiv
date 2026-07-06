@@ -38,6 +38,7 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     cross_observable_prediction_ledger,
+    dynamic_signature_alignment_ledger,
     dynamic_heterogeneity_benchmark_consistency,
     fragility_benchmark_consistency,
     frontier_benchmark_horizon,
@@ -3924,6 +3925,25 @@ def write_sota_glassbench_timecode_signature_support_csv(
     return rows
 
 
+def write_sota_dynamic_signature_alignment_csv(
+    path: Path,
+    *,
+    claim_alignment_rows: list[dict[str, float | str]],
+    literature_readiness_rows: list[dict[str, float | str]],
+    glassbench_signature_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Align model support, SOTA literature, and real GlassBench signature evidence."""
+
+    rows = dynamic_signature_alignment_ledger(
+        alignment_id="sota_dynamic_signature_alignment",
+        claim_rows=claim_alignment_rows,
+        literature_rows=literature_readiness_rows,
+        glassbench_signature_rows=glassbench_signature_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -7779,6 +7799,63 @@ def write_sota_glassbench_timecode_signature_support_svg(
     path.write_text(svg)
 
 
+def write_sota_dynamic_signature_alignment_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 610
+    left, top = 75, 118
+    row_h = 70
+    colors = {
+        "real_curve_supported": "#2f855a",
+        "real_curve_supported_pre_alpha_threshold": "#b7791f",
+        "real_proxy_supported_spatial_boundary": "#805ad5",
+        "model_literature_supported_real_inversion_blocked": "#c05621",
+        "scope_boundary_not_explained": "#4a5568",
+        "model_supported_literature_or_real_data_pending": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["alignment_stage"])
+        color = colors.get(stage, "#4a5568")
+        signature = str(row["signature"]).replace("_", " ")
+        model = int(float(row["model_support"]) > 0.0)
+        literature = int(float(row["literature_qualitative_support"]))
+        real = int(float(row["real_glassbench_support"]))
+        inversion = int(float(row["real_quantitative_inversion_ready"]))
+        thermo = int(float(row["thermodynamic_claim_allowed"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{signature[:34]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 255}" y="{y - 6}" width="340" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 265}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:49]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">model={model}; literature={literature}; real curve={real}; real inversion={inversion}; thermo={thermo}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">phenomenon={str(row["phenomenon"]).replace("_", " ")[:66]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 55}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA dynamic-signature alignment</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Model diagnostics, literature-level SOTA claims, and current real GlassBench evidence are aligned without promoting thermodynamic or fit claims.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">signature</text>
+  <text x="{left + 255}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">alignment stage</text>
+  <text x="{left + 620}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">support and blocker</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9938,6 +10015,16 @@ def main() -> None:
     write_literature_inversion_readiness_svg(
         FIGURE_DIR / "renewal_cage_literature_inversion_readiness.svg",
         literature_readiness_rows,
+    )
+    dynamic_signature_alignment_rows = write_sota_dynamic_signature_alignment_csv(
+        DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv",
+        claim_alignment_rows=sota_claim_alignment_rows,
+        literature_readiness_rows=literature_readiness_rows,
+        glassbench_signature_rows=glassbench_timecode_signature_support_rows,
+    )
+    write_sota_dynamic_signature_alignment_svg(
+        FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.svg",
+        dynamic_signature_alignment_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

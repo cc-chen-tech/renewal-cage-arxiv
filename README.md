@@ -284,6 +284,13 @@ anchor-`F_s` decay, a transient NGP peak with partial recovery, and a transient
 overlap-`chi4` proxy peak with partial recovery. It still records
 `thermodynamic_claim_allowed=0` and keeps the real persistence/exchange
 inversion blocked by the missing alpha-threshold crossing.
+The SOTA dynamic-signature alignment ledger then joins model diagnostics,
+literature-level benchmarks, and the current GlassBench real curve. It marks
+MSD growth/cage escape and transient NGP as model+literature+real-curve
+supported, marks self-intermediate scattering as real-curve supported but still
+pre-alpha-threshold, marks `chi4` as a proxy spatial-heterogeneity alignment,
+keeps persistence/exchange decoupling blocked until real inversion, and leaves
+thermodynamic transition as a scope boundary.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
@@ -442,6 +449,7 @@ figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.svg
 figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.svg
 figures/renewal_cage_sota_glassbench_timecode_curve_bridge.svg
 figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
+figures/renewal_cage_sota_dynamic_signature_alignment.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
 figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg
 figures/renewal_cage_sota_glassbench_observable_coverage_audit.svg
@@ -530,6 +538,7 @@ data/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.csv
 data/renewal_cage_sota_glassbench_ka2d_timecode_semantics.csv
 data/renewal_cage_sota_glassbench_timecode_curve_bridge.csv
 data/renewal_cage_sota_glassbench_timecode_signature_support.csv
+data/renewal_cage_sota_dynamic_signature_alignment.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
 data/renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv
 data/renewal_cage_sota_glassbench_observable_coverage_audit.csv
@@ -637,6 +646,7 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable
 paper/figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
+paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf
 paper/figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf

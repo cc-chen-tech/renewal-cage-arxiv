@@ -5810,6 +5810,146 @@ def glassbench_timecode_signature_support_gate(
     return out
 
 
+def dynamic_signature_alignment_ledger(
+    *,
+    alignment_id: str,
+    claim_rows: Sequence[dict[str, object]],
+    literature_rows: Sequence[dict[str, object]],
+    glassbench_signature_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Align model diagnostics, literature claims, and real GlassBench signature support."""
+
+    if not alignment_id:
+        raise ValueError("alignment_id must be nonempty")
+    if not claim_rows:
+        raise ValueError("claim_rows must be nonempty")
+    if not literature_rows:
+        raise ValueError("literature_rows must be nonempty")
+    if not glassbench_signature_rows:
+        raise ValueError("glassbench_signature_rows must be nonempty")
+
+    claim_by_phenomenon = {str(row.get("phenomenon", "")): row for row in claim_rows}
+    literature_sources = {str(row.get("benchmark_source", "")) for row in literature_rows}
+    real_rows = [
+        row
+        for row in glassbench_signature_rows
+        if float(row.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+    ]
+    real = real_rows[0] if real_rows else {}
+    real_ready = float(real.get("real_time_observable_curve_ready", 0.0) or 0.0)
+    real_inversion_ready = float(real.get("real_pe_inversion_ready", 0.0) or 0.0)
+    real_blocker = str(real.get("primary_blocker", "real_glassbench_signature_support"))
+
+    def claim_support(phenomenon: str) -> tuple[float, str, str]:
+        row = claim_by_phenomenon.get(phenomenon, {})
+        alignment = str(row.get("claim_alignment", "missing"))
+        support_level = str(row.get("model_support_level", "missing"))
+        model_support = 1.0 if alignment == "supported" else 0.5 if alignment == "partial" else 0.0
+        blocker = str(row.get("primary_blocker", "claim_alignment"))
+        return model_support, support_level, blocker
+
+    def literature_support(required_sources: Sequence[str]) -> float:
+        return float(all(source in literature_sources for source in required_sources))
+
+    specs = [
+        {
+            "signature": "msd_growth_cage_escape",
+            "phenomenon": "cage_plateau_transient_ngp_van_hove_tail",
+            "sources": ["kob1995vanhove"],
+            "real_support": float(real.get("msd_growth_signature", 0.0) or 0.0),
+            "stage_if_real": "real_curve_supported",
+            "blocker": "none",
+        },
+        {
+            "signature": "self_intermediate_alpha",
+            "phenomenon": "self_intermediate_scattering_alpha_relaxation",
+            "sources": ["kob1995intermediate"],
+            "real_support": float(real.get("self_intermediate_decay_signature", 0.0) or 0.0),
+            "stage_if_real": "real_curve_supported_pre_alpha_threshold"
+            if float(real.get("alpha_threshold_crossed", 0.0) or 0.0) == 0.0
+            else "real_curve_supported",
+            "blocker": real_blocker if float(real.get("alpha_threshold_crossed", 0.0) or 0.0) == 0.0 else "none",
+        },
+        {
+            "signature": "transient_ngp_peak",
+            "phenomenon": "cage_plateau_transient_ngp_van_hove_tail",
+            "sources": ["kob1995vanhove"],
+            "real_support": float(real.get("transient_ngp_peak_signature", 0.0) or 0.0),
+            "stage_if_real": "real_curve_supported",
+            "blocker": "none",
+        },
+        {
+            "signature": "chi4_dynamic_heterogeneity_proxy",
+            "phenomenon": "chi4_peak_and_dynamic_length_growth",
+            "sources": ["lacevic2003fourpoint"],
+            "real_support": float(real.get("transient_chi4_peak_signature", 0.0) or 0.0),
+            "stage_if_real": "real_proxy_supported_spatial_boundary",
+            "blocker": "direct_four_point_function_and_dynamic_length",
+        },
+        {
+            "signature": "persistence_exchange_decoupling",
+            "phenomenon": "persistence_exchange_decoupling",
+            "sources": ["hedges2007persistence"],
+            "real_support": 0.0,
+            "stage_if_real": "model_literature_supported_real_inversion_blocked",
+            "blocker": real_blocker,
+        },
+        {
+            "signature": "thermodynamic_transition",
+            "phenomenon": "configurational_entropy_and_ideal_glass_scope",
+            "sources": [],
+            "real_support": 0.0,
+            "stage_if_real": "scope_boundary_not_explained",
+            "blocker": "thermodynamic_input_law",
+        },
+    ]
+
+    rows: list[dict[str, float | str]] = []
+    for spec in specs:
+        signature = str(spec["signature"])
+        phenomenon = str(spec["phenomenon"])
+        model_support, model_support_level, claim_blocker = claim_support(phenomenon)
+        lit_support = literature_support(spec["sources"])  # type: ignore[arg-type]
+        real_support = float(spec["real_support"])
+        if signature == "thermodynamic_transition":
+            stage = "scope_boundary_not_explained"
+            blocker = str(spec["blocker"])
+        elif real_support == 1.0:
+            stage = str(spec["stage_if_real"])
+            blocker = str(spec["blocker"])
+        elif model_support > 0.0 and lit_support == 1.0:
+            stage = str(spec["stage_if_real"])
+            blocker = str(spec["blocker"])
+        elif model_support > 0.0:
+            stage = "model_supported_literature_or_real_data_pending"
+            blocker = claim_blocker
+        else:
+            stage = "unsupported_or_scope_boundary"
+            blocker = claim_blocker
+        if blocker == "none" and real_inversion_ready == 0.0 and signature in {
+            "self_intermediate_alpha",
+            "persistence_exchange_decoupling",
+        }:
+            blocker = real_blocker
+        rows.append(
+            {
+                "alignment_id": alignment_id,
+                "signature": signature,
+                "phenomenon": phenomenon,
+                "model_support": float(model_support),
+                "model_support_level": model_support_level,
+                "literature_qualitative_support": lit_support,
+                "real_glassbench_support": real_support,
+                "real_time_observable_curve_ready": real_ready,
+                "real_quantitative_inversion_ready": real_inversion_ready,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "alignment_stage": stage,
+            }
+        )
+    return rows
+
+
 def sota_glassbench_visible_member_ensemble_audit_gate(
     *,
     audit_id: str,
