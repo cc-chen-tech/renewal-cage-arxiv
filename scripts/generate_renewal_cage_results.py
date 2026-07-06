@@ -7577,10 +7577,10 @@ def write_sota_glassbench_ka2d_timecode_semantics_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    width, height = 1160, 470
+    width, height = 1160, 790
     left, top = 75, 118
-    row_h = 70
-    display_rows = rows[:4]
+    row_h = 66
+    display_rows = rows
     colors = {
         "physical_timecode_semantics_ready_sparse_coverage": "#2b6cb0",
         "physical_timecode_semantics_ready_member_uncertainty_short": "#b7791f",
@@ -7625,7 +7625,8 @@ def write_sota_glassbench_ka2d_timecode_semantics_svg(
   <text x="{left + 150}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">semantic stage</text>
   <text x="{left + 530}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">corrected fixed-time observables</text>
   {"".join(marks)}
-  <rect x="75" y="420" width="14" height="14" fill="#2b6cb0" /><text x="96" y="432" font-family="Arial, sans-serif" font-size="12">physical lag time is known for observed tc codes, but full time-code coverage is still missing</text>
+  <rect x="75" y="742" width="14" height="14" fill="#2f855a" /><text x="96" y="754" font-family="Arial, sans-serif" font-size="12">full observed time-code curve ready for T=0.23</text>
+  <rect x="430" y="742" width="14" height="14" fill="#2b6cb0" /><text x="451" y="754" font-family="Arial, sans-serif" font-size="12">physical lag time known, but time-code coverage remains sparse</text>
 </svg>
 """
     path.write_text(svg)

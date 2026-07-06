@@ -1382,8 +1382,12 @@ self-intermediate scattering at several wave numbers, and overlap-\(\chi_4\).
 A subsequent semantic audit uses the official KA2D trajectory README to correct
 the interpretation: the leading \texttt{positions} axis is not a time axis but
 the 20 isoconfigurational replicas, while the physical lag time is encoded by
-the file-name \texttt{tc} code. The manuscript still keeps real inversion
-disabled until enough members are extracted across all official time codes.
+the file-name \texttt{tc} code. In the current 8 MB prefix cache,
+\(T=0.23\) now has all eight official time codes with at least four complete
+members per code, whereas \(T=0.30\) remains sparse at \texttt{tc01} only. The
+manuscript therefore promotes \(T=0.23\) to a physical-time observable curve
+ready for the next inversion gate, while still keeping real
+persistence/exchange fitting disabled until that protocol is run.
 
 \begin{figure}[p]
   \centering
@@ -1409,13 +1413,14 @@ disabled until enough members are extracted across all official time codes.
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf}
   \caption{GlassBench KA2D time-code semantic audit. The official trajectory
-  README maps \texttt{tc05}=0.1 and \texttt{tc10}=1.1 at \(T=0.23\), and
-  \texttt{tc01}=0.11 at \(T=0.30\) for the currently extracted prefix members,
-  and identifies the \texttt{positions} leading axis as isoconfigurational
-  replicas. This is a genuine physical-time correction, but it is still too
-  sparse for persistence/exchange inversion because the extracted prefix covers
-  only 2 of 8 official \(T=0.23\) time codes and 1 of 6 official \(T=0.30\)
-  time codes.}
+  README maps \texttt{tc} codes to physical lag times and identifies the
+  \texttt{positions} leading axis as isoconfigurational replicas. The current
+  prefix cache covers all eight official \(T=0.23\) time codes, including
+  \texttt{tc40}=1.5e6, with at least four complete members per code; the same
+  cache still covers only \texttt{tc01}=0.11 at \(T=0.30\). Thus the
+  GlassBench comparison has crossed from metadata-only evidence to a
+  one-temperature physical-time observable curve, but not yet to a completed
+  persistence/exchange inversion.}
 \end{figure}
 
 \begin{figure}[p]

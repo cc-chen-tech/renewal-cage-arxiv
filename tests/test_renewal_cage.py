@@ -16,6 +16,7 @@ from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
     FacilitatedExchangeLawParams,
     GammaExchangeParams,
+    LangevinCageLandscapeParams,
     TemperatureLawParams,
     alpha_relaxation_time,
     apparent_alpha_activation_energies,
@@ -65,6 +66,11 @@ from renewal_cage import (  # noqa: E402
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
     late_mechanism_selection,
+    kramers_escape_rate,
+    langevin_bare_diffusion,
+    langevin_cage_ou_parameters,
+    langevin_first_principles_bridge_audit,
+    langevin_to_persistence_exchange,
     minimal_barrier_requirements,
     MCTBetaParams,
     mct_beta_correlator,
@@ -192,6 +198,87 @@ class DelayedRenewalCageTests(unittest.TestCase):
         expected = params.renewal_rate * t**3 / (3.0 * params.renewal_delay**2)
 
         np.testing.assert_allclose(mean, expected, rtol=2e-4, atol=1e-16)
+
+    def test_langevin_bare_diffusion_and_ou_cage_follow_einstein_and_equipartition(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.8,
+            friction=4.0,
+            cage_curvature=10.0,
+            saddle_curvature=6.0,
+            barrier_height=3.2,
+            jump_length=1.5,
+        )
+
+        self.assertAlmostEqual(langevin_bare_diffusion(landscape), 0.2)
+        ou = langevin_cage_ou_parameters(landscape)
+
+        self.assertAlmostEqual(ou["cage_variance"], 0.08)
+        self.assertAlmostEqual(ou["cage_tau"], 0.4)
+
+    def test_kramers_escape_rate_has_overdamped_arrhenius_barrier_scaling(self):
+        fast = kramers_escape_rate(
+            temperature=1.0,
+            friction=2.0,
+            basin_curvature=8.0,
+            saddle_curvature=4.0,
+            barrier_height=2.0,
+        )
+        slow = kramers_escape_rate(
+            temperature=1.0,
+            friction=2.0,
+            basin_curvature=8.0,
+            saddle_curvature=4.0,
+            barrier_height=3.0,
+        )
+        expected_ratio = math.exp(1.0)
+
+        self.assertGreater(fast, slow)
+        self.assertAlmostEqual(fast / slow, expected_ratio)
+
+    def test_langevin_landscape_coarse_grains_to_persistence_exchange_parameters(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.7,
+            friction=3.0,
+            cage_curvature=7.0,
+            saddle_curvature=5.0,
+            barrier_height=2.4,
+            jump_length=1.2,
+            persistence_barrier_extra=1.4,
+            exchange_barrier_extra=0.2,
+            dimension=3,
+        )
+        params = langevin_to_persistence_exchange(landscape)
+
+        self.assertIsInstance(params, PersistenceExchangeParams)
+        self.assertAlmostEqual(params.cage_variance, landscape.temperature / landscape.cage_curvature)
+        self.assertAlmostEqual(params.cage_tau, landscape.friction / landscape.cage_curvature)
+        self.assertAlmostEqual(params.jump_variance, landscape.jump_length**2 / landscape.dimension)
+        self.assertGreater(params.persistence_mean, params.exchange_mean)
+        self.assertGreater(
+            persistence_exchange_diffusion_coefficient(params)
+            * persistence_exchange_alpha_relaxation_time(1.0, params, threshold=math.exp(-1.0)),
+            params.jump_variance,
+        )
+
+    def test_langevin_bridge_audit_marks_derived_effective_theory_and_remaining_assumptions(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.75,
+            friction=2.5,
+            cage_curvature=6.0,
+            saddle_curvature=4.0,
+            barrier_height=2.0,
+            jump_length=1.0,
+            persistence_barrier_extra=0.8,
+            exchange_barrier_extra=0.1,
+        )
+        row = langevin_first_principles_bridge_audit(landscape)
+
+        self.assertEqual(row["bridge_stage"], "langevin_kramers_to_renewal_effective_theory")
+        self.assertEqual(float(row["langevin_equation_specified"]), 1.0)
+        self.assertEqual(float(row["kramers_rates_derived"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_params_derived"]), 1.0)
+        self.assertEqual(float(row["full_many_body_first_principles_claim_allowed"]), 0.0)
+        self.assertEqual(row["remaining_assumption"], "metastable_basin_partition_and_barrier_inputs")
 
     def test_local_cage_variance_has_plateau(self):
         params = DelayedRenewalCageParams(

@@ -1027,7 +1027,7 @@ class ArxivPackageTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text())
         self.assertEqual(
             manifest["source"],
-            "remote_zip_ka2d_trajectory_readme_timecode_semantics_and_corrected_member_observables",
+            "remote_zip_8mb_prefix_ka2d_trajectory_readme_timecode_semantics_and_corrected_member_observables",
         )
         self.assertIn("isoconfigurational trajectories", manifest["axis_semantics_evidence"])
 
@@ -1041,12 +1041,27 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_023_tc05["physical_lag_time_ready"]), 1.0)
         self.assertEqual(float(ka2d_023_tc05["axis0_is_isoconfigurational_replica"]), 1.0)
         self.assertEqual(float(ka2d_023_tc05["frame_axis_is_physical_time"]), 0.0)
-        self.assertEqual(float(ka2d_023_tc05["member_count"]), 3.0)
-        self.assertEqual(float(ka2d_023_tc05["available_time_code_count"]), 2.0)
+        self.assertEqual(float(ka2d_023_tc05["member_count"]), 9.0)
+        self.assertEqual(float(ka2d_023_tc05["available_time_code_count"]), 8.0)
         self.assertEqual(float(ka2d_023_tc05["required_time_code_count"]), 8.0)
-        self.assertEqual(float(ka2d_023_tc05["timecode_curve_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023_tc05["timecode_curve_ready"]), 1.0)
         self.assertEqual(float(ka2d_023_tc05["sota_inversion_ready"]), 0.0)
-        self.assertEqual(ka2d_023_tc05["primary_blocker"], "sparse_time_code_coverage")
+        self.assertEqual(ka2d_023_tc05["primary_blocker"], "none")
+
+        ka2d_023_tc40 = by_key[("KA2D", "0.23", "tc40")]
+        self.assertEqual(float(ka2d_023_tc40["lag_time"]), 1500000.0)
+        self.assertGreater(float(ka2d_023_tc40["msd"]), float(ka2d_023_tc05["msd"]))
+        self.assertLess(
+            float(ka2d_023_tc40["self_intermediate_scattering"]),
+            float(ka2d_023_tc05["self_intermediate_scattering"]),
+        )
+
+        ka2d_030_tc01 = by_key[("KA2D", "0.30", "tc01")]
+        self.assertEqual(float(ka2d_030_tc01["member_count"]), 49.0)
+        self.assertEqual(float(ka2d_030_tc01["available_time_code_count"]), 1.0)
+        self.assertEqual(float(ka2d_030_tc01["required_time_code_count"]), 6.0)
+        self.assertEqual(float(ka2d_030_tc01["timecode_curve_ready"]), 0.0)
+        self.assertEqual(ka2d_030_tc01["primary_blocker"], "sparse_time_code_coverage")
 
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"

@@ -152,6 +152,25 @@ class PersistenceExchangeParams:
 
 
 @dataclass(frozen=True)
+class LangevinCageLandscapeParams:
+    """Overdamped Langevin landscape inputs for an effective renewal bridge.
+
+    This is a microscopic-parameter bridge for a local metastable basin and an
+    activated escape saddle. It does not derive the many-body landscape itself.
+    """
+
+    temperature: float
+    friction: float
+    cage_curvature: float
+    saddle_curvature: float
+    barrier_height: float
+    jump_length: float
+    persistence_barrier_extra: float = 0.0
+    exchange_barrier_extra: float = 0.0
+    dimension: int = 2
+
+
+@dataclass(frozen=True)
 class TranslationRotationExchangeParams:
     """Coupled translational and rotational persistence/exchange clocks.
 
@@ -252,6 +271,26 @@ def _validate_persistence_exchange(params: PersistenceExchangeParams) -> None:
             raise ValueError(f"{name} must be positive")
 
 
+def _validate_langevin_landscape(params: LangevinCageLandscapeParams) -> None:
+    for name in (
+        "temperature",
+        "friction",
+        "cage_curvature",
+        "saddle_curvature",
+        "barrier_height",
+        "jump_length",
+    ):
+        value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    for name in ("persistence_barrier_extra", "exchange_barrier_extra"):
+        value = getattr(params, name)
+        if value < 0.0:
+            raise ValueError(f"{name} must be nonnegative")
+    if int(params.dimension) != params.dimension or params.dimension <= 0:
+        raise ValueError("dimension must be a positive integer")
+
+
 def _validate_translation_rotation(params: TranslationRotationExchangeParams) -> None:
     for name in (
         "cage_variance",
@@ -292,6 +331,96 @@ def activated_barrier_temperature_law(barrier: ActivatedBarrierParams) -> Temper
     )
     _validate_temperature_law(law)
     return law
+
+
+def langevin_bare_diffusion(params: LangevinCageLandscapeParams) -> float:
+    """Einstein diffusion coefficient for an overdamped Langevin particle."""
+
+    _validate_langevin_landscape(params)
+    return params.temperature / params.friction
+
+
+def langevin_cage_ou_parameters(params: LangevinCageLandscapeParams) -> dict[str, float]:
+    """OU cage variance and relaxation time from equipartition and friction."""
+
+    _validate_langevin_landscape(params)
+    return {
+        "cage_variance": params.temperature / params.cage_curvature,
+        "cage_tau": params.friction / params.cage_curvature,
+    }
+
+
+def kramers_escape_rate(
+    *,
+    temperature: float,
+    friction: float,
+    basin_curvature: float,
+    saddle_curvature: float,
+    barrier_height: float,
+) -> float:
+    """Overdamped one-dimensional Kramers escape rate for a local barrier."""
+
+    for name, value in (
+        ("temperature", temperature),
+        ("friction", friction),
+        ("basin_curvature", basin_curvature),
+        ("saddle_curvature", saddle_curvature),
+        ("barrier_height", barrier_height),
+    ):
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    prefactor = math.sqrt(basin_curvature * saddle_curvature) / (2.0 * math.pi * friction)
+    return prefactor * math.exp(-barrier_height / temperature)
+
+
+def langevin_to_persistence_exchange(params: LangevinCageLandscapeParams) -> PersistenceExchangeParams:
+    """Coarse-grain a local Langevin barrier model to persistence/exchange parameters."""
+
+    _validate_langevin_landscape(params)
+    ou = langevin_cage_ou_parameters(params)
+    persistence_rate = kramers_escape_rate(
+        temperature=params.temperature,
+        friction=params.friction,
+        basin_curvature=params.cage_curvature,
+        saddle_curvature=params.saddle_curvature,
+        barrier_height=params.barrier_height + params.persistence_barrier_extra,
+    )
+    exchange_rate = kramers_escape_rate(
+        temperature=params.temperature,
+        friction=params.friction,
+        basin_curvature=params.cage_curvature,
+        saddle_curvature=params.saddle_curvature,
+        barrier_height=params.barrier_height + params.exchange_barrier_extra,
+    )
+    return PersistenceExchangeParams(
+        cage_variance=ou["cage_variance"],
+        cage_tau=ou["cage_tau"],
+        jump_variance=params.jump_length**2 / float(params.dimension),
+        persistence_mean=1.0 / persistence_rate,
+        exchange_mean=1.0 / exchange_rate,
+    )
+
+
+def langevin_first_principles_bridge_audit(params: LangevinCageLandscapeParams) -> dict[str, float | str]:
+    """Audit what the Langevin-to-renewal bridge derives and what it assumes."""
+
+    effective = langevin_to_persistence_exchange(params)
+    return {
+        "bridge_stage": "langevin_kramers_to_renewal_effective_theory",
+        "langevin_equation_specified": 1.0,
+        "ou_cage_params_derived": 1.0,
+        "kramers_rates_derived": 1.0,
+        "persistence_exchange_params_derived": 1.0,
+        "bare_diffusion": langevin_bare_diffusion(params),
+        "cage_variance": effective.cage_variance,
+        "cage_tau": effective.cage_tau,
+        "jump_variance": effective.jump_variance,
+        "persistence_mean": effective.persistence_mean,
+        "exchange_mean": effective.exchange_mean,
+        "persistence_exchange_ratio": effective.persistence_mean / effective.exchange_mean,
+        "full_many_body_first_principles_claim_allowed": 0.0,
+        "remaining_assumption": "metastable_basin_partition_and_barrier_inputs",
+    }
 
 
 def temperature_dependent_params(temperature: float, law: TemperatureLawParams) -> DelayedRenewalCageParams:
@@ -5313,6 +5442,8 @@ def sota_glassbench_ka2d_timecode_semantics_gate(
                     "sigma_self_intermediate_scattering_by_k_member_sem": ";".join(
                         f"{value:.12g}" for value in fs_sigmas
                     ),
+                    "self_intermediate_scattering": float(fs_means[0]),
+                    "sigma_self_intermediate_scattering_member_sem": float(fs_sigmas[0]),
                     "overlap_radius": overlap_radius,
                     "chi4_overlap_replica": chi4,
                     "sigma_chi4_overlap_member_sem": sigma_chi4,

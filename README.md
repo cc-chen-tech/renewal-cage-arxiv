@@ -265,17 +265,19 @@ multi-k `F_s(k,t)`, and overlap-`chi4` into array-index means and standard
 errors. The official KA2D trajectory README then corrects the semantics: the
 leading `positions` axis is the 20-isoconfigurational-trajectory replica axis,
 not a time axis, and the physical lag time is encoded by the file-name `tc`
-code. The corrected time-code gate now maps the extracted prefix members to
-real lag times (`tc05=0.1` and `tc10=1.1` at `T=0.23`, `tc01=0.11` at
-`T=0.30`) and recomputes fixed-time observables relative to
-`initial_positions`. This is a genuine physical-time correction, but it still
-keeps persistence/exchange inversion disabled until enough members are
-extracted across all official time codes.
+code. The corrected time-code gate now maps the extracted 8 MB prefix members
+to real lag times and recomputes fixed-time observables relative to
+`initial_positions`. The result is asymmetric but useful: `T=0.23` covers all
+eight official time codes (`tc05` through `tc40`) with at least four complete
+members per time code, so it is a physical-time observable curve ready for the
+next persistence/exchange inversion gate; `T=0.30` still covers only `tc01` and
+therefore remains blocked by sparse time-code coverage.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
-gate ready, while the real inversion remains blocked until full time-code
-coverage is attached.
+gate ready, while the real inversion remains blocked until the curve-ready
+`T=0.23` row is passed through the inversion protocol and the sparse `T=0.30`
+coverage is extended.
 The observable-coverage audit isolates the remaining real-inversion observable
 gap: both current KA2D first-NPZ rows now expose frame index, MSD, 2D NGP,
 multi-k `F_s(k,t)`, and a single-origin overlap-`chi4` proxy. They still lack

@@ -3269,7 +3269,7 @@ def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
         "Official trajectory README maps tc file codes to lag times and identifies positions[20] as isoconfigurational replicas.",
     )
     left, top = 48, page_h - 92
-    row_h = 56
+    row_h = 42
     colors_by_stage = {
         "physical_timecode_semantics_ready_sparse_coverage": colors.HexColor("#2b6cb0"),
         "physical_timecode_semantics_ready_member_uncertainty_short": colors.HexColor("#b7791f"),
@@ -3279,7 +3279,7 @@ def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
     c.drawString(left, top + 18, "target")
     c.drawString(left + 104, top + 18, "semantic stage")
     c.drawString(left + 370, top + 18, "corrected fixed-time observables")
-    for index, row in enumerate(rows[:4]):
+    for index, row in enumerate(rows):
         y = top - index * row_h
         stage = row["timecode_semantics_stage"]
         color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
@@ -3314,7 +3314,7 @@ def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
                 int(float(row["frame_axis_is_physical_time"])),
             ),
         )
-        c.drawString(left + 370, y - 27, f'blocker={row["primary_blocker"]}; next={row["next_required_action"]}')
+        c.drawString(left + 370, y - 27, f'blocker={row["primary_blocker"]}; next={row["next_required_action"][:54]}')
     c.setFont("Helvetica", 8)
     c.drawString(
         42,
