@@ -3121,6 +3121,75 @@ def write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(path: Path) -> Non
     c.save()
 
 
+def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench visible-member ensemble audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Prefix-visible NPZ headers are gated before they are used as an uncertainty ensemble.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 64
+    colors_by_stage = {
+        "visible_member_ensemble_ready_for_uncertainty": colors.HexColor("#2f855a"),
+        "visible_prefix_not_publishable_ensemble": colors.HexColor("#c05621"),
+        "visible_member_ensemble_layout_blocked": colors.HexColor("#4a5568"),
+        "visible_member_split_policy_missing": colors.HexColor("#b7791f"),
+        "visible_member_ensemble_incomplete": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 100, top + 18, "ensemble stage")
+    c.drawString(left + 370, top + 18, "member evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["ensemble_audit_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 12, 245, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 370,
+            y,
+            "ready={}; prefix={}/{}; full list={}; split={}".format(
+                int(float(row["publishable_ensemble_uncertainty_ready"])),
+                int(float(row["prefix_npz_member_count"])),
+                int(float(row["required_member_count"])),
+                int(float(row["full_member_id_list_visible"])),
+                row["split_labels_in_probe"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 370, y - 14, f'first member id: {row["first_member_id"][:60]}')
+        c.drawString(
+            left + 370,
+            y - 27,
+            f'next: {row["next_required_actions"].replace("_", " ")[:85]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "Current prefix evidence does not yet justify member-ensemble uncertainty or thermodynamic claims.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4442,6 +4511,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_npz_ensemble_horizon_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf"
     )
+    sota_glassbench_visible_member_ensemble_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -4548,6 +4620,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
+    )
+    write_sota_glassbench_visible_member_ensemble_audit_pdf(
+        sota_glassbench_visible_member_ensemble_audit_pdf
     )
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
@@ -4687,6 +4762,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf",
+        )
+        archive.write(
+            sota_glassbench_visible_member_ensemble_audit_pdf,
+            "figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf",
         )
         archive.write(
             sota_remote_result_curve_cache_pdf,

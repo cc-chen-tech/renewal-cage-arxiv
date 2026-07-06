@@ -909,6 +909,32 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_030["primary_blocker"], "additional_npz_member_headers")
         self.assertEqual(ka2d_030["horizon_stage"], "prefix_member_horizon_short")
 
+    def test_sota_glassbench_visible_member_ensemble_audit_blocks_prefix_only_members(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv"
+        self.assertTrue(path.exists())
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key, first_member_id, split_label in [
+            (("KA2D", "0.23"), "N1290T0.23_202_tc05", "test"),
+            (("KA2D", "0.30"), "N1290T0.30_3_tc01", "train"),
+        ]:
+            row = by_key[key]
+            self.assertEqual(row["first_member_id"], first_member_id)
+            self.assertEqual(row["split_labels_in_probe"], split_label)
+            self.assertEqual(float(row["prefix_npz_member_count"]), 3.0)
+            self.assertEqual(float(row["required_member_count"]), 4.0)
+            self.assertEqual(float(row["additional_member_count_needed"]), 1.0)
+            self.assertEqual(float(row["first_member_id_visible"]), 1.0)
+            self.assertEqual(float(row["full_member_id_list_visible"]), 0.0)
+            self.assertEqual(float(row["member_count_threshold_pass"]), 0.0)
+            self.assertEqual(float(row["publishable_ensemble_uncertainty_ready"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertEqual(row["primary_blocker"], "member_count_and_full_member_list")
+            self.assertEqual(row["ensemble_audit_stage"], "visible_prefix_not_publishable_ensemble")
+
     def test_sota_remote_result_curve_cache_records_range_cached_numeric_curves(self):
         manifest_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
         path = ROOT / "data" / "renewal_cage_sota_remote_result_curve_cache.csv"
@@ -1542,6 +1568,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)

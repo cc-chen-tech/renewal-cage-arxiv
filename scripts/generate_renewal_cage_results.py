@@ -106,6 +106,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_class_gate,
     sota_evidence_verdict,
     sota_glassbench_frame_time_mapping_audit_gate,
+    sota_glassbench_visible_member_ensemble_audit_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
@@ -3763,6 +3764,24 @@ def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
     return rows
 
 
+def write_sota_glassbench_visible_member_ensemble_audit_csv(
+    path: Path,
+    *,
+    tar_probe_rows: list[dict[str, float | str]],
+    ensemble_horizon_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit visible NPZ member identity evidence before ensemble uncertainties."""
+
+    rows = sota_glassbench_visible_member_ensemble_audit_gate(
+        audit_id="glassbench_visible_member_ensemble_audit",
+        accession_id="glassbench_zenodo_10118191",
+        tar_probe_rows=tar_probe_rows,
+        ensemble_horizon_rows=ensemble_horizon_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -7216,6 +7235,64 @@ def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_visible_member_ensemble_audit_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 420
+    left, top = 75, 112
+    row_h = 76
+    colors = {
+        "visible_member_ensemble_ready_for_uncertainty": "#2f855a",
+        "visible_prefix_not_publishable_ensemble": "#c05621",
+        "visible_member_ensemble_layout_blocked": "#4a5568",
+        "visible_member_split_policy_missing": "#b7791f",
+        "visible_member_ensemble_incomplete": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["ensemble_audit_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ready = int(float(row["publishable_ensemble_uncertainty_ready"]))
+        prefix = int(float(row["prefix_npz_member_count"]))
+        required = int(float(row["required_member_count"]))
+        full_list = int(float(row["full_member_id_list_visible"]))
+        first_id = str(row["first_member_id"])[:42]
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 128}" y="{y - 5}" width="335" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 138}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:46]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 490}" y="{y + 13}" font-family="Arial, sans-serif" font-size="11">ready={ready}; prefix members={prefix}/{required}; full member list={full_list}; split={row["split_labels_in_probe"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 128}" y="{y + 40}" font-family="Arial, sans-serif" font-size="9" fill="#555">first member id: {first_id}; blocker: {str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 128}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">next: {str(row["next_required_actions"]).replace("_", " ")[:118]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench visible-member ensemble audit</text>
+  <text x="75" y="67" font-family="Arial, sans-serif" font-size="13" fill="#444">Prefix-visible NPZ headers are not promoted to ensemble uncertainty until member count and full member identities are documented.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 128}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">ensemble audit stage</text>
+  <text x="{left + 490}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member evidence</text>
+  {"".join(marks)}
+  <rect x="75" y="360" width="14" height="14" fill="#c05621" /><text x="96" y="372" font-family="Arial, sans-serif" font-size="12">current prefix evidence: 3 visible headers and only the first member identity</text>
+  <rect x="650" y="360" width="14" height="14" fill="#2f855a" /><text x="671" y="372" font-family="Arial, sans-serif" font-size="12">green requires enough independent member identities for uncertainty</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_remote_result_curve_cache_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1160, 390
@@ -9115,6 +9192,15 @@ def main() -> None:
     write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg",
         glassbench_trajectory_npz_ensemble_horizon_rows,
+    )
+    glassbench_visible_member_ensemble_audit_rows = write_sota_glassbench_visible_member_ensemble_audit_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv",
+        tar_probe_rows=glassbench_trajectory_inner_tar_header_probe_rows,
+        ensemble_horizon_rows=glassbench_trajectory_npz_ensemble_horizon_rows,
+    )
+    write_sota_glassbench_visible_member_ensemble_audit_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg",
+        glassbench_visible_member_ensemble_audit_rows,
     )
     remote_result_curve_cache_rows = write_sota_remote_result_curve_cache_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv"

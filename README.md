@@ -252,6 +252,11 @@ inner-tar prefix probes expose three KA2D `.npz` members at both temperatures,
 so the archive is not a single-trajectory source, but the prefix evidence is
 still one member short of the four-member uncertainty threshold and no
 multi-member extraction is claimed.
+The visible-member ensemble audit adds the next guardrail: the prefix evidence
+shows the first member identity and split label (`test` at `T=0.23`, `train` at
+`T=0.30`), but not a full member-id list. It therefore keeps
+`publishable_ensemble_uncertainty_ready=0` until enough independent member
+identities are indexed and member-resolved observables are computed.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
@@ -386,6 +391,7 @@ figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.svg
 figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
+figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
@@ -466,6 +472,7 @@ data/renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv
 data/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
+data/renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
@@ -565,6 +572,7 @@ paper/figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf
 paper/figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
+paper/figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf

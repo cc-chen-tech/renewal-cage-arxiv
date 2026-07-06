@@ -4567,6 +4567,124 @@ def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
     return out
 
 
+def sota_glassbench_visible_member_ensemble_audit_gate(
+    *,
+    audit_id: str,
+    accession_id: str,
+    tar_probe_rows: Sequence[dict[str, float | str]],
+    ensemble_horizon_rows: Sequence[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit visible NPZ member evidence before treating a prefix as an ensemble."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not tar_probe_rows:
+        raise ValueError("tar_probe_rows must be nonempty")
+    if not ensemble_horizon_rows:
+        raise ValueError("ensemble_horizon_rows must be nonempty")
+
+    horizon_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in ensemble_horizon_rows
+    }
+
+    def split_items(value: object) -> list[str]:
+        text = str(value)
+        if not text or text == "none":
+            return []
+        return [item for item in text.split(";") if item and item != "none"]
+
+    def member_id(path: str) -> str:
+        if not path or path == "none":
+            return "none"
+        name = path.rsplit("/", 1)[-1]
+        return name[:-4] if name.endswith(".npz") else name
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        tar_probe_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), str(item.get("temperature", "none"))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        if system_id == "none" or temperature == "none":
+            continue
+        horizon = horizon_by_key.get((system_id, temperature), {})
+        layout_ready = bool(float(row.get("trajectory_layout_ready", 0.0)))
+        first_member = str(row.get("first_npz_member", "none"))
+        first_id = member_id(first_member)
+        split_labels = str(row.get("split_labels_in_probe", "none"))
+        split_items_visible = split_items(split_labels)
+        visible_member_paths = split_items(row.get("visible_npz_members", "none"))
+        prefix_count = float(
+            horizon.get("prefix_npz_member_count", row.get("npz_member_count_in_probe", 0.0))
+        )
+        required_count = float(horizon.get("min_member_count", 4.0))
+        additional_needed = max(0.0, required_count - prefix_count)
+        threshold_pass = prefix_count >= required_count
+        first_visible = first_id != "none"
+        full_list_visible = len(visible_member_paths) >= int(required_count) and len(visible_member_paths) >= int(prefix_count)
+        split_policy_documented = bool(split_items_visible)
+        ready = bool(layout_ready and threshold_pass and first_visible and full_list_visible and split_policy_documented)
+
+        if ready:
+            stage = "visible_member_ensemble_ready_for_uncertainty"
+            blocker = "none"
+            next_actions = ["compute_member_resolved_observables_and_uncertainties"]
+        elif not layout_ready:
+            stage = "visible_member_ensemble_layout_blocked"
+            blocker = "trajectory_layout"
+            next_actions = ["complete_inner_tar_layout_probe"]
+        elif not threshold_pass or not full_list_visible:
+            stage = "visible_prefix_not_publishable_ensemble"
+            blocker = "member_count_and_full_member_list"
+            next_actions = [
+                "index_full_npz_member_list",
+                "extract_at_least_4_independent_members_per_temperature",
+                "keep_split_policy_fixed_within_temperature",
+            ]
+        elif not split_policy_documented:
+            stage = "visible_member_split_policy_missing"
+            blocker = "split_policy"
+            next_actions = ["document_train_test_split_policy_for_member_ensemble"]
+        else:
+            stage = "visible_member_ensemble_incomplete"
+            blocker = "member_identity"
+            next_actions = ["verify_independent_member_identifiers"]
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": str(row.get("source_path", "none")),
+                "first_npz_member": first_member,
+                "first_member_id": first_id,
+                "split_labels_in_probe": split_labels,
+                "prefix_npz_member_count": float(prefix_count),
+                "required_member_count": float(required_count),
+                "additional_member_count_needed": float(additional_needed),
+                "visible_member_list_count": float(len(visible_member_paths)),
+                "first_member_id_visible": float(first_visible),
+                "full_member_id_list_visible": float(full_list_visible),
+                "split_policy_documented": float(split_policy_documented),
+                "member_count_threshold_pass": float(threshold_pass),
+                "publishable_ensemble_uncertainty_ready": float(ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_actions": ";".join(next_actions),
+                "ensemble_audit_stage": stage,
+            }
+        )
+
+    if not out:
+        raise ValueError("tar_probe_rows did not contain any concrete system-temperature rows")
+    return out
+
+
 def sota_remote_result_curve_cache_gate(
     *,
     curve_cache_id: str,

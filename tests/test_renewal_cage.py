@@ -120,6 +120,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_verdict,
     sota_evidence_class_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
+    sota_glassbench_visible_member_ensemble_audit_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_real_inversion_gap_ledger_gate,
     sota_glassbench_real_inversion_unlock_protocol_gate,
@@ -3430,6 +3431,84 @@ class DelayedRenewalCageTests(unittest.TestCase):
         ka = by_key[("KA", "none")]
         self.assertEqual(ka["horizon_stage"], "trajectory_layout_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_visible_member_ensemble_audit_blocks_first_member_only_prefix(self):
+        rows = sota_glassbench_visible_member_ensemble_audit_gate(
+            audit_id="glassbench_visible_member_ensemble_audit",
+            accession_id="glassbench_zenodo_10118191",
+            tar_probe_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                    "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                    "split_labels_in_probe": "test",
+                    "npz_member_count_in_probe": 3.0,
+                    "trajectory_layout_ready": 1.0,
+                }
+            ],
+            ensemble_horizon_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "prefix_npz_member_count": 3.0,
+                    "min_member_count": 4.0,
+                    "member_count_gap_to_threshold": 1.0,
+                    "prefix_member_horizon_ready": 0.0,
+                }
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(row["first_member_id"], "N1290T0.23_202_tc05")
+        self.assertEqual(row["split_labels_in_probe"], "test")
+        self.assertEqual(float(row["prefix_npz_member_count"]), 3.0)
+        self.assertEqual(float(row["required_member_count"]), 4.0)
+        self.assertEqual(float(row["additional_member_count_needed"]), 1.0)
+        self.assertEqual(float(row["first_member_id_visible"]), 1.0)
+        self.assertEqual(float(row["full_member_id_list_visible"]), 0.0)
+        self.assertEqual(float(row["split_policy_documented"]), 1.0)
+        self.assertEqual(float(row["publishable_ensemble_uncertainty_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "member_count_and_full_member_list")
+        self.assertIn("index_full_npz_member_list", row["next_required_actions"])
+        self.assertIn("extract_at_least_4_independent_members_per_temperature", row["next_required_actions"])
+        self.assertEqual(row["ensemble_audit_stage"], "visible_prefix_not_publishable_ensemble")
+
+    def test_sota_glassbench_visible_member_ensemble_audit_accepts_complete_member_list(self):
+        rows = sota_glassbench_visible_member_ensemble_audit_gate(
+            audit_id="glassbench_visible_member_ensemble_audit",
+            accession_id="glassbench_zenodo_10118191",
+            tar_probe_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                    "split_labels_in_probe": "train",
+                    "npz_member_count_in_probe": 4.0,
+                    "visible_npz_members": "T0.30/train/member_1.npz;T0.30/train/member_2.npz;T0.30/train/member_3.npz;T0.30/train/member_4.npz",
+                    "trajectory_layout_ready": 1.0,
+                }
+            ],
+            ensemble_horizon_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "prefix_npz_member_count": 4.0,
+                    "min_member_count": 4.0,
+                    "member_count_gap_to_threshold": 0.0,
+                    "prefix_member_horizon_ready": 1.0,
+                }
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(float(row["full_member_id_list_visible"]), 1.0)
+        self.assertEqual(float(row["member_count_threshold_pass"]), 1.0)
+        self.assertEqual(float(row["publishable_ensemble_uncertainty_ready"]), 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(row["next_required_actions"], "compute_member_resolved_observables_and_uncertainties")
+        self.assertEqual(row["ensemble_audit_stage"], "visible_member_ensemble_ready_for_uncertainty")
 
     def test_sota_remote_result_curve_cache_verifies_range_cached_dat_files(self):
         manifest = {
