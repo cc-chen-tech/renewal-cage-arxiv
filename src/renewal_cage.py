@@ -4090,6 +4090,158 @@ def sota_glassbench_trajectory_timebase_bridge_gate(
     return out
 
 
+def sota_glassbench_real_inversion_gap_ledger_gate(
+    *,
+    ledger_id: str,
+    accession_id: str,
+    short_window_rows: Sequence[dict[str, float | str]],
+    timebase_rows: Sequence[dict[str, float | str]],
+    ensemble_horizon_rows: Sequence[dict[str, float | str]],
+    inversion_readiness_rows: Sequence[dict[str, float | str]],
+    observable_semantics_rows: Sequence[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Collapse GlassBench real-data gates into one manuscript-safe claim ledger."""
+
+    if not ledger_id:
+        raise ValueError("ledger_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not timebase_rows:
+        raise ValueError("timebase_rows must be nonempty")
+    if not ensemble_horizon_rows:
+        raise ValueError("ensemble_horizon_rows must be nonempty")
+    if not inversion_readiness_rows:
+        raise ValueError("inversion_readiness_rows must be nonempty")
+
+    canary_by_system: dict[str, dict[str, float | str]] = {}
+    for row in short_window_rows:
+        system = str(row.get("system_id", "unknown"))
+        canary_by_system[system] = row
+
+    timebase_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in timebase_rows
+    }
+    ensemble_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in ensemble_horizon_rows
+    }
+    inversion_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in inversion_readiness_rows
+    }
+    semantics_ready_keys = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        for row in observable_semantics_rows
+        if float(row.get("real_inversion_ready", 0.0)) == 1.0
+    }
+
+    keys = sorted(
+        {
+            key
+            for key in set(timebase_by_key) | set(ensemble_by_key) | set(inversion_by_key)
+            if key[0] != "KA" and key[1] != "none"
+        },
+        key=lambda key: (key[0], float(key[1])),
+    )
+    out: list[dict[str, float | str]] = []
+    for system_id, temperature in keys:
+        canary = canary_by_system.get(system_id, {})
+        timebase = timebase_by_key.get((system_id, temperature), {})
+        ensemble = ensemble_by_key.get((system_id, temperature), {})
+        inversion = inversion_by_key.get((system_id, temperature), {})
+
+        short_window_ready = bool(float(canary.get("short_window_real_data_canary_ready", 0.0)))
+        timebase_ready = bool(float(timebase.get("trajectory_timebase_ready", 0.0)))
+        ensemble_ready = bool(float(ensemble.get("prefix_member_horizon_ready", 0.0)))
+        structural_ready = bool(float(inversion.get("structural_curve_ready", 0.0)))
+        uncertainty_ready = bool(float(inversion.get("uncertainty_ready", 0.0)))
+        inversion_ready = bool(float(inversion.get("sota_inversion_ready", 0.0)))
+        semantics_ready = (system_id, temperature) in semantics_ready_keys or not observable_semantics_rows
+        quantitative_ready = (
+            short_window_ready
+            and timebase_ready
+            and ensemble_ready
+            and structural_ready
+            and uncertainty_ready
+            and inversion_ready
+            and semantics_ready
+        )
+
+        if quantitative_ready:
+            stage = "real_data_quantitative_inversion_ready"
+            claim = "uncertainty_weighted_real_trajectory_inversion"
+            blocker = "none"
+            next_action = "run_real_data_persistence_exchange_residuals"
+        elif short_window_ready and not timebase_ready:
+            stage = "real_data_canary_timebase_blocked"
+            claim = "short_window_coordinate_trend_only"
+            blocker = str(timebase.get("primary_blocker", "trajectory_timebase_ready"))
+            next_action = str(timebase.get("next_required_action", "derive_or_fetch_trajectory_frame_time_mapping"))
+        elif short_window_ready and not ensemble_ready:
+            stage = "real_data_canary_ensemble_blocked"
+            claim = "short_window_coordinate_trend_only"
+            blocker = str(ensemble.get("primary_blocker", "prefix_member_horizon_ready"))
+            next_action = str(ensemble.get("next_required_action", "extract_multiple_independent_npz_members"))
+        elif short_window_ready and not structural_ready:
+            stage = "real_data_canary_observable_set_blocked"
+            claim = "short_window_coordinate_trend_only"
+            blocker = str(inversion.get("primary_blocker", "structural_curve_ready"))
+            next_action = str(inversion.get("next_required_action", "compute_required_observables"))
+        elif short_window_ready and not uncertainty_ready:
+            stage = "real_data_canary_uncertainty_blocked"
+            claim = "short_window_coordinate_trend_only"
+            blocker = "uncertainty_columns"
+            next_action = "add_member_or_block_uncertainty_columns"
+        else:
+            stage = "real_data_coordinate_canary_missing"
+            claim = "metadata_or_coordinate_ingestion_only"
+            blocker = str(canary.get("primary_blocker", "short_window_real_data_canary"))
+            next_action = "complete_short_window_coordinate_canary"
+
+        missing_observables = str(inversion.get("missing_observables", "none"))
+        missing_uncertainties = str(inversion.get("missing_uncertainty_columns", "none"))
+        next_actions = list(
+            dict.fromkeys(
+                action
+                for action in [
+                    next_action,
+                    str(ensemble.get("next_required_action", "none")),
+                    "compute_missing_observables" if missing_observables != "none" else "none",
+                    "add_uncertainty_columns" if missing_uncertainties != "none" else "none",
+                ]
+                if action and action != "none"
+            )
+        )
+
+        out.append(
+            {
+                "ledger_id": f"{ledger_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "short_window_claim_ready": float(short_window_ready),
+                "trajectory_timebase_ready": float(timebase_ready),
+                "ensemble_horizon_ready": float(ensemble_ready),
+                "structural_observable_ready": float(structural_ready),
+                "uncertainty_ready": float(uncertainty_ready),
+                "observable_semantics_ready": float(semantics_ready),
+                "quantitative_real_inversion_ready": float(quantitative_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_claim_level": claim,
+                "missing_observables": missing_observables,
+                "missing_uncertainty_columns": missing_uncertainties,
+                "primary_blocker": blocker,
+                "next_required_actions": ";".join(next_actions) if next_actions else "none",
+                "ledger_stage": stage,
+            }
+        )
+
+    if not out:
+        raise ValueError("no GlassBench real-data ledger rows could be assembled")
+    return out
+
+
 def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
     *,
     horizon_id: str,

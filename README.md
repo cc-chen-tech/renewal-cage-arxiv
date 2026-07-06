@@ -222,6 +222,13 @@ frame indices. They cannot yet be attached: the `T=0.23` trajectory curve has
 time points, with no explicit frame-time mapping. This converts the physical
 time blocker into a quantitative requirement rather than an assumed unit
 conversion.
+The GlassBench real-inversion gap ledger then collapses these gates into one
+claim-level verdict. For both KA2D temperatures the allowed claim remains
+`short_window_coordinate_trend_only`: the coordinate canary passes, but the
+timebase gate fails, the ensemble prefix is one visible member short of the
+uncertainty threshold, and the full `F_s`/`chi4`/uncertainty observable set is
+missing. This is the current SOTA comparison boundary before any real
+persistence/exchange inversion.
 The first-NPZ inversion-readiness gate then turns that limitation into explicit
 machine-readable blockers: physical lag times, multiple independent members,
 multi-k self-intermediate scattering, a chi4/overlap observable, and positive
@@ -361,6 +368,7 @@ figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.svg
 figures/renewal_cage_sota_glassbench_short_window_trend_canary.svg
 figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.svg
+figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.svg
 figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
@@ -438,6 +446,7 @@ data/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.csv
 data/renewal_cage_sota_glassbench_short_window_trend_canary.csv
 data/renewal_cage_sota_glassbench_trajectory_timebase_bridge.csv
+data/renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv
 data/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
@@ -534,6 +543,7 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf
 paper/figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf
+paper/figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf

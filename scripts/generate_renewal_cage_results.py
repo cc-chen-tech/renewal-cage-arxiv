@@ -108,6 +108,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
+    sota_glassbench_real_inversion_gap_ledger_gate,
     sota_glassbench_short_window_trend_canary_gate,
     sota_glassbench_trajectory_timebase_bridge_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
@@ -3679,6 +3680,30 @@ def write_sota_glassbench_trajectory_timebase_bridge_csv(
     return rows
 
 
+def write_sota_glassbench_real_inversion_gap_ledger_csv(
+    path: Path,
+    *,
+    short_window_rows: list[dict[str, float | str]],
+    timebase_rows: list[dict[str, float | str]],
+    ensemble_horizon_rows: list[dict[str, float | str]],
+    inversion_readiness_rows: list[dict[str, float | str]],
+    observable_semantics_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Collapse GlassBench real-data evidence into one claim-level ledger."""
+
+    rows = sota_glassbench_real_inversion_gap_ledger_gate(
+        ledger_id="glassbench_real_inversion_gap_ledger",
+        accession_id="glassbench_zenodo_10118191",
+        short_window_rows=short_window_rows,
+        timebase_rows=timebase_rows,
+        ensemble_horizon_rows=ensemble_horizon_rows,
+        inversion_readiness_rows=inversion_readiness_rows,
+        observable_semantics_rows=observable_semantics_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
     path: Path,
     *,
@@ -6925,6 +6950,65 @@ def write_sota_glassbench_trajectory_timebase_bridge_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_inversion_gap_ledger_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 420
+    left, top = 75, 112
+    row_h = 72
+    colors = {
+        "real_data_quantitative_inversion_ready": "#2f855a",
+        "real_data_canary_timebase_blocked": "#c05621",
+        "real_data_canary_ensemble_blocked": "#b7791f",
+        "real_data_canary_observable_set_blocked": "#805ad5",
+        "real_data_canary_uncertainty_blocked": "#2b6cb0",
+        "real_data_coordinate_canary_missing": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["ledger_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ready = int(float(row["quantitative_real_inversion_ready"]))
+        short = int(float(row["short_window_claim_ready"]))
+        timebase = int(float(row["trajectory_timebase_ready"]))
+        ensemble = int(float(row["ensemble_horizon_ready"]))
+        uncertainty = int(float(row["uncertainty_ready"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 125}" y="{y - 4}" width="330" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 135}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:45]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 480}" y="{y + 13}" font-family="Arial, sans-serif" font-size="11">claim={str(row["allowed_claim_level"]).replace("_", " ")[:46]}; ready={ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 480}" y="{y + 34}" font-family="Arial, sans-serif" font-size="10" fill="#555">short={short}; timebase={timebase}; ensemble={ensemble}; uncertainty={uncertainty}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 125}" y="{y + 53}" font-family="Arial, sans-serif" font-size="8.8" fill="#555">next: {str(row["next_required_actions"]).replace("_", " ")[:118]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-data inversion gap ledger</text>
+  <text x="75" y="67" font-family="Arial, sans-serif" font-size="13" fill="#444">The final claim level is the minimum of the coordinate canary, timebase, ensemble, observable, semantic, and uncertainty gates.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 125}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">ledger stage</text>
+  <text x="{left + 480}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim level and blockers</text>
+  {"".join(marks)}
+  <rect x="75" y="360" width="14" height="14" fill="#c05621" /><text x="96" y="372" font-family="Arial, sans-serif" font-size="12">current real-data rows: short-window trend only, timebase blocked</text>
+  <rect x="555" y="360" width="14" height="14" fill="#2f855a" /><text x="576" y="372" font-family="Arial, sans-serif" font-size="12">future state: uncertainty-weighted real trajectory inversion</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -8933,6 +9017,18 @@ def main() -> None:
     write_sota_remote_result_curve_observable_semantics_svg(
         FIGURE_DIR / "renewal_cage_sota_remote_result_curve_observable_semantics.svg",
         remote_result_curve_observable_semantics_rows,
+    )
+    glassbench_real_inversion_gap_ledger_rows = write_sota_glassbench_real_inversion_gap_ledger_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv",
+        short_window_rows=glassbench_short_window_trend_canary_rows,
+        timebase_rows=glassbench_trajectory_timebase_bridge_rows,
+        ensemble_horizon_rows=glassbench_trajectory_npz_ensemble_horizon_rows,
+        inversion_readiness_rows=glassbench_trajectory_first_npz_inversion_readiness_rows,
+        observable_semantics_rows=remote_result_curve_observable_semantics_rows,
+    )
+    write_sota_glassbench_real_inversion_gap_ledger_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.svg",
+        glassbench_real_inversion_gap_ledger_rows,
     )
     readme_digest_rows = write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"

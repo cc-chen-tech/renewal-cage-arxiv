@@ -2776,6 +2776,69 @@ def write_sota_glassbench_trajectory_timebase_bridge_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_real_inversion_gap_ledger_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real-data inversion gap ledger")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The allowed manuscript claim is the minimum over canary, timebase, ensemble, observable, semantics, and uncertainty gates.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 62
+    colors_by_stage = {
+        "real_data_quantitative_inversion_ready": colors.HexColor("#2f855a"),
+        "real_data_canary_timebase_blocked": colors.HexColor("#c05621"),
+        "real_data_canary_ensemble_blocked": colors.HexColor("#b7791f"),
+        "real_data_canary_observable_set_blocked": colors.HexColor("#805ad5"),
+        "real_data_canary_uncertainty_blocked": colors.HexColor("#2b6cb0"),
+        "real_data_coordinate_canary_missing": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 100, top + 18, "stage")
+    c.drawString(left + 370, top + 18, "claim and blockers")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["ledger_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 12, 245, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 370,
+            y,
+            "claim={}; ready={}; blocker={}".format(
+                row["allowed_claim_level"].replace("_", " ")[:42],
+                int(float(row["quantitative_real_inversion_ready"])),
+                row["primary_blocker"].replace("_", " "),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 370, y - 14, f'next: {row["next_required_actions"].replace("_", " ")[:90]}')
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "Current GlassBench rows allow a short-window coordinate trend only; they do not support full persistence/exchange inversion or thermodynamic claims.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4224,6 +4287,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_timebase_bridge_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf"
     )
+    sota_glassbench_real_inversion_gap_ledger_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf"
+    )
     sota_glassbench_trajectory_first_npz_inversion_readiness_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
     )
@@ -4321,6 +4387,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_timebase_bridge_pdf(
         sota_glassbench_trajectory_timebase_bridge_pdf
+    )
+    write_sota_glassbench_real_inversion_gap_ledger_pdf(
+        sota_glassbench_real_inversion_gap_ledger_pdf
     )
     write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(
         sota_glassbench_trajectory_first_npz_inversion_readiness_pdf
@@ -4446,6 +4515,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_timebase_bridge_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_inversion_gap_ledger_pdf,
+            "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_first_npz_inversion_readiness_pdf,

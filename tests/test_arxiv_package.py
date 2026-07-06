@@ -802,6 +802,25 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(row["sota_inversion_ready"]), 0.0)
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_real_inversion_gap_ledger_keeps_claim_level_safe(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv"
+        self.assertTrue(path.exists())
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key in [("KA2D", "0.23"), ("KA2D", "0.30")]:
+            row = by_key[key]
+            self.assertEqual(row["ledger_stage"], "real_data_canary_timebase_blocked")
+            self.assertEqual(row["allowed_claim_level"], "short_window_coordinate_trend_only")
+            self.assertEqual(row["primary_blocker"], "frame_time_point_count")
+            self.assertEqual(float(row["short_window_claim_ready"]), 1.0)
+            self.assertEqual(float(row["trajectory_timebase_ready"]), 0.0)
+            self.assertEqual(float(row["quantitative_real_inversion_ready"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertIn("derive_or_fetch_trajectory_frame_time_mapping", row["next_required_actions"])
+
     def test_sota_glassbench_trajectory_first_npz_inversion_readiness_records_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv"
         self.assertTrue(path.exists())
@@ -1470,6 +1489,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
@@ -1621,6 +1641,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_simultaneous_closure.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
+            "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",
