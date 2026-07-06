@@ -99,6 +99,7 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_diffusion_coefficient,
     persistence_exchange_data_protocol,
     persistence_exchange_joint_diagnostic,
+    simultaneous_dynamical_signature_closure_gate,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
@@ -5760,6 +5761,128 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(scored["chi4_peak_z"], 2.0)
         self.assertEqual(scored["chi4_peak_z_consistent"], 0.0)
         self.assertEqual(scored["passes_uncertainty_protocol"], 0.0)
+
+    def test_simultaneous_dynamical_signature_closure_gate_accepts_minimal_anchor_inversion(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        observed_tau_alpha = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        time_grid = np.geomspace(0.05, 300.0, 260)
+        late_time = 80.0 * params.persistence_mean
+        scored = persistence_exchange_data_protocol(
+            anchor_wave_number=1.1,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=observed_tau_alpha,
+            tau_alpha_relative_error_by_k={wave_number: 0.05 for wave_number in wave_numbers},
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            late_time=late_time,
+            observed_late_ngp=float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0]),
+            late_ngp_relative_error=0.08,
+            observed_chi4_peak=float(
+                np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, params))
+            ),
+            chi4_peak_relative_error=0.1,
+            time_grid=time_grid,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=2.0,
+        )
+
+        gate = simultaneous_dynamical_signature_closure_gate(
+            protocol_id="synthetic_minimal_dynamical_closure",
+            scored_row=scored,
+            calibration_observables=["diffusion_coefficient", "tau_alpha(k_anchor)"],
+            heldout_observables=[
+                "tau_alpha(k!=anchor)",
+                "late_ngp_recovery",
+                "stokes_einstein_growth",
+                "chi4_proxy_peak",
+            ],
+            required_consistency_flags=[
+                "multik_tau_alpha_z_consistent",
+                "late_ngp_z_consistent",
+                "chi4_peak_z_consistent",
+            ],
+            min_stokes_einstein_growth_over_poisson=2.0,
+        )
+
+        self.assertEqual(gate["closure_stage"], "simultaneous_dynamical_signature_closure_passed")
+        self.assertEqual(gate["simultaneous_closure_ready"], 1.0)
+        self.assertEqual(gate["all_required_dynamical_predictions_pass"], 1.0)
+        self.assertEqual(gate["thermodynamic_claim_allowed"], 0.0)
+        self.assertEqual(gate["calibration_count"], 2.0)
+        self.assertEqual(gate["heldout_count"], 4.0)
+        self.assertGreater(gate["stokes_einstein_growth_over_poisson"], 2.0)
+        self.assertEqual(gate["primary_blocker"], "none")
+
+    def test_simultaneous_dynamical_signature_closure_gate_rejects_chi4_proxy_mismatch(self):
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=0.7,
+            persistence_mean=8.0,
+            exchange_mean=1.0,
+        )
+        wave_numbers = [0.7, 1.1, 1.6]
+        observed_tau_alpha = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        time_grid = np.geomspace(0.05, 300.0, 260)
+        predicted_chi4_peak = float(
+            np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, params))
+        )
+        late_time = 80.0 * params.persistence_mean
+        scored = persistence_exchange_data_protocol(
+            anchor_wave_number=1.1,
+            wave_numbers=wave_numbers,
+            observed_tau_alpha_by_k=observed_tau_alpha,
+            tau_alpha_relative_error_by_k={wave_number: 0.05 for wave_number in wave_numbers},
+            jump_variance=params.jump_variance,
+            diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            late_time=late_time,
+            observed_late_ngp=float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0]),
+            late_ngp_relative_error=0.08,
+            observed_chi4_peak=2.0 * predicted_chi4_peak,
+            chi4_peak_relative_error=0.1,
+            time_grid=time_grid,
+            cage_variance=params.cage_variance,
+            cage_tau=params.cage_tau,
+            z_threshold=2.0,
+        )
+
+        gate = simultaneous_dynamical_signature_closure_gate(
+            protocol_id="synthetic_chi4_mismatch_closure",
+            scored_row=scored,
+            calibration_observables=["diffusion_coefficient", "tau_alpha(k_anchor)"],
+            heldout_observables=[
+                "tau_alpha(k!=anchor)",
+                "late_ngp_recovery",
+                "stokes_einstein_growth",
+                "chi4_proxy_peak",
+            ],
+            required_consistency_flags=[
+                "multik_tau_alpha_z_consistent",
+                "late_ngp_z_consistent",
+                "chi4_peak_z_consistent",
+            ],
+            min_stokes_einstein_growth_over_poisson=2.0,
+        )
+
+        self.assertEqual(gate["closure_stage"], "dynamical_heldout_prediction_failed")
+        self.assertEqual(gate["simultaneous_closure_ready"], 1.0)
+        self.assertEqual(gate["all_required_dynamical_predictions_pass"], 0.0)
+        self.assertEqual(gate["primary_blocker"], "chi4_peak_z_consistent")
+        self.assertEqual(gate["thermodynamic_claim_allowed"], 0.0)
 
     def test_persistence_exchange_long_time_ngp_recovers_to_zero(self):
         params = PersistenceExchangeParams(

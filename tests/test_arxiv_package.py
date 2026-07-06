@@ -249,6 +249,27 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermodynamic["evidence_class"], "thermodynamic_scope_boundary")
         self.assertEqual(thermodynamic["primary_blocker"], "renewal_dynamics_not_thermodynamic_theory")
 
+    def test_simultaneous_closure_gate_requires_heldout_dynamical_predictions(self):
+        path = ROOT / "data" / "renewal_cage_simultaneous_closure.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["protocol_id"]: row for row in rows}
+        passed = by_id["synthetic_minimal_dynamical_closure"]
+        self.assertEqual(
+            passed["closure_stage"],
+            "simultaneous_dynamical_signature_closure_passed",
+        )
+        self.assertEqual(float(passed["simultaneous_closure_ready"]), 1.0)
+        self.assertEqual(float(passed["all_required_dynamical_predictions_pass"]), 1.0)
+        self.assertEqual(float(passed["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(passed["heldout_count"]), 4.0)
+
+        chi4_mismatch = by_id["synthetic_chi4_mismatch_closure"]
+        self.assertEqual(chi4_mismatch["closure_stage"], "dynamical_heldout_prediction_failed")
+        self.assertEqual(chi4_mismatch["primary_blocker"], "chi4_peak_z_consistent")
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -1431,6 +1452,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_persistence_exchange_joint_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_translation_rotation_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_simultaneous_closure.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -1566,6 +1588,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_frontier_benchmark_horizon.pdf",
             "figures/renewal_cage_sota_signed_constraints.pdf",
             "figures/renewal_cage_sota_evidence_class.pdf",
+            "figures/renewal_cage_simultaneous_closure.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",

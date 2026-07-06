@@ -1703,6 +1703,53 @@ def write_sota_evidence_class_pdf(path: Path) -> None:
     c.save()
 
 
+def write_simultaneous_closure_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_simultaneous_closure.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Simultaneous dynamical-signature closure gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A minimal D plus anchor-alpha inversion must pass held-out alpha, late-NGP, SE-growth, and chi4-proxy checks.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "protocol")
+    c.drawString(left + 220, top, "closure stage")
+    c.drawString(left + 520, top, "held")
+    c.drawString(left + 560, top, "pass")
+    c.drawString(left + 610, top, "SE growth")
+    c.drawString(left + 675, top, "blocker")
+    palette = {
+        "simultaneous_dynamical_signature_closure_passed": colors.HexColor("#2f855a"),
+        "dynamical_heldout_prediction_failed": colors.HexColor("#c05621"),
+        "scored_protocol_incomplete": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica", 7)
+    for idx, row in enumerate(rows):
+        y = top - 20 - idx * 42
+        stage = row["closure_stage"]
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["protocol_id"].replace("_", " ")[:34])
+        c.setFillColor(palette[stage])
+        c.rect(left + 220, y - 4, 270, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 225, y, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.drawString(left + 527, y, str(int(float(row["heldout_count"]))))
+        c.drawString(left + 570, y, str(int(float(row["all_required_dynamical_predictions_pass"]))))
+        c.drawString(left + 616, y, f"{float(row['stokes_einstein_growth_over_poisson']):.2f}")
+        c.drawString(left + 675, y, row["primary_blocker"].replace("_", " ")[:22])
+        c.drawString(left + 220, y - 12, f"held-out: {row['heldout_observables'].replace('_', ' ')[:82]}")
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3994,6 +4041,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_signed_constraints_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_signed_constraints.pdf"
     sota_evidence_verdict_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_verdict.pdf"
     sota_evidence_class_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_class.pdf"
+    simultaneous_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_simultaneous_closure.pdf"
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -4103,6 +4151,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_signed_constraints_pdf(sota_signed_constraints_pdf)
     write_sota_evidence_verdict_pdf(sota_evidence_verdict_pdf)
     write_sota_evidence_class_pdf(sota_evidence_class_pdf)
+    write_simultaneous_closure_pdf(simultaneous_closure_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -4189,6 +4238,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(sota_signed_constraints_pdf, "figures/renewal_cage_sota_signed_constraints.pdf")
         archive.write(sota_evidence_verdict_pdf, "figures/renewal_cage_sota_evidence_verdict.pdf")
         archive.write(sota_evidence_class_pdf, "figures/renewal_cage_sota_evidence_class.pdf")
+        archive.write(simultaneous_closure_pdf, "figures/renewal_cage_simultaneous_closure.pdf")
         archive.write(
             real_benchmark_assimilation_gate_pdf,
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",

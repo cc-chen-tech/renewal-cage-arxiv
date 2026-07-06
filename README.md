@@ -132,6 +132,11 @@ GlassBench metadata readiness from synthetic protocol-canary evidence and
 fit-only overclaim risks.
 The cross-observable prediction ledger separates calibration inputs from
 held-out predictions and external closures, making fit-only overclaims visible.
+The simultaneous-closure gate sharpens this into a minimal dynamical test:
+diffusion and one anchor `tau_alpha(k)` are calibration inputs, while multi-k
+alpha shape, late NGP recovery, Stokes-Einstein growth, and the `chi4` proxy
+must pass as held-out predictions; thermodynamic-transition claims remain
+disallowed for this gate.
 The inversion-identifiability audit then checks fit-rank margins, held-out
 predictions, closure dependence, and parameter degeneracy before any real-data
 fit is claimed.
@@ -323,6 +328,7 @@ figures/renewal_cage_sota_benchmark_consistency.svg
 figures/renewal_cage_sota_claim_alignment.svg
 figures/renewal_cage_sota_signed_constraints.svg
 figures/renewal_cage_sota_evidence_class.svg
+figures/renewal_cage_simultaneous_closure.svg
 figures/renewal_cage_real_benchmark_assimilation_gate.svg
 figures/renewal_cage_cross_observable_prediction_ledger.svg
 figures/renewal_cage_inversion_identifiability_audit.svg
@@ -396,6 +402,7 @@ data/renewal_cage_sota_benchmark_consistency.csv
 data/renewal_cage_sota_claim_alignment.csv
 data/renewal_cage_sota_signed_constraints.csv
 data/renewal_cage_sota_evidence_class.csv
+data/renewal_cage_simultaneous_closure.csv
 data/renewal_cage_real_benchmark_assimilation_gate.csv
 data/renewal_cage_cross_observable_prediction_ledger.csv
 data/renewal_cage_inversion_identifiability_audit.csv
@@ -490,6 +497,7 @@ paper/figures/renewal_cage_sota_benchmark_consistency.pdf
 paper/figures/renewal_cage_sota_claim_alignment.pdf
 paper/figures/renewal_cage_sota_signed_constraints.pdf
 paper/figures/renewal_cage_sota_evidence_class.pdf
+paper/figures/renewal_cage_simultaneous_closure.pdf
 paper/figures/renewal_cage_real_benchmark_assimilation_gate.pdf
 paper/figures/renewal_cage_cross_observable_prediction_ledger.pdf
 paper/figures/renewal_cage_inversion_identifiability_audit.pdf

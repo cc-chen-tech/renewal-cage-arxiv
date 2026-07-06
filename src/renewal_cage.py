@@ -7884,6 +7884,94 @@ def persistence_exchange_data_protocol(
     return out
 
 
+def simultaneous_dynamical_signature_closure_gate(
+    *,
+    protocol_id: str,
+    scored_row: dict[str, object],
+    calibration_observables: Sequence[str],
+    heldout_observables: Sequence[str],
+    required_consistency_flags: Sequence[str],
+    min_stokes_einstein_growth_over_poisson: float = 1.0,
+) -> dict[str, float | str]:
+    """Classify a minimal persistence/exchange inversion as a held-out closure test.
+
+    This gate is deliberately narrower than a glass-transition theory claim. It
+    asks whether diffusion plus one anchor alpha time can support simultaneous
+    dynamical predictions: multi-k alpha shape, late NGP recovery, the
+    Stokes-Einstein product, and a chi4 proxy. Thermodynamic transition claims
+    are always out of scope for this row.
+    """
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not calibration_observables:
+        raise ValueError("calibration_observables must be nonempty")
+    if not heldout_observables:
+        raise ValueError("heldout_observables must be nonempty")
+    if not required_consistency_flags:
+        raise ValueError("required_consistency_flags must be nonempty")
+    if min_stokes_einstein_growth_over_poisson <= 0.0:
+        raise ValueError("min_stokes_einstein_growth_over_poisson must be positive")
+    for name, values in {
+        "calibration_observables": calibration_observables,
+        "heldout_observables": heldout_observables,
+        "required_consistency_flags": required_consistency_flags,
+    }.items():
+        if any(not value for value in values):
+            raise ValueError(f"{name} must contain nonempty strings")
+
+    calibration = list(dict.fromkeys(calibration_observables))
+    heldout = list(dict.fromkeys(heldout_observables))
+    required = list(dict.fromkeys(required_consistency_flags))
+    missing_flags = [flag for flag in required if flag not in scored_row]
+    se_growth = float(scored_row.get("stokes_einstein_growth_over_poisson", 0.0))
+
+    base: dict[str, float | str] = {
+        "protocol_id": protocol_id,
+        "calibration_observables": ";".join(calibration),
+        "heldout_observables": ";".join(heldout),
+        "required_consistency_flags": ";".join(required),
+        "calibration_count": float(len(calibration)),
+        "heldout_count": float(len(heldout)),
+        "required_consistency_count": float(len(required)),
+        "stokes_einstein_growth_over_poisson": se_growth,
+        "min_stokes_einstein_growth_over_poisson": float(min_stokes_einstein_growth_over_poisson),
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+    if missing_flags:
+        base.update(
+            {
+                "simultaneous_closure_ready": 0.0,
+                "all_required_dynamical_predictions_pass": 0.0,
+                "stokes_einstein_growth_pass": 0.0,
+                "primary_blocker": missing_flags[0],
+                "closure_stage": "scored_protocol_incomplete",
+            }
+        )
+        return base
+
+    failed_flags = [flag for flag in required if float(scored_row.get(flag, 0.0)) != 1.0]
+    se_pass = se_growth >= min_stokes_einstein_growth_over_poisson
+    if not se_pass:
+        failed_flags.append("stokes_einstein_growth_over_poisson")
+    predictions_pass = not failed_flags
+    base.update(
+        {
+            "simultaneous_closure_ready": 1.0,
+            "all_required_dynamical_predictions_pass": float(predictions_pass),
+            "stokes_einstein_growth_pass": float(se_pass),
+            "primary_blocker": "none" if predictions_pass else failed_flags[0],
+            "closure_stage": "simultaneous_dynamical_signature_closure_passed"
+            if predictions_pass
+            else "dynamical_heldout_prediction_failed",
+        }
+    )
+    for flag in required:
+        base[flag] = float(scored_row.get(flag, 0.0))
+    return base
+
+
 def persistence_exchange_scan(
     *,
     ratios: list[float],

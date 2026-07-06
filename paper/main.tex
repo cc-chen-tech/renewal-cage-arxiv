@@ -1406,6 +1406,16 @@ those held-out scores into protocol-level outcomes: one row is
 falsification-ready and passes, one row is blocked by upstream alpha-threshold
 coverage, and a fit-only negative control is explicitly marked as an overclaim
 risk.
+The minimal simultaneous-closure gate
+\texttt{renewal\_cage\_simultaneous\_closure.csv} then asks the sharper
+publication question: after using only diffusion and one anchor
+$\tau_\alpha(k)$ as calibration inputs, can the inferred persistence/exchange
+clocks predict multi-$k$ alpha shape, late NGP recovery, Stokes--Einstein
+growth, and the $\chi_4$ proxy as held-out dynamical checks? The synthetic
+consistent row passes all four held-out checks, while a deliberately corrupted
+$\chi_4$ proxy is rejected. The gate also carries
+\texttt{thermodynamic\_claim\_allowed=0}, preserving the distinction between a
+dynamical-signature closure and a thermodynamic glass-transition theory.
 The separate file
 \texttt{renewal\_cage\_literature\_inversion\_readiness.csv} audits the
 data-readiness of representative benchmark papers. It marks the

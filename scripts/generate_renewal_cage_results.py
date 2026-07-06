@@ -97,6 +97,7 @@ from renewal_cage import (  # noqa: E402
     real_benchmark_assimilation_gate,
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
+    simultaneous_dynamical_signature_closure_gate,
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
@@ -4570,6 +4571,82 @@ def write_trajectory_prediction_falsification_csv(
     return rows
 
 
+def write_simultaneous_closure_csv(path: Path) -> list[dict[str, float | str]]:
+    """Gate minimal-anchor persistence/exchange inversion against held-out dynamics."""
+
+    params = PersistenceExchangeParams(
+        cage_variance=1.0,
+        cage_tau=0.2,
+        jump_variance=0.7,
+        persistence_mean=8.0,
+        exchange_mean=1.0,
+    )
+    wave_numbers = [0.7, 1.1, 1.6]
+    observed_tau_alpha = {
+        wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+        for wave_number in wave_numbers
+    }
+    time_grid = np.geomspace(0.05, 300.0, 260)
+    late_time = 80.0 * params.persistence_mean
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    predicted_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(1.1, time_grid, params))
+    )
+    common_inputs = {
+        "anchor_wave_number": 1.1,
+        "wave_numbers": wave_numbers,
+        "observed_tau_alpha_by_k": observed_tau_alpha,
+        "tau_alpha_relative_error_by_k": {wave_number: 0.05 for wave_number in wave_numbers},
+        "jump_variance": params.jump_variance,
+        "diffusion_coefficient": persistence_exchange_diffusion_coefficient(params),
+        "late_time": late_time,
+        "observed_late_ngp": observed_late_ngp,
+        "late_ngp_relative_error": 0.08,
+        "chi4_peak_relative_error": 0.1,
+        "time_grid": time_grid,
+        "cage_variance": params.cage_variance,
+        "cage_tau": params.cage_tau,
+        "z_threshold": 2.0,
+    }
+    closure_inputs = {
+        "calibration_observables": ["diffusion_coefficient", "tau_alpha(k_anchor)"],
+        "heldout_observables": [
+            "tau_alpha(k!=anchor)",
+            "late_ngp_recovery",
+            "stokes_einstein_growth",
+            "chi4_proxy_peak",
+        ],
+        "required_consistency_flags": [
+            "multik_tau_alpha_z_consistent",
+            "late_ngp_z_consistent",
+            "chi4_peak_z_consistent",
+        ],
+        "min_stokes_einstein_growth_over_poisson": 2.0,
+    }
+    passed = persistence_exchange_data_protocol(
+        **common_inputs,
+        observed_chi4_peak=predicted_chi4_peak,
+    )
+    chi4_mismatch = persistence_exchange_data_protocol(
+        **common_inputs,
+        observed_chi4_peak=2.0 * predicted_chi4_peak,
+    )
+    rows = [
+        simultaneous_dynamical_signature_closure_gate(
+            protocol_id="synthetic_minimal_dynamical_closure",
+            scored_row=passed,
+            **closure_inputs,
+        ),
+        simultaneous_dynamical_signature_closure_gate(
+            protocol_id="synthetic_chi4_mismatch_closure",
+            scored_row=chi4_mismatch,
+            **closure_inputs,
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_benchmark_publication_ladder_csv(
     path: Path,
     *,
@@ -8095,6 +8172,51 @@ def write_benchmark_publication_ladder_svg(
     path.write_text(svg)
 
 
+def write_simultaneous_closure_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1080, 300
+    left, top = 72, 108
+    row_h = 58
+    colors_by_stage = {
+        "simultaneous_dynamical_signature_closure_passed": "#2f855a",
+        "dynamical_heldout_prediction_failed": "#c05621",
+        "scored_protocol_incomplete": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["closure_stage"])
+        color = colors_by_stage[stage]
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["protocol_id"]).replace("_", " ")[:40]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 300}" y="{y}" width="292" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 312}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">held={int(float(row["heldout_count"]))}; pass={int(float(row["all_required_dynamical_predictions_pass"]))}; SE={float(row["stokes_einstein_growth_over_poisson"]):.2f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 300}" y="{y + 42}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker: {str(row["primary_blocker"]).replace("_", " ")}; thermodynamic claim allowed={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Simultaneous dynamical-signature closure gate</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Diffusion plus one anchor alpha time must predict multi-k alpha, late NGP recovery, SE growth, and chi4 proxy before a dynamical closure claim is allowed.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">protocol</text>
+  <text x="{left + 300}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">closure stage</text>
+  <text x="{left + 620}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">held-out predictions</text>
+  {"".join(marks)}
+  <rect x="72" y="252" width="14" height="14" fill="#2f855a" /><text x="94" y="264" font-family="Arial, sans-serif" font-size="12">simultaneous closure passed</text>
+  <rect x="302" y="252" width="14" height="14" fill="#c05621" /><text x="324" y="264" font-family="Arial, sans-serif" font-size="12">held-out mismatch rejected</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -9098,6 +9220,13 @@ def main() -> None:
     trajectory_falsification_rows = write_trajectory_prediction_falsification_csv(
         DATA_DIR / "renewal_cage_trajectory_prediction_falsification.csv",
         trajectory_heldout_prediction_rows,
+    )
+    simultaneous_closure_rows = write_simultaneous_closure_csv(
+        DATA_DIR / "renewal_cage_simultaneous_closure.csv"
+    )
+    write_simultaneous_closure_svg(
+        FIGURE_DIR / "renewal_cage_simultaneous_closure.svg",
+        simultaneous_closure_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"
