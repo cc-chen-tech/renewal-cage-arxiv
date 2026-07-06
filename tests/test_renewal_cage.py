@@ -126,6 +126,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
+    sota_glassbench_ka2d_timecode_semantics_gate,
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
@@ -3826,6 +3827,70 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(frame1["physical_time_ready"]), 0.0)
         self.assertEqual(float(frame1["sota_inversion_ready"]), 0.0)
         self.assertEqual(frame1["primary_blocker"], "physical_time_semantics")
+
+    def test_sota_glassbench_ka2d_timecode_semantics_corrects_replica_axis(self):
+        manifest = {
+            "source": "remote_zip_ka2d_trajectory_readme_timecode_semantics_and_corrected_member_observables",
+            "axis_semantics_evidence": "positions has shape (20,1290,2) for the 20 isoconfigurational trajectories",
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "tau_alpha": 2200.0,
+                    "time_code_map": {"tc01": 0.11, "tc02": 1.25},
+                    "members": [
+                        {
+                            "member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                            "time_code": "tc01",
+                            "lag_time": 0.11,
+                            "lag_time_over_tau_alpha": 0.00005,
+                            "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                            "replica_count": 20,
+                            "msd": 0.005,
+                            "ngp_2d": 0.04,
+                            "self_intermediate_scattering_by_k": [0.99, 0.98],
+                            "chi4_overlap_replica": 0.08,
+                        },
+                        {
+                            "member": "T0.30/train/N1290T0.30_10_tc01.npz",
+                            "time_code": "tc01",
+                            "lag_time": 0.11,
+                            "lag_time_over_tau_alpha": 0.00005,
+                            "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                            "replica_count": 20,
+                            "msd": 0.007,
+                            "ngp_2d": 0.06,
+                            "self_intermediate_scattering_by_k": [0.97, 0.96],
+                            "chi4_overlap_replica": 0.12,
+                        },
+                    ],
+                }
+            ],
+        }
+
+        rows = sota_glassbench_ka2d_timecode_semantics_gate(
+            semantics_id="glassbench_ka2d_timecode_semantics",
+            accession_id="glassbench_zenodo_10118191",
+            semantics_manifest=manifest,
+            min_members_per_time_code=2,
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["time_code"], "tc01")
+        self.assertEqual(float(row["lag_time"]), 0.11)
+        self.assertEqual(float(row["physical_lag_time_ready"]), 1.0)
+        self.assertEqual(float(row["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertEqual(float(row["frame_axis_is_physical_time"]), 0.0)
+        self.assertEqual(float(row["member_count"]), 2.0)
+        self.assertAlmostEqual(float(row["msd"]), 0.006)
+        self.assertGreater(float(row["sigma_msd_member_sem"]), 0.0)
+        self.assertEqual(row["self_intermediate_scattering_by_k"], "0.98;0.97")
+        self.assertEqual(float(row["all_time_codes_observed"]), 0.0)
+        self.assertEqual(float(row["timecode_curve_ready"]), 0.0)
+        self.assertEqual(float(row["sota_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "sparse_time_code_coverage")
 
     def test_sota_glassbench_visible_member_ensemble_audit_blocks_first_member_only_prefix(self):
         rows = sota_glassbench_visible_member_ensemble_audit_gate(

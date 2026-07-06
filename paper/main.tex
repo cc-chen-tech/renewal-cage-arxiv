@@ -1377,10 +1377,13 @@ adds an identity-level guardrail. The extended index exposes member ids and
 split labels at each KA2D temperature, so the member-list gate is ready for a
 member-resolved uncertainty extraction. A follow-on observable gate now extracts
 the first four indexed members at each KA2D temperature and computes
-frame-index means and standard errors for MSD, the two-dimensional NGP,
+array-index means and standard errors for MSD, the two-dimensional NGP,
 self-intermediate scattering at several wave numbers, and overlap-\(\chi_4\).
-The manuscript still keeps real inversion disabled until physical lag times are
-attached.
+A subsequent semantic audit uses the official KA2D trajectory README to correct
+the interpretation: the leading \texttt{positions} axis is not a time axis but
+the 20 isoconfigurational replicas, while the physical lag time is encoded by
+the file-name \texttt{tc} code. The manuscript still keeps real inversion
+disabled until enough members are extracted across all official time codes.
 
 \begin{figure}[p]
   \centering
@@ -1394,13 +1397,25 @@ attached.
 \begin{figure}[p]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf}
-  \caption{GlassBench four-member frame-index observable uncertainty gate. The
+  \caption{GlassBench four-member pre-semantic observable uncertainty gate. The
   first four indexed KA2D members at each temperature are extracted and
-  aggregated into observable means with standard errors. This upgrades the
-  GlassBench evidence from member-list visibility to member-resolved dynamical
-  observables, but it remains a frame-index result: physical lag times are still
-  required before persistence/exchange inversion, Stokes--Einstein products, or
-  real-time alpha-relaxation claims are enabled.}
+  aggregated into observable means with standard errors before the official
+  trajectory README semantics are applied. The follow-on time-code audit below
+  supersedes the frame-axis interpretation and prevents these rows from being
+  treated as physical-time trajectories.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf}
+  \caption{GlassBench KA2D time-code semantic audit. The official trajectory
+  README maps \texttt{tc05}=0.1 and \texttt{tc10}=1.1 at \(T=0.23\), and
+  \texttt{tc01}=0.11 at \(T=0.30\) for the currently extracted prefix members,
+  and identifies the \texttt{positions} leading axis as isoconfigurational
+  replicas. This is a genuine physical-time correction, but it is still too
+  sparse for persistence/exchange inversion because the extracted prefix covers
+  only 2 of 8 official \(T=0.23\) time codes and 1 of 6 official \(T=0.30\)
+  time codes.}
 \end{figure}
 
 \begin{figure}[p]

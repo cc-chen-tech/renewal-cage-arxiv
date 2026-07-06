@@ -5165,6 +5165,172 @@ def sota_glassbench_trajectory_member_ensemble_observable_gate(
     return out
 
 
+def sota_glassbench_ka2d_timecode_semantics_gate(
+    *,
+    semantics_id: str,
+    accession_id: str,
+    semantics_manifest: dict[str, object],
+    min_members_per_time_code: int,
+) -> list[dict[str, float | str]]:
+    """Promote KA2D trajectory observables only after correcting time-code semantics."""
+
+    if not semantics_id:
+        raise ValueError("semantics_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if int(min_members_per_time_code) != min_members_per_time_code or min_members_per_time_code < 1:
+        raise ValueError("min_members_per_time_code must be a positive integer")
+    entries = semantics_manifest.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("semantics_manifest entries must be a nonempty list")
+    evidence = str(semantics_manifest.get("axis_semantics_evidence", ""))
+    readme_marks_replica_axis = (
+        "isoconfigurational" in evidence.lower()
+        and "positions" in evidence.lower()
+    )
+    wave_numbers = [float(value) for value in semantics_manifest.get("wave_numbers", [])]
+    wave_numbers_text = ";".join(f"{value:g}" for value in wave_numbers) if wave_numbers else "none"
+    overlap_radius = float(semantics_manifest.get("overlap_radius", 0.0) or 0.0)
+
+    def mean_and_se(values: Sequence[float]) -> tuple[float, float]:
+        arr = np.asarray(values, dtype=float)
+        if arr.size == 0 or not np.all(np.isfinite(arr)):
+            raise ValueError("time-code observable values must be finite and nonempty")
+        mean = float(np.mean(arr))
+        if arr.size < 2:
+            return mean, 0.0
+        return mean, float(np.std(arr, ddof=1) / math.sqrt(arr.size))
+
+    def member_id(path: str) -> str:
+        name = path.rsplit("/", 1)[-1]
+        return name[:-4] if name.endswith(".npz") else name
+
+    out: list[dict[str, float | str]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("semantics entries must be dictionaries")
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        source_path = str(entry.get("source_path", "none"))
+        tau_alpha = float(entry.get("tau_alpha", 0.0) or 0.0)
+        time_code_map = entry.get("time_code_map", {})
+        if not isinstance(time_code_map, dict) or not time_code_map:
+            raise ValueError("time_code_map must be a nonempty dictionary")
+        time_code_to_lag = {str(code): float(value) for code, value in time_code_map.items()}
+        members = entry.get("members", [])
+        if not isinstance(members, list) or not members:
+            raise ValueError("members must be a nonempty list")
+
+        by_time_code: dict[str, list[dict[str, object]]] = {}
+        for member in members:
+            if not isinstance(member, dict):
+                raise ValueError("members must contain dictionaries")
+            time_code = str(member.get("time_code", "none"))
+            if time_code not in time_code_to_lag:
+                raise ValueError("member time_code must be present in time_code_map")
+            by_time_code.setdefault(time_code, []).append(member)
+
+        observed_time_codes = sorted(by_time_code, key=lambda code: time_code_to_lag[code])
+        all_time_codes_observed = set(observed_time_codes) == set(time_code_to_lag)
+        min_member_count = min(len(group) for group in by_time_code.values())
+        enough_members_everywhere = min_member_count >= int(min_members_per_time_code)
+        curve_ready = bool(all_time_codes_observed and enough_members_everywhere and tau_alpha > 0.0)
+        primary_blocker = (
+            "none"
+            if curve_ready
+            else "sparse_time_code_coverage"
+            if not all_time_codes_observed
+            else "member_count_per_time_code"
+        )
+        stage = (
+            "physical_timecode_curve_ready"
+            if curve_ready
+            else "physical_timecode_semantics_ready_sparse_coverage"
+            if not all_time_codes_observed
+            else "physical_timecode_semantics_ready_member_uncertainty_short"
+        )
+
+        for time_code in observed_time_codes:
+            group = by_time_code[time_code]
+            member_names = sorted(member_id(str(row.get("member", "none"))) for row in group)
+            msd, sigma_msd = mean_and_se([float(row.get("msd", 0.0) or 0.0) for row in group])
+            ngp, sigma_ngp = mean_and_se([float(row.get("ngp_2d", 0.0) or 0.0) for row in group])
+            chi4, sigma_chi4 = mean_and_se(
+                [float(row.get("chi4_overlap_replica", 0.0) or 0.0) for row in group]
+            )
+            fs_values = []
+            for row in group:
+                raw_fs = row.get("self_intermediate_scattering_by_k", [])
+                if isinstance(raw_fs, str):
+                    parsed = _parse_semicolon_float_values(
+                        raw_fs,
+                        name="self_intermediate_scattering_by_k",
+                    )
+                else:
+                    parsed = [float(value) for value in raw_fs]  # type: ignore[arg-type]
+                fs_values.append(parsed)
+            fs_matrix = np.asarray(fs_values, dtype=float)
+            if fs_matrix.ndim != 2 or fs_matrix.shape[1] == 0:
+                raise ValueError("Fs time-code values must be a nonempty matrix")
+            fs_means = np.mean(fs_matrix, axis=0)
+            if fs_matrix.shape[0] < 2:
+                fs_sigmas = np.zeros(fs_matrix.shape[1])
+            else:
+                fs_sigmas = np.std(fs_matrix, axis=0, ddof=1) / math.sqrt(fs_matrix.shape[0])
+            axis0_is_replica = all(
+                str(row.get("axis0_semantics", "")) == "isoconfigurational_trajectory_replicates"
+                for row in group
+            )
+            lag_time = time_code_to_lag[time_code]
+            out.append(
+                {
+                    "semantics_id": f"{semantics_id}_{system_id.lower()}_t{temperature.replace('.', '_')}_{time_code}",
+                    "accession_id": accession_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_path": source_path,
+                    "time_code": time_code,
+                    "lag_time": lag_time,
+                    "tau_alpha": tau_alpha,
+                    "lag_time_over_tau_alpha": lag_time / tau_alpha if tau_alpha > 0.0 else 0.0,
+                    "member_ids": ";".join(member_names),
+                    "member_count": float(len(group)),
+                    "min_members_per_time_code": float(min_members_per_time_code),
+                    "available_time_code_count": float(len(observed_time_codes)),
+                    "required_time_code_count": float(len(time_code_to_lag)),
+                    "available_time_codes": ";".join(observed_time_codes),
+                    "official_time_codes": ";".join(sorted(time_code_to_lag, key=lambda code: time_code_to_lag[code])),
+                    "axis0_is_isoconfigurational_replica": float(axis0_is_replica and readme_marks_replica_axis),
+                    "frame_axis_is_physical_time": 0.0,
+                    "physical_lag_time_ready": float(tau_alpha > 0.0 and lag_time > 0.0),
+                    "all_time_codes_observed": float(all_time_codes_observed),
+                    "msd": msd,
+                    "sigma_msd_member_sem": sigma_msd,
+                    "ngp_2d": ngp,
+                    "sigma_ngp_2d_member_sem": sigma_ngp,
+                    "wave_numbers": wave_numbers_text,
+                    "self_intermediate_scattering_by_k": ";".join(f"{value:.12g}" for value in fs_means),
+                    "sigma_self_intermediate_scattering_by_k_member_sem": ";".join(
+                        f"{value:.12g}" for value in fs_sigmas
+                    ),
+                    "overlap_radius": overlap_radius,
+                    "chi4_overlap_replica": chi4,
+                    "sigma_chi4_overlap_member_sem": sigma_chi4,
+                    "timecode_curve_ready": float(curve_ready),
+                    "sota_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": primary_blocker,
+                    "next_required_action": "run_persistence_exchange_inversion"
+                    if curve_ready
+                    else "extract_members_across_all_official_time_codes"
+                    if primary_blocker == "sparse_time_code_coverage"
+                    else "extract_more_members_per_time_code",
+                    "timecode_semantics_stage": stage,
+                }
+            )
+    return out
+
+
 def sota_glassbench_visible_member_ensemble_audit_gate(
     *,
     audit_id: str,

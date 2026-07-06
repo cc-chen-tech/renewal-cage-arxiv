@@ -3254,6 +3254,77 @@ def write_sota_glassbench_trajectory_member_ensemble_observable_pdf(path: Path) 
     c.save()
 
 
+def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench KA2D time-code semantics")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Official trajectory README maps tc file codes to lag times and identifies positions[20] as isoconfigurational replicas.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 56
+    colors_by_stage = {
+        "physical_timecode_semantics_ready_sparse_coverage": colors.HexColor("#2b6cb0"),
+        "physical_timecode_semantics_ready_member_uncertainty_short": colors.HexColor("#b7791f"),
+        "physical_timecode_curve_ready": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 104, top + 18, "semantic stage")
+    c.drawString(left + 370, top + 18, "corrected fixed-time observables")
+    for index, row in enumerate(rows[:4]):
+        y = top - index * row_h
+        stage = row["timecode_semantics_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} {row["time_code"]}')
+        c.setFillColor(color)
+        c.rect(left + 104, y - 12, 246, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 112, y - 3, stage.replace("_", " ")[:43])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 370,
+            y,
+            "t={:g}; tau_alpha={:g}; members={}; time codes={}/{}".format(
+                float(row["lag_time"]),
+                float(row["tau_alpha"]),
+                int(float(row["member_count"])),
+                int(float(row["available_time_code_count"])),
+                int(float(row["required_time_code_count"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            "MSD={:.5g}; chi4(replica)={:.3g}; axis0 replica={}; frame-axis time={}".format(
+                float(row["msd"]),
+                float(row["chi4_overlap_replica"]),
+                int(float(row["axis0_is_isoconfigurational_replica"])),
+                int(float(row["frame_axis_is_physical_time"])),
+            ),
+        )
+        c.drawString(left + 370, y - 27, f'blocker={row["primary_blocker"]}; next={row["next_required_action"]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This corrects the trajectory-axis semantics; full time-code coverage is still required before real inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4795,6 +4866,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_member_ensemble_observable_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf"
     )
+    sota_glassbench_ka2d_timecode_semantics_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -4913,6 +4987,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_member_ensemble_observable_pdf(
         sota_glassbench_trajectory_member_ensemble_observable_pdf
+    )
+    write_sota_glassbench_ka2d_timecode_semantics_pdf(
+        sota_glassbench_ka2d_timecode_semantics_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5068,6 +5145,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_member_ensemble_observable_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
+        )
+        archive.write(
+            sota_glassbench_ka2d_timecode_semantics_pdf,
+            "figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

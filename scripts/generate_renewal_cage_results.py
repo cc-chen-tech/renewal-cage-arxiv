@@ -107,6 +107,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_verdict,
     sota_glassbench_first_npz_structural_observable_plan_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
+    sota_glassbench_ka2d_timecode_semantics_gate,
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_visible_member_ensemble_audit_gate,
     sota_glassbench_trajectory_member_ensemble_observable_gate,
@@ -3874,6 +3875,20 @@ def write_sota_glassbench_trajectory_member_ensemble_observable_csv(path: Path) 
     return rows
 
 
+def write_sota_glassbench_ka2d_timecode_semantics_csv(path: Path) -> list[dict[str, float | str]]:
+    """Record official KA2D tc-to-time semantics and corrected fixed-time observables."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    rows = sota_glassbench_ka2d_timecode_semantics_gate(
+        semantics_id="glassbench_ka2d_timecode_semantics",
+        accession_id="glassbench_zenodo_10118191",
+        semantics_manifest=json.loads(manifest_path.read_text(encoding="utf-8")),
+        min_members_per_time_code=4,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -7558,6 +7573,64 @@ def write_sota_glassbench_trajectory_member_ensemble_observable_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_ka2d_timecode_semantics_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 470
+    left, top = 75, 118
+    row_h = 70
+    display_rows = rows[:4]
+    colors = {
+        "physical_timecode_semantics_ready_sparse_coverage": "#2b6cb0",
+        "physical_timecode_semantics_ready_member_uncertainty_short": "#b7791f",
+        "physical_timecode_curve_ready": "#2f855a",
+    }
+    marks = []
+    for index, row in enumerate(display_rows):
+        y = top + index * row_h
+        stage = str(row["timecode_semantics_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]} {row["time_code"]}'
+        lag = float(row["lag_time"])
+        tau = float(row["tau_alpha"])
+        members = int(float(row["member_count"]))
+        time_count = int(float(row["available_time_code_count"]))
+        required = int(float(row["required_time_code_count"]))
+        msd = float(row["msd"])
+        chi4 = float(row["chi4_overlap_replica"])
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 150}" y="{y - 4}" width="355" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 160}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">t={lag:g}; tau_alpha={tau:g}; members={members}; time codes={time_count}/{required}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 34}" font-family="Arial, sans-serif" font-size="10" fill="#555">MSD={msd:.5g}; chi4(replica)={chi4:.3g}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 52}" font-family="Arial, sans-serif" font-size="10" fill="#555">axis0 replica={int(float(row["axis0_is_isoconfigurational_replica"]))}; frame-axis time={int(float(row["frame_axis_is_physical_time"]))}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench KA2D time-code semantics</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Official trajectory README maps file-name tc codes to physical lag times and states that positions[20] are isoconfigurational replicas.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 150}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">semantic stage</text>
+  <text x="{left + 530}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">corrected fixed-time observables</text>
+  {"".join(marks)}
+  <rect x="75" y="420" width="14" height="14" fill="#2b6cb0" /><text x="96" y="432" font-family="Arial, sans-serif" font-size="12">physical lag time is known for observed tc codes, but full time-code coverage is still missing</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9523,6 +9596,13 @@ def main() -> None:
     write_sota_glassbench_trajectory_member_ensemble_observable_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.svg",
         glassbench_trajectory_member_ensemble_observable_rows,
+    )
+    glassbench_ka2d_timecode_semantics_rows = write_sota_glassbench_ka2d_timecode_semantics_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.csv"
+    )
+    write_sota_glassbench_ka2d_timecode_semantics_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.svg",
+        glassbench_ka2d_timecode_semantics_rows,
     )
     glassbench_trajectory_npz_ensemble_horizon_rows = write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv",

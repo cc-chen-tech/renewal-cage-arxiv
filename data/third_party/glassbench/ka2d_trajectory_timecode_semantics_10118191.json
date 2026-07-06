@@ -1,0 +1,347 @@
+{
+  "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+  "axis_semantics_evidence": "README states positions has shape (20,1290,2) for the 20 isoconfigurational trajectories; physical time is encoded by tc in file names.",
+  "entries": [
+    {
+      "members": [
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 0.03728070175438604,
+          "displacement_reference": "initial_positions",
+          "lag_time": 0.1,
+          "lag_time_over_tau_alpha": 1.0889616315258749e-07,
+          "member": "T0.23/test/N1290T0.23_202_tc05.npz",
+          "member_bytes": 465710,
+          "member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+          "msd": 0.0035537117040855327,
+          "ngp_2d": 0.0045489550436736805,
+          "overlap_mean": 0.9397286821705425,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9995647661001049,
+            0.9989255861594446,
+            0.9977282373094185
+          ],
+          "sigma_msd_replica_sem": 1.415132488600596e-05,
+          "sigma_ngp_2d_replica_sem": 0.004547287437752742,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            1.7327732583054474e-06,
+            4.276119301085197e-06,
+            9.036025956886666e-06
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 202,
+          "time_code": "tc05"
+        },
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 0.02899020807833538,
+          "displacement_reference": "initial_positions",
+          "lag_time": 0.1,
+          "lag_time_over_tau_alpha": 1.0889616315258749e-07,
+          "member": "T0.23/test/N1290T0.23_228_tc05.npz",
+          "member_bytes": 465710,
+          "member_md5": "858c58202e9403b5478d2680779f2710",
+          "msd": 0.0035980034270517193,
+          "ngp_2d": 0.011202171429168345,
+          "overlap_mean": 0.9361627906976745,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9995593424383934,
+            0.9989122005601102,
+            0.997699947197491
+          ],
+          "sigma_msd_replica_sem": 1.3879535729849504e-05,
+          "sigma_ngp_2d_replica_sem": 0.005890310531133852,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            1.6997052491459657e-06,
+            4.195281144422519e-06,
+            8.868240589786234e-06
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 228,
+          "time_code": "tc05"
+        },
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 0.06420848633210946,
+          "displacement_reference": "initial_positions",
+          "lag_time": 0.1,
+          "lag_time_over_tau_alpha": 1.0889616315258749e-07,
+          "member": "T0.23/test/N1290T0.23_299_tc05.npz",
+          "member_bytes": 465710,
+          "member_md5": "82f147097534e6b1897e3924f31bcba3",
+          "msd": 0.0035406451630610783,
+          "ngp_2d": 0.024858788157952588,
+          "overlap_mean": 0.9393410852713178,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9995663681148781,
+            0.9989295470980621,
+            0.997736637055098
+          ],
+          "sigma_msd_replica_sem": 1.7932464885108396e-05,
+          "sigma_ngp_2d_replica_sem": 0.007729719675926512,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            2.1954605825181118e-06,
+            5.416852284084399e-06,
+            1.1442260555131793e-05
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 299,
+          "time_code": "tc05"
+        },
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 1.0551999184006533,
+          "displacement_reference": "initial_positions",
+          "lag_time": 1.1,
+          "lag_time_over_tau_alpha": 1.1978577946784624e-06,
+          "member": "T0.23/test/N1290T0.23_299_tc10.npz",
+          "member_bytes": 465710,
+          "member_md5": "cfa5061c71824fe1748e91d0a0021cee",
+          "msd": 0.017993708801741608,
+          "ngp_2d": 0.12023878068022972,
+          "overlap_mean": 0.4446124031007751,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9977985326532961,
+            0.9945737206144327,
+            0.9885590984459979
+          ],
+          "sigma_msd_replica_sem": 0.000316822706923507,
+          "sigma_ngp_2d_replica_sem": 0.015580773498190939,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            3.870011702803016e-05,
+            9.516593316515209e-05,
+            0.0001997700438440538
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 299,
+          "time_code": "tc10"
+        }
+      ],
+      "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+      "system_id": "KA2D",
+      "tau_alpha": 918306.0,
+      "temperature": "0.23",
+      "time_code_map": {
+        "tc05": 0.1,
+        "tc10": 1.1,
+        "tc15": 11.64,
+        "tc20": 122.47,
+        "tc25": 1288.41,
+        "tc30": 13554.0,
+        "tc35": 142587.0,
+        "tc40": 1500000.0
+      }
+    },
+    {
+      "members": [
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 0.07948592411260716,
+          "displacement_reference": "initial_positions",
+          "lag_time": 0.11,
+          "lag_time_over_tau_alpha": 5e-05,
+          "member": "T0.30/train/N1290T0.30_3_tc01.npz",
+          "member_bytes": 444786,
+          "member_md5": "f51fd76f59b8288405a9e7abb61cdd0a",
+          "msd": 0.0050222364497156755,
+          "ngp_2d": 0.01244592950813736,
+          "overlap_mean": 0.8645736434108529,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9993849675225182,
+            0.9984819407846421,
+            0.9967909907905252
+          ],
+          "sigma_msd_replica_sem": 2.3146190023733716e-05,
+          "sigma_ngp_2d_replica_sem": 0.006168712324684293,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            2.8334891713852046e-06,
+            6.990027121417058e-06,
+            1.4761270509143283e-05
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 3,
+          "time_code": "tc01"
+        },
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 0.0973867809057528,
+          "displacement_reference": "initial_positions",
+          "lag_time": 0.11,
+          "lag_time_over_tau_alpha": 5e-05,
+          "member": "T0.30/train/N1290T0.30_10_tc01.npz",
+          "member_bytes": 444786,
+          "member_md5": "0100ddab8cf908a0f33d3c113e0080ae",
+          "msd": 0.005153240864741001,
+          "ngp_2d": 0.0016617524364216708,
+          "overlap_mean": 0.8569379844961242,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9993689260210304,
+            0.9984423518150063,
+            0.9967073263265736
+          ],
+          "sigma_msd_replica_sem": 2.4281039177617605e-05,
+          "sigma_ngp_2d_replica_sem": 0.00718855699030048,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            2.9725432874407162e-06,
+            7.333534923127436e-06,
+            1.5488556659768778e-05
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 10,
+          "time_code": "tc01"
+        },
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 0.03962464300285614,
+          "displacement_reference": "initial_positions",
+          "lag_time": 0.11,
+          "lag_time_over_tau_alpha": 5e-05,
+          "member": "T0.30/train/N1290T0.30_19_tc01.npz",
+          "member_bytes": 444786,
+          "member_md5": "a4758721a573b8911c96a21c89eb0c09",
+          "msd": 0.005313770776318704,
+          "ngp_2d": 0.015225132999286423,
+          "overlap_mean": 0.8494573643410851,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9993492761764073,
+            0.9983938833542068,
+            0.9966049978065848
+          ],
+          "sigma_msd_replica_sem": 2.466020504208605e-05,
+          "sigma_ngp_2d_replica_sem": 0.005363941306709223,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            3.0192084530311313e-06,
+            7.4495547444642435e-06,
+            1.57371141358062e-05
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 19,
+          "time_code": "tc01"
+        },
+        {
+          "axis0_semantics": "isoconfigurational_trajectory_replicates",
+          "box_length": 32.8962,
+          "chi4_overlap_replica": 0.048410852713178076,
+          "displacement_reference": "initial_positions",
+          "lag_time": 0.11,
+          "lag_time_over_tau_alpha": 5e-05,
+          "member": "T0.30/train/N1290T0.30_28_tc01.npz",
+          "member_bytes": 444786,
+          "member_md5": "919eb64f096c688e10ba0de8426eeef9",
+          "msd": 0.00531192100837456,
+          "ngp_2d": 0.021759516199443017,
+          "overlap_mean": 0.8489534883720931,
+          "particle_count": 1290,
+          "positions_shape": [
+            20,
+            1290,
+            2
+          ],
+          "replica_count": 20,
+          "self_intermediate_scattering_by_k": [
+            0.9993495055606798,
+            0.9983944598834105,
+            0.9966062574324159
+          ],
+          "sigma_msd_replica_sem": 2.1336977026112528e-05,
+          "sigma_ngp_2d_replica_sem": 0.0077347009324240604,
+          "sigma_self_intermediate_scattering_by_k_replica_sem": [
+            2.6114046752355647e-06,
+            6.4399681755596995e-06,
+            1.3591033315278461e-05
+          ],
+          "spatial_dimension": 2,
+          "species_count": 3,
+          "structure_id": 28,
+          "time_code": "tc01"
+        }
+      ],
+      "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+      "system_id": "KA2D",
+      "tau_alpha": 2200.0,
+      "temperature": "0.30",
+      "time_code_map": {
+        "tc01": 0.11,
+        "tc02": 1.25,
+        "tc03": 14.14,
+        "tc04": 158.74,
+        "tc05": 1781.79,
+        "tc06": 20000.0
+      }
+    }
+  ],
+  "observable_method": "minimal_image_displacement_from_initial_positions_per_isoconfigurational_replica",
+  "official_readme_crc32": "ec21e74c",
+  "official_readme_md5": "0c552aaf37f9005cb94d7a390868221f",
+  "official_readme_path": "GlassBench/KA2D_trajectories/README",
+  "overlap_radius": 0.1,
+  "source": "remote_zip_ka2d_trajectory_readme_timecode_semantics_and_corrected_member_observables",
+  "wave_numbers": [
+    0.7,
+    1.1,
+    1.6
+  ]
+}

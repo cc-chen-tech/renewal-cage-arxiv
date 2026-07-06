@@ -1018,6 +1018,36 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_030_frame1["sota_inversion_ready"]), 0.0)
         self.assertEqual(ka2d_030_frame1["primary_blocker"], "physical_time_semantics")
 
+    def test_sota_glassbench_ka2d_timecode_semantics_corrects_axis_and_time_codes(self):
+        manifest_path = ROOT / "data" / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.csv"
+        self.assertTrue(manifest_path.exists())
+        self.assertTrue(path.exists())
+
+        manifest = json.loads(manifest_path.read_text())
+        self.assertEqual(
+            manifest["source"],
+            "remote_zip_ka2d_trajectory_readme_timecode_semantics_and_corrected_member_observables",
+        )
+        self.assertIn("isoconfigurational trajectories", manifest["axis_semantics_evidence"])
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"], row["time_code"]): row for row in rows}
+        ka2d_023_tc05 = by_key[("KA2D", "0.23", "tc05")]
+        self.assertEqual(float(ka2d_023_tc05["lag_time"]), 0.1)
+        self.assertEqual(float(ka2d_023_tc05["tau_alpha"]), 918306.0)
+        self.assertEqual(float(ka2d_023_tc05["physical_lag_time_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023_tc05["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertEqual(float(ka2d_023_tc05["frame_axis_is_physical_time"]), 0.0)
+        self.assertEqual(float(ka2d_023_tc05["member_count"]), 3.0)
+        self.assertEqual(float(ka2d_023_tc05["available_time_code_count"]), 2.0)
+        self.assertEqual(float(ka2d_023_tc05["required_time_code_count"]), 8.0)
+        self.assertEqual(float(ka2d_023_tc05["timecode_curve_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023_tc05["sota_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023_tc05["primary_blocker"], "sparse_time_code_coverage")
+
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
         self.assertTrue(path.exists())
@@ -1699,6 +1729,7 @@ class ArxivPackageTests(unittest.TestCase):
                 "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
                 names,
             )
+            self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf", names)
@@ -1768,6 +1799,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
             main_tex,
         )
+        self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
@@ -1804,6 +1836,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf",
+            "figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
@@ -2009,6 +2042,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf"
             ).read_bytes()
+            first_sota_glassbench_ka2d_timecode_semantics = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf"
+            ).read_bytes()
             first_sota_glassbench_trajectory_npz_ensemble_horizon = (
                 ROOT
                 / "paper"
@@ -2204,6 +2243,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf"
             ).read_bytes()
+            second_sota_glassbench_ka2d_timecode_semantics = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf"
+            ).read_bytes()
             second_sota_glassbench_trajectory_npz_ensemble_horizon = (
                 ROOT
                 / "paper"
@@ -2355,6 +2400,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_glassbench_trajectory_member_ensemble_observable,
             second_sota_glassbench_trajectory_member_ensemble_observable,
+        )
+        self.assertEqual(
+            first_sota_glassbench_ka2d_timecode_semantics,
+            second_sota_glassbench_ka2d_timecode_semantics,
         )
         self.assertEqual(
             first_sota_glassbench_trajectory_npz_ensemble_horizon,
