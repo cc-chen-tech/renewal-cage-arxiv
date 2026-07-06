@@ -2640,6 +2640,75 @@ def write_sota_glassbench_trajectory_first_npz_observable_curve_pdf(path: Path) 
     c.save()
 
 
+def write_sota_glassbench_short_window_trend_canary_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_short_window_trend_canary.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench short-window real-data canary")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real first-NPZ frame-index curves are allowed to support a short-window MSD/NGP sanity check only.",
+    )
+    left, top = 48, page_h - 96
+    colors_by_stage = {
+        "short_window_real_data_canary_ready_inversion_blocked": colors.HexColor("#2b6cb0"),
+        "short_window_trend_canary_failed": colors.HexColor("#c05621"),
+        "short_window_trend_canary_incomplete": colors.HexColor("#b7791f"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "comparison")
+    c.drawString(left + 120, top + 18, "stage")
+    c.drawString(left + 390, top + 18, "canary values")
+    for index, row in enumerate(rows):
+        y = top - index * 58
+        stage = row["canary_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} {row["cold_temperature"]}->{row["hot_temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 120, y - 12, 250, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 128, y - 3, stage.replace("_", " ")[:43])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 390,
+            y,
+            "ready={}; inversion={}; thermodynamic={}; hot/cold MSD={:.3g}".format(
+                int(float(row["short_window_real_data_canary_ready"])),
+                int(float(row["sota_inversion_ready"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+                float(row["hot_to_cold_final_msd_ratio"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "peak NGP cold/hot=({:.3g}, {:.3g}); frames={}; blocker={}".format(
+                float(row["cold_peak_ngp_2d"]),
+                float(row["hot_peak_ngp_2d"]),
+                int(float(row["common_frame_count"])),
+                row["primary_blocker"].replace("_", " ")[:40],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "This canary does not supply lag-time units, multi-member uncertainties, Fs(k,t), chi4, alpha relaxation, or thermodynamic evidence.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4082,6 +4151,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_first_npz_observable_curve_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf"
     )
+    sota_glassbench_short_window_trend_canary_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_short_window_trend_canary.pdf"
+    )
     sota_glassbench_trajectory_first_npz_inversion_readiness_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
     )
@@ -4173,6 +4245,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_first_npz_observable_curve_pdf(
         sota_glassbench_trajectory_first_npz_observable_curve_pdf
+    )
+    write_sota_glassbench_short_window_trend_canary_pdf(
+        sota_glassbench_short_window_trend_canary_pdf
     )
     write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(
         sota_glassbench_trajectory_first_npz_inversion_readiness_pdf
@@ -4290,6 +4365,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_first_npz_observable_curve_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf",
+        )
+        archive.write(
+            sota_glassbench_short_window_trend_canary_pdf,
+            "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_first_npz_inversion_readiness_pdf,

@@ -3819,6 +3819,150 @@ def sota_glassbench_trajectory_first_npz_inversion_readiness_gate(
     return out
 
 
+def sota_glassbench_short_window_trend_canary_gate(
+    *,
+    canary_id: str,
+    accession_id: str,
+    curve_rows: Sequence[dict[str, float | str]],
+    cold_temperature: str,
+    hot_temperature: str,
+    min_common_frame_count: int,
+    min_msd_slowdown_ratio: float,
+    min_peak_ngp: float,
+) -> list[dict[str, float | str]]:
+    """Compare two real GlassBench first-NPZ curves without promoting them to fits."""
+
+    if not canary_id:
+        raise ValueError("canary_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not curve_rows:
+        raise ValueError("curve_rows must be nonempty")
+    if not cold_temperature:
+        raise ValueError("cold_temperature must be nonempty")
+    if not hot_temperature:
+        raise ValueError("hot_temperature must be nonempty")
+    if int(min_common_frame_count) != min_common_frame_count or min_common_frame_count < 2:
+        raise ValueError("min_common_frame_count must be an integer at least two")
+    if min_msd_slowdown_ratio <= 0.0:
+        raise ValueError("min_msd_slowdown_ratio must be positive")
+    if min_peak_ngp < 0.0:
+        raise ValueError("min_peak_ngp must be nonnegative")
+
+    ready_rows = [
+        row
+        for row in curve_rows
+        if float(row.get("observable_curve_ready", 0.0)) == 1.0
+        and str(row.get("temperature", "none")) in {cold_temperature, hot_temperature}
+    ]
+    system_ids = sorted({str(row.get("system_id", "unknown")) for row in ready_rows})
+    out: list[dict[str, float | str]] = []
+
+    for system_id in system_ids:
+        by_temp: dict[str, dict[float, dict[str, float | str]]] = {
+            cold_temperature: {},
+            hot_temperature: {},
+        }
+        for row in ready_rows:
+            if str(row.get("system_id", "unknown")) != system_id:
+                continue
+            temp = str(row.get("temperature", "none"))
+            frame = float(row.get("frame_index", -1.0))
+            if frame >= 0.0:
+                by_temp[temp][frame] = row
+
+        cold_frames = by_temp[cold_temperature]
+        hot_frames = by_temp[hot_temperature]
+        common_frames = sorted(set(cold_frames).intersection(hot_frames))
+        common_frame_count = len(common_frames)
+        cold_peak_ngp = max([float(row.get("ngp_2d", 0.0)) for row in cold_frames.values()] + [0.0])
+        hot_peak_ngp = max([float(row.get("ngp_2d", 0.0)) for row in hot_frames.values()] + [0.0])
+        if common_frames:
+            final_frame = common_frames[-1]
+            cold_final_msd = float(cold_frames[final_frame].get("msd", 0.0))
+            hot_final_msd = float(hot_frames[final_frame].get("msd", 0.0))
+        else:
+            final_frame = -1.0
+            cold_final_msd = 0.0
+            hot_final_msd = 0.0
+
+        ratio = hot_final_msd / cold_final_msd if cold_final_msd > 0.0 else math.inf
+        common_ready = common_frame_count >= int(min_common_frame_count)
+        slowdown_pass = common_ready and ratio >= float(min_msd_slowdown_ratio)
+        ngp_pass = common_ready and cold_peak_ngp >= float(min_peak_ngp) and hot_peak_ngp >= float(min_peak_ngp)
+        canary_ready = slowdown_pass and ngp_pass
+
+        if not common_ready:
+            stage = "short_window_trend_canary_incomplete"
+            blocker = "common_frame_count"
+        elif not slowdown_pass:
+            stage = "short_window_trend_canary_failed"
+            blocker = "short_window_msd_slowdown"
+        elif not ngp_pass:
+            stage = "short_window_trend_canary_failed"
+            blocker = "positive_ngp_canary"
+        else:
+            stage = "short_window_real_data_canary_ready_inversion_blocked"
+            blocker = "physical_time_ensemble_uncertainty"
+
+        out.append(
+            {
+                "canary_id": f"{canary_id}_{system_id.lower()}_t{cold_temperature.replace('.', '_')}_t{hot_temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "cold_temperature": cold_temperature,
+                "hot_temperature": hot_temperature,
+                "common_frame_count": float(common_frame_count),
+                "min_common_frame_count": float(min_common_frame_count),
+                "final_common_frame_index": float(final_frame),
+                "cold_final_msd": float(cold_final_msd),
+                "hot_final_msd": float(hot_final_msd),
+                "hot_to_cold_final_msd_ratio": float(ratio),
+                "min_msd_slowdown_ratio": float(min_msd_slowdown_ratio),
+                "cold_peak_ngp_2d": float(cold_peak_ngp),
+                "hot_peak_ngp_2d": float(hot_peak_ngp),
+                "min_peak_ngp_2d": float(min_peak_ngp),
+                "short_window_msd_slowdown_pass": float(slowdown_pass),
+                "positive_ngp_canary_pass": float(ngp_pass),
+                "short_window_real_data_canary_ready": float(canary_ready),
+                "sota_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "canary_stage": stage,
+            }
+        )
+
+    if not out:
+        out.append(
+            {
+                "canary_id": f"{canary_id}_missing",
+                "accession_id": accession_id,
+                "system_id": "none",
+                "cold_temperature": cold_temperature,
+                "hot_temperature": hot_temperature,
+                "common_frame_count": 0.0,
+                "min_common_frame_count": float(min_common_frame_count),
+                "final_common_frame_index": -1.0,
+                "cold_final_msd": 0.0,
+                "hot_final_msd": 0.0,
+                "hot_to_cold_final_msd_ratio": 0.0,
+                "min_msd_slowdown_ratio": float(min_msd_slowdown_ratio),
+                "cold_peak_ngp_2d": 0.0,
+                "hot_peak_ngp_2d": 0.0,
+                "min_peak_ngp_2d": float(min_peak_ngp),
+                "short_window_msd_slowdown_pass": 0.0,
+                "positive_ngp_canary_pass": 0.0,
+                "short_window_real_data_canary_ready": 0.0,
+                "sota_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "observable_curve_ready",
+                "canary_stage": "short_window_trend_canary_incomplete",
+            }
+        )
+
+    return out
+
+
 def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
     *,
     horizon_id: str,

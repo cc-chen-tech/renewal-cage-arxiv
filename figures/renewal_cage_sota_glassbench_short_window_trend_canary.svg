@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="360" viewBox="0 0 1160 360">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench short-window real-data canary</text>
+  <text x="75" y="67" font-family="Arial, sans-serif" font-size="13" fill="#444">First-NPZ frame-index curves may support a short-window MSD/NGP sanity check, not a full alpha or thermodynamic claim.</text>
+  <text x="78" y="92" font-family="Arial, sans-serif" font-size="12" font-weight="700">comparison</text>
+  <text x="268" y="92" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="643" y="92" font-family="Arial, sans-serif" font-size="12" font-weight="700">quantitative canary</text>
+  <text x="78" y="134" font-family="Arial, sans-serif" font-size="12" font-weight="700">KA2D: T=0.23 vs 0.30</text><rect x="268" y="114" width="355" height="26" fill="#2b6cb0" opacity="0.92" /><text x="278" y="131" font-family="Arial, sans-serif" font-size="10" fill="#fff">short window real data canary ready inversion bloc</text><text x="643" y="133" font-family="Arial, sans-serif" font-size="11">ready=1; inversion=0; hot/cold MSD=1.36; peak NGP=(0.15, 0.179)</text><text x="268" y="162" font-family="Arial, sans-serif" font-size="10" fill="#555">frames=20; blocker=physical time ensemble uncertainty</text>
+  <rect x="75" y="292" width="14" height="14" fill="#2b6cb0" /><text x="96" y="304" font-family="Arial, sans-serif" font-size="12">real short-window canary ready</text>
+  <rect x="340" y="292" width="14" height="14" fill="#c05621" /><text x="361" y="304" font-family="Arial, sans-serif" font-size="12">trend failed</text>
+  <text x="550" y="304" font-family="Arial, sans-serif" font-size="12">physical time, ensemble members, Fs(k,t), chi4, and uncertainties remain required for SOTA inversion</text>
+</svg>

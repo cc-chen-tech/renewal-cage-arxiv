@@ -108,6 +108,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
+    sota_glassbench_short_window_trend_canary_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
@@ -3637,6 +3638,27 @@ def write_sota_glassbench_trajectory_first_npz_inversion_readiness_csv(
     return rows
 
 
+def write_sota_glassbench_short_window_trend_canary_csv(
+    path: Path,
+    *,
+    curve_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compare two real first-NPZ GlassBench short windows without claiming inversion."""
+
+    rows = sota_glassbench_short_window_trend_canary_gate(
+        canary_id="glassbench_short_window_trend_canary",
+        accession_id="glassbench_zenodo_10118191",
+        curve_rows=curve_rows,
+        cold_temperature="0.23",
+        hot_temperature="0.30",
+        min_common_frame_count=20,
+        min_msd_slowdown_ratio=1.1,
+        min_peak_ngp=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
     path: Path,
     *,
@@ -6776,6 +6798,59 @@ def write_sota_glassbench_trajectory_first_npz_inversion_readiness_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_short_window_trend_canary_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 360
+    left, top = 78, 118
+    colors = {
+        "short_window_real_data_canary_ready_inversion_blocked": "#2b6cb0",
+        "short_window_trend_canary_failed": "#c05621",
+        "short_window_trend_canary_incomplete": "#b7791f",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * 82
+        stage = str(row["canary_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]}: T={row["cold_temperature"]} vs {row["hot_temperature"]}'
+        ready = int(float(row["short_window_real_data_canary_ready"]))
+        inv = int(float(row["sota_inversion_ready"]))
+        ratio = float(row["hot_to_cold_final_msd_ratio"])
+        cold_ngp = float(row["cold_peak_ngp_2d"])
+        hot_ngp = float(row["hot_peak_ngp_2d"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 190}" y="{y - 4}" width="355" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 200}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">ready={ready}; inversion={inv}; hot/cold MSD={ratio:.3g}; peak NGP=({cold_ngp:.3g}, {hot_ngp:.3g})</text>'
+        )
+        marks.append(
+            f'<text x="{left + 190}" y="{y + 44}" font-family="Arial, sans-serif" font-size="10" fill="#555">frames={int(float(row["common_frame_count"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench short-window real-data canary</text>
+  <text x="75" y="67" font-family="Arial, sans-serif" font-size="13" fill="#444">First-NPZ frame-index curves may support a short-window MSD/NGP sanity check, not a full alpha or thermodynamic claim.</text>
+  <text x="{left}" y="{top - 26}" font-family="Arial, sans-serif" font-size="12" font-weight="700">comparison</text>
+  <text x="{left + 190}" y="{top - 26}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 565}" y="{top - 26}" font-family="Arial, sans-serif" font-size="12" font-weight="700">quantitative canary</text>
+  {"".join(marks)}
+  <rect x="75" y="292" width="14" height="14" fill="#2b6cb0" /><text x="96" y="304" font-family="Arial, sans-serif" font-size="12">real short-window canary ready</text>
+  <rect x="340" y="292" width="14" height="14" fill="#c05621" /><text x="361" y="304" font-family="Arial, sans-serif" font-size="12">trend failed</text>
+  <text x="550" y="304" font-family="Arial, sans-serif" font-size="12">physical time, ensemble members, Fs(k,t), chi4, and uncertainties remain required for SOTA inversion</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -8705,6 +8780,14 @@ def main() -> None:
     write_sota_glassbench_trajectory_first_npz_observable_curve_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.svg",
         glassbench_trajectory_first_npz_observable_curve_rows,
+    )
+    glassbench_short_window_trend_canary_rows = write_sota_glassbench_short_window_trend_canary_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_short_window_trend_canary.csv",
+        curve_rows=glassbench_trajectory_first_npz_observable_curve_rows,
+    )
+    write_sota_glassbench_short_window_trend_canary_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_short_window_trend_canary.svg",
+        glassbench_short_window_trend_canary_rows,
     )
     glassbench_trajectory_first_npz_inversion_readiness_rows = (
         write_sota_glassbench_trajectory_first_npz_inversion_readiness_csv(

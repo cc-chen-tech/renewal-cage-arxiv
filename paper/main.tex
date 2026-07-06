@@ -1299,6 +1299,17 @@ or parsing problem into a controlled analysis-policy problem.
   inversions.}
 \end{figure}
 
+The short-window trend canary makes the first real coordinate-level comparison
+quantitative without promoting it to a fit. In
+\texttt{renewal\_cage\_sota\_glassbench\_short\_window\_trend\_canary.csv},
+the first KA2D \texttt{T=0.30} member has a final-frame MSD \(1.36\) times the
+first \texttt{T=0.23} member, and both first members have positive
+two-dimensional NGP peaks. This is a real-data MSD/NGP sanity check consistent
+with faster short-window motion at the hotter state, but its
+\texttt{sota\_inversion\_ready} and \texttt{thermodynamic\_claim\_allowed}
+flags remain zero because physical lag times, ensemble uncertainties,
+multi-\(k\) \(F_s\), and \(\chi_4\)-like observables are still absent.
+
 The corresponding SOTA-inversion readiness gate records the next hard
 requirements for turning these real coordinate curves into a quantitative
 persistence/exchange comparison. A row is promoted only after physical lag-time

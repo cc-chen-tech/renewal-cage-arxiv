@@ -123,6 +123,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
+    sota_glassbench_short_window_trend_canary_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
@@ -2914,6 +2915,85 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(ready["ensemble_ready"]), 1.0)
         self.assertEqual(float(ready["uncertainty_ready"]), 1.0)
         self.assertEqual(float(ready["sota_inversion_ready"]), 1.0)
+
+    def test_sota_glassbench_short_window_trend_canary_detects_real_cooling_slowdown(self):
+        curve_rows = []
+        for temp, msd_values, ngp_values in [
+            ("0.23", [0.0, 0.004, 0.0041, 0.0040], [0.0, 0.05, 0.11, 0.04]),
+            ("0.30", [0.0, 0.005, 0.0054, 0.0053], [0.0, 0.04, 0.12, 0.03]),
+        ]:
+            for frame, (msd, ngp) in enumerate(zip(msd_values, ngp_values)):
+                curve_rows.append(
+                    {
+                        "curve_id": f"curve_ka2d_t{temp}_frame_{frame}",
+                        "accession_id": "glassbench_zenodo_10118191",
+                        "system_id": "KA2D",
+                        "temperature": temp,
+                        "source_path": f"GlassBench/KA2D_trajectories/T{temp}.tar.xz",
+                        "first_npz_member": f"T{temp}/member.npz",
+                        "observable_method": "minimal_image_displacement_from_first_frame",
+                        "frame_index": float(frame),
+                        "msd": msd,
+                        "ngp_2d": ngp,
+                        "observable_curve_ready": 1.0,
+                        "trajectory_extraction_ready": 0.0,
+                        "real_reanalysis_ready": 0.0,
+                        "primary_blocker": "single_npz_frame_index_curve",
+                        "curve_stage": "first_npz_observable_curve_ready_reanalysis_blocked",
+                    }
+                )
+
+        rows = sota_glassbench_short_window_trend_canary_gate(
+            canary_id="glassbench_short_window_trend_canary",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            cold_temperature="0.23",
+            hot_temperature="0.30",
+            min_common_frame_count=4,
+            min_msd_slowdown_ratio=1.1,
+            min_peak_ngp=0.05,
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["system_id"], "KA2D")
+        self.assertGreater(float(row["hot_to_cold_final_msd_ratio"]), 1.1)
+        self.assertEqual(float(row["short_window_msd_slowdown_pass"]), 1.0)
+        self.assertEqual(float(row["positive_ngp_canary_pass"]), 1.0)
+        self.assertEqual(float(row["short_window_real_data_canary_ready"]), 1.0)
+        self.assertEqual(float(row["sota_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["canary_stage"], "short_window_real_data_canary_ready_inversion_blocked")
+
+    def test_sota_glassbench_short_window_trend_canary_rejects_inverted_msd_trend(self):
+        curve_rows = []
+        for temp, final_msd in [("0.23", 0.006), ("0.30", 0.004)]:
+            for frame in range(4):
+                curve_rows.append(
+                    {
+                        "system_id": "KA2D",
+                        "temperature": temp,
+                        "frame_index": float(frame),
+                        "msd": final_msd * frame / 3.0,
+                        "ngp_2d": 0.08 if frame == 2 else 0.02,
+                        "observable_curve_ready": 1.0,
+                    }
+                )
+
+        rows = sota_glassbench_short_window_trend_canary_gate(
+            canary_id="glassbench_short_window_trend_canary",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            cold_temperature="0.23",
+            hot_temperature="0.30",
+            min_common_frame_count=4,
+            min_msd_slowdown_ratio=1.1,
+            min_peak_ngp=0.05,
+        )
+
+        self.assertEqual(float(rows[0]["short_window_real_data_canary_ready"]), 0.0)
+        self.assertEqual(rows[0]["primary_blocker"], "short_window_msd_slowdown")
+        self.assertEqual(rows[0]["canary_stage"], "short_window_trend_canary_failed")
 
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_counts_prefix_members_without_claiming_extraction(self):
         tar_probe_rows = [
