@@ -105,6 +105,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_class_gate,
     sota_evidence_verdict,
+    sota_glassbench_first_npz_structural_observable_plan_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_visible_member_ensemble_audit_gate,
@@ -3661,6 +3662,30 @@ def write_sota_glassbench_observable_coverage_audit_csv(
         observable_semantics_rows=observable_semantics_rows,
         required_observables=[
             "lag_time",
+            "msd",
+            "ngp_2d",
+            "self_intermediate_scattering_by_k",
+            "chi4_overlap",
+        ],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_first_npz_structural_observable_plan_csv(
+    path: Path,
+    *,
+    schema_probe_rows: list[dict[str, float | str]],
+    observable_coverage_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Plan the first-NPZ coordinate extraction needed for Fs/chi4 observables."""
+
+    rows = sota_glassbench_first_npz_structural_observable_plan_gate(
+        plan_id="glassbench_first_npz_structural_observable_plan",
+        accession_id="glassbench_zenodo_10118191",
+        schema_probe_rows=schema_probe_rows,
+        observable_coverage_rows=observable_coverage_rows,
+        implemented_observables=[
             "msd",
             "ngp_2d",
             "self_intermediate_scattering_by_k",
@@ -7266,6 +7291,63 @@ def write_sota_glassbench_observable_coverage_audit_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_first_npz_structural_observable_plan_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 405
+    left, top = 75, 112
+    row_h = 76
+    colors = {
+        "structural_observable_compute_ready": "#2f855a",
+        "coordinate_schema_ready_positions_bytes_missing": "#c05621",
+        "coordinate_schema_incomplete": "#4a5568",
+    }
+    marks = []
+    for index, row in enumerate(rows):
+        y = top + index * row_h
+        stage = str(row["compute_plan_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        schema = int(float(row["coordinate_schema_ready"]))
+        raw = int(float(row["raw_coordinate_bytes_cached"]))
+        after = int(float(row["computable_after_npz_extraction"]))
+        immediate = int(float(row["immediately_computable_from_current_cache"]))
+        remaining = str(row["remaining_missing_after_structural_compute"]).replace("_", " ")
+        actions = str(row["next_required_actions"]).replace("_", " ")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 125}" y="{y - 5}" width="360" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 135}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 510}" y="{y + 13}" font-family="Arial, sans-serif" font-size="11">schema={schema}; raw bytes={raw}; after extraction={after}; immediate={immediate}; frames={int(float(row["frame_count"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 125}" y="{y + 40}" font-family="Arial, sans-serif" font-size="9" fill="#555">protocol: {str(row["implemented_observable_protocol"]).replace("_", " ")[:112]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 125}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">remaining after compute: {remaining}; next: {actions[:84]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench first-NPZ structural-observable plan</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Coordinate schema plus the implemented trajectory protocol make F_s and overlap chi4 computable after raw first-NPZ bytes are extracted.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 125}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">compute-plan stage</text>
+  <text x="{left + 510}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">coordinate-to-observable status</text>
+  {"".join(marks)}
+  <rect x="75" y="346" width="14" height="14" fill="#c05621" /><text x="96" y="358" font-family="Arial, sans-serif" font-size="12">current cache: schema is visible but raw coordinate bytes are not stored</text>
+  <rect x="620" y="346" width="14" height="14" fill="#2f855a" /><text x="641" y="358" font-family="Arial, sans-serif" font-size="12">green requires cached positions.npy/box.npy/types.npy for the first NPZ</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9359,6 +9441,17 @@ def main() -> None:
     write_sota_glassbench_observable_coverage_audit_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_observable_coverage_audit.svg",
         glassbench_observable_coverage_audit_rows,
+    )
+    glassbench_first_npz_structural_observable_plan_rows = (
+        write_sota_glassbench_first_npz_structural_observable_plan_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_first_npz_structural_observable_plan.csv",
+            schema_probe_rows=glassbench_trajectory_npz_schema_probe_rows,
+            observable_coverage_rows=glassbench_observable_coverage_audit_rows,
+        )
+    )
+    write_sota_glassbench_first_npz_structural_observable_plan_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_structural_observable_plan.svg",
+        glassbench_first_npz_structural_observable_plan_rows,
     )
     glassbench_real_inversion_gap_ledger_rows = write_sota_glassbench_real_inversion_gap_ledger_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv",

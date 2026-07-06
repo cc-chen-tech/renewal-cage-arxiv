@@ -125,6 +125,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_real_inversion_gap_ledger_gate,
     sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
+    sota_glassbench_first_npz_structural_observable_plan_gate,
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
@@ -3051,6 +3052,106 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["observable_coverage_ready"]), 1.0)
         self.assertEqual(float(row["publishable_real_inversion_observable_set_ready"]), 1.0)
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_first_npz_structural_observable_plan_marks_positions_bytes_blocker(self):
+        schema_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "npz_schema_ready": 1.0,
+                "coordinate_array_ready": 1.0,
+                "trajectory_extraction_ready": 0.0,
+                "npz_member_bytes": 444786.0,
+                "array_names": "box.npy;types.npy;initial_positions.npy;positions.npy",
+                "array_shapes": "box.npy:scalar;types.npy:1290;positions.npy:20x1290x2",
+                "frame_count": 20.0,
+                "particle_count": 1290.0,
+                "spatial_dimension": 2.0,
+            }
+        ]
+        coverage_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "available_trajectory_observables": "frame_index;msd;ngp_2d",
+                "missing_observables": "lag_time;self_intermediate_scattering_by_k;chi4_overlap",
+                "observable_coverage_ready": 0.0,
+            }
+        ]
+
+        rows = sota_glassbench_first_npz_structural_observable_plan_gate(
+            plan_id="glassbench_first_npz_structural_observable_plan",
+            accession_id="glassbench_zenodo_10118191",
+            schema_probe_rows=schema_rows,
+            observable_coverage_rows=coverage_rows,
+            implemented_observables=[
+                "msd",
+                "ngp_2d",
+                "self_intermediate_scattering_by_k",
+                "chi4_overlap",
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(row["compute_plan_stage"], "coordinate_schema_ready_positions_bytes_missing")
+        self.assertEqual(float(row["coordinate_schema_ready"]), 1.0)
+        self.assertEqual(float(row["raw_coordinate_bytes_cached"]), 0.0)
+        self.assertEqual(float(row["computable_after_npz_extraction"]), 1.0)
+        self.assertEqual(float(row["immediately_computable_from_current_cache"]), 0.0)
+        self.assertIn("self_intermediate_scattering_by_k", row["implemented_observable_protocol"])
+        self.assertIn("chi4_overlap", row["implemented_observable_protocol"])
+        self.assertEqual(row["remaining_missing_after_structural_compute"], "lag_time")
+        self.assertEqual(row["primary_blocker"], "raw_coordinate_bytes")
+        self.assertIn("extract_first_npz_positions_box_types", row["next_required_actions"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_first_npz_structural_observable_plan_accepts_cached_positions(self):
+        rows = sota_glassbench_first_npz_structural_observable_plan_gate(
+            plan_id="glassbench_first_npz_structural_observable_plan",
+            accession_id="glassbench_zenodo_10118191",
+            schema_probe_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "first_npz_member": "T0.30/train/member_1.npz",
+                    "npz_schema_ready": 1.0,
+                    "coordinate_array_ready": 1.0,
+                    "trajectory_extraction_ready": 1.0,
+                    "npz_member_bytes": 444786.0,
+                    "array_names": "box.npy;types.npy;positions.npy",
+                    "array_shapes": "box.npy:scalar;types.npy:1290;positions.npy:20x1290x2",
+                    "frame_count": 20.0,
+                    "particle_count": 1290.0,
+                    "spatial_dimension": 2.0,
+                }
+            ],
+            observable_coverage_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "available_trajectory_observables": "frame_index;msd;ngp_2d",
+                    "missing_observables": "lag_time;self_intermediate_scattering_by_k;chi4_overlap",
+                    "observable_coverage_ready": 0.0,
+                }
+            ],
+            implemented_observables=[
+                "msd",
+                "ngp_2d",
+                "self_intermediate_scattering_by_k",
+                "chi4_overlap",
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(row["compute_plan_stage"], "structural_observable_compute_ready")
+        self.assertEqual(float(row["raw_coordinate_bytes_cached"]), 1.0)
+        self.assertEqual(float(row["immediately_computable_from_current_cache"]), 1.0)
+        self.assertEqual(row["remaining_missing_after_structural_compute"], "lag_time")
+        self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+        self.assertEqual(row["next_required_actions"], "run_trajectory_observable_protocol_on_cached_npz")
 
     def test_sota_glassbench_short_window_trend_canary_detects_real_cooling_slowdown(self):
         curve_rows = []

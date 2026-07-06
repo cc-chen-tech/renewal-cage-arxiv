@@ -3263,6 +3263,78 @@ def write_sota_glassbench_observable_coverage_audit_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_first_npz_structural_observable_plan_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_first_npz_structural_observable_plan.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench first-NPZ structural-observable plan")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Coordinate schema and implemented trajectory observables are separated from the missing raw first-NPZ bytes.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 64
+    colors_by_stage = {
+        "structural_observable_compute_ready": colors.HexColor("#2f855a"),
+        "coordinate_schema_ready_positions_bytes_missing": colors.HexColor("#c05621"),
+        "coordinate_schema_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 100, top + 18, "compute stage")
+    c.drawString(left + 390, top + 18, "coordinate-to-observable status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["compute_plan_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 12, 265, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:45])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 390,
+            y,
+            "schema={}; raw bytes={}; after extraction={}; immediate={}; frames={}; npz={:.0f} bytes".format(
+                int(float(row["coordinate_schema_ready"])),
+                int(float(row["raw_coordinate_bytes_cached"])),
+                int(float(row["computable_after_npz_extraction"])),
+                int(float(row["immediately_computable_from_current_cache"])),
+                int(float(row["frame_count"])),
+                float(row["npz_member_bytes"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            f'protocol: {row["implemented_observable_protocol"].replace("_", " ")[:82]}',
+        )
+        c.drawString(
+            left + 390,
+            y - 27,
+            f'remaining: {row["remaining_missing_after_structural_compute"].replace("_", " ")}; next: {row["next_required_actions"].replace("_", " ")[:60]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "The current cache is sufficient to prove computability after extraction, not to claim that F_s or chi4 have already been measured.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4590,6 +4662,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_observable_coverage_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_observable_coverage_audit.pdf"
     )
+    sota_glassbench_first_npz_structural_observable_plan_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -4702,6 +4777,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_observable_coverage_audit_pdf(
         sota_glassbench_observable_coverage_audit_pdf
+    )
+    write_sota_glassbench_first_npz_structural_observable_plan_pdf(
+        sota_glassbench_first_npz_structural_observable_plan_pdf
     )
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
@@ -4849,6 +4927,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_observable_coverage_audit_pdf,
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
+        )
+        archive.write(
+            sota_glassbench_first_npz_structural_observable_plan_pdf,
+            "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
         )
         archive.write(
             sota_remote_result_curve_cache_pdf,

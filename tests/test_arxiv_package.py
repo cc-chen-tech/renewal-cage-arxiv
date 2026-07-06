@@ -915,6 +915,29 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("compute_multi_k_self_intermediate_scattering", row["next_required_actions"])
             self.assertIn("do_not_substitute_rhomax_or_ml_feature_curves_for_fs_chi4", row["next_required_actions"])
 
+    def test_sota_glassbench_first_npz_structural_observable_plan_marks_extractable_observables(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_first_npz_structural_observable_plan.csv"
+        self.assertTrue(path.exists())
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key, npz_bytes in [(("KA2D", "0.23"), 465710.0), (("KA2D", "0.30"), 444786.0)]:
+            row = by_key[key]
+            self.assertEqual(row["compute_plan_stage"], "coordinate_schema_ready_positions_bytes_missing")
+            self.assertEqual(float(row["coordinate_schema_ready"]), 1.0)
+            self.assertEqual(float(row["raw_coordinate_bytes_cached"]), 0.0)
+            self.assertEqual(float(row["computable_after_npz_extraction"]), 1.0)
+            self.assertEqual(float(row["immediately_computable_from_current_cache"]), 0.0)
+            self.assertEqual(float(row["npz_member_bytes"]), npz_bytes)
+            self.assertIn("self_intermediate_scattering_by_k", row["implemented_observable_protocol"])
+            self.assertIn("chi4_overlap", row["implemented_observable_protocol"])
+            self.assertEqual(row["remaining_missing_after_structural_compute"], "lag_time")
+            self.assertEqual(row["primary_blocker"], "raw_coordinate_bytes")
+            self.assertIn("extract_first_npz_positions_box_types", row["next_required_actions"])
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
         self.assertTrue(path.exists())
@@ -1593,6 +1616,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)
@@ -1746,6 +1770,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
+            "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",

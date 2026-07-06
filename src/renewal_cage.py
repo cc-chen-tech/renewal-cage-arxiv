@@ -3984,6 +3984,121 @@ def sota_glassbench_observable_coverage_audit_gate(
     return out
 
 
+def sota_glassbench_first_npz_structural_observable_plan_gate(
+    *,
+    plan_id: str,
+    accession_id: str,
+    schema_probe_rows: Sequence[dict[str, float | str]],
+    observable_coverage_rows: Sequence[dict[str, float | str]],
+    implemented_observables: Sequence[str],
+) -> list[dict[str, float | str]]:
+    """Plan the first-NPZ coordinate extraction needed for Fs/chi4 observables."""
+
+    if not plan_id:
+        raise ValueError("plan_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not schema_probe_rows:
+        raise ValueError("schema_probe_rows must be nonempty")
+    if not observable_coverage_rows:
+        raise ValueError("observable_coverage_rows must be nonempty")
+    implemented = list(dict.fromkeys(str(item) for item in implemented_observables))
+    if not implemented or any(not item for item in implemented):
+        raise ValueError("implemented_observables must contain nonempty strings")
+
+    def key(row: dict[str, float | str]) -> tuple[str, str]:
+        return (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+
+    def split_items(value: object) -> list[str]:
+        text = str(value)
+        if not text or text == "none":
+            return []
+        return [item for item in text.split(";") if item and item != "none"]
+
+    coverage_by_key = {key(row): row for row in observable_coverage_rows}
+    out: list[dict[str, float | str]] = []
+    for schema in sorted(schema_probe_rows, key=lambda row: (str(row.get("system_id", "")), str(row.get("temperature", "")))):
+        system_id, temperature = key(schema)
+        if system_id == "KA" and temperature == "none":
+            continue
+        coverage = coverage_by_key.get((system_id, temperature), {})
+        schema_ready = bool(float(schema.get("npz_schema_ready", 0.0)))
+        coordinate_ready = bool(float(schema.get("coordinate_array_ready", 0.0)))
+        raw_cached = bool(float(schema.get("trajectory_extraction_ready", 0.0)))
+        coordinate_schema_ready = schema_ready and coordinate_ready
+        computable_after_extraction = coordinate_schema_ready and all(
+            item in implemented for item in ["msd", "ngp_2d", "self_intermediate_scattering_by_k", "chi4_overlap"]
+        )
+        immediate = computable_after_extraction and raw_cached
+        available_now = split_items(coverage.get("available_trajectory_observables", "none"))
+        missing_now = split_items(coverage.get("missing_observables", "none"))
+        after_compute_available = list(dict.fromkeys(available_now + [item for item in implemented if item != "msd"]))
+        remaining_after_compute = [
+            item
+            for item in missing_now
+            if item not in set(implemented)
+            and not (item == "ngp_2d" and "ngp_2d" in implemented)
+            and not (item == "msd" and "msd" in implemented)
+        ]
+
+        if not coordinate_schema_ready:
+            stage = "coordinate_schema_incomplete"
+            blocker = str(schema.get("primary_blocker", "coordinate_schema"))
+            actions = ["verify_first_npz_coordinate_schema"]
+        elif not raw_cached:
+            stage = "coordinate_schema_ready_positions_bytes_missing"
+            blocker = "raw_coordinate_bytes"
+            actions = [
+                "extract_first_npz_positions_box_types",
+                "run_trajectory_observable_protocol_on_extracted_npz",
+            ]
+        elif remaining_after_compute:
+            stage = "structural_observable_compute_ready"
+            blocker = "physical_time_semantics" if remaining_after_compute == ["lag_time"] else remaining_after_compute[0]
+            actions = ["run_trajectory_observable_protocol_on_cached_npz"]
+        else:
+            stage = "structural_observable_compute_ready"
+            blocker = "none"
+            actions = ["run_trajectory_observable_protocol_on_cached_npz"]
+
+        out.append(
+            {
+                "plan_id": f"{plan_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": str(schema.get("source_path", "none")),
+                "first_npz_member": str(schema.get("first_npz_member", "none")),
+                "npz_member_bytes": float(schema.get("npz_member_bytes", 0.0)),
+                "frame_count": float(schema.get("frame_count", 0.0)),
+                "particle_count": float(schema.get("particle_count", 0.0)),
+                "spatial_dimension": float(schema.get("spatial_dimension", 0.0)),
+                "coordinate_schema_ready": float(coordinate_schema_ready),
+                "raw_coordinate_bytes_cached": float(raw_cached),
+                "computable_after_npz_extraction": float(computable_after_extraction),
+                "immediately_computable_from_current_cache": float(immediate),
+                "implemented_observable_protocol": ";".join(implemented),
+                "available_observables_now": ";".join(available_now) if available_now else "none",
+                "missing_observables_now": ";".join(missing_now) if missing_now else "none",
+                "available_after_structural_compute": (
+                    ";".join(after_compute_available) if after_compute_available else "none"
+                ),
+                "remaining_missing_after_structural_compute": (
+                    ";".join(remaining_after_compute) if remaining_after_compute else "none"
+                ),
+                "minimum_extraction_scope": "positions.npy;box.npy;types.npy",
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_actions": ";".join(actions),
+                "compute_plan_stage": stage,
+            }
+        )
+
+    if not out:
+        raise ValueError("no GlassBench structural observable compute-plan rows could be assembled")
+    return out
+
+
 def sota_glassbench_short_window_trend_canary_gate(
     *,
     canary_id: str,

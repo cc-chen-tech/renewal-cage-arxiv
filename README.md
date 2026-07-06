@@ -262,6 +262,14 @@ gap: both current KA2D first-NPZ rows expose only frame index, MSD, and 2D NGP.
 They still lack physical `lag_time`, multi-k `F_s(k,t)`, and overlap `chi4`
 columns, and the audit explicitly forbids substituting `rhomax` or ML feature
 curves for those dynamical observables.
+The first-NPZ structural-observable plan then separates a missing-data issue
+from a theory/protocol issue. The visible schemas contain `positions.npy`,
+`box.npy`, and `types.npy`, and the repository already has a trajectory
+observable protocol that can compute MSD, NGP, multi-k `F_s`, and overlap
+`chi4` once those first-NPZ bytes are extracted. The current cache still lacks
+those raw coordinate bytes, so the gate records
+`coordinate_schema_ready_positions_bytes_missing` rather than claiming that
+the structural observables have already been measured.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`
@@ -398,6 +406,7 @@ figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.sv
 figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
 figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg
 figures/renewal_cage_sota_glassbench_observable_coverage_audit.svg
+figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.svg
 figures/renewal_cage_sota_remote_result_curve_cache.svg
 figures/renewal_cage_sota_remote_result_curve_fetch_gap.svg
 figures/renewal_cage_sota_remote_result_curve_target_fetch.svg
@@ -480,6 +489,7 @@ data/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
 data/renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv
 data/renewal_cage_sota_glassbench_observable_coverage_audit.csv
+data/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.csv
 data/renewal_cage_sota_remote_result_curve_cache.csv
 data/renewal_cage_sota_remote_result_curve_fetch_gap.csv
 data/renewal_cage_sota_remote_result_curve_target_fetch.csv
@@ -581,6 +591,7 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readin
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf
 paper/figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf
+paper/figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_cache.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf
 paper/figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf

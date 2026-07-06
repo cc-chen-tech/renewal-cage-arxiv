@@ -1520,6 +1520,14 @@ self-intermediate scattering, or overlap-\(\chi_4\).  The audit also forbids
 using \texttt{rhomax} or machine-learning feature curves as substitutes for
 those dynamical observables, so the current GlassBench evidence remains a
 coordinate-level canary rather than an uncertainty-weighted real inversion.
+The companion
+\texttt{renewal\_cage\_sota\_glassbench\_first\_npz\_structural\_observable\_plan.csv}
+separates computability from cache availability: the schema shows
+\texttt{positions.npy}, \texttt{box.npy}, and \texttt{types.npy}, and the
+implemented trajectory protocol can compute MSD, NGP, multi-\(k\)
+self-intermediate scattering, and overlap-\(\chi_4\) once the first-\texttt{npz}
+bytes are extracted.  The current row is therefore blocked by raw coordinate
+bytes, not by a missing observable formula.
 The gate
 \texttt{renewal\_cage\_trajectory\_inversion\_readiness.csv} then separates a
 trajectory source that is merely structurally usable from one that is ready for
