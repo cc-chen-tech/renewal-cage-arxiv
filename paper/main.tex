@@ -1446,6 +1446,28 @@ GlassBench fit or any thermodynamic transition.
   window; the \(T=0.30\) row remains blocked by sparse time-code coverage.}
 \end{figure}
 
+The same blocker can be made sharper by auditing the GlassBench
+\(\tau_\alpha\) metadata against the anchor threshold used by the present
+diagnostic. For \(T=0.23\), the cached time-code curve already extends beyond
+the tabulated metadata value, with \(t_{\max}/\tau_\alpha\simeq 1.63\), but
+the anchor \(F_s(k=1.1,t_{\max})\) is still far above \(e^{-1}\). This is not
+promoted to a contradiction or a fit failure. Instead, the audit records a
+definition-level mismatch: the GlassBench \(\tau_\alpha\) metadata, the chosen
+anchor wave number, and the \(F_s=e^{-1}\) inversion threshold cannot yet be
+treated as the same operational alpha time. The real persistence/exchange
+inversion is therefore blocked until the alpha definition is verified or a
+longer horizon crosses the anchor threshold.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf}
+  \caption{GlassBench alpha-threshold horizon audit. The \(T=0.23\) row has
+  reached the metadata \(\tau_\alpha\) horizon but has not crossed the
+  diagnostic anchor \(F_s(k=1.1,t)=e^{-1}\) threshold, so the package records an
+  alpha-definition or anchor-wave-number blocker rather than claiming a real
+  persistence/exchange inversion.}
+\end{figure}
+
 Even before parameter inversion, the same real curve can be used as a
 model-independent SOTA signature check. The \(T=0.23\) GlassBench row supports
 four dynamical signatures on the corrected physical-time grid: MSD grows by

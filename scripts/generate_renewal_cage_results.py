@@ -49,6 +49,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
     gamma_exchange_temperature_scan,
+    glassbench_alpha_threshold_horizon_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
     infer_gamma_exchange_multik_collapse,
@@ -3917,6 +3918,23 @@ def write_sota_glassbench_timecode_signature_support_csv(
 
     rows = glassbench_timecode_signature_support_gate(
         support_id="glassbench_ka2d_timecode_signature_support",
+        timecode_rows=timecode_rows,
+        bridge_rows=bridge_rows,
+        anchor_wave_number=1.1,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_alpha_threshold_horizon_csv(
+    path: Path,
+    timecode_rows: list[dict[str, float | str]],
+    bridge_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit GlassBench tau-alpha metadata against the anchor Fs threshold."""
+
+    rows = glassbench_alpha_threshold_horizon_audit(
+        audit_id="glassbench_ka2d_alpha_threshold_horizon",
         timecode_rows=timecode_rows,
         bridge_rows=bridge_rows,
         anchor_wave_number=1.1,
@@ -7799,6 +7817,60 @@ def write_sota_glassbench_timecode_signature_support_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_alpha_threshold_horizon_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "alpha_threshold_horizon_inversion_ready": "#2f855a",
+        "alpha_threshold_crossed_preinversion": "#b7791f",
+        "alpha_threshold_not_yet_reached": "#c05621",
+        "metadata_tau_alpha_anchor_fs_mismatch": "#9f1239",
+        "timecode_curve_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["audit_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        latest_tau = float(row["latest_lag_time_over_tau_alpha_metadata"])
+        fs_anchor = float(row["latest_self_intermediate_scattering_anchor"])
+        extension = float(row["estimated_lag_extension_factor"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="375" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">metadata tau reached={int(float(row["metadata_tau_alpha_reached"]))}; alpha crossed={int(float(row["alpha_threshold_crossed"]))}; consistent={int(float(row["metadata_tau_alpha_consistent_with_anchor_fs"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">latest t/tau_alpha(meta)={latest_tau:.3g}; anchor Fs={fs_anchor:.3g}; extrapolated extension={extension:.3g}x</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">PE inversion={int(float(row["real_pe_inversion_ready"]))}; thermodynamic claim={int(float(row["thermodynamic_claim_allowed"]))}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench alpha-threshold horizon audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The audit checks whether tau-alpha metadata agrees with the anchor self-intermediate-scattering threshold used for PE inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">audit stage</text>
+  <text x="{left + 530}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">threshold and inversion status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9836,6 +9908,15 @@ def main() -> None:
     write_sota_glassbench_timecode_curve_bridge_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.svg",
         glassbench_timecode_curve_bridge_rows,
+    )
+    glassbench_alpha_threshold_horizon_rows = write_sota_glassbench_alpha_threshold_horizon_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.csv",
+        glassbench_ka2d_timecode_semantics_rows,
+        glassbench_timecode_curve_bridge_rows,
+    )
+    write_sota_glassbench_alpha_threshold_horizon_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.svg",
+        glassbench_alpha_threshold_horizon_rows,
     )
     glassbench_timecode_signature_support_rows = write_sota_glassbench_timecode_signature_support_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.csv",

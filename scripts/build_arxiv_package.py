@@ -3477,6 +3477,86 @@ def write_sota_glassbench_timecode_signature_support_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_alpha_threshold_horizon_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench alpha-threshold horizon audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Tau-alpha metadata is checked against the anchor Fs=e^-1 crossing used by the persistence/exchange inversion.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "alpha_threshold_horizon_inversion_ready": colors.HexColor("#2f855a"),
+        "alpha_threshold_crossed_preinversion": colors.HexColor("#b7791f"),
+        "alpha_threshold_not_yet_reached": colors.HexColor("#c05621"),
+        "metadata_tau_alpha_anchor_fs_mismatch": colors.HexColor("#9f1239"),
+        "timecode_curve_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "audit stage")
+    c.drawString(left + 365, top + 24, "threshold and inversion status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["audit_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 250, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 365,
+            y,
+            "tau reached={}; alpha crossed={}; consistent={}; blocker={}".format(
+                int(float(row["metadata_tau_alpha_reached"])),
+                int(float(row["alpha_threshold_crossed"])),
+                int(float(row["metadata_tau_alpha_consistent_with_anchor_fs"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 365,
+            y - 14,
+            "latest t/tau_alpha(meta)={:.3g}; anchor Fs={:.3g}; extension={:.3g}x".format(
+                float(row["latest_lag_time_over_tau_alpha_metadata"]),
+                float(row["latest_self_intermediate_scattering_anchor"]),
+                float(row["estimated_lag_extension_factor"]),
+            ),
+        )
+        c.drawString(
+            left + 365,
+            y - 27,
+            "PE inversion={}; thermodynamic claim={}; next={}".format(
+                int(float(row["real_pe_inversion_ready"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+                row["next_required_action"][:58],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "A metadata/anchor-Fs mismatch blocks real-data inversion until the alpha definition or longer horizon is resolved.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5092,6 +5172,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_timecode_signature_support_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.pdf"
     )
+    sota_glassbench_alpha_threshold_horizon_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -5222,6 +5305,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_timecode_signature_support_pdf(
         sota_glassbench_timecode_signature_support_pdf
+    )
+    write_sota_glassbench_alpha_threshold_horizon_pdf(
+        sota_glassbench_alpha_threshold_horizon_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -5392,6 +5478,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_timecode_signature_support_pdf,
             "figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf",
+        )
+        archive.write(
+            sota_glassbench_alpha_threshold_horizon_pdf,
+            "figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

@@ -1120,6 +1120,33 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
 
+    def test_sota_glassbench_alpha_threshold_horizon_audits_tau_alpha_mismatch(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_alpha_threshold_horizon.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(ka2d_023["audit_stage"], "metadata_tau_alpha_anchor_fs_mismatch")
+        self.assertEqual(float(ka2d_023["real_time_observable_curve_ready"]), 1.0)
+        self.assertGreater(float(ka2d_023["latest_lag_time_over_tau_alpha_metadata"]), 1.0)
+        self.assertEqual(float(ka2d_023["metadata_tau_alpha_reached"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_threshold_crossed"]), 0.0)
+        self.assertEqual(float(ka2d_023["metadata_tau_alpha_consistent_with_anchor_fs"]), 0.0)
+        self.assertGreater(
+            float(ka2d_023["latest_self_intermediate_scattering_anchor"]),
+            math.exp(-1.0),
+        )
+        self.assertGreater(float(ka2d_023["estimated_lag_extension_factor"]), 1.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "anchor_wave_number_or_alpha_definition_mismatch")
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["audit_stage"], "timecode_curve_upstream_incomplete")
+        self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
+
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
         self.assertTrue(path.exists())
@@ -1833,6 +1860,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
@@ -1906,6 +1934,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)

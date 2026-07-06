@@ -5631,6 +5631,189 @@ def glassbench_timecode_curve_bridge(
     return out
 
 
+def glassbench_alpha_threshold_horizon_audit(
+    *,
+    audit_id: str,
+    timecode_rows: Sequence[dict[str, object]],
+    bridge_rows: Sequence[dict[str, object]],
+    anchor_wave_number: float,
+    threshold: float = math.exp(-1.0),
+    min_extension_factor: float = 1.25,
+) -> list[dict[str, float | str]]:
+    """Audit whether GlassBench tau-alpha metadata matches the anchor Fs threshold."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not timecode_rows:
+        raise ValueError("timecode_rows must be nonempty")
+    if not bridge_rows:
+        raise ValueError("bridge_rows must be nonempty")
+    for name, value in {
+        "anchor_wave_number": anchor_wave_number,
+        "threshold": threshold,
+        "min_extension_factor": min_extension_factor,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if threshold >= 1.0:
+        raise ValueError("threshold must be below one")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in timecode_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+    bridge_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in bridge_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("lag_time", 0.0)))
+        bridge = bridge_by_key.get((system_id, temperature), {})
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        observed_time_codes = [str(row.get("time_code", "none")) for row in sorted_group]
+        tau_alpha = max(float(row.get("tau_alpha", 0.0) or 0.0) for row in sorted_group)
+        latest_lag = max(float(row.get("lag_time", 0.0) or 0.0) for row in sorted_group)
+        latest_lag_over_tau = latest_lag / tau_alpha if tau_alpha > 0.0 else 0.0
+        real_curve_ready = (
+            bool(sorted_group)
+            and all(float(row.get("timecode_curve_ready", 0.0)) == 1.0 for row in sorted_group)
+            and float(bridge.get("real_time_observable_curve_ready", 0.0)) == 1.0
+        )
+
+        if not real_curve_ready:
+            blocker = str(
+                bridge.get(
+                    "primary_blocker",
+                    next(
+                        (
+                            row.get("primary_blocker")
+                            for row in sorted_group
+                            if row.get("primary_blocker") != "none"
+                        ),
+                        "timecode_curve_ready",
+                    ),
+                )
+            )
+            out.append(
+                {
+                    "audit_id": audit_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_paths": ";".join(source_paths) if source_paths else "none",
+                    "observed_time_codes": ";".join(observed_time_codes) if observed_time_codes else "none",
+                    "lag_count": float(len(sorted_group)),
+                    "tau_alpha_metadata": float(tau_alpha),
+                    "latest_lag_time": float(latest_lag),
+                    "latest_lag_time_over_tau_alpha_metadata": float(latest_lag_over_tau),
+                    "latest_self_intermediate_scattering_anchor": 0.0,
+                    "threshold": float(threshold),
+                    "metadata_tau_alpha_reached": float(tau_alpha > 0.0 and latest_lag >= tau_alpha),
+                    "alpha_threshold_crossed": 0.0,
+                    "metadata_tau_alpha_consistent_with_anchor_fs": 0.0,
+                    "estimated_threshold_lag_time": 0.0,
+                    "estimated_lag_extension_factor": 0.0,
+                    "extension_factor_above_minimum": 0.0,
+                    "real_time_observable_curve_ready": 0.0,
+                    "real_pe_inversion_ready": float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0),
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": "complete_timecode_curve_before_alpha_horizon_audit",
+                    "audit_stage": "timecode_curve_upstream_incomplete",
+                }
+            )
+            continue
+
+        lag_times: list[float] = []
+        fs_anchor: list[float] = []
+        for row in sorted_group:
+            wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
+            fs_values = _parse_semicolon_float_values(
+                row["self_intermediate_scattering_by_k"],
+                name="self_intermediate_scattering_by_k",
+            )
+            if len(wave_numbers) != len(fs_values):
+                raise ValueError("GlassBench wave_numbers and Fs lengths must match")
+            lookup = {float(wave): float(value) for wave, value in zip(wave_numbers, fs_values)}
+            if float(anchor_wave_number) not in lookup:
+                raise ValueError("anchor_wave_number must be present in every time-code row")
+            lag = float(row["lag_time"])
+            fs_value = float(lookup[float(anchor_wave_number)])
+            if lag <= 0.0 or fs_value <= 0.0:
+                raise ValueError("GlassBench alpha horizon rows require positive lag times and Fs")
+            lag_times.append(lag)
+            fs_anchor.append(fs_value)
+
+        latest_fs = float(fs_anchor[-1])
+        metadata_reached = tau_alpha > 0.0 and latest_lag >= tau_alpha
+        alpha_crossed = latest_fs <= threshold
+        metadata_consistent = (not metadata_reached) or alpha_crossed
+        estimated_threshold_lag = latest_lag if alpha_crossed else 0.0
+        estimated_extension_factor = 1.0 if alpha_crossed else 0.0
+        if not alpha_crossed and len(lag_times) >= 2:
+            t_prev, t_last = float(lag_times[-2]), float(lag_times[-1])
+            fs_prev, fs_last = float(fs_anchor[-2]), float(fs_anchor[-1])
+            if t_last > t_prev > 0.0 and fs_prev > 0.0 and fs_last > 0.0:
+                slope = (math.log(fs_last) - math.log(fs_prev)) / (math.log(t_last) - math.log(t_prev))
+                if slope < 0.0:
+                    log_t_cross = math.log(t_last) + (math.log(threshold) - math.log(fs_last)) / slope
+                    if log_t_cross > math.log(t_last):
+                        estimated_threshold_lag = float(math.exp(log_t_cross))
+                        estimated_extension_factor = estimated_threshold_lag / t_last
+
+        real_pe_ready = float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0)
+        extension_above_minimum = estimated_extension_factor >= min_extension_factor
+        if metadata_reached and not alpha_crossed:
+            stage = "metadata_tau_alpha_anchor_fs_mismatch"
+            blocker = "anchor_wave_number_or_alpha_definition_mismatch"
+            next_action = "verify_alpha_definition_or_extend_archive_to_threshold_crossing"
+        elif real_pe_ready == 1.0 and alpha_crossed:
+            stage = "alpha_threshold_horizon_inversion_ready"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        elif alpha_crossed:
+            stage = "alpha_threshold_crossed_preinversion"
+            blocker = str(bridge.get("primary_blocker", "persistence_exchange_inversion"))
+            next_action = str(bridge.get("next_required_action", "run_preinversion_checks"))
+        else:
+            stage = "alpha_threshold_not_yet_reached"
+            blocker = "alpha_threshold_crossing"
+            next_action = "extend_timecode_curve_until_alpha_threshold_crossing"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "observed_time_codes": ";".join(observed_time_codes) if observed_time_codes else "none",
+                "lag_count": float(len(sorted_group)),
+                "tau_alpha_metadata": float(tau_alpha),
+                "latest_lag_time": float(latest_lag),
+                "latest_lag_time_over_tau_alpha_metadata": float(latest_lag_over_tau),
+                "latest_self_intermediate_scattering_anchor": latest_fs,
+                "threshold": float(threshold),
+                "metadata_tau_alpha_reached": float(metadata_reached),
+                "alpha_threshold_crossed": float(alpha_crossed),
+                "metadata_tau_alpha_consistent_with_anchor_fs": float(metadata_consistent),
+                "estimated_threshold_lag_time": float(estimated_threshold_lag),
+                "estimated_lag_extension_factor": float(estimated_extension_factor),
+                "extension_factor_above_minimum": float(extension_above_minimum),
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": real_pe_ready,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "audit_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_timecode_signature_support_gate(
     *,
     support_id: str,

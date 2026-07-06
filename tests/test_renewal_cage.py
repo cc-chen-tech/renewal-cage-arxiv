@@ -133,6 +133,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
+    glassbench_alpha_threshold_horizon_audit,
     glassbench_timecode_signature_support_gate,
     glassbench_timecode_curve_bridge,
     sota_glassbench_ka2d_timecode_semantics_gate,
@@ -331,6 +332,60 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["alpha_threshold_crossed"]), 0.0)
         self.assertGreaterEqual(float(row["supported_dynamical_signature_count"]), 4.0)
         self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_alpha_threshold_horizon_audit_flags_metadata_anchor_mismatch(self):
+        timecode_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc20",
+                "lag_time": 50.0,
+                "tau_alpha": 100.0,
+                "timecode_curve_ready": 1.0,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.93;0.88;0.75",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc40",
+                "lag_time": 200.0,
+                "tau_alpha": 100.0,
+                "timecode_curve_ready": 1.0,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.80;0.70;0.55",
+            },
+        ]
+        bridge_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+
+        row = glassbench_alpha_threshold_horizon_audit(
+            audit_id="glassbench_alpha_threshold_horizon",
+            timecode_rows=timecode_rows,
+            bridge_rows=bridge_rows,
+            anchor_wave_number=1.1,
+        )[0]
+
+        self.assertEqual(row["audit_stage"], "metadata_tau_alpha_anchor_fs_mismatch")
+        self.assertEqual(float(row["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(row["metadata_tau_alpha_reached"]), 1.0)
+        self.assertEqual(float(row["alpha_threshold_crossed"]), 0.0)
+        self.assertEqual(float(row["metadata_tau_alpha_consistent_with_anchor_fs"]), 0.0)
+        self.assertGreater(float(row["latest_lag_time_over_tau_alpha_metadata"]), 1.0)
+        self.assertGreater(float(row["latest_self_intermediate_scattering_anchor"]), math.exp(-1.0))
+        self.assertGreater(float(row["estimated_lag_extension_factor"]), 1.0)
+        self.assertEqual(row["primary_blocker"], "anchor_wave_number_or_alpha_definition_mismatch")
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
