@@ -740,8 +740,11 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertTrue(path.exists())
 
         manifest = json.loads(manifest_path.read_text())
-        self.assertEqual(manifest["source"], "remote_zip_member_first_npz_minimal_image_observable_curve")
+        self.assertEqual(manifest["source"], "remote_zip_member_first_npz_structural_observable_curve")
         self.assertEqual(manifest["observable_method"], "minimal_image_displacement_from_first_frame")
+        self.assertEqual(manifest["structural_observable_method"], "single_origin_minimal_image_from_frame0")
+        self.assertEqual(manifest["wave_numbers"], [0.7, 1.1, 1.6])
+        self.assertAlmostEqual(float(manifest["overlap_radius"]), 0.1)
 
         with path.open() as f:
             rows = list(csv.DictReader(f))
@@ -753,10 +756,18 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertAlmostEqual(float(peak["ngp_2d"]), 0.178746269034)
         self.assertEqual(float(peak["real_reanalysis_ready"]), 0.0)
         self.assertEqual(peak["primary_blocker"], "single_npz_frame_index_curve")
+        self.assertEqual(peak["wave_numbers"], "0.7;1.1;1.6")
+        self.assertGreater(float(peak["chi4_overlap"]), 0.0)
 
         final = by_key[("KA2D", "0.30", "19.0")]
         self.assertAlmostEqual(float(final["msd"]), 0.005414723094)
         self.assertAlmostEqual(float(final["ngp_2d"]), 0.051977831407)
+
+        frame1 = by_key[("KA2D", "0.30", "1.0")]
+        self.assertEqual(frame1["self_intermediate_scattering_by_k"], "0.999328332998;0.998342249629;0.996496085279")
+        self.assertAlmostEqual(float(frame1["self_intermediate_scattering"]), 0.999328332998)
+        self.assertAlmostEqual(float(frame1["overlap_radius"]), 0.1)
+        self.assertAlmostEqual(float(frame1["chi4_overlap"]), 173.78372093)
 
     def test_sota_glassbench_short_window_trend_canary_records_real_data_sanity_check(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_short_window_trend_canary.csv"
@@ -885,7 +896,9 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_030["ensemble_ready"]), 0.0)
         self.assertEqual(float(ka2d_030["sota_inversion_ready"]), 0.0)
         self.assertIn("lag_time", ka2d_030["missing_observables"])
-        self.assertIn("self_intermediate_scattering_by_k", ka2d_030["missing_observables"])
+        self.assertNotIn("self_intermediate_scattering_by_k", ka2d_030["missing_observables"])
+        self.assertIn("self_intermediate_scattering_by_k", ka2d_030["available_observables"])
+        self.assertIn("chi4_overlap", ka2d_030["available_observables"])
         self.assertIn("sigma_msd", ka2d_030["missing_uncertainty_columns"])
 
         ka = by_key[("KA", "none")]
@@ -902,17 +915,18 @@ class ArxivPackageTests(unittest.TestCase):
         by_key = {(row["system_id"], row["temperature"]): row for row in rows}
         for key in [("KA2D", "0.23"), ("KA2D", "0.30")]:
             row = by_key[key]
-            self.assertEqual(row["observable_audit_stage"], "frame_index_msd_ngp_only")
-            self.assertEqual(row["available_trajectory_observables"], "frame_index;msd;ngp_2d")
-            self.assertIn("lag_time", row["missing_observables"])
-            self.assertIn("self_intermediate_scattering_by_k", row["missing_observables"])
-            self.assertIn("chi4_overlap", row["missing_observables"])
+            self.assertEqual(row["observable_audit_stage"], "required_observable_set_incomplete")
+            self.assertEqual(
+                row["available_trajectory_observables"],
+                "frame_index;msd;ngp_2d;self_intermediate_scattering_by_k;chi4_overlap",
+            )
+            self.assertEqual(row["missing_observables"], "lag_time")
             self.assertEqual(float(row["proxy_observable_substitution_allowed"]), 0.0)
             self.assertEqual(float(row["observable_coverage_ready"]), 0.0)
             self.assertEqual(float(row["publishable_real_inversion_observable_set_ready"]), 0.0)
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
             self.assertEqual(row["primary_blocker"], "observable_set")
-            self.assertIn("compute_multi_k_self_intermediate_scattering", row["next_required_actions"])
+            self.assertIn("compute_lag_time", row["next_required_actions"])
             self.assertIn("do_not_substitute_rhomax_or_ml_feature_curves_for_fs_chi4", row["next_required_actions"])
 
     def test_sota_glassbench_first_npz_structural_observable_plan_marks_extractable_observables(self):
@@ -925,17 +939,18 @@ class ArxivPackageTests(unittest.TestCase):
         by_key = {(row["system_id"], row["temperature"]): row for row in rows}
         for key, npz_bytes in [(("KA2D", "0.23"), 465710.0), (("KA2D", "0.30"), 444786.0)]:
             row = by_key[key]
-            self.assertEqual(row["compute_plan_stage"], "coordinate_schema_ready_positions_bytes_missing")
+            self.assertEqual(row["compute_plan_stage"], "structural_observables_cached_raw_coordinates_not_retained")
             self.assertEqual(float(row["coordinate_schema_ready"]), 1.0)
             self.assertEqual(float(row["raw_coordinate_bytes_cached"]), 0.0)
+            self.assertEqual(float(row["structural_observables_cached"]), 1.0)
             self.assertEqual(float(row["computable_after_npz_extraction"]), 1.0)
             self.assertEqual(float(row["immediately_computable_from_current_cache"]), 0.0)
             self.assertEqual(float(row["npz_member_bytes"]), npz_bytes)
             self.assertIn("self_intermediate_scattering_by_k", row["implemented_observable_protocol"])
             self.assertIn("chi4_overlap", row["implemented_observable_protocol"])
             self.assertEqual(row["remaining_missing_after_structural_compute"], "lag_time")
-            self.assertEqual(row["primary_blocker"], "raw_coordinate_bytes")
-            self.assertIn("extract_first_npz_positions_box_types", row["next_required_actions"])
+            self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+            self.assertEqual(row["next_required_actions"], "attach_physical_lag_time_and_units")
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):

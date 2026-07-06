@@ -2771,6 +2771,15 @@ class DelayedRenewalCageTests(unittest.TestCase):
                     "frame_indices": [0, 1, 11, 19],
                     "msd": [0.0, 0.005484922658, 0.005117245596, 0.005414723094],
                     "ngp_2d": [0.0, 0.048418253757, 0.178746269034, 0.051977831407],
+                    "wave_numbers": [0.7, 1.1, 1.6],
+                    "self_intermediate_scattering_by_k": [
+                        "1;1;1",
+                        "0.999;0.998;0.997",
+                        "0.995;0.991;0.984",
+                        "0.994;0.989;0.982",
+                    ],
+                    "overlap_radius": 0.3,
+                    "chi4_overlap": [0.0, 0.01, 0.18, 0.05],
                 }
             ]
         }
@@ -2790,6 +2799,11 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(peak["observable_curve_ready"], 1.0)
         self.assertAlmostEqual(peak["msd"], 0.005117245596)
         self.assertAlmostEqual(peak["ngp_2d"], 0.178746269034)
+        self.assertEqual(peak["wave_numbers"], "0.7;1.1;1.6")
+        self.assertEqual(peak["self_intermediate_scattering_by_k"], "0.995;0.991;0.984")
+        self.assertAlmostEqual(peak["self_intermediate_scattering"], 0.995)
+        self.assertAlmostEqual(peak["overlap_radius"], 0.3)
+        self.assertAlmostEqual(peak["chi4_overlap"], 0.18)
         self.assertEqual(peak["trajectory_extraction_ready"], 0.0)
         self.assertEqual(peak["real_reanalysis_ready"], 0.0)
         self.assertEqual(peak["primary_blocker"], "single_npz_frame_index_curve")
@@ -3152,6 +3166,52 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["remaining_missing_after_structural_compute"], "lag_time")
         self.assertEqual(row["primary_blocker"], "physical_time_semantics")
         self.assertEqual(row["next_required_actions"], "run_trajectory_observable_protocol_on_cached_npz")
+
+    def test_sota_glassbench_first_npz_structural_observable_plan_marks_cached_structural_observables(self):
+        rows = sota_glassbench_first_npz_structural_observable_plan_gate(
+            plan_id="glassbench_first_npz_structural_observable_plan",
+            accession_id="glassbench_zenodo_10118191",
+            schema_probe_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "first_npz_member": "T0.30/train/member_1.npz",
+                    "npz_schema_ready": 1.0,
+                    "coordinate_array_ready": 1.0,
+                    "trajectory_extraction_ready": 0.0,
+                    "npz_member_bytes": 444786.0,
+                    "array_names": "box.npy;types.npy;positions.npy",
+                    "array_shapes": "box.npy:scalar;types.npy:1290;positions.npy:20x1290x2",
+                    "frame_count": 20.0,
+                    "particle_count": 1290.0,
+                    "spatial_dimension": 2.0,
+                }
+            ],
+            observable_coverage_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "available_trajectory_observables": "frame_index;msd;ngp_2d;self_intermediate_scattering_by_k;chi4_overlap",
+                    "missing_observables": "lag_time",
+                    "observable_coverage_ready": 0.0,
+                }
+            ],
+            implemented_observables=[
+                "msd",
+                "ngp_2d",
+                "self_intermediate_scattering_by_k",
+                "chi4_overlap",
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(row["compute_plan_stage"], "structural_observables_cached_raw_coordinates_not_retained")
+        self.assertEqual(float(row["structural_observables_cached"]), 1.0)
+        self.assertEqual(float(row["raw_coordinate_bytes_cached"]), 0.0)
+        self.assertEqual(row["remaining_missing_after_structural_compute"], "lag_time")
+        self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+        self.assertEqual(row["next_required_actions"], "attach_physical_lag_time_and_units")
 
     def test_sota_glassbench_short_window_trend_canary_detects_real_cooling_slowdown(self):
         curve_rows = []

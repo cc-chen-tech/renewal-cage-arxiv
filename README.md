@@ -204,17 +204,19 @@ minimal-image frame-index MSD and two-dimensional NGP summaries. The first
 coordinate-to-observable ingestion, while still blocking physical time-series
 comparison until time semantics, full ensemble extraction, and uncertainty
 weights are available.
-The first-NPZ observable-curve table retains the full 20-frame MSD and NGP
+The first-NPZ observable-curve table retains the full 20-frame MSD, NGP,
+multi-k self-intermediate-scattering, and single-origin overlap-chi4 proxy
 sequence for both first members. It is the first real GlassBench coordinate
-payload converted into the repository's raw-curve shape, but it remains a
-frame-index, single-member artifact rather than a physical-time SOTA inversion.
+payload converted into the repository's raw-curve shape beyond MSD/NGP, but it
+remains a frame-index, single-member artifact rather than a physical-time SOTA
+inversion.
 The GlassBench short-window trend canary then makes the first real
 coordinate-level comparison quantitative: the `T=0.30` first member has a
 final-frame MSD 1.36 times the `T=0.23` value, while both first members retain
 positive two-dimensional NGP peaks. This passes only a short-window
 MSD/NGP sanity check; the same row keeps SOTA inversion and thermodynamic
-claims disabled until physical lag times, ensembles, multi-k `F_s`, `chi4`,
-and uncertainty columns are supplied.
+claims disabled until physical lag times, independent-member ensembles, and
+uncertainty columns are supplied.
 The trajectory-result timebase bridge then checks whether the cached
 same-temperature GlassBench result time grids can calibrate those first-NPZ
 frame indices. They cannot yet be attached: the `T=0.23` trajectory curve has
@@ -230,23 +232,24 @@ candidate until `dump_interval`, saved-frame stride, frame origin, and the
 result-time generation script are documented.
 The GlassBench real-inversion gap ledger then collapses these gates into one
 claim-level verdict. For both KA2D temperatures the allowed claim remains
-`short_window_coordinate_trend_only`: the coordinate canary passes, but the
-timebase gate fails, the ensemble prefix is one visible member short of the
-uncertainty threshold, and the full `F_s`/`chi4`/uncertainty observable set is
-missing. This is the current SOTA comparison boundary before any real
-persistence/exchange inversion.
+`short_window_coordinate_trend_only`: the coordinate canary passes and
+first-member `F_s`/overlap-chi4 proxies are cached, but the timebase gate
+fails, the ensemble prefix is one visible member short of the uncertainty
+threshold, and uncertainty columns are missing. This is the current SOTA
+comparison boundary before any real persistence/exchange inversion.
 The real-inversion unlock protocol turns that boundary into a minimum data
 payload: for each KA2D temperature it requires an explicit frame-time mapping,
 one more independent visible `.npz` member beyond the current prefix horizon,
-the missing `lag_time`/multi-k `F_s`/`chi4` observables, and positive
-uncertainty columns. Passing this protocol would promote the comparison to
+and positive uncertainty columns for MSD, NGP, multi-k `F_s`, and overlap
+`chi4`. Passing this protocol would promote the comparison to
 `uncertainty_weighted_real_trajectory_inversion`; it still would not enable a
 thermodynamic glass-transition claim.
 The first-NPZ inversion-readiness gate then turns that limitation into explicit
 machine-readable blockers: physical lag times, multiple independent members,
-multi-k self-intermediate scattering, a chi4/overlap observable, and positive
-uncertainty columns are required before a real persistence/exchange comparison
-is allowed.
+and positive uncertainty columns are required before a real
+persistence/exchange comparison is allowed. The first-member structural
+observables are useful evidence, but they are not a calibrated physical-time
+or ensemble-averaged inversion.
 The NPZ ensemble-horizon gate narrows the ensemble blocker: the current 1 MB
 inner-tar prefix probes expose three KA2D `.npz` members at both temperatures,
 so the archive is not a single-trajectory source, but the prefix evidence is
@@ -258,18 +261,19 @@ shows the first member identity and split label (`test` at `T=0.23`, `train` at
 `publishable_ensemble_uncertainty_ready=0` until enough independent member
 identities are indexed and member-resolved observables are computed.
 The observable-coverage audit isolates the remaining real-inversion observable
-gap: both current KA2D first-NPZ rows expose only frame index, MSD, and 2D NGP.
-They still lack physical `lag_time`, multi-k `F_s(k,t)`, and overlap `chi4`
-columns, and the audit explicitly forbids substituting `rhomax` or ML feature
-curves for those dynamical observables.
+gap: both current KA2D first-NPZ rows now expose frame index, MSD, 2D NGP,
+multi-k `F_s(k,t)`, and a single-origin overlap-`chi4` proxy. They still lack
+physical `lag_time`, and the audit explicitly forbids substituting `rhomax` or
+ML feature curves for the dynamical observables in any later comparison.
 The first-NPZ structural-observable plan then separates a missing-data issue
 from a theory/protocol issue. The visible schemas contain `positions.npy`,
 `box.npy`, and `types.npy`, and the repository already has a trajectory
 observable protocol that can compute MSD, NGP, multi-k `F_s`, and overlap
-`chi4` once those first-NPZ bytes are extracted. The current cache still lacks
-those raw coordinate bytes, so the gate records
-`coordinate_schema_ready_positions_bytes_missing` rather than claiming that
-the structural observables have already been measured.
+`chi4`. The current cache records derived structural observables but does not
+retain the raw coordinate bytes, so the gate records
+`structural_observables_cached_raw_coordinates_not_retained` and keeps the
+remaining blocker at physical lag-time semantics rather than coordinate
+availability.
 The SOTA remote result-curve cache adds the first byte-range verified numeric
 curve layer from the public GlassBench archive. It verifies small KA time-grid
 and `rhomax_md` result files and KA2D time-grid, `rhomax_md`, and `rhomax_bb`

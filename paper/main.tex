@@ -1280,23 +1280,24 @@ pipeline rather than stopping at metadata or schema validation.
   as explicit blockers.}
 \end{figure}
 
-The companion curve table retains the full 20-frame MSD and NGP sequence for
-each first-\texttt{npz} member. These frame-index curves are intentionally not
-fit to the renewal-cage model: no physical time step, trajectory ensemble, or
-uncertainty estimate has been attached. Their purpose is narrower and
-reproducible: they prove that GlassBench coordinate payloads can be converted
-into the same observable curve format used by the repository's synthetic
-trajectory-to-inversion gates. This turns the remaining SOTA gap from an access
-or parsing problem into a controlled analysis-policy problem.
+The companion curve table retains the full 20-frame MSD, NGP, multi-\(k\)
+self-intermediate-scattering, and single-origin overlap-\(\chi_4\) proxy
+sequence for each first-\texttt{npz} member. These frame-index curves are
+intentionally not fit to the renewal-cage model: no physical time step,
+trajectory ensemble, or uncertainty estimate has been attached. Their purpose
+is narrower and reproducible: they prove that GlassBench coordinate payloads
+can be converted into the same observable curve format used by the repository's
+synthetic trajectory-to-inversion gates. This turns the remaining SOTA gap
+from an access or parsing problem into a controlled analysis-policy problem.
 
 \begin{figure}[p]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf}
   \caption{GlassBench first-\texttt{npz} observable curves. The full 20-frame
-  frame-index MSD and two-dimensional NGP curves are retained for the first
-  streamed KA2D \texttt{npz} member at each temperature. These are
-  observable-ingestion curves, not physical-time or uncertainty-weighted model
-  inversions.}
+  frame-index MSD, two-dimensional NGP, multi-\(k\) \(F_s\), and
+  overlap-\(\chi_4\) proxy curves are retained for the first streamed KA2D
+  \texttt{npz} member at each temperature. These are observable-ingestion
+  curves, not physical-time or uncertainty-weighted model inversions.}
 \end{figure}
 
 The short-window trend canary makes the first real coordinate-level comparison
@@ -1307,8 +1308,8 @@ first \texttt{T=0.23} member, and both first members have positive
 two-dimensional NGP peaks. This is a real-data MSD/NGP sanity check consistent
 with faster short-window motion at the hotter state, but its
 \texttt{sota\_inversion\_ready} and \texttt{thermodynamic\_claim\_allowed}
-flags remain zero because physical lag times, ensemble uncertainties,
-multi-\(k\) \(F_s\), and \(\chi_4\)-like observables are still absent.
+flags remain zero because physical lag times, independent-member ensembles,
+and uncertainty columns are still absent.
 The companion timebase bridge makes the first of these blockers quantitative:
 the cached same-temperature result time grids have 8 points at
 \texttt{T=0.23} and 6 points at \texttt{T=0.30}, whereas the first
@@ -1336,9 +1337,10 @@ The companion unlock protocol
 \texttt{renewal\_cage\_sota\_glassbench\_real\_inversion\_unlock\_protocol.csv}
 then lists the minimum payload needed for that promotion: an explicit
 frame-time mapping, one additional independent visible \texttt{npz} member at
-each KA2D temperature, the missing lag-time/\(F_s\)/\(\chi_4\) observables, and
-positive uncertainty columns. It is therefore a falsifiable data-acquisition
-and observable-computation protocol, not an additional thermodynamic claim.
+each KA2D temperature, and positive uncertainty columns for MSD, NGP,
+multi-\(k\) \(F_s\), and overlap-\(\chi_4\). It is therefore a falsifiable
+data-acquisition and observable-computation protocol, not an additional
+thermodynamic claim.
 
 The corresponding SOTA-inversion readiness gate records the next hard
 requirements for turning these real coordinate curves into a quantitative
@@ -1354,11 +1356,10 @@ physical-time, ensemble-averaged, uncertainty-weighted SOTA inversion.
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf}
   \caption{GlassBench first-\texttt{npz} SOTA-inversion readiness. The gate
-  converts the real frame-index MSD/NGP curves into explicit blockers for
-  physical-time model comparison: lag-time semantics, ensemble members,
-  multi-\(k\) self-intermediate scattering, \(\chi_4\)-like overlap
-  fluctuations, and uncertainty estimates are all required before a real
-  persistence/exchange inversion is claimed.}
+  converts the real frame-index structural curves into explicit blockers for
+  physical-time model comparison: lag-time semantics, ensemble members, and
+  uncertainty estimates are all required before a real persistence/exchange
+  inversion is claimed.}
 \end{figure}
 
 The inner-tar member horizon narrows the ensemble blocker without overstating
@@ -1515,19 +1516,21 @@ members are available.
 For the current GlassBench first-\texttt{npz} rows, the separate
 \texttt{renewal\_cage\_sota\_glassbench\_observable\_coverage\_audit.csv}
 records the sharper blocker: the real coordinate curves expose frame index,
-MSD, and two-dimensional NGP, but not physical lag time, multi-\(k\)
-self-intermediate scattering, or overlap-\(\chi_4\).  The audit also forbids
-using \texttt{rhomax} or machine-learning feature curves as substitutes for
-those dynamical observables, so the current GlassBench evidence remains a
-coordinate-level canary rather than an uncertainty-weighted real inversion.
+MSD, two-dimensional NGP, multi-\(k\) self-intermediate scattering, and a
+single-origin overlap-\(\chi_4\) proxy, but not physical lag time. The audit
+also forbids using \texttt{rhomax} or machine-learning feature curves as
+substitutes for those dynamical observables in later comparisons, so the
+current GlassBench evidence remains a coordinate-level canary rather than an
+uncertainty-weighted real inversion.
 The companion
 \texttt{renewal\_cage\_sota\_glassbench\_first\_npz\_structural\_observable\_plan.csv}
 separates computability from cache availability: the schema shows
 \texttt{positions.npy}, \texttt{box.npy}, and \texttt{types.npy}, and the
 implemented trajectory protocol can compute MSD, NGP, multi-\(k\)
-self-intermediate scattering, and overlap-\(\chi_4\) once the first-\texttt{npz}
-bytes are extracted.  The current row is therefore blocked by raw coordinate
-bytes, not by a missing observable formula.
+self-intermediate scattering, and overlap-\(\chi_4\). The current row records
+derived structural observables without retaining raw coordinate bytes, so its
+remaining blocker is physical lag-time semantics rather than coordinate
+availability.
 The gate
 \texttt{renewal\_cage\_trajectory\_inversion\_readiness.csv} then separates a
 trajectory source that is merely structurally usable from one that is ready for

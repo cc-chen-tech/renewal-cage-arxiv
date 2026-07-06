@@ -3554,6 +3554,13 @@ def sota_glassbench_trajectory_first_npz_observable_curve_gate(
     }
 
     rows: list[dict[str, float | str]] = []
+    default_structural_observables: dict[str, float | str] = {
+        "wave_numbers": "none",
+        "self_intermediate_scattering_by_k": "none",
+        "self_intermediate_scattering": 0.0,
+        "overlap_radius": 0.0,
+        "chi4_overlap": 0.0,
+    }
     for smoke_row in smoke_rows:
         system_id = str(smoke_row.get("system_id", "unknown"))
         temperature = str(smoke_row.get("temperature", "none"))
@@ -3575,6 +3582,7 @@ def sota_glassbench_trajectory_first_npz_observable_curve_gate(
                     "frame_index": -1.0,
                     "msd": 0.0,
                     "ngp_2d": 0.0,
+                    **default_structural_observables,
                     "observable_curve_ready": 0.0,
                     "trajectory_extraction_ready": 0.0,
                     "real_reanalysis_ready": 0.0,
@@ -3598,6 +3606,7 @@ def sota_glassbench_trajectory_first_npz_observable_curve_gate(
                     "frame_index": -1.0,
                     "msd": 0.0,
                     "ngp_2d": 0.0,
+                    **default_structural_observables,
                     "observable_curve_ready": 0.0,
                     "trajectory_extraction_ready": 0.0,
                     "real_reanalysis_ready": 0.0,
@@ -3611,6 +3620,19 @@ def sota_glassbench_trajectory_first_npz_observable_curve_gate(
         frame_indices = entry.get("frame_indices", [])
         msd_values = entry.get("msd", [])
         ngp_values = entry.get("ngp_2d", [])
+        wave_numbers_value = entry.get("wave_numbers", [])
+        fs_by_k_values = entry.get("self_intermediate_scattering_by_k", [])
+        chi4_values = entry.get("chi4_overlap", [])
+        overlap_radius = float(entry.get("overlap_radius", 0.0) or 0.0)
+        structural_values_ready = (
+            isinstance(wave_numbers_value, list)
+            and len(wave_numbers_value) > 0
+            and isinstance(fs_by_k_values, list)
+            and isinstance(chi4_values, list)
+            and len(fs_by_k_values) == len(frame_indices)
+            and len(chi4_values) == len(frame_indices)
+            and overlap_radius > 0.0
+        )
         curve_ready = (
             entry_method == required_method
             and isinstance(frame_indices, list)
@@ -3632,6 +3654,7 @@ def sota_glassbench_trajectory_first_npz_observable_curve_gate(
                     "frame_index": -1.0,
                     "msd": 0.0,
                     "ngp_2d": 0.0,
+                    **default_structural_observables,
                     "observable_curve_ready": 0.0,
                     "trajectory_extraction_ready": 0.0,
                     "real_reanalysis_ready": 0.0,
@@ -3641,27 +3664,44 @@ def sota_glassbench_trajectory_first_npz_observable_curve_gate(
             )
             continue
 
-        for frame_index, msd, ngp in zip(frame_indices, msd_values, ngp_values):
+        wave_numbers_text = (
+            ";".join(f"{float(value):g}" for value in wave_numbers_value)
+            if structural_values_ready
+            else "none"
+        )
+        for row_index, (frame_index, msd, ngp) in enumerate(zip(frame_indices, msd_values, ngp_values)):
             frame = int(frame_index)
-            rows.append(
-                {
-                    "curve_id": f"{row_id_prefix}_frame_{frame}",
-                    "accession_id": accession_id,
-                    "system_id": system_id,
-                    "temperature": temperature,
-                    "source_path": source_path,
-                    "first_npz_member": first_npz_member,
-                    "observable_method": entry_method,
-                    "frame_index": float(frame),
-                    "msd": float(msd),
-                    "ngp_2d": float(ngp),
-                    "observable_curve_ready": 1.0,
-                    "trajectory_extraction_ready": 0.0,
-                    "real_reanalysis_ready": 0.0,
-                    "primary_blocker": "single_npz_frame_index_curve",
-                    "curve_stage": "first_npz_observable_curve_ready_reanalysis_blocked",
-                }
-            )
+            row = {
+                "curve_id": f"{row_id_prefix}_frame_{frame}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "first_npz_member": first_npz_member,
+                "observable_method": entry_method,
+                "frame_index": float(frame),
+                "msd": float(msd),
+                "ngp_2d": float(ngp),
+                **default_structural_observables,
+                "observable_curve_ready": 1.0,
+                "trajectory_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "primary_blocker": "single_npz_frame_index_curve",
+                "curve_stage": "first_npz_observable_curve_ready_reanalysis_blocked",
+            }
+            if structural_values_ready:
+                fs_text = str(fs_by_k_values[row_index])
+                first_fs = fs_text.split(";")[0] if fs_text else "nan"
+                row.update(
+                    {
+                        "wave_numbers": wave_numbers_text,
+                        "self_intermediate_scattering_by_k": fs_text,
+                        "self_intermediate_scattering": float(first_fs),
+                        "overlap_radius": overlap_radius,
+                        "chi4_overlap": float(chi4_values[row_index]),
+                    }
+                )
+            rows.append(row)
     return rows
 
 
@@ -4032,6 +4072,10 @@ def sota_glassbench_first_npz_structural_observable_plan_gate(
         immediate = computable_after_extraction and raw_cached
         available_now = split_items(coverage.get("available_trajectory_observables", "none"))
         missing_now = split_items(coverage.get("missing_observables", "none"))
+        structural_observables_cached = all(
+            item in set(available_now)
+            for item in ["msd", "ngp_2d", "self_intermediate_scattering_by_k", "chi4_overlap"]
+        )
         after_compute_available = list(dict.fromkeys(available_now + [item for item in implemented if item != "msd"]))
         remaining_after_compute = [
             item
@@ -4045,6 +4089,14 @@ def sota_glassbench_first_npz_structural_observable_plan_gate(
             stage = "coordinate_schema_incomplete"
             blocker = str(schema.get("primary_blocker", "coordinate_schema"))
             actions = ["verify_first_npz_coordinate_schema"]
+        elif structural_observables_cached and remaining_after_compute:
+            stage = "structural_observables_cached_raw_coordinates_not_retained"
+            blocker = "physical_time_semantics" if remaining_after_compute == ["lag_time"] else remaining_after_compute[0]
+            actions = ["attach_physical_lag_time_and_units"]
+        elif structural_observables_cached:
+            stage = "structural_observables_cached_raw_coordinates_not_retained"
+            blocker = "none"
+            actions = ["attach_uncertainties_and_run_real_inversion"]
         elif not raw_cached:
             stage = "coordinate_schema_ready_positions_bytes_missing"
             blocker = "raw_coordinate_bytes"
@@ -4075,6 +4127,7 @@ def sota_glassbench_first_npz_structural_observable_plan_gate(
                 "spatial_dimension": float(schema.get("spatial_dimension", 0.0)),
                 "coordinate_schema_ready": float(coordinate_schema_ready),
                 "raw_coordinate_bytes_cached": float(raw_cached),
+                "structural_observables_cached": float(structural_observables_cached),
                 "computable_after_npz_extraction": float(computable_after_extraction),
                 "immediately_computable_from_current_cache": float(immediate),
                 "implemented_observable_protocol": ";".join(implemented),
