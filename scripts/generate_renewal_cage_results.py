@@ -48,6 +48,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
     gamma_exchange_temperature_scan,
+    glassbench_timecode_curve_bridge,
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
@@ -3889,6 +3890,22 @@ def write_sota_glassbench_ka2d_timecode_semantics_csv(path: Path) -> list[dict[s
     return rows
 
 
+def write_sota_glassbench_timecode_curve_bridge_csv(
+    path: Path,
+    timecode_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Bridge corrected GlassBench time-code rows into PE pre-inversion inputs."""
+
+    rows = glassbench_timecode_curve_bridge(
+        benchmark_id="glassbench_ka2d_timecode_curve_bridge",
+        rows=timecode_rows,
+        required_wave_numbers=[0.7, 1.1, 1.6],
+        anchor_wave_number=1.1,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -7632,6 +7649,61 @@ def write_sota_glassbench_ka2d_timecode_semantics_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_timecode_curve_bridge_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 75, 118
+    row_h = 78
+    colors = {
+        "glassbench_timecode_curve_bridge_ready": "#2f855a",
+        "glassbench_timecode_curve_bridge_incomplete": "#c05621",
+        "glassbench_timecode_curve_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["bridge_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        lag_count = int(float(row["lag_count"]))
+        curve = int(float(row["timecode_curve_ready"]))
+        real_curve = int(float(row["real_time_observable_curve_ready"]))
+        pe_ready = int(float(row["real_pe_inversion_ready"]))
+        latest_tau = float(row["latest_lag_time_over_tau_alpha"])
+        fs_anchor = float(row["latest_self_intermediate_scattering_anchor"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 5}" width="345" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">lags={lag_count}; tc curve={curve}; real curve={real_curve}; PE inversion={pe_ready}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">latest t/tau_alpha={latest_tau:.3g}; anchor Fs={fs_anchor:.3g}; D-window={int(float(row["diffusion_asymptote_window_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench time-code curve bridge</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Corrected KA2D physical-time rows are translated into the same trajectory PE pre-inversion schema, with blockers preserved.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">bridge stage</text>
+  <text x="{left + 500}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">real-data inversion status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9604,6 +9676,14 @@ def main() -> None:
     write_sota_glassbench_ka2d_timecode_semantics_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.svg",
         glassbench_ka2d_timecode_semantics_rows,
+    )
+    glassbench_timecode_curve_bridge_rows = write_sota_glassbench_timecode_curve_bridge_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.csv",
+        glassbench_ka2d_timecode_semantics_rows,
+    )
+    write_sota_glassbench_timecode_curve_bridge_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.svg",
+        glassbench_timecode_curve_bridge_rows,
     )
     glassbench_trajectory_npz_ensemble_horizon_rows = write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv",

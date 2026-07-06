@@ -5462,6 +5462,175 @@ def sota_glassbench_ka2d_timecode_semantics_gate(
     return out
 
 
+def glassbench_timecode_curve_bridge(
+    *,
+    benchmark_id: str,
+    rows: Sequence[dict[str, object]],
+    required_wave_numbers: Sequence[float],
+    anchor_wave_number: float,
+    threshold: float = math.exp(-1.0),
+    dimension: float = 2.0,
+    min_lag_time_over_tau_alpha_for_diffusion: float = 3.0,
+) -> list[dict[str, float | str]]:
+    """Bridge corrected GlassBench time-code curves to the PE pre-inversion schema."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not rows:
+        raise ValueError("rows must be nonempty")
+    if dimension <= 0.0:
+        raise ValueError("dimension must be positive")
+    if min_lag_time_over_tau_alpha_for_diffusion <= 0.0:
+        raise ValueError("min_lag_time_over_tau_alpha_for_diffusion must be positive")
+    required = list(dict.fromkeys(float(wave_number) for wave_number in required_wave_numbers))
+    if not required or any(wave_number <= 0.0 for wave_number in required):
+        raise ValueError("required_wave_numbers must be positive and nonempty")
+    if float(anchor_wave_number) not in required:
+        raise ValueError("required_wave_numbers must include anchor_wave_number")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("lag_time", 0.0)))
+        ready_rows = [row for row in sorted_group if float(row.get("timecode_curve_ready", 0.0)) == 1.0]
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        observed_time_codes = [str(row.get("time_code", "none")) for row in sorted_group]
+        tau_alpha = max(float(row.get("tau_alpha", 0.0) or 0.0) for row in sorted_group)
+        lag_count = len(sorted_group)
+
+        if len(ready_rows) != len(sorted_group) or not ready_rows:
+            blocker = str(
+                next(
+                    (
+                        row.get("primary_blocker")
+                        for row in sorted_group
+                        if row.get("primary_blocker") != "none"
+                    ),
+                    "timecode_curve_ready",
+                )
+            )
+            out.append(
+                {
+                    "benchmark_id": benchmark_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_paths": ";".join(source_paths) if source_paths else "none",
+                    "observed_time_codes": ";".join(observed_time_codes) if observed_time_codes else "none",
+                    "lag_count": float(lag_count),
+                    "tau_alpha": float(tau_alpha),
+                    "latest_lag_time": max(float(row.get("lag_time", 0.0) or 0.0) for row in sorted_group),
+                    "latest_lag_time_over_tau_alpha": 0.0,
+                    "latest_self_intermediate_scattering_anchor": 0.0,
+                    "timecode_curve_ready": 0.0,
+                    "real_time_observable_curve_ready": 0.0,
+                    "curve_bridge_ready": 0.0,
+                    "diffusion_asymptote_window_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": "extract_members_across_all_official_time_codes",
+                    "bridge_stage": "glassbench_timecode_curve_upstream_incomplete",
+                }
+            )
+            continue
+
+        bridge_rows: list[dict[str, object]] = []
+        positive_uncertainty_rows = 0
+        latest_anchor_fs = 0.0
+        for row in ready_rows:
+            wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
+            fs_values = _parse_semicolon_float_values(
+                row["self_intermediate_scattering_by_k"],
+                name="self_intermediate_scattering_by_k",
+            )
+            if len(wave_numbers) != len(fs_values):
+                raise ValueError("GlassBench wave_numbers and Fs lengths must match")
+            fs_lookup = {float(wave): float(value) for wave, value in zip(wave_numbers, fs_values)}
+            latest_anchor_fs = fs_lookup.get(float(anchor_wave_number), latest_anchor_fs)
+            sigma_fs = _parse_semicolon_float_values(
+                row.get("sigma_self_intermediate_scattering_by_k_member_sem", "none"),
+                name="sigma_self_intermediate_scattering_by_k_member_sem",
+            )
+            if (
+                float(row.get("sigma_msd_member_sem", 0.0) or 0.0) > 0.0
+                and float(row.get("sigma_ngp_2d_member_sem", 0.0) or 0.0) > 0.0
+                and float(row.get("sigma_chi4_overlap_member_sem", 0.0) or 0.0) > 0.0
+                and sigma_fs
+                and all(value > 0.0 for value in sigma_fs)
+            ):
+                positive_uncertainty_rows += 1
+            bridge_rows.append(
+                {
+                    "lag_time": float(row["lag_time"]),
+                    "dimension": float(dimension),
+                    "msd": float(row["msd"]),
+                    "ngp": float(row["ngp_2d"]),
+                    "wave_numbers": row["wave_numbers"],
+                    "self_intermediate_scattering_by_k": row["self_intermediate_scattering_by_k"],
+                    "chi4_overlap": float(row["chi4_overlap_replica"]),
+                }
+            )
+
+        bridge = trajectory_observable_curve_bridge(
+            benchmark_id=f"{benchmark_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+            rows=bridge_rows,
+            required_wave_numbers=required,
+            anchor_wave_number=anchor_wave_number,
+            threshold=threshold,
+        )
+        latest_lag = max(float(row["lag_time"]) for row in ready_rows)
+        latest_lag_over_tau = latest_lag / tau_alpha if tau_alpha > 0.0 else 0.0
+        diffusion_window_ready = latest_lag_over_tau >= min_lag_time_over_tau_alpha_for_diffusion
+        uncertainty_ready = positive_uncertainty_rows == len(ready_rows)
+        bridge_ready = float(bridge["curve_bridge_ready"]) == 1.0
+        real_inversion_ready = bridge_ready and diffusion_window_ready and uncertainty_ready
+        if not bridge_ready:
+            blocker = str(bridge["primary_blocker"])
+            next_action = "extend_timecode_curve_until_alpha_threshold_crossing"
+        elif not diffusion_window_ready:
+            blocker = "diffusion_asymptote_window"
+            next_action = "extend_lag_window_beyond_multiple_tau_alpha"
+        elif not uncertainty_ready:
+            blocker = "positive_member_uncertainties"
+            next_action = "extract_more_members_for_positive_uncertainties"
+        else:
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        out.append(
+            {
+                **bridge,
+                "benchmark_id": benchmark_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "observed_time_codes": ";".join(observed_time_codes),
+                "tau_alpha": float(tau_alpha),
+                "latest_lag_time": float(latest_lag),
+                "latest_lag_time_over_tau_alpha": float(latest_lag_over_tau),
+                "latest_self_intermediate_scattering_anchor": float(latest_anchor_fs),
+                "positive_uncertainty_row_count": float(positive_uncertainty_rows),
+                "timecode_curve_ready": 1.0,
+                "real_time_observable_curve_ready": 1.0,
+                "diffusion_asymptote_window_ready": float(diffusion_window_ready),
+                "real_pe_inversion_ready": float(real_inversion_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "bridge_stage": "glassbench_timecode_curve_bridge_ready"
+                if real_inversion_ready
+                else "glassbench_timecode_curve_bridge_incomplete",
+            }
+        )
+    return out
+
+
 def sota_glassbench_visible_member_ensemble_audit_gate(
     *,
     audit_id: str,

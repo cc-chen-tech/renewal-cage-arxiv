@@ -1423,6 +1423,29 @@ persistence/exchange fitting disabled until that protocol is run.
   persistence/exchange inversion.}
 \end{figure}
 
+The next bridge converts that corrected time-code curve into the same
+trajectory persistence/exchange pre-inversion schema used by the synthetic
+falsification protocol. This is the first real-trajectory row in the manuscript
+that carries physical lag times, member standard errors, MSD, NGP, multi-\(k\)
+self-intermediate scattering, and an overlap-\(\chi_4\) proxy on a shared
+temperature and lag grid. The resulting row remains blocked, as it should:
+for \(T=0.23\) the latest cached point reaches only about
+\(1.63\tau_\alpha\) and the anchor \(F_s(k=1.1,t)\) remains above the
+\(e^{-1}\) alpha threshold, while \(T=0.30\) still lacks the official time-code
+coverage. The model comparison therefore advances from ``metadata ready'' to a
+quantitative real-data pre-inversion blocker, without claiming a completed
+GlassBench fit or any thermodynamic transition.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf}
+  \caption{GlassBench time-code curve bridge. Corrected KA2D physical-time
+  rows are translated into the trajectory persistence/exchange pre-inversion
+  schema. The \(T=0.23\) row is a real observable curve but remains blocked by
+  the missing alpha-threshold crossing and insufficient long-time diffusion
+  window; the \(T=0.30\) row remains blocked by sparse time-code coverage.}
+\end{figure}
+
 \begin{figure}[p]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf}

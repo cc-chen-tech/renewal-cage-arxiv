@@ -272,12 +272,18 @@ eight official time codes (`tc05` through `tc40`) with at least four complete
 members per time code, so it is a physical-time observable curve ready for the
 next persistence/exchange inversion gate; `T=0.30` still covers only `tc01` and
 therefore remains blocked by sparse time-code coverage.
+The time-code curve bridge now runs that `T=0.23` curve through the same
+trajectory pre-inversion schema used by the persistence/exchange protocol. It
+promotes the row from metadata-only evidence to a real physical-time
+observable curve, but it still blocks real inversion because the cached curve
+does not cross the alpha threshold and its latest point is only about
+`1.63 tau_alpha`; `T=0.30` remains blocked by sparse time-code coverage.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
-gate ready, while the real inversion remains blocked until the curve-ready
-`T=0.23` row is passed through the inversion protocol and the sparse `T=0.30`
-coverage is extended.
+gate ready, while the real inversion remains blocked until the cached
+GlassBench lag window is extended far enough for alpha-threshold crossing and
+long-time diffusion checks.
 The observable-coverage audit isolates the remaining real-inversion observable
 gap: both current KA2D first-NPZ rows now expose frame index, MSD, 2D NGP,
 multi-k `F_s(k,t)`, and a single-origin overlap-`chi4` proxy. They still lack
@@ -428,6 +434,7 @@ figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.sv
 figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.svg
 figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.svg
 figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.svg
+figures/renewal_cage_sota_glassbench_timecode_curve_bridge.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
 figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg
 figures/renewal_cage_sota_glassbench_observable_coverage_audit.svg
@@ -514,6 +521,7 @@ data/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_member_index.csv
 data/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.csv
 data/renewal_cage_sota_glassbench_ka2d_timecode_semantics.csv
+data/renewal_cage_sota_glassbench_timecode_curve_bridge.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
 data/renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv
 data/renewal_cage_sota_glassbench_observable_coverage_audit.csv
@@ -619,6 +627,7 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readin
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf
 paper/figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf
+paper/figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf
 paper/figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf

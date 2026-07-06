@@ -3325,6 +3325,78 @@ def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_timecode_curve_bridge_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench time-code curve bridge")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Corrected KA2D physical-time rows are translated into the trajectory PE pre-inversion schema without promoting blockers.",
+    )
+    left, top = 48, page_h - 98
+    row_h = 54
+    colors_by_stage = {
+        "glassbench_timecode_curve_bridge_ready": colors.HexColor("#2f855a"),
+        "glassbench_timecode_curve_bridge_incomplete": colors.HexColor("#c05621"),
+        "glassbench_timecode_curve_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 22, "target")
+    c.drawString(left + 100, top + 22, "bridge stage")
+    c.drawString(left + 345, top + 22, "real-data inversion status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["bridge_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 228, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:39])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 345,
+            y,
+            "lags={}; tc curve={}; real curve={}; PE inversion={}; blocker={}".format(
+                int(float(row["lag_count"])),
+                int(float(row["timecode_curve_ready"])),
+                int(float(row["real_time_observable_curve_ready"])),
+                int(float(row["real_pe_inversion_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 345,
+            y - 14,
+            "latest t/tau_alpha={:.3g}; anchor Fs={:.3g}; D-window={}; thermodynamic claim={}".format(
+                float(row["latest_lag_time_over_tau_alpha"]),
+                float(row["latest_self_intermediate_scattering_anchor"]),
+                int(float(row["diffusion_asymptote_window_ready"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+            ),
+        )
+        c.drawString(left + 345, y - 27, f'next={row["next_required_action"][:70]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This promotes one real physical-time GlassBench curve to a quantitative pre-inversion blocker, not to a completed real-data fit.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4869,6 +4941,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_ka2d_timecode_semantics_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf"
     )
+    sota_glassbench_timecode_curve_bridge_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -4990,6 +5065,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_ka2d_timecode_semantics_pdf(
         sota_glassbench_ka2d_timecode_semantics_pdf
+    )
+    write_sota_glassbench_timecode_curve_bridge_pdf(
+        sota_glassbench_timecode_curve_bridge_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5149,6 +5227,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_ka2d_timecode_semantics_pdf,
             "figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf",
+        )
+        archive.write(
+            sota_glassbench_timecode_curve_bridge_pdf,
+            "figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

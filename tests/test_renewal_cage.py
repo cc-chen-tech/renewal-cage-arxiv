@@ -132,6 +132,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
+    glassbench_timecode_curve_bridge,
     sota_glassbench_ka2d_timecode_semantics_gate,
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
@@ -198,6 +199,66 @@ class DelayedRenewalCageTests(unittest.TestCase):
         expected = params.renewal_rate * t**3 / (3.0 * params.renewal_delay**2)
 
         np.testing.assert_allclose(mean, expected, rtol=2e-4, atol=1e-16)
+
+    def test_glassbench_timecode_curve_bridge_keeps_real_curve_before_inversion(self):
+        rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc05",
+                "lag_time": 0.1,
+                "tau_alpha": 918306.0,
+                "timecode_curve_ready": 1.0,
+                "member_count": 9.0,
+                "msd": 0.0035,
+                "sigma_msd_member_sem": 1e-5,
+                "ngp_2d": 0.008,
+                "sigma_ngp_2d_member_sem": 0.002,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.999;0.998;0.997",
+                "sigma_self_intermediate_scattering_by_k_member_sem": "1e-6;2e-6;3e-6",
+                "chi4_overlap_replica": 0.04,
+                "sigma_chi4_overlap_member_sem": 0.005,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "tau_alpha": 918306.0,
+                "timecode_curve_ready": 1.0,
+                "member_count": 6.0,
+                "msd": 1.2,
+                "sigma_msd_member_sem": 0.1,
+                "ngp_2d": 1.9,
+                "sigma_ngp_2d_member_sem": 0.16,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.879;0.763;0.640",
+                "sigma_self_intermediate_scattering_by_k_member_sem": "0.009;0.016;0.023",
+                "chi4_overlap_replica": 3.17,
+                "sigma_chi4_overlap_member_sem": 0.79,
+            },
+        ]
+
+        row = glassbench_timecode_curve_bridge(
+            benchmark_id="glassbench_ka2d_t023_timecode_curve",
+            rows=rows,
+            required_wave_numbers=[0.7, 1.1, 1.6],
+            anchor_wave_number=1.1,
+        )[0]
+
+        self.assertEqual(row["bridge_stage"], "glassbench_timecode_curve_bridge_incomplete")
+        self.assertEqual(float(row["timecode_curve_ready"]), 1.0)
+        self.assertEqual(float(row["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(row["curve_bridge_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(float(row["lag_count"]), 2.0)
+        self.assertGreater(float(row["latest_lag_time_over_tau_alpha"]), 1.0)
+        self.assertGreater(float(row["latest_self_intermediate_scattering_anchor"]), math.exp(-1.0))
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_langevin_bare_diffusion_and_ou_cage_follow_einstein_and_equipartition(self):
         landscape = LangevinCageLandscapeParams(
