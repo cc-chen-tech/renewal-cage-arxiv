@@ -109,6 +109,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_short_window_trend_canary_gate,
+    sota_glassbench_trajectory_timebase_bridge_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
@@ -3659,6 +3660,25 @@ def write_sota_glassbench_short_window_trend_canary_csv(
     return rows
 
 
+def write_sota_glassbench_trajectory_timebase_bridge_csv(
+    path: Path,
+    *,
+    curve_rows: list[dict[str, float | str]],
+    payload_adapter_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Gate result time grids before attaching them to trajectory frame indices."""
+
+    rows = sota_glassbench_trajectory_timebase_bridge_gate(
+        bridge_id="glassbench_trajectory_timebase_bridge",
+        accession_id="glassbench_zenodo_10118191",
+        curve_rows=curve_rows,
+        payload_adapter_rows=payload_adapter_rows,
+        require_explicit_frame_time_mapping=True,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
     path: Path,
     *,
@@ -6851,6 +6871,60 @@ def write_sota_glassbench_short_window_trend_canary_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_timebase_bridge_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 410
+    left, top = 75, 112
+    row_h = 66
+    colors = {
+        "trajectory_timebase_ready_observable_inversion_blocked": "#2f855a",
+        "trajectory_result_timebase_length_mismatch": "#c05621",
+        "trajectory_result_timebase_mapping_required": "#b7791f",
+        "trajectory_result_timebase_missing": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["timebase_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ready = int(float(row["trajectory_timebase_ready"]))
+        frames = int(float(row["frame_count"]))
+        points = int(float(row["time_point_count"]))
+        match = int(float(row["frame_time_point_count_match"]))
+        mapping = int(float(row["explicit_frame_time_mapping"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 15}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 4}" width="345" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:48]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">ready={ready}; frames={frames}; time points={points}; count match={match}; explicit mapping={mapping}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 36}" font-family="Arial, sans-serif" font-size="9" fill="#555">time grid: {str(row["time_grid_path"])[:95]}; next: {str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench trajectory-result timebase bridge</text>
+  <text x="75" y="67" font-family="Arial, sans-serif" font-size="13" fill="#444">Result time grids are not attached to trajectory frame-index curves unless counts and explicit frame-time mapping agree.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">timebase stage</text>
+  <text x="{left + 500}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness checks</text>
+  {"".join(marks)}
+  <rect x="75" y="354" width="14" height="14" fill="#c05621" /><text x="96" y="366" font-family="Arial, sans-serif" font-size="12">result time-grid length does not match trajectory frame count</text>
+  <rect x="520" y="354" width="14" height="14" fill="#2f855a" /><text x="541" y="366" font-family="Arial, sans-serif" font-size="12">timebase ready, but full observable inversion remains blocked</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -8842,6 +8916,15 @@ def main() -> None:
     write_sota_remote_result_curve_payload_adapter_svg(
         FIGURE_DIR / "renewal_cage_sota_remote_result_curve_payload_adapter.svg",
         remote_result_curve_payload_adapter_rows,
+    )
+    glassbench_trajectory_timebase_bridge_rows = write_sota_glassbench_trajectory_timebase_bridge_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_trajectory_timebase_bridge.csv",
+        curve_rows=glassbench_trajectory_first_npz_observable_curve_rows,
+        payload_adapter_rows=remote_result_curve_payload_adapter_rows,
+    )
+    write_sota_glassbench_trajectory_timebase_bridge_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_timebase_bridge.svg",
+        glassbench_trajectory_timebase_bridge_rows,
     )
     remote_result_curve_observable_semantics_rows = write_sota_remote_result_curve_observable_semantics_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_observable_semantics.csv",

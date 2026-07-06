@@ -3963,6 +3963,133 @@ def sota_glassbench_short_window_trend_canary_gate(
     return out
 
 
+def sota_glassbench_trajectory_timebase_bridge_gate(
+    *,
+    bridge_id: str,
+    accession_id: str,
+    curve_rows: Sequence[dict[str, float | str]],
+    payload_adapter_rows: Sequence[dict[str, float | str]],
+    require_explicit_frame_time_mapping: bool,
+    explicit_frame_time_mappings: dict[tuple[str, str], bool] | None = None,
+) -> list[dict[str, float | str]]:
+    """Gate result time grids before attaching them to trajectory frame-index curves."""
+
+    if not bridge_id:
+        raise ValueError("bridge_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not curve_rows:
+        raise ValueError("curve_rows must be nonempty")
+    if not payload_adapter_rows:
+        raise ValueError("payload_adapter_rows must be nonempty")
+
+    mappings = explicit_frame_time_mappings or {}
+    grouped_curves: dict[tuple[str, str], list[dict[str, float | str]]] = {}
+    for row in curve_rows:
+        if float(row.get("observable_curve_ready", 0.0)) != 1.0:
+            continue
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped_curves.setdefault(key, []).append(row)
+
+    adapters_by_key: dict[tuple[str, str], list[dict[str, float | str]]] = {}
+    for row in payload_adapter_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        adapters_by_key.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(grouped_curves.items(), key=lambda item: (item[0][0], float(item[0][1]))):
+        frame_indices = sorted({float(row.get("frame_index", -1.0)) for row in group if float(row.get("frame_index", -1.0)) >= 0.0})
+        frame_count = len(frame_indices)
+        adapters = adapters_by_key.get((system_id, temperature), [])
+        time_adapters = [
+            row
+            for row in adapters
+            if str(row.get("time_grid_path", "none")) != "none"
+            and float(row.get("time_point_count", 0.0)) > 0.0
+        ]
+        time_grid_available = bool(time_adapters)
+        if time_adapters:
+            best_time_adapter = max(time_adapters, key=lambda row: float(row.get("time_point_count", 0.0)))
+            time_point_count = int(float(best_time_adapter.get("time_point_count", 0.0)))
+            time_grid_path = str(best_time_adapter.get("time_grid_path", "none"))
+            structural_adapter_ready = bool(float(best_time_adapter.get("structural_adapter_ready", 0.0)))
+        else:
+            time_point_count = 0
+            time_grid_path = "none"
+            structural_adapter_ready = False
+
+        count_match = time_grid_available and frame_count == time_point_count
+        explicit_mapping = bool(mappings.get((system_id, temperature), False))
+        mapping_ready = explicit_mapping or not require_explicit_frame_time_mapping
+        timebase_ready = bool(time_grid_available and count_match and mapping_ready)
+
+        if not time_grid_available:
+            stage = "trajectory_result_timebase_missing"
+            blocker = "time_grid"
+            next_action = "fetch_same_temperature_time_grid"
+        elif not count_match:
+            stage = "trajectory_result_timebase_length_mismatch"
+            blocker = "frame_time_point_count"
+            next_action = "derive_or_fetch_trajectory_frame_time_mapping"
+        elif not mapping_ready:
+            stage = "trajectory_result_timebase_mapping_required"
+            blocker = "explicit_frame_time_mapping"
+            next_action = "document_frame_to_physical_time_mapping"
+        else:
+            stage = "trajectory_timebase_ready_observable_inversion_blocked"
+            blocker = "observable_set_and_uncertainty"
+            next_action = "compute_fs_chi4_and_uncertainties_on_timebase"
+
+        out.append(
+            {
+                "bridge_id": f"{bridge_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "frame_count": float(frame_count),
+                "time_point_count": float(time_point_count),
+                "time_grid_path": time_grid_path,
+                "time_grid_available": float(time_grid_available),
+                "structural_result_adapter_ready": float(structural_adapter_ready),
+                "frame_time_point_count_match": float(count_match),
+                "explicit_frame_time_mapping_required": float(require_explicit_frame_time_mapping),
+                "explicit_frame_time_mapping": float(explicit_mapping),
+                "trajectory_timebase_ready": float(timebase_ready),
+                "sota_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "timebase_stage": stage,
+            }
+        )
+
+    if not out:
+        out.append(
+            {
+                "bridge_id": f"{bridge_id}_missing",
+                "accession_id": accession_id,
+                "system_id": "none",
+                "temperature": "none",
+                "frame_count": 0.0,
+                "time_point_count": 0.0,
+                "time_grid_path": "none",
+                "time_grid_available": 0.0,
+                "structural_result_adapter_ready": 0.0,
+                "frame_time_point_count_match": 0.0,
+                "explicit_frame_time_mapping_required": float(require_explicit_frame_time_mapping),
+                "explicit_frame_time_mapping": 0.0,
+                "trajectory_timebase_ready": 0.0,
+                "sota_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "observable_curve_ready",
+                "next_required_action": "complete_first_npz_observable_curve",
+                "timebase_stage": "trajectory_result_timebase_missing",
+            }
+        )
+
+    return out
+
+
 def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
     *,
     horizon_id: str,

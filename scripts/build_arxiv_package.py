@@ -2709,6 +2709,73 @@ def write_sota_glassbench_short_window_trend_canary_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_trajectory_timebase_bridge_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_timebase_bridge.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench trajectory-result timebase bridge")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Result time grids are gated before being attached to first-NPZ trajectory frame-index curves.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 58
+    colors_by_stage = {
+        "trajectory_timebase_ready_observable_inversion_blocked": colors.HexColor("#2f855a"),
+        "trajectory_result_timebase_length_mismatch": colors.HexColor("#c05621"),
+        "trajectory_result_timebase_mapping_required": colors.HexColor("#b7791f"),
+        "trajectory_result_timebase_missing": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 100, top + 18, "stage")
+    c.drawString(left + 370, top + 18, "timebase checks")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["timebase_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 12, 245, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 370,
+            y,
+            "ready={}; frames={}; time points={}; match={}; explicit mapping={}".format(
+                int(float(row["trajectory_timebase_ready"])),
+                int(float(row["frame_count"])),
+                int(float(row["time_point_count"])),
+                int(float(row["frame_time_point_count_match"])),
+                int(float(row["explicit_frame_time_mapping"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            f'time grid: {row["time_grid_path"][:70]}; next: {row["next_required_action"].replace("_", " ")[:45]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "Physical-time promotion requires same-temperature time grids, matching counts, and an explicit frame-time mapping; full inversion remains a later gate.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4154,6 +4221,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_short_window_trend_canary_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_short_window_trend_canary.pdf"
     )
+    sota_glassbench_trajectory_timebase_bridge_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf"
+    )
     sota_glassbench_trajectory_first_npz_inversion_readiness_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
     )
@@ -4248,6 +4318,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_short_window_trend_canary_pdf(
         sota_glassbench_short_window_trend_canary_pdf
+    )
+    write_sota_glassbench_trajectory_timebase_bridge_pdf(
+        sota_glassbench_trajectory_timebase_bridge_pdf
     )
     write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(
         sota_glassbench_trajectory_first_npz_inversion_readiness_pdf
@@ -4369,6 +4442,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_short_window_trend_canary_pdf,
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
+        )
+        archive.write(
+            sota_glassbench_trajectory_timebase_bridge_pdf,
+            "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_first_npz_inversion_readiness_pdf,

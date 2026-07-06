@@ -1309,6 +1309,14 @@ with faster short-window motion at the hotter state, but its
 \texttt{sota\_inversion\_ready} and \texttt{thermodynamic\_claim\_allowed}
 flags remain zero because physical lag times, ensemble uncertainties,
 multi-\(k\) \(F_s\), and \(\chi_4\)-like observables are still absent.
+The companion timebase bridge makes the first of these blockers quantitative:
+the cached same-temperature result time grids have 8 points at
+\texttt{T=0.23} and 6 points at \texttt{T=0.30}, whereas the first
+\texttt{npz} trajectory curves have 20 frame-index points at each temperature.
+Because there is no explicit frame-to-physical-time mapping, the gate keeps
+\texttt{trajectory\_timebase\_ready}=0 and records
+\texttt{frame\_time\_point\_count} as the blocker. Thus the real-data trend
+check is not silently upgraded into an alpha-relaxation or transport fit.
 
 The corresponding SOTA-inversion readiness gate records the next hard
 requirements for turning these real coordinate curves into a quantitative

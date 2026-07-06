@@ -124,6 +124,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_short_window_trend_canary_gate,
+    sota_glassbench_trajectory_timebase_bridge_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
     sota_glassbench_trajectory_member_stream_probe_gate,
     sota_glassbench_trajectory_first_npz_observable_smoke_gate,
@@ -2994,6 +2995,89 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(rows[0]["short_window_real_data_canary_ready"]), 0.0)
         self.assertEqual(rows[0]["primary_blocker"], "short_window_msd_slowdown")
         self.assertEqual(rows[0]["canary_stage"], "short_window_trend_canary_failed")
+
+    def test_sota_glassbench_trajectory_timebase_bridge_blocks_mismatched_result_grid(self):
+        curve_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "frame_index": float(frame),
+                "msd": 0.005 + frame * 1e-4,
+                "ngp_2d": 0.05,
+                "observable_curve_ready": 1.0,
+            }
+            for frame in range(20)
+        ]
+        payload_adapter_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "curve_role": "rhomax_md",
+                "time_grid_path": "GlassBench/KA2D_results/times_0.30.dat",
+                "time_point_count": 6.0,
+                "structural_adapter_ready": 1.0,
+            }
+        ]
+
+        rows = sota_glassbench_trajectory_timebase_bridge_gate(
+            bridge_id="glassbench_trajectory_timebase_bridge",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            payload_adapter_rows=payload_adapter_rows,
+            require_explicit_frame_time_mapping=True,
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["system_id"], "KA2D")
+        self.assertEqual(row["temperature"], "0.30")
+        self.assertEqual(float(row["frame_count"]), 20.0)
+        self.assertEqual(float(row["time_point_count"]), 6.0)
+        self.assertEqual(float(row["frame_time_point_count_match"]), 0.0)
+        self.assertEqual(float(row["trajectory_timebase_ready"]), 0.0)
+        self.assertEqual(float(row["sota_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "frame_time_point_count")
+        self.assertEqual(row["timebase_stage"], "trajectory_result_timebase_length_mismatch")
+
+    def test_sota_glassbench_trajectory_timebase_bridge_accepts_explicit_matching_grid(self):
+        curve_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "frame_index": float(frame),
+                "msd": 0.005 + frame * 1e-4,
+                "ngp_2d": 0.05,
+                "observable_curve_ready": 1.0,
+            }
+            for frame in range(4)
+        ]
+        payload_adapter_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "curve_role": "rhomax_md",
+                "time_grid_path": "GlassBench/KA2D_results/times_0.30.dat",
+                "time_point_count": 4.0,
+                "structural_adapter_ready": 1.0,
+            }
+        ]
+
+        rows = sota_glassbench_trajectory_timebase_bridge_gate(
+            bridge_id="glassbench_trajectory_timebase_bridge",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            payload_adapter_rows=payload_adapter_rows,
+            require_explicit_frame_time_mapping=True,
+            explicit_frame_time_mappings={("KA2D", "0.30"): True},
+        )
+
+        row = rows[0]
+        self.assertEqual(float(row["time_grid_available"]), 1.0)
+        self.assertEqual(float(row["frame_time_point_count_match"]), 1.0)
+        self.assertEqual(float(row["explicit_frame_time_mapping"]), 1.0)
+        self.assertEqual(float(row["trajectory_timebase_ready"]), 1.0)
+        self.assertEqual(float(row["sota_inversion_ready"]), 0.0)
+        self.assertEqual(row["timebase_stage"], "trajectory_timebase_ready_observable_inversion_blocked")
 
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_counts_prefix_members_without_claiming_extraction(self):
         tar_probe_rows = [
