@@ -125,6 +125,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_real_inversion_gap_ledger_gate,
     sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
+    sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_short_window_trend_canary_gate,
@@ -2920,6 +2921,136 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(ready["ensemble_ready"]), 1.0)
         self.assertEqual(float(ready["uncertainty_ready"]), 1.0)
         self.assertEqual(float(ready["sota_inversion_ready"]), 1.0)
+
+    def test_sota_glassbench_observable_coverage_audit_blocks_frame_index_msd_ngp_only(self):
+        curve_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "observable_curve_ready": 1.0,
+                "frame_index": float(frame),
+                "msd": 0.004 + 0.0001 * frame,
+                "ngp_2d": 0.08,
+            }
+            for frame in range(20)
+        ]
+        readiness_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "available_observables": "msd;ngp_2d",
+                "missing_observables": "lag_time;self_intermediate_scattering_by_k;chi4_overlap",
+                "structural_curve_ready": 0.0,
+                "sota_inversion_ready": 0.0,
+            }
+        ]
+        semantics_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "curve_role": "rhomax_md",
+                "candidate_observable": "overlap_density_proxy",
+                "proxy_observable_ready": 0.0,
+                "real_inversion_ready": 0.0,
+                "primary_blocker": "structural_adapter",
+            }
+        ]
+
+        rows = sota_glassbench_observable_coverage_audit_gate(
+            audit_id="glassbench_observable_coverage_audit",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            inversion_readiness_rows=readiness_rows,
+            observable_semantics_rows=semantics_rows,
+            required_observables=[
+                "lag_time",
+                "msd",
+                "ngp_2d",
+                "self_intermediate_scattering_by_k",
+                "chi4_overlap",
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(row["observable_audit_stage"], "frame_index_msd_ngp_only")
+        self.assertEqual(row["available_trajectory_observables"], "frame_index;msd;ngp_2d")
+        self.assertIn("lag_time", row["missing_observables"])
+        self.assertIn("self_intermediate_scattering_by_k", row["missing_observables"])
+        self.assertIn("chi4_overlap", row["missing_observables"])
+        self.assertEqual(float(row["proxy_observable_substitution_allowed"]), 0.0)
+        self.assertEqual(float(row["observable_coverage_ready"]), 0.0)
+        self.assertEqual(float(row["publishable_real_inversion_observable_set_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "observable_set")
+        self.assertIn("compute_multi_k_self_intermediate_scattering", row["next_required_actions"])
+        self.assertIn("do_not_substitute_rhomax_or_ml_feature_curves_for_fs_chi4", row["next_required_actions"])
+
+    def test_sota_glassbench_observable_coverage_audit_accepts_complete_observable_set(self):
+        curve_rows = []
+        for frame in range(20):
+            curve_rows.append(
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "first_npz_member": "T0.30/train/member_1.npz",
+                    "observable_curve_ready": 1.0,
+                    "frame_index": float(frame),
+                    "lag_time": 0.1 * frame,
+                    "msd": 0.005 + 0.0001 * frame,
+                    "ngp_2d": 0.05,
+                    "self_intermediate_scattering_by_k": "0.9;0.8",
+                    "chi4_overlap": 0.2,
+                }
+            )
+        readiness_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "available_observables": "lag_time;msd;ngp_2d;self_intermediate_scattering_by_k;chi4_overlap",
+                "missing_observables": "none",
+                "structural_curve_ready": 1.0,
+                "sota_inversion_ready": 1.0,
+            }
+        ]
+        semantics_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "curve_role": "direct_fs_chi4",
+                "candidate_observable": "direct_trajectory_observables",
+                "proxy_observable_ready": 1.0,
+                "real_inversion_ready": 1.0,
+                "primary_blocker": "none",
+            }
+        ]
+
+        rows = sota_glassbench_observable_coverage_audit_gate(
+            audit_id="glassbench_observable_coverage_audit",
+            accession_id="glassbench_zenodo_10118191",
+            curve_rows=curve_rows,
+            inversion_readiness_rows=readiness_rows,
+            observable_semantics_rows=semantics_rows,
+            required_observables=[
+                "lag_time",
+                "msd",
+                "ngp_2d",
+                "self_intermediate_scattering_by_k",
+                "chi4_overlap",
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(row["observable_audit_stage"], "real_inversion_observable_set_ready")
+        self.assertEqual(row["missing_observables"], "none")
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(row["next_required_actions"], "attach_uncertainties_and_run_real_inversion")
+        self.assertEqual(float(row["remote_result_semantics_ready"]), 1.0)
+        self.assertEqual(float(row["observable_coverage_ready"]), 1.0)
+        self.assertEqual(float(row["publishable_real_inversion_observable_set_ready"]), 1.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_sota_glassbench_short_window_trend_canary_detects_real_cooling_slowdown(self):
         curve_rows = []

@@ -3819,6 +3819,171 @@ def sota_glassbench_trajectory_first_npz_inversion_readiness_gate(
     return out
 
 
+def sota_glassbench_observable_coverage_audit_gate(
+    *,
+    audit_id: str,
+    accession_id: str,
+    curve_rows: Sequence[dict[str, float | str]],
+    inversion_readiness_rows: Sequence[dict[str, float | str]],
+    observable_semantics_rows: Sequence[dict[str, float | str]],
+    required_observables: Sequence[str],
+) -> list[dict[str, float | str]]:
+    """Audit whether real GlassBench rows expose the observables needed for PE inversion."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not curve_rows:
+        raise ValueError("curve_rows must be nonempty")
+    if not inversion_readiness_rows:
+        raise ValueError("inversion_readiness_rows must be nonempty")
+    required = list(dict.fromkeys(str(observable) for observable in required_observables))
+    if not required or any(not observable for observable in required):
+        raise ValueError("required_observables must contain nonempty strings")
+
+    def split_items(value: object) -> list[str]:
+        text = str(value)
+        if not text or text == "none":
+            return []
+        return [item for item in text.split(";") if item and item != "none"]
+
+    def key(row: dict[str, float | str]) -> tuple[str, str]:
+        return (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+
+    grouped_curves: dict[tuple[str, str], list[dict[str, float | str]]] = {}
+    for row in curve_rows:
+        grouped_curves.setdefault(key(row), []).append(row)
+
+    readiness_by_key = {key(row): row for row in inversion_readiness_rows}
+    semantics_by_key: dict[tuple[str, str], list[dict[str, float | str]]] = {}
+    for row in observable_semantics_rows:
+        semantics_by_key.setdefault(key(row), []).append(row)
+
+    all_keys = sorted(
+        {
+            item
+            for item in set(grouped_curves) | set(readiness_by_key)
+            if item[0] != "KA" and item[1] != "none"
+        },
+        key=lambda item: (item[0], float(item[1])),
+    )
+
+    out: list[dict[str, float | str]] = []
+    for system_id, temperature in all_keys:
+        group = grouped_curves.get((system_id, temperature), [])
+        readiness = readiness_by_key.get((system_id, temperature), {})
+        ready_rows = [row for row in group if float(row.get("observable_curve_ready", 0.0)) == 1.0]
+        rows_for_columns = ready_rows if ready_rows else group
+
+        available: list[str] = []
+        if any("frame_index" in row for row in rows_for_columns):
+            available.append("frame_index")
+        for observable in required:
+            if any(observable in row for row in rows_for_columns):
+                available.append(observable)
+        for observable in split_items(readiness.get("available_observables", "none")):
+            if observable not in available:
+                available.append(observable)
+        available = list(dict.fromkeys(available))
+        available_required = {observable for observable in available if observable in set(required)}
+        missing = [observable for observable in required if observable not in available_required]
+
+        frame_count = len({float(row.get("frame_index", -1.0)) for row in ready_rows if float(row.get("frame_index", -1.0)) >= 0.0})
+        member_count = len(
+            {
+                str(row.get("first_npz_member", "none"))
+                for row in ready_rows
+                if str(row.get("first_npz_member", "none")) != "none"
+            }
+        )
+        source_paths = sorted({str(row.get("source_path", "none")) for row in ready_rows or group})
+        first_members = sorted(
+            {
+                str(row.get("first_npz_member", "none"))
+                for row in ready_rows or group
+                if str(row.get("first_npz_member", "none")) != "none"
+            }
+        )
+
+        semantics_rows = semantics_by_key.get((system_id, temperature), [])
+        semantics_ready = any(float(row.get("real_inversion_ready", 0.0)) == 1.0 for row in semantics_rows)
+        proxy_candidates = [
+            str(row.get("candidate_observable", "unmapped_result_curve")) for row in semantics_rows
+        ]
+        has_proxy_semantics = any(
+            candidate not in {"direct_trajectory_observables", "unmapped_result_curve"}
+            for candidate in proxy_candidates
+        )
+        proxy_substitution_allowed = False
+        trajectory_ready = bool(ready_rows)
+        coverage_ready = trajectory_ready and not missing
+        publishable_ready = coverage_ready and (semantics_ready or not observable_semantics_rows)
+
+        if not trajectory_ready:
+            stage = "trajectory_observable_curve_missing"
+            blocker = str(readiness.get("primary_blocker", "observable_curve_ready"))
+            actions = ["complete_first_npz_observable_curve"]
+        elif missing:
+            blocker = "observable_set"
+            if available == ["frame_index", "msd", "ngp_2d"] or set(available) == {
+                "frame_index",
+                "msd",
+                "ngp_2d",
+            }:
+                stage = "frame_index_msd_ngp_only"
+            else:
+                stage = "required_observable_set_incomplete"
+            actions = []
+            if "lag_time" in missing:
+                actions.append("compute_lag_time")
+            if "self_intermediate_scattering_by_k" in missing:
+                actions.append("compute_multi_k_self_intermediate_scattering")
+            if "chi4_overlap" in missing:
+                actions.append("compute_overlap_chi4")
+            if has_proxy_semantics or semantics_rows:
+                actions.append("do_not_substitute_rhomax_or_ml_feature_curves_for_fs_chi4")
+        elif not semantics_ready and observable_semantics_rows:
+            stage = "observable_semantics_incomplete"
+            blocker = "remote_result_observable_semantics"
+            actions = ["attach_direct_fs_ngp_msd_chi4_semantics"]
+            if has_proxy_semantics or semantics_rows:
+                actions.append("do_not_substitute_rhomax_or_ml_feature_curves_for_fs_chi4")
+        else:
+            stage = "real_inversion_observable_set_ready"
+            blocker = "none"
+            actions = ["attach_uncertainties_and_run_real_inversion"]
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "first_npz_members": ";".join(first_members) if first_members else "none",
+                "frame_count": float(frame_count),
+                "member_count": float(member_count),
+                "required_observables": ";".join(required),
+                "available_trajectory_observables": ";".join(available) if available else "none",
+                "missing_observables": ";".join(missing) if missing else "none",
+                "remote_candidate_observables": ";".join(proxy_candidates) if proxy_candidates else "none",
+                "remote_result_semantics_ready": float(semantics_ready),
+                "proxy_observable_substitution_allowed": float(proxy_substitution_allowed),
+                "observable_coverage_ready": float(coverage_ready),
+                "publishable_real_inversion_observable_set_ready": float(publishable_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_actions": ";".join(list(dict.fromkeys(actions))) if actions else "none",
+                "observable_audit_stage": stage,
+            }
+        )
+
+    if not out:
+        raise ValueError("no GlassBench observable coverage rows could be assembled")
+    return out
+
+
 def sota_glassbench_short_window_trend_canary_gate(
     *,
     canary_id: str,

@@ -1512,6 +1512,14 @@ observables are averaged only into standard-error rows, not into a completed
 real-data fit. This is the route required for a future GlassBench-style
 multi-\texttt{npz} reanalysis once physical time units and enough independent
 members are available.
+For the current GlassBench first-\texttt{npz} rows, the separate
+\texttt{renewal\_cage\_sota\_glassbench\_observable\_coverage\_audit.csv}
+records the sharper blocker: the real coordinate curves expose frame index,
+MSD, and two-dimensional NGP, but not physical lag time, multi-\(k\)
+self-intermediate scattering, or overlap-\(\chi_4\).  The audit also forbids
+using \texttt{rhomax} or machine-learning feature curves as substitutes for
+those dynamical observables, so the current GlassBench evidence remains a
+coordinate-level canary rather than an uncertainty-weighted real inversion.
 The gate
 \texttt{renewal\_cage\_trajectory\_inversion\_readiness.csv} then separates a
 trajectory source that is merely structurally usable from one that is ready for

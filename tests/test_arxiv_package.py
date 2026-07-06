@@ -892,6 +892,29 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka["readiness_stage"], "upstream_curve_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
 
+    def test_sota_glassbench_observable_coverage_audit_blocks_proxy_substitution(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_observable_coverage_audit.csv"
+        self.assertTrue(path.exists())
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key in [("KA2D", "0.23"), ("KA2D", "0.30")]:
+            row = by_key[key]
+            self.assertEqual(row["observable_audit_stage"], "frame_index_msd_ngp_only")
+            self.assertEqual(row["available_trajectory_observables"], "frame_index;msd;ngp_2d")
+            self.assertIn("lag_time", row["missing_observables"])
+            self.assertIn("self_intermediate_scattering_by_k", row["missing_observables"])
+            self.assertIn("chi4_overlap", row["missing_observables"])
+            self.assertEqual(float(row["proxy_observable_substitution_allowed"]), 0.0)
+            self.assertEqual(float(row["observable_coverage_ready"]), 0.0)
+            self.assertEqual(float(row["publishable_real_inversion_observable_set_ready"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertEqual(row["primary_blocker"], "observable_set")
+            self.assertIn("compute_multi_k_self_intermediate_scattering", row["next_required_actions"])
+            self.assertIn("do_not_substitute_rhomax_or_ml_feature_curves_for_fs_chi4", row["next_required_actions"])
+
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
         self.assertTrue(path.exists())
@@ -1569,6 +1592,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_target_fetch.pdf", names)
@@ -1721,6 +1745,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
+            "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",

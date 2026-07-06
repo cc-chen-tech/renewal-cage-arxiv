@@ -106,6 +106,7 @@ from renewal_cage import (  # noqa: E402
     sota_evidence_class_gate,
     sota_evidence_verdict,
     sota_glassbench_frame_time_mapping_audit_gate,
+    sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_visible_member_ensemble_audit_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
@@ -3638,6 +3639,33 @@ def write_sota_glassbench_trajectory_first_npz_inversion_readiness_csv(
         min_member_count=4,
         min_frame_count=20,
         has_physical_time=False,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_observable_coverage_audit_csv(
+    path: Path,
+    *,
+    curve_rows: list[dict[str, float | str]],
+    inversion_readiness_rows: list[dict[str, float | str]],
+    observable_semantics_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit whether real GlassBench rows expose the observables needed for inversion."""
+
+    rows = sota_glassbench_observable_coverage_audit_gate(
+        audit_id="glassbench_observable_coverage_audit",
+        accession_id="glassbench_zenodo_10118191",
+        curve_rows=curve_rows,
+        inversion_readiness_rows=inversion_readiness_rows,
+        observable_semantics_rows=observable_semantics_rows,
+        required_observables=[
+            "lag_time",
+            "msd",
+            "ngp_2d",
+            "self_intermediate_scattering_by_k",
+            "chi4_overlap",
+        ],
     )
     write_sweep_csv(path, rows)
     return rows
@@ -7178,6 +7206,66 @@ def write_sota_glassbench_real_inversion_unlock_protocol_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_observable_coverage_audit_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 405
+    left, top = 75, 112
+    row_h = 76
+    colors = {
+        "real_inversion_observable_set_ready": "#2f855a",
+        "frame_index_msd_ngp_only": "#c05621",
+        "required_observable_set_incomplete": "#b7791f",
+        "observable_semantics_incomplete": "#805ad5",
+        "trajectory_observable_curve_missing": "#4a5568",
+    }
+    marks = []
+    for index, row in enumerate(rows):
+        y = top + index * row_h
+        stage = str(row["observable_audit_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ready = int(float(row["publishable_real_inversion_observable_set_ready"]))
+        coverage = int(float(row["observable_coverage_ready"]))
+        semantics = int(float(row["remote_result_semantics_ready"]))
+        proxy_allowed = int(float(row["proxy_observable_substitution_allowed"]))
+        missing = str(row["missing_observables"]).replace("_", " ")
+        available = str(row["available_trajectory_observables"]).replace("_", " ")
+        actions = str(row["next_required_actions"]).replace("_", " ")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 125}" y="{y - 5}" width="320" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 135}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:44]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 470}" y="{y + 13}" font-family="Arial, sans-serif" font-size="11">ready={ready}; coverage={coverage}; semantics={semantics}; proxy substitution={proxy_allowed}; frames={int(float(row["frame_count"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 125}" y="{y + 40}" font-family="Arial, sans-serif" font-size="9" fill="#555">available: {available[:96]}; missing: {missing[:92]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 125}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">next: {actions[:116]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench observable coverage audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Frame-index MSD/NGP curves are not promoted to real inversion until physical lag time, multi-k F_s, overlap chi4, and direct semantics are present.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 125}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">observable audit stage</text>
+  <text x="{left + 470}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">coverage checks</text>
+  {"".join(marks)}
+  <rect x="75" y="346" width="14" height="14" fill="#c05621" /><text x="96" y="358" font-family="Arial, sans-serif" font-size="12">current real rows: frame-index MSD/NGP only</text>
+  <rect x="492" y="346" width="14" height="14" fill="#2f855a" /><text x="513" y="358" font-family="Arial, sans-serif" font-size="12">green requires direct lag-time, F_s(k,t), chi4, and model-ready semantics</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9261,6 +9349,16 @@ def main() -> None:
     write_sota_remote_result_curve_observable_semantics_svg(
         FIGURE_DIR / "renewal_cage_sota_remote_result_curve_observable_semantics.svg",
         remote_result_curve_observable_semantics_rows,
+    )
+    glassbench_observable_coverage_audit_rows = write_sota_glassbench_observable_coverage_audit_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_observable_coverage_audit.csv",
+        curve_rows=glassbench_trajectory_first_npz_observable_curve_rows,
+        inversion_readiness_rows=glassbench_trajectory_first_npz_inversion_readiness_rows,
+        observable_semantics_rows=remote_result_curve_observable_semantics_rows,
+    )
+    write_sota_glassbench_observable_coverage_audit_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_observable_coverage_audit.svg",
+        glassbench_observable_coverage_audit_rows,
     )
     glassbench_real_inversion_gap_ledger_rows = write_sota_glassbench_real_inversion_gap_ledger_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv",

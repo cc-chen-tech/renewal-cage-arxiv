@@ -3190,6 +3190,79 @@ def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_observable_coverage_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_observable_coverage_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench observable coverage audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Frame-index MSD/NGP rows are gated before being used as real persistence/exchange inversion inputs.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 64
+    colors_by_stage = {
+        "real_inversion_observable_set_ready": colors.HexColor("#2f855a"),
+        "frame_index_msd_ngp_only": colors.HexColor("#c05621"),
+        "required_observable_set_incomplete": colors.HexColor("#b7791f"),
+        "observable_semantics_incomplete": colors.HexColor("#805ad5"),
+        "trajectory_observable_curve_missing": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 100, top + 18, "observable stage")
+    c.drawString(left + 370, top + 18, "coverage evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["observable_audit_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 12, 245, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 370,
+            y,
+            "ready={}; coverage={}; semantics={}; proxy substitution={}; frames={}".format(
+                int(float(row["publishable_real_inversion_observable_set_ready"])),
+                int(float(row["observable_coverage_ready"])),
+                int(float(row["remote_result_semantics_ready"])),
+                int(float(row["proxy_observable_substitution_allowed"])),
+                int(float(row["frame_count"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            f'available: {row["available_trajectory_observables"].replace("_", " ")[:72]}',
+        )
+        c.drawString(
+            left + 370,
+            y - 27,
+            f'missing: {row["missing_observables"].replace("_", " ")[:76]}; next: {row["next_required_actions"].replace("_", " ")[:52]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "Proxy rhomax or ML-feature result curves are not substitutes for lag time, multi-k F_s, overlap chi4, and direct semantics.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_remote_result_curve_cache_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_remote_result_curve_cache.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4514,6 +4587,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
+    sota_glassbench_observable_coverage_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_observable_coverage_audit.pdf"
+    )
     sota_remote_result_curve_cache_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_remote_result_curve_cache.pdf"
     )
@@ -4623,6 +4699,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_visible_member_ensemble_audit_pdf(
         sota_glassbench_visible_member_ensemble_audit_pdf
+    )
+    write_sota_glassbench_observable_coverage_audit_pdf(
+        sota_glassbench_observable_coverage_audit_pdf
     )
     write_sota_remote_result_curve_cache_pdf(sota_remote_result_curve_cache_pdf)
     write_sota_remote_result_curve_fetch_gap_pdf(sota_remote_result_curve_fetch_gap_pdf)
@@ -4766,6 +4845,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_visible_member_ensemble_audit_pdf,
             "figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf",
+        )
+        archive.write(
+            sota_glassbench_observable_coverage_audit_pdf,
+            "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
         )
         archive.write(
             sota_remote_result_curve_cache_pdf,
