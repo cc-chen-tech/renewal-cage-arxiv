@@ -821,6 +821,33 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
             self.assertIn("derive_or_fetch_trajectory_frame_time_mapping", row["next_required_actions"])
 
+    def test_sota_glassbench_real_inversion_unlock_protocol_lists_minimum_payload(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_inversion_unlock_protocol.csv"
+        self.assertTrue(path.exists())
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key, time_point_count in [(("KA2D", "0.23"), 8.0), (("KA2D", "0.30"), 6.0)]:
+            row = by_key[key]
+            self.assertEqual(row["unlock_stage"], "minimum_real_inversion_payload_missing")
+            self.assertEqual(row["current_claim_level"], "short_window_coordinate_trend_only")
+            self.assertEqual(row["post_unlock_claim_level"], "uncertainty_weighted_real_trajectory_inversion")
+            self.assertEqual(float(row["minimum_unlock_ready"]), 0.0)
+            self.assertEqual(float(row["frame_time_mapping_required"]), 1.0)
+            self.assertEqual(float(row["frame_time_mapping_present"]), 0.0)
+            self.assertEqual(float(row["observed_prefix_member_count"]), 3.0)
+            self.assertEqual(float(row["required_member_count"]), 4.0)
+            self.assertEqual(float(row["additional_member_count_needed"]), 1.0)
+            self.assertEqual(float(row["frame_count"]), 20.0)
+            self.assertEqual(float(row["time_point_count"]), time_point_count)
+            self.assertIn("frame_time_mapping", row["minimum_required_payload"])
+            self.assertIn("one_more_independent_npz_member", row["minimum_required_payload"])
+            self.assertIn("chi4_overlap", row["minimum_required_payload"])
+            self.assertIn("sigma_chi4_overlap", row["minimum_required_payload"])
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_trajectory_first_npz_inversion_readiness_records_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv"
         self.assertTrue(path.exists())
@@ -1490,6 +1517,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", names)
@@ -1642,6 +1670,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
+            "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",

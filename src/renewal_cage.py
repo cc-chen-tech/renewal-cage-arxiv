@@ -4242,6 +4242,134 @@ def sota_glassbench_real_inversion_gap_ledger_gate(
     return out
 
 
+def sota_glassbench_real_inversion_unlock_protocol_gate(
+    *,
+    protocol_id: str,
+    accession_id: str,
+    ledger_rows: Sequence[dict[str, float | str]],
+    timebase_rows: Sequence[dict[str, float | str]],
+    ensemble_horizon_rows: Sequence[dict[str, float | str]],
+    inversion_readiness_rows: Sequence[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """List the minimum payload needed to promote GlassBench canaries to real inversion."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not ledger_rows:
+        raise ValueError("ledger_rows must be nonempty")
+    if not timebase_rows:
+        raise ValueError("timebase_rows must be nonempty")
+    if not ensemble_horizon_rows:
+        raise ValueError("ensemble_horizon_rows must be nonempty")
+    if not inversion_readiness_rows:
+        raise ValueError("inversion_readiness_rows must be nonempty")
+
+    def rows_by_key(
+        rows: Sequence[dict[str, float | str]],
+    ) -> dict[tuple[str, str], dict[str, float | str]]:
+        return {
+            (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+            for row in rows
+        }
+
+    def split_items(value: object) -> list[str]:
+        text = str(value)
+        if not text or text == "none":
+            return []
+        return [item for item in text.split(";") if item and item != "none"]
+
+    timebase_by_key = rows_by_key(timebase_rows)
+    ensemble_by_key = rows_by_key(ensemble_horizon_rows)
+    readiness_by_key = rows_by_key(inversion_readiness_rows)
+
+    out: list[dict[str, float | str]] = []
+    for ledger in sorted(
+        ledger_rows,
+        key=lambda row: (str(row.get("system_id", "unknown")), float(row.get("temperature", 0.0))),
+    ):
+        system_id = str(ledger.get("system_id", "unknown"))
+        temperature = str(ledger.get("temperature", "none"))
+        if system_id == "none" or temperature == "none":
+            continue
+        key = (system_id, temperature)
+        timebase = timebase_by_key.get(key, {})
+        ensemble = ensemble_by_key.get(key, {})
+        readiness = readiness_by_key.get(key, {})
+
+        frame_count = float(timebase.get("frame_count", readiness.get("frame_count", 0.0)))
+        time_point_count = float(timebase.get("time_point_count", 0.0))
+        mapping_required = bool(float(timebase.get("explicit_frame_time_mapping_required", 1.0)))
+        mapping_present = bool(float(timebase.get("explicit_frame_time_mapping", 0.0)))
+        mapping_missing = mapping_required and not mapping_present
+
+        observed_prefix_members = float(
+            ensemble.get(
+                "prefix_npz_member_count",
+                ensemble.get("npz_member_count_in_probe", readiness.get("observed_member_count", 0.0)),
+            )
+        )
+        required_members = float(
+            ensemble.get("min_member_count", readiness.get("min_member_count", 1.0))
+        )
+        additional_members = max(0.0, required_members - observed_prefix_members)
+        missing_observables = split_items(readiness.get("missing_observables", "none"))
+        missing_sigmas = split_items(readiness.get("missing_uncertainty_columns", "none"))
+
+        payload_items: list[str] = []
+        if mapping_missing:
+            payload_items.append("frame_time_mapping")
+        if additional_members > 0.0:
+            if math.isclose(additional_members, 1.0):
+                payload_items.append("one_more_independent_npz_member")
+            else:
+                payload_items.append(f"{int(math.ceil(additional_members))}_more_independent_npz_members")
+        payload_items.extend(missing_observables)
+        payload_items.extend(missing_sigmas)
+        payload_items = list(dict.fromkeys(payload_items))
+
+        unlock_ready = not payload_items and bool(
+            float(ledger.get("quantitative_real_inversion_ready", readiness.get("sota_inversion_ready", 0.0)))
+        )
+        current_claim = str(ledger.get("allowed_claim_level", "metadata_or_coordinate_ingestion_only"))
+        post_unlock_claim = (
+            "uncertainty_weighted_real_trajectory_inversion"
+            if current_claim != "uncertainty_weighted_real_trajectory_inversion"
+            else current_claim
+        )
+
+        out.append(
+            {
+                "protocol_id": f"{protocol_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "current_claim_level": current_claim,
+                "post_unlock_claim_level": post_unlock_claim,
+                "minimum_unlock_ready": float(unlock_ready),
+                "frame_count": frame_count,
+                "time_point_count": time_point_count,
+                "frame_time_mapping_required": float(mapping_required),
+                "frame_time_mapping_present": float(mapping_present),
+                "observed_prefix_member_count": observed_prefix_members,
+                "required_member_count": required_members,
+                "additional_member_count_needed": additional_members,
+                "missing_observables": ";".join(missing_observables) if missing_observables else "none",
+                "missing_uncertainty_columns": ";".join(missing_sigmas) if missing_sigmas else "none",
+                "minimum_required_payload": ";".join(payload_items) if payload_items else "none",
+                "thermodynamic_claim_allowed": 0.0,
+                "unlock_stage": "minimum_real_inversion_payload_ready"
+                if unlock_ready
+                else "minimum_real_inversion_payload_missing",
+            }
+        )
+
+    if not out:
+        raise ValueError("ledger_rows did not contain any concrete system-temperature rows")
+    return out
+
+
 def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
     *,
     horizon_id: str,

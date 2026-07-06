@@ -122,6 +122,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_entry_metadata_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_real_inversion_gap_ledger_gate,
+    sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_short_window_trend_canary_gate,
@@ -3213,6 +3214,82 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["allowed_claim_level"], "uncertainty_weighted_real_trajectory_inversion")
         self.assertEqual(row["primary_blocker"], "none")
         self.assertEqual(row["ledger_stage"], "real_data_quantitative_inversion_ready")
+
+    def test_sota_glassbench_real_inversion_unlock_protocol_lists_minimum_missing_payload(self):
+        rows = sota_glassbench_real_inversion_unlock_protocol_gate(
+            protocol_id="glassbench_real_inversion_unlock_protocol",
+            accession_id="glassbench_zenodo_10118191",
+            ledger_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "short_window_claim_ready": 1.0,
+                    "trajectory_timebase_ready": 0.0,
+                    "ensemble_horizon_ready": 0.0,
+                    "structural_observable_ready": 0.0,
+                    "uncertainty_ready": 0.0,
+                    "observable_semantics_ready": 0.0,
+                    "quantitative_real_inversion_ready": 0.0,
+                    "allowed_claim_level": "short_window_coordinate_trend_only",
+                    "primary_blocker": "frame_time_point_count",
+                }
+            ],
+            timebase_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "frame_count": 20.0,
+                    "time_point_count": 8.0,
+                    "explicit_frame_time_mapping_required": 1.0,
+                    "explicit_frame_time_mapping": 0.0,
+                    "trajectory_timebase_ready": 0.0,
+                    "primary_blocker": "frame_time_point_count",
+                }
+            ],
+            ensemble_horizon_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "npz_member_count_in_probe": 3.0,
+                    "min_member_count": 4.0,
+                    "member_count_gap_to_threshold": 1.0,
+                    "prefix_member_horizon_ready": 0.0,
+                }
+            ],
+            inversion_readiness_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "observed_member_count": 1.0,
+                    "min_member_count": 4.0,
+                    "frame_count": 20.0,
+                    "min_frame_count": 20.0,
+                    "missing_observables": "lag_time;self_intermediate_scattering_by_k;chi4_overlap",
+                    "missing_uncertainty_columns": "sigma_msd;sigma_ngp_2d;sigma_self_intermediate_scattering_by_k;sigma_chi4_overlap",
+                    "sota_inversion_ready": 0.0,
+                }
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(row["unlock_stage"], "minimum_real_inversion_payload_missing")
+        self.assertEqual(row["current_claim_level"], "short_window_coordinate_trend_only")
+        self.assertEqual(row["post_unlock_claim_level"], "uncertainty_weighted_real_trajectory_inversion")
+        self.assertEqual(float(row["minimum_unlock_ready"]), 0.0)
+        self.assertEqual(float(row["frame_time_mapping_required"]), 1.0)
+        self.assertEqual(float(row["frame_time_mapping_present"]), 0.0)
+        self.assertEqual(float(row["observed_prefix_member_count"]), 3.0)
+        self.assertEqual(float(row["required_member_count"]), 4.0)
+        self.assertEqual(float(row["additional_member_count_needed"]), 1.0)
+        self.assertEqual(float(row["frame_count"]), 20.0)
+        self.assertEqual(float(row["time_point_count"]), 8.0)
+        self.assertEqual(row["missing_observables"], "lag_time;self_intermediate_scattering_by_k;chi4_overlap")
+        self.assertIn("sigma_chi4_overlap", row["missing_uncertainty_columns"])
+        self.assertEqual(
+            row["minimum_required_payload"],
+            "frame_time_mapping;one_more_independent_npz_member;lag_time;self_intermediate_scattering_by_k;chi4_overlap;sigma_msd;sigma_ngp_2d;sigma_self_intermediate_scattering_by_k;sigma_chi4_overlap",
+        )
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_counts_prefix_members_without_claiming_extraction(self):
         tar_probe_rows = [

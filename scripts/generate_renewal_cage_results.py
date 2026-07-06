@@ -109,6 +109,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_real_inversion_gap_ledger_gate,
+    sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_short_window_trend_canary_gate,
     sota_glassbench_trajectory_timebase_bridge_gate,
     sota_glassbench_trajectory_entry_metadata_gate,
@@ -3704,6 +3705,28 @@ def write_sota_glassbench_real_inversion_gap_ledger_csv(
     return rows
 
 
+def write_sota_glassbench_real_inversion_unlock_protocol_csv(
+    path: Path,
+    *,
+    ledger_rows: list[dict[str, float | str]],
+    timebase_rows: list[dict[str, float | str]],
+    ensemble_horizon_rows: list[dict[str, float | str]],
+    inversion_readiness_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """List the minimum payload needed before a real GlassBench inversion claim."""
+
+    rows = sota_glassbench_real_inversion_unlock_protocol_gate(
+        protocol_id="glassbench_real_inversion_unlock_protocol",
+        accession_id="glassbench_zenodo_10118191",
+        ledger_rows=ledger_rows,
+        timebase_rows=timebase_rows,
+        ensemble_horizon_rows=ensemble_horizon_rows,
+        inversion_readiness_rows=inversion_readiness_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
     path: Path,
     *,
@@ -7009,6 +7032,57 @@ def write_sota_glassbench_real_inversion_gap_ledger_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_inversion_unlock_protocol_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 420
+    left, top = 75, 112
+    row_h = 76
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ready = int(float(row["minimum_unlock_ready"]))
+        color = "#2f855a" if ready else "#c05621"
+        members = int(math.ceil(float(row["additional_member_count_needed"])))
+        frames = int(float(row["frame_count"]))
+        points = int(float(row["time_point_count"]))
+        mapping = int(float(row["frame_time_mapping_present"]))
+        payload = str(row["minimum_required_payload"]).replace("_", " ")[:132]
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 128}" y="{y - 5}" width="310" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 138}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{str(row["unlock_stage"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 465}" y="{y + 13}" font-family="Arial, sans-serif" font-size="11">frames={frames}; result time points={points}; mapping={mapping}; extra members={members}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 128}" y="{y + 40}" font-family="Arial, sans-serif" font-size="9" fill="#555">payload: {payload}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 128}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">after unlock: {str(row["post_unlock_claim_level"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-inversion unlock protocol</text>
+  <text x="75" y="67" font-family="Arial, sans-serif" font-size="13" fill="#444">Minimum additional payload needed before promoting short-window real-data canaries to uncertainty-weighted trajectory inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 128}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">unlock stage</text>
+  <text x="{left + 465}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">minimum missing payload</text>
+  {"".join(marks)}
+  <rect x="75" y="360" width="14" height="14" fill="#c05621" /><text x="96" y="372" font-family="Arial, sans-serif" font-size="12">current KA2D rows still miss frame-time mapping, ensemble margin, observables, and uncertainties</text>
+  <rect x="720" y="360" width="14" height="14" fill="#2f855a" /><text x="741" y="372" font-family="Arial, sans-serif" font-size="12">green means ready for real persistence/exchange inversion</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9029,6 +9103,19 @@ def main() -> None:
     write_sota_glassbench_real_inversion_gap_ledger_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.svg",
         glassbench_real_inversion_gap_ledger_rows,
+    )
+    glassbench_real_inversion_unlock_protocol_rows = (
+        write_sota_glassbench_real_inversion_unlock_protocol_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_inversion_unlock_protocol.csv",
+            ledger_rows=glassbench_real_inversion_gap_ledger_rows,
+            timebase_rows=glassbench_trajectory_timebase_bridge_rows,
+            ensemble_horizon_rows=glassbench_trajectory_npz_ensemble_horizon_rows,
+            inversion_readiness_rows=glassbench_trajectory_first_npz_inversion_readiness_rows,
+        )
+    )
+    write_sota_glassbench_real_inversion_unlock_protocol_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_inversion_unlock_protocol.svg",
+        glassbench_real_inversion_unlock_protocol_rows,
     )
     readme_digest_rows = write_sota_readme_digest_csv(
         DATA_DIR / "renewal_cage_sota_readme_digest.csv"

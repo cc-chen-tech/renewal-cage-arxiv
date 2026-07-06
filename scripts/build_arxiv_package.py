@@ -2839,6 +2839,72 @@ def write_sota_glassbench_real_inversion_gap_ledger_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_real_inversion_unlock_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_inversion_unlock_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real-inversion unlock protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Minimum additional payload required before promoting real-data canaries to uncertainty-weighted trajectory inversion.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 64
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 100, top + 18, "unlock stage")
+    c.drawString(left + 360, top + 18, "minimum missing payload")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        ready = bool(float(row["minimum_unlock_ready"]))
+        color = colors.HexColor("#2f855a") if ready else colors.HexColor("#c05621")
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 12, 235, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, row["unlock_stage"].replace("_", " ")[:40])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7)
+        c.drawString(
+            left + 360,
+            y,
+            "frames={}; result times={}; mapping={}; extra members={}".format(
+                int(float(row["frame_count"])),
+                int(float(row["time_point_count"])),
+                int(float(row["frame_time_mapping_present"])),
+                int(math.ceil(float(row["additional_member_count_needed"]))),
+            ),
+        )
+        c.setFont("Helvetica", 6.6)
+        c.drawString(
+            left + 360,
+            y - 14,
+            f'payload: {row["minimum_required_payload"].replace("_", " ")[:95]}',
+        )
+        c.drawString(
+            left + 360,
+            y - 27,
+            f'after unlock: {row["post_unlock_claim_level"].replace("_", " ")}',
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "This is a data-acquisition and observable-computation protocol, not a thermodynamic glass-transition claim.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4290,6 +4356,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_real_inversion_gap_ledger_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf"
     )
+    sota_glassbench_real_inversion_unlock_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf"
+    )
     sota_glassbench_trajectory_first_npz_inversion_readiness_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
     )
@@ -4390,6 +4459,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_real_inversion_gap_ledger_pdf(
         sota_glassbench_real_inversion_gap_ledger_pdf
+    )
+    write_sota_glassbench_real_inversion_unlock_protocol_pdf(
+        sota_glassbench_real_inversion_unlock_protocol_pdf
     )
     write_sota_glassbench_trajectory_first_npz_inversion_readiness_pdf(
         sota_glassbench_trajectory_first_npz_inversion_readiness_pdf
@@ -4519,6 +4591,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_real_inversion_gap_ledger_pdf,
             "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_inversion_unlock_protocol_pdf,
+            "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_first_npz_inversion_readiness_pdf,

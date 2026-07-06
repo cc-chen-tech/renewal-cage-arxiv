@@ -1325,6 +1325,13 @@ temperatures its allowed claim is
 \texttt{short\_window\_coordinate\_trend\_only}; the current primary blocker is
 the frame/time-count mismatch, with ensemble and uncertainty actions still
 queued before a real persistence/exchange inversion can be claimed.
+The companion unlock protocol
+\texttt{renewal\_cage\_sota\_glassbench\_real\_inversion\_unlock\_protocol.csv}
+then lists the minimum payload needed for that promotion: an explicit
+frame-time mapping, one additional independent visible \texttt{npz} member at
+each KA2D temperature, the missing lag-time/\(F_s\)/\(\chi_4\) observables, and
+positive uncertainty columns. It is therefore a falsifiable data-acquisition
+and observable-computation protocol, not an additional thermodynamic claim.
 
 The corresponding SOTA-inversion readiness gate records the next hard
 requirements for turning these real coordinate curves into a quantitative
