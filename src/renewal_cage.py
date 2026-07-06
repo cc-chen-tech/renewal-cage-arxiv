@@ -4090,6 +4090,124 @@ def sota_glassbench_trajectory_timebase_bridge_gate(
     return out
 
 
+def sota_glassbench_frame_time_mapping_audit_gate(
+    *,
+    audit_id: str,
+    accession_id: str,
+    timebase_rows: Sequence[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Classify candidate frame-to-time mappings without silently interpolating data."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not timebase_rows:
+        raise ValueError("timebase_rows must be nonempty")
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        timebase_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), str(item.get("temperature", "none"))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        if system_id == "none" or temperature == "none":
+            continue
+        frame_count = int(float(row.get("frame_count", 0.0)))
+        time_point_count = int(float(row.get("time_point_count", 0.0)))
+        time_grid_available = bool(float(row.get("time_grid_available", 0.0)))
+        explicit_mapping = bool(float(row.get("explicit_frame_time_mapping", 0.0)))
+        exact_count_match = time_grid_available and frame_count > 0 and frame_count == time_point_count
+
+        if frame_count > 1 and time_point_count > 1:
+            stride_ratio = (frame_count - 1) / (time_point_count - 1)
+            integer_stride = math.isclose(stride_ratio, round(stride_ratio), rel_tol=0.0, abs_tol=1e-12)
+        else:
+            stride_ratio = 0.0
+            integer_stride = False
+        endpoint_interpolation = bool(time_grid_available and frame_count > 1 and time_point_count > 1 and not exact_count_match)
+
+        if exact_count_match and explicit_mapping:
+            stage = "frame_time_mapping_ready"
+            accepted = "explicit_count_matched_frame_time_mapping"
+            provisional = "none"
+            metadata = "none"
+            blocker = "none"
+            next_action = "run_timebase_attached_observable_protocol"
+            publishable_ready = True
+        elif exact_count_match:
+            stage = "count_matched_mapping_metadata_required"
+            accepted = "none"
+            provisional = "count_matched_requires_explicit_metadata"
+            metadata = "dump_interval;saved_frame_stride;trajectory_frame_origin"
+            blocker = "explicit_frame_time_mapping"
+            next_action = "document_frame_to_physical_time_mapping"
+            publishable_ready = False
+        elif integer_stride and explicit_mapping:
+            stage = "subsample_mapping_ready"
+            accepted = "explicit_integer_stride_subsample_mapping"
+            provisional = "none"
+            metadata = "none"
+            blocker = "none"
+            next_action = "compute_observables_on_subsampled_time_grid"
+            publishable_ready = True
+        elif integer_stride:
+            stage = "integer_stride_mapping_metadata_required"
+            accepted = "none"
+            provisional = "integer_stride_subsample_requires_metadata"
+            metadata = "dump_interval;saved_frame_stride;trajectory_frame_origin;result_time_generation_script"
+            blocker = "explicit_frame_time_mapping"
+            next_action = "document_subsample_stride_and_result_time_generation"
+            publishable_ready = False
+        elif endpoint_interpolation:
+            stage = "ambiguous_frame_time_mapping"
+            accepted = "none"
+            provisional = "endpoint_interpolation_requires_metadata"
+            metadata = "dump_interval;saved_frame_stride;trajectory_frame_origin;result_time_generation_script"
+            blocker = "frame_time_point_count"
+            next_action = "derive_or_fetch_trajectory_frame_time_mapping"
+            publishable_ready = False
+        else:
+            stage = "frame_time_mapping_missing"
+            accepted = "none"
+            provisional = "none"
+            metadata = "time_grid;trajectory_frame_count;trajectory_frame_origin"
+            blocker = "time_grid"
+            next_action = "fetch_same_temperature_time_grid"
+            publishable_ready = False
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "frame_count": float(frame_count),
+                "time_point_count": float(time_point_count),
+                "time_grid_path": str(row.get("time_grid_path", "none")),
+                "time_grid_available": float(time_grid_available),
+                "exact_count_match": float(exact_count_match),
+                "frame_to_result_stride_ratio": float(stride_ratio),
+                "integer_stride_subsample_candidate": float(integer_stride and not exact_count_match),
+                "endpoint_interpolation_candidate": float(endpoint_interpolation),
+                "explicit_frame_time_mapping": float(explicit_mapping),
+                "accepted_mapping_class": accepted,
+                "provisional_mapping_class": provisional,
+                "publishable_frame_time_mapping_ready": float(publishable_ready),
+                "minimum_required_metadata": metadata,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "mapping_audit_stage": stage,
+            }
+        )
+
+    if not out:
+        raise ValueError("timebase_rows did not contain any concrete system-temperature rows")
+    return out
+
+
 def sota_glassbench_real_inversion_gap_ledger_gate(
     *,
     ledger_id: str,

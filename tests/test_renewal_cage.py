@@ -123,6 +123,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_real_inversion_gap_ledger_gate,
     sota_glassbench_real_inversion_unlock_protocol_gate,
+    sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_short_window_trend_canary_gate,
@@ -3290,6 +3291,80 @@ class DelayedRenewalCageTests(unittest.TestCase):
             "frame_time_mapping;one_more_independent_npz_member;lag_time;self_intermediate_scattering_by_k;chi4_overlap;sigma_msd;sigma_ngp_2d;sigma_self_intermediate_scattering_by_k;sigma_chi4_overlap",
         )
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_frame_time_mapping_audit_rejects_ambiguous_subsampling(self):
+        rows = sota_glassbench_frame_time_mapping_audit_gate(
+            audit_id="glassbench_frame_time_mapping_audit",
+            accession_id="glassbench_zenodo_10118191",
+            timebase_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "frame_count": 20.0,
+                    "time_point_count": 8.0,
+                    "time_grid_available": 1.0,
+                    "time_grid_path": "GlassBench/KA2D_results/times_0.23.dat",
+                    "explicit_frame_time_mapping_required": 1.0,
+                    "explicit_frame_time_mapping": 0.0,
+                    "trajectory_timebase_ready": 0.0,
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "frame_count": 20.0,
+                    "time_point_count": 6.0,
+                    "time_grid_available": 1.0,
+                    "time_grid_path": "GlassBench/KA2D_results/times_0.30.dat",
+                    "explicit_frame_time_mapping_required": 1.0,
+                    "explicit_frame_time_mapping": 0.0,
+                    "trajectory_timebase_ready": 0.0,
+                },
+            ],
+        )
+
+        by_temperature = {row["temperature"]: row for row in rows}
+        cold = by_temperature["0.23"]
+        hot = by_temperature["0.30"]
+        self.assertEqual(float(cold["exact_count_match"]), 0.0)
+        self.assertEqual(float(hot["exact_count_match"]), 0.0)
+        self.assertEqual(float(cold["integer_stride_subsample_candidate"]), 0.0)
+        self.assertEqual(float(hot["integer_stride_subsample_candidate"]), 0.0)
+        self.assertEqual(float(cold["endpoint_interpolation_candidate"]), 1.0)
+        self.assertEqual(float(hot["endpoint_interpolation_candidate"]), 1.0)
+        for row in rows:
+            self.assertEqual(float(row["publishable_frame_time_mapping_ready"]), 0.0)
+            self.assertEqual(row["accepted_mapping_class"], "none")
+            self.assertEqual(row["provisional_mapping_class"], "endpoint_interpolation_requires_metadata")
+            self.assertIn("dump_interval", row["minimum_required_metadata"])
+            self.assertIn("trajectory_frame_origin", row["minimum_required_metadata"])
+            self.assertEqual(row["mapping_audit_stage"], "ambiguous_frame_time_mapping")
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_frame_time_mapping_audit_accepts_explicit_count_match(self):
+        rows = sota_glassbench_frame_time_mapping_audit_gate(
+            audit_id="glassbench_frame_time_mapping_audit",
+            accession_id="glassbench_zenodo_10118191",
+            timebase_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "frame_count": 6.0,
+                    "time_point_count": 6.0,
+                    "time_grid_available": 1.0,
+                    "time_grid_path": "GlassBench/KA2D_results/times_0.30.dat",
+                    "explicit_frame_time_mapping_required": 1.0,
+                    "explicit_frame_time_mapping": 1.0,
+                    "trajectory_timebase_ready": 1.0,
+                }
+            ],
+        )
+
+        row = rows[0]
+        self.assertEqual(float(row["exact_count_match"]), 1.0)
+        self.assertEqual(float(row["publishable_frame_time_mapping_ready"]), 1.0)
+        self.assertEqual(row["accepted_mapping_class"], "explicit_count_matched_frame_time_mapping")
+        self.assertEqual(row["minimum_required_metadata"], "none")
+        self.assertEqual(row["mapping_audit_stage"], "frame_time_mapping_ready")
 
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_counts_prefix_members_without_claiming_extraction(self):
         tar_probe_rows = [

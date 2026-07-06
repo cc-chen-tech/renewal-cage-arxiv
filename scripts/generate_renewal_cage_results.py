@@ -105,6 +105,7 @@ from renewal_cage import (  # noqa: E402
     sota_data_accession_gate,
     sota_evidence_class_gate,
     sota_evidence_verdict,
+    sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
@@ -3681,6 +3682,22 @@ def write_sota_glassbench_trajectory_timebase_bridge_csv(
     return rows
 
 
+def write_sota_glassbench_frame_time_mapping_audit_csv(
+    path: Path,
+    *,
+    timebase_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit whether result time grids can be mapped to trajectory frame indices."""
+
+    rows = sota_glassbench_frame_time_mapping_audit_gate(
+        audit_id="glassbench_frame_time_mapping_audit",
+        accession_id="glassbench_zenodo_10118191",
+        timebase_rows=timebase_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_glassbench_real_inversion_gap_ledger_csv(
     path: Path,
     *,
@@ -6973,6 +6990,65 @@ def write_sota_glassbench_trajectory_timebase_bridge_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_frame_time_mapping_audit_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 420
+    left, top = 75, 112
+    row_h = 76
+    colors = {
+        "frame_time_mapping_ready": "#2f855a",
+        "subsample_mapping_ready": "#2f855a",
+        "count_matched_mapping_metadata_required": "#2b6cb0",
+        "integer_stride_mapping_metadata_required": "#b7791f",
+        "ambiguous_frame_time_mapping": "#c05621",
+        "frame_time_mapping_missing": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["mapping_audit_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ready = int(float(row["publishable_frame_time_mapping_ready"]))
+        exact = int(float(row["exact_count_match"]))
+        stride = int(float(row["integer_stride_subsample_candidate"]))
+        interp = int(float(row["endpoint_interpolation_candidate"]))
+        ratio = float(row["frame_to_result_stride_ratio"])
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 128}" y="{y - 5}" width="330" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 138}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:46]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 485}" y="{y + 13}" font-family="Arial, sans-serif" font-size="11">ready={ready}; exact={exact}; integer stride={stride}; endpoint interpolation={interp}; ratio={ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 128}" y="{y + 40}" font-family="Arial, sans-serif" font-size="9" fill="#555">accepted: {str(row["accepted_mapping_class"]).replace("_", " ")}; provisional: {str(row["provisional_mapping_class"]).replace("_", " ")[:70]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 128}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">metadata: {str(row["minimum_required_metadata"]).replace("_", " ")[:120]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench frame-time mapping audit</text>
+  <text x="75" y="67" font-family="Arial, sans-serif" font-size="13" fill="#444">Result time grids are not attached to trajectory frame indices unless a publishable mapping class is documented.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 128}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">mapping audit stage</text>
+  <text x="{left + 485}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">candidate checks</text>
+  {"".join(marks)}
+  <rect x="75" y="360" width="14" height="14" fill="#c05621" /><text x="96" y="372" font-family="Arial, sans-serif" font-size="12">endpoint interpolation alone is not a publishable frame-time mapping</text>
+  <rect x="645" y="360" width="14" height="14" fill="#2f855a" /><text x="666" y="372" font-family="Arial, sans-serif" font-size="12">green requires explicit count-matched or explicit stride metadata</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_real_inversion_gap_ledger_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9083,6 +9159,14 @@ def main() -> None:
     write_sota_glassbench_trajectory_timebase_bridge_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_timebase_bridge.svg",
         glassbench_trajectory_timebase_bridge_rows,
+    )
+    glassbench_frame_time_mapping_audit_rows = write_sota_glassbench_frame_time_mapping_audit_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_frame_time_mapping_audit.csv",
+        timebase_rows=glassbench_trajectory_timebase_bridge_rows,
+    )
+    write_sota_glassbench_frame_time_mapping_audit_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_frame_time_mapping_audit.svg",
+        glassbench_frame_time_mapping_audit_rows,
     )
     remote_result_curve_observable_semantics_rows = write_sota_remote_result_curve_observable_semantics_csv(
         DATA_DIR / "renewal_cage_sota_remote_result_curve_observable_semantics.csv",

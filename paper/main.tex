@@ -1317,6 +1317,13 @@ Because there is no explicit frame-to-physical-time mapping, the gate keeps
 \texttt{trajectory\_timebase\_ready}=0 and records
 \texttt{frame\_time\_point\_count} as the blocker. Thus the real-data trend
 check is not silently upgraded into an alpha-relaxation or transport fit.
+The frame-time mapping audit
+\texttt{renewal\_cage\_sota\_glassbench\_frame\_time\_mapping\_audit.csv}
+then classifies possible bridges. For both KA2D temperatures the current rows
+fail exact count matching and integer-stride subsampling; endpoint
+interpolation is recorded only as a provisional class until the dump interval,
+saved-frame stride, trajectory frame origin, and result-time generation script
+are documented.
 The aggregate gap ledger
 \texttt{renewal\_cage\_sota\_glassbench\_real\_inversion\_gap\_ledger.csv}
 then takes the minimum over the coordinate canary, timebase bridge, ensemble

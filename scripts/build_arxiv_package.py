@@ -2776,6 +2776,80 @@ def write_sota_glassbench_trajectory_timebase_bridge_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_frame_time_mapping_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_frame_time_mapping_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench frame-time mapping audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Candidate mappings are classified before attaching result time grids to trajectory frame-index curves.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 64
+    colors_by_stage = {
+        "frame_time_mapping_ready": colors.HexColor("#2f855a"),
+        "subsample_mapping_ready": colors.HexColor("#2f855a"),
+        "count_matched_mapping_metadata_required": colors.HexColor("#2b6cb0"),
+        "integer_stride_mapping_metadata_required": colors.HexColor("#b7791f"),
+        "ambiguous_frame_time_mapping": colors.HexColor("#c05621"),
+        "frame_time_mapping_missing": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 100, top + 18, "mapping stage")
+    c.drawString(left + 370, top + 18, "candidate checks")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["mapping_audit_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 12, 245, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 370,
+            y,
+            "ready={}; exact={}; stride={}; interpolation={}; ratio={:.3g}".format(
+                int(float(row["publishable_frame_time_mapping_ready"])),
+                int(float(row["exact_count_match"])),
+                int(float(row["integer_stride_subsample_candidate"])),
+                int(float(row["endpoint_interpolation_candidate"])),
+                float(row["frame_to_result_stride_ratio"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            f'accepted: {row["accepted_mapping_class"].replace("_", " ")}; provisional: {row["provisional_mapping_class"].replace("_", " ")[:55]}',
+        )
+        c.drawString(
+            left + 370,
+            y - 27,
+            f'metadata: {row["minimum_required_metadata"].replace("_", " ")[:80]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.black)
+    c.drawString(
+        42,
+        34,
+        "Endpoint interpolation alone is kept as provisional and cannot support a publishable trajectory-time inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_real_inversion_gap_ledger_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4353,6 +4427,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_trajectory_timebase_bridge_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf"
     )
+    sota_glassbench_frame_time_mapping_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf"
+    )
     sota_glassbench_real_inversion_gap_ledger_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf"
     )
@@ -4456,6 +4533,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_trajectory_timebase_bridge_pdf(
         sota_glassbench_trajectory_timebase_bridge_pdf
+    )
+    write_sota_glassbench_frame_time_mapping_audit_pdf(
+        sota_glassbench_frame_time_mapping_audit_pdf
     )
     write_sota_glassbench_real_inversion_gap_ledger_pdf(
         sota_glassbench_real_inversion_gap_ledger_pdf
@@ -4587,6 +4667,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_trajectory_timebase_bridge_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
+        )
+        archive.write(
+            sota_glassbench_frame_time_mapping_audit_pdf,
+            "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",
         )
         archive.write(
             sota_glassbench_real_inversion_gap_ledger_pdf,

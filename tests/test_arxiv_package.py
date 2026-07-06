@@ -802,6 +802,27 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(row["sota_inversion_ready"]), 0.0)
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_frame_time_mapping_audit_blocks_interpolation_only_bridge(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_frame_time_mapping_audit.csv"
+        self.assertTrue(path.exists())
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key, ratio in [(("KA2D", "0.23"), 19.0 / 7.0), (("KA2D", "0.30"), 19.0 / 5.0)]:
+            row = by_key[key]
+            self.assertEqual(row["mapping_audit_stage"], "ambiguous_frame_time_mapping")
+            self.assertEqual(float(row["exact_count_match"]), 0.0)
+            self.assertEqual(float(row["integer_stride_subsample_candidate"]), 0.0)
+            self.assertEqual(float(row["endpoint_interpolation_candidate"]), 1.0)
+            self.assertAlmostEqual(float(row["frame_to_result_stride_ratio"]), ratio)
+            self.assertEqual(row["accepted_mapping_class"], "none")
+            self.assertEqual(row["provisional_mapping_class"], "endpoint_interpolation_requires_metadata")
+            self.assertEqual(float(row["publishable_frame_time_mapping_ready"]), 0.0)
+            self.assertIn("result_time_generation_script", row["minimum_required_metadata"])
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_real_inversion_gap_ledger_keeps_claim_level_safe(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_real_inversion_gap_ledger.csv"
         self.assertTrue(path.exists())
@@ -1516,6 +1537,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
@@ -1669,6 +1691,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_simultaneous_closure.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
+            "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
