@@ -1493,8 +1493,6 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_published_semantics.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_sota_readme_schema.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_trajectory_adapter_contract.pdf", main_tex)
         self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", main_tex)
         self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_raw_curve_ingestion_contract.pdf", main_tex)
@@ -1534,8 +1532,6 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_remote_result_curve_published_semantics.pdf",
             "figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf",
             "figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf",
-            "figures/renewal_cage_sota_readme_schema.pdf",
-            "figures/renewal_cage_trajectory_adapter_contract.pdf",
             "figures/renewal_cage_observable_falsification_matrix.pdf",
             "figures/renewal_cage_benchmark_fusion_readiness.pdf",
             "figures/renewal_cage_raw_curve_ingestion_contract.pdf",
@@ -1588,6 +1584,8 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_evidence_class.pdf",
             "figures/renewal_cage_simultaneous_closure.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
+            "figures/renewal_cage_sota_readme_schema.pdf",
+            "figures/renewal_cage_trajectory_adapter_contract.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
