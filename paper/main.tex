@@ -1362,19 +1362,31 @@ physical-time, ensemble-averaged, uncertainty-weighted SOTA inversion.
   inversion is claimed.}
 \end{figure}
 
-The inner-tar member horizon narrows the ensemble blocker without overstating
-the result. The current 1 MB tar-prefix probes expose three KA2D
-\texttt{npz} members at both \texttt{T=0.23} and \texttt{T=0.30}. Thus the
-archive is not being treated as a single-trajectory source, but the visible
-prefix evidence is still one member short of the four-member uncertainty gate,
-and no multi-\texttt{npz} observable extraction or real reanalysis is claimed.
+The member-index gate narrows the ensemble blocker without overstating the
+result. The earlier 1 MB tar-prefix probes expose three KA2D \texttt{npz}
+members at both \texttt{T=0.23} and \texttt{T=0.30}; an 8 MB extended
+byte-range probe now indexes 9 valid \texttt{T=0.23} members and 10 valid
+\texttt{T=0.30} members. Thus the archive is not being treated as a
+single-trajectory source, and the four-member list threshold is now passed.
+This is still member-list evidence only: no multi-\texttt{npz} observable
+extraction, uncertainty estimate, physical-time mapping, or real reanalysis is
+claimed.
 The visible-member audit
 \texttt{renewal\_cage\_sota\_glassbench\_visible\_member\_ensemble\_audit.csv}
-adds an identity-level guardrail. The prefix exposes the first member id and
-split label at each KA2D temperature, but it does not expose a full member-id
-list. Consequently \texttt{publishable\_ensemble\_uncertainty\_ready}=0 until
-enough independent member identities are indexed and member-resolved
-observables are computed.
+adds an identity-level guardrail. The extended index exposes member ids and
+split labels at each KA2D temperature, so the member-list gate is ready for a
+future uncertainty extraction. The manuscript still keeps real inversion
+disabled until member-resolved observables, uncertainty columns, and physical
+lag times are attached.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf}
+  \caption{GlassBench extended \texttt{npz} member index. An 8 MB byte-range
+  probe indexes more than four valid trajectory members at each KA2D
+  temperature, resolving the member-list threshold while keeping multi-member
+  observable extraction and uncertainty-weighted inversion as later gates.}
+\end{figure}
 
 \begin{figure}[p]
   \centering

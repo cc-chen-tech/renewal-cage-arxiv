@@ -110,6 +110,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_visible_member_ensemble_audit_gate,
     sota_glassbench_trajectory_npz_ensemble_horizon_gate,
+    sota_glassbench_trajectory_npz_member_index_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
     sota_glassbench_real_inversion_gap_ledger_gate,
@@ -3803,6 +3804,7 @@ def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
     *,
     tar_probe_rows: list[dict[str, float | str]],
     inversion_readiness_rows: list[dict[str, float | str]],
+    member_index_rows: list[dict[str, float | str]] | None = None,
 ) -> list[dict[str, float | str]]:
     """Record visible NPZ ensemble-member horizon before multi-member extraction."""
 
@@ -3811,6 +3813,26 @@ def write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
         accession_id="glassbench_zenodo_10118191",
         tar_probe_rows=tar_probe_rows,
         inversion_readiness_rows=inversion_readiness_rows,
+        min_member_count=4,
+        member_index_rows=member_index_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_trajectory_npz_member_index_csv(
+    path: Path,
+    *,
+    tar_probe_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Record extended tar-prefix NPZ member lists before multi-member extraction."""
+
+    manifest_path = DATA_DIR / "third_party" / "glassbench" / "trajectory_npz_member_index_10118191.json"
+    rows = sota_glassbench_trajectory_npz_member_index_gate(
+        index_id="glassbench_npz_member_index",
+        accession_id="glassbench_zenodo_10118191",
+        tar_probe_rows=tar_probe_rows,
+        member_index_manifest=json.loads(manifest_path.read_text(encoding="utf-8")),
         min_member_count=4,
     )
     write_sweep_csv(path, rows)
@@ -3822,6 +3844,7 @@ def write_sota_glassbench_visible_member_ensemble_audit_csv(
     *,
     tar_probe_rows: list[dict[str, float | str]],
     ensemble_horizon_rows: list[dict[str, float | str]],
+    member_index_rows: list[dict[str, float | str]] | None = None,
 ) -> list[dict[str, float | str]]:
     """Audit visible NPZ member identity evidence before ensemble uncertainties."""
 
@@ -3830,6 +3853,7 @@ def write_sota_glassbench_visible_member_ensemble_audit_csv(
         accession_id="glassbench_zenodo_10118191",
         tar_probe_rows=tar_probe_rows,
         ensemble_horizon_rows=ensemble_horizon_rows,
+        member_index_rows=member_index_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -7405,6 +7429,63 @@ def write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_trajectory_npz_member_index_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 420
+    left, top = 75, 112
+    row_h = 78
+    colors = {
+        "member_index_threshold_ready_extraction_pending": "#2b6cb0",
+        "member_index_threshold_short": "#b7791f",
+        "member_index_missing": "#c05621",
+        "trajectory_layout_incomplete": "#4a5568",
+    }
+    marks = []
+    for index, row in enumerate(rows):
+        y = top + index * row_h
+        stage = str(row["member_index_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        count = int(float(row["indexed_npz_member_count"]))
+        required = int(float(row["required_member_count"]))
+        threshold = int(float(row["member_count_threshold_pass"]))
+        first_four = str(row["first_four_member_ids"])[:92]
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 4}" width="355" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:48]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 495}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">indexed members={count}/{required}; threshold pass={threshold}; split={row["split_labels_in_index"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 43}" font-family="Arial, sans-serif" font-size="9" fill="#555">8 MB compressed range, tar prefix={int(float(row["tar_probe_bytes"]))} bytes; first four: {first_four}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 120}" y="{y + 58}" font-family="Arial, sans-serif" font-size="9" fill="#555">next: {str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench extended NPZ member index</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Extended byte-range probes index enough independent trajectory members for the ensemble threshold, while observable extraction remains pending.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">index stage</text>
+  <text x="{left + 495}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member-list evidence</text>
+  {"".join(marks)}
+  <rect x="75" y="358" width="14" height="14" fill="#2b6cb0" /><text x="96" y="370" font-family="Arial, sans-serif" font-size="12">member-list threshold ready, extraction pending</text>
+  <rect x="430" y="358" width="14" height="14" fill="#b7791f" /><text x="451" y="370" font-family="Arial, sans-serif" font-size="12">member-list threshold short</text>
+  <text x="685" y="370" font-family="Arial, sans-serif" font-size="12">not a physical-time or uncertainty-weighted inversion</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -9354,10 +9435,19 @@ def main() -> None:
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.svg",
         glassbench_trajectory_first_npz_inversion_readiness_rows,
     )
+    glassbench_trajectory_npz_member_index_rows = write_sota_glassbench_trajectory_npz_member_index_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_member_index.csv",
+        tar_probe_rows=glassbench_trajectory_inner_tar_header_probe_rows,
+    )
+    write_sota_glassbench_trajectory_npz_member_index_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_member_index.svg",
+        glassbench_trajectory_npz_member_index_rows,
+    )
     glassbench_trajectory_npz_ensemble_horizon_rows = write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv",
         tar_probe_rows=glassbench_trajectory_inner_tar_header_probe_rows,
         inversion_readiness_rows=glassbench_trajectory_first_npz_inversion_readiness_rows,
+        member_index_rows=glassbench_trajectory_npz_member_index_rows,
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg",
@@ -9367,6 +9457,7 @@ def main() -> None:
         DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv",
         tar_probe_rows=glassbench_trajectory_inner_tar_header_probe_rows,
         ensemble_horizon_rows=glassbench_trajectory_npz_ensemble_horizon_rows,
+        member_index_rows=glassbench_trajectory_npz_member_index_rows,
     )
     write_sota_glassbench_visible_member_ensemble_audit_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg",

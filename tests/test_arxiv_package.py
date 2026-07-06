@@ -869,13 +869,14 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(row["minimum_unlock_ready"]), 0.0)
             self.assertEqual(float(row["frame_time_mapping_required"]), 1.0)
             self.assertEqual(float(row["frame_time_mapping_present"]), 0.0)
-            self.assertEqual(float(row["observed_prefix_member_count"]), 3.0)
+            expected_members = 9.0 if key == ("KA2D", "0.23") else 10.0
+            self.assertEqual(float(row["observed_prefix_member_count"]), expected_members)
             self.assertEqual(float(row["required_member_count"]), 4.0)
-            self.assertEqual(float(row["additional_member_count_needed"]), 1.0)
+            self.assertEqual(float(row["additional_member_count_needed"]), 0.0)
             self.assertEqual(float(row["frame_count"]), 20.0)
             self.assertEqual(float(row["time_point_count"]), time_point_count)
             self.assertIn("frame_time_mapping", row["minimum_required_payload"])
-            self.assertIn("one_more_independent_npz_member", row["minimum_required_payload"])
+            self.assertNotIn("one_more_independent_npz_member", row["minimum_required_payload"])
             self.assertIn("chi4_overlap", row["minimum_required_payload"])
             self.assertIn("sigma_chi4_overlap", row["minimum_required_payload"])
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
@@ -953,6 +954,33 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(row["next_required_actions"], "attach_physical_lag_time_and_units")
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_trajectory_npz_member_index_records_extended_member_list(self):
+        manifest_path = ROOT / "data" / "third_party" / "glassbench" / "trajectory_npz_member_index_10118191.json"
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_member_index.csv"
+        self.assertTrue(manifest_path.exists())
+        self.assertTrue(path.exists())
+
+        manifest = json.loads(manifest_path.read_text())
+        self.assertEqual(manifest["source"], "remote_zip_member_to_extended_tar_member_index")
+        self.assertEqual(manifest["compressed_probe_bytes"], 8_388_608)
+
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(float(ka2d_023["indexed_npz_member_count"]), 9.0)
+        self.assertEqual(float(ka2d_023["member_count_threshold_pass"]), 1.0)
+        self.assertEqual(ka2d_023["split_labels_in_index"], "test")
+        self.assertIn("N1290T0.23_202_tc05", ka2d_023["first_four_member_ids"])
+        self.assertEqual(float(ka2d_023["multi_npz_extraction_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "multi_npz_observable_extraction")
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(float(ka2d_030["indexed_npz_member_count"]), 10.0)
+        self.assertEqual(float(ka2d_030["member_count_threshold_pass"]), 1.0)
+        self.assertEqual(ka2d_030["member_index_stage"], "member_index_threshold_ready_extraction_pending")
+
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
         self.assertTrue(path.exists())
@@ -961,14 +989,14 @@ class ArxivPackageTests(unittest.TestCase):
 
         by_key = {(row["system_id"], row["temperature"]): row for row in rows}
         ka2d_030 = by_key[("KA2D", "0.30")]
-        self.assertEqual(float(ka2d_030["prefix_npz_member_count"]), 3.0)
+        self.assertEqual(float(ka2d_030["prefix_npz_member_count"]), 10.0)
         self.assertEqual(float(ka2d_030["extracted_curve_member_count"]), 1.0)
-        self.assertEqual(float(ka2d_030["member_count_gap_to_threshold"]), 1.0)
-        self.assertEqual(float(ka2d_030["prefix_member_horizon_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["member_count_gap_to_threshold"]), 0.0)
+        self.assertEqual(float(ka2d_030["prefix_member_horizon_ready"]), 1.0)
         self.assertEqual(float(ka2d_030["multi_npz_extraction_ready"]), 0.0)
         self.assertEqual(float(ka2d_030["real_reanalysis_ready"]), 0.0)
-        self.assertEqual(ka2d_030["primary_blocker"], "additional_npz_member_headers")
-        self.assertEqual(ka2d_030["horizon_stage"], "prefix_member_horizon_short")
+        self.assertEqual(ka2d_030["primary_blocker"], "multi_npz_observable_extraction")
+        self.assertEqual(ka2d_030["horizon_stage"], "member_index_horizon_ready_extraction_blocked")
 
     def test_sota_glassbench_visible_member_ensemble_audit_blocks_prefix_only_members(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv"
@@ -985,16 +1013,17 @@ class ArxivPackageTests(unittest.TestCase):
             row = by_key[key]
             self.assertEqual(row["first_member_id"], first_member_id)
             self.assertEqual(row["split_labels_in_probe"], split_label)
-            self.assertEqual(float(row["prefix_npz_member_count"]), 3.0)
+            expected_members = 9.0 if key == ("KA2D", "0.23") else 10.0
+            self.assertEqual(float(row["prefix_npz_member_count"]), expected_members)
             self.assertEqual(float(row["required_member_count"]), 4.0)
-            self.assertEqual(float(row["additional_member_count_needed"]), 1.0)
+            self.assertEqual(float(row["additional_member_count_needed"]), 0.0)
             self.assertEqual(float(row["first_member_id_visible"]), 1.0)
-            self.assertEqual(float(row["full_member_id_list_visible"]), 0.0)
-            self.assertEqual(float(row["member_count_threshold_pass"]), 0.0)
-            self.assertEqual(float(row["publishable_ensemble_uncertainty_ready"]), 0.0)
+            self.assertEqual(float(row["full_member_id_list_visible"]), 1.0)
+            self.assertEqual(float(row["member_count_threshold_pass"]), 1.0)
+            self.assertEqual(float(row["publishable_ensemble_uncertainty_ready"]), 1.0)
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
-            self.assertEqual(row["primary_blocker"], "member_count_and_full_member_list")
-            self.assertEqual(row["ensemble_audit_stage"], "visible_prefix_not_publishable_ensemble")
+            self.assertEqual(row["primary_blocker"], "none")
+            self.assertEqual(row["ensemble_audit_stage"], "visible_member_ensemble_ready_for_uncertainty")
 
     def test_sota_remote_result_curve_cache_records_range_cached_numeric_curves(self):
         manifest_path = ROOT / "data" / "third_party" / "glassbench" / "range_result_curve_cache_10118191.json"
@@ -1628,6 +1657,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf", names)
@@ -1692,6 +1722,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
@@ -1726,6 +1757,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_smoke.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_observable_curve.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf",
+            "figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf",
             "figures/renewal_cage_sota_remote_result_curve_cache.pdf",
             "figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf",
@@ -1919,6 +1951,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
             ).read_bytes()
+            first_sota_glassbench_trajectory_npz_member_index = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf"
+            ).read_bytes()
             first_sota_glassbench_trajectory_npz_ensemble_horizon = (
                 ROOT
                 / "paper"
@@ -2102,6 +2140,12 @@ class ArxivPackageTests(unittest.TestCase):
                 / "figures"
                 / "renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.pdf"
             ).read_bytes()
+            second_sota_glassbench_trajectory_npz_member_index = (
+                ROOT
+                / "paper"
+                / "figures"
+                / "renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf"
+            ).read_bytes()
             second_sota_glassbench_trajectory_npz_ensemble_horizon = (
                 ROOT
                 / "paper"
@@ -2245,6 +2289,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_sota_glassbench_trajectory_first_npz_inversion_readiness,
             second_sota_glassbench_trajectory_first_npz_inversion_readiness,
+        )
+        self.assertEqual(
+            first_sota_glassbench_trajectory_npz_member_index,
+            second_sota_glassbench_trajectory_npz_member_index,
         )
         self.assertEqual(
             first_sota_glassbench_trajectory_npz_ensemble_horizon,

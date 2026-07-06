@@ -4828,6 +4828,7 @@ def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
     tar_probe_rows: Sequence[dict[str, float | str]],
     inversion_readiness_rows: Sequence[dict[str, float | str]],
     min_member_count: int,
+    member_index_rows: Sequence[dict[str, float | str]] | None = None,
 ) -> list[dict[str, float | str]]:
     """Record how many NPZ trajectory members are visible before ensemble extraction."""
 
@@ -4844,19 +4845,26 @@ def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
         (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
         for row in inversion_readiness_rows
     }
+    index_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in (member_index_rows or [])
+    }
     out: list[dict[str, float | str]] = []
     for row in tar_probe_rows:
         system_id = str(row.get("system_id", "unknown"))
         temperature = str(row.get("temperature", "none"))
         source_path = str(row.get("source_path", "none"))
         layout_ready = bool(float(row.get("trajectory_layout_ready", 0.0)))
-        prefix_count = int(float(row.get("npz_member_count_in_probe", 0.0)))
+        index_row = index_by_key.get((system_id, temperature), {})
+        index_threshold_ready = bool(float(index_row.get("member_count_threshold_pass", 0.0)))
+        indexed_count = int(float(index_row.get("indexed_npz_member_count", 0.0)))
+        prefix_count = max(int(float(row.get("npz_member_count_in_probe", 0.0))), indexed_count)
         tar_probe_bytes = int(float(row.get("tar_probe_bytes", 0.0)))
         readiness = readiness_by_key.get((system_id, temperature), {})
         extracted_member_count = int(float(readiness.get("member_count", 0.0)))
         current_sota_ready = bool(float(readiness.get("sota_inversion_ready", 0.0)))
         gap = max(0, int(min_member_count) - prefix_count)
-        prefix_horizon_ready = layout_ready and prefix_count >= int(min_member_count)
+        prefix_horizon_ready = layout_ready and (prefix_count >= int(min_member_count) or index_threshold_ready)
 
         if not layout_ready:
             stage = "trajectory_layout_incomplete"
@@ -4866,6 +4874,10 @@ def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
             stage = "sota_inversion_already_ready"
             blocker = "none"
             next_action = "report_uncertainty_weighted_residuals"
+        elif index_threshold_ready:
+            stage = "member_index_horizon_ready_extraction_blocked"
+            blocker = "multi_npz_observable_extraction"
+            next_action = "extract_indexed_npz_members_and_compute_uncertainties"
         elif prefix_horizon_ready:
             stage = "prefix_member_horizon_ready_extraction_blocked"
             blocker = "streaming_multi_npz_extraction_policy"
@@ -4900,12 +4912,131 @@ def sota_glassbench_trajectory_npz_ensemble_horizon_gate(
     return out
 
 
+def sota_glassbench_trajectory_npz_member_index_gate(
+    *,
+    index_id: str,
+    accession_id: str,
+    tar_probe_rows: Sequence[dict[str, float | str]],
+    member_index_manifest: dict[str, object],
+    min_member_count: int,
+) -> list[dict[str, float | str]]:
+    """Index visible NPZ trajectory members from an extended tar prefix."""
+
+    if not index_id:
+        raise ValueError("index_id must be nonempty")
+    if not accession_id:
+        raise ValueError("accession_id must be nonempty")
+    if not tar_probe_rows:
+        raise ValueError("tar_probe_rows must be nonempty")
+    if int(min_member_count) != min_member_count or min_member_count < 1:
+        raise ValueError("min_member_count must be a positive integer")
+    entries = member_index_manifest.get("entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("member_index_manifest entries must be a list")
+
+    index_by_path = {
+        str(entry.get("path", "none")): entry
+        for entry in entries
+        if isinstance(entry, dict)
+    }
+
+    def split_items(value: object) -> list[str]:
+        text = str(value)
+        if not text or text == "none":
+            return []
+        return [item for item in text.split(";") if item and item != "none"]
+
+    def member_id(path: str) -> str:
+        if not path or path == "none":
+            return "none"
+        name = path.rsplit("/", 1)[-1]
+        return name[:-4] if name.endswith(".npz") else name
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        tar_probe_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), str(item.get("temperature", "none"))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        source_path = str(row.get("source_path", "none"))
+        layout_ready = bool(float(row.get("trajectory_layout_ready", 0.0)))
+        entry = index_by_path.get(source_path, {})
+        npz_members = entry.get("npz_members", []) if isinstance(entry, dict) else []
+        if not isinstance(npz_members, list):
+            raise ValueError("npz_members must be a list")
+        member_names = [
+            str(member.get("name", "none"))
+            for member in npz_members
+            if isinstance(member, dict) and str(member.get("name", "none")).endswith(".npz")
+        ]
+        member_ids = [member_id(name) for name in member_names]
+        split_labels = sorted(
+            {
+                name.split("/")[1]
+                for name in member_names
+                if len(name.split("/")) >= 3 and name.split("/")[1]
+            }
+        )
+        indexed_count = len(member_names)
+        threshold_pass = layout_ready and indexed_count >= int(min_member_count)
+        full_list_visible = threshold_pass and bool(entry)
+        complete_for_probe = bool(entry.get("member_index_complete_for_probe", False)) if isinstance(entry, dict) else False
+
+        if not layout_ready:
+            stage = "trajectory_layout_incomplete"
+            blocker = str(row.get("primary_blocker", "trajectory_layout"))
+            next_action = "complete_inner_tar_layout_probe"
+        elif not entry:
+            stage = "member_index_missing"
+            blocker = "extended_tar_member_index"
+            next_action = "extend_tar_probe_or_index_full_member_list"
+        elif threshold_pass:
+            stage = "member_index_threshold_ready_extraction_pending"
+            blocker = "multi_npz_observable_extraction"
+            next_action = "extract_indexed_npz_members_and_compute_uncertainties"
+        else:
+            stage = "member_index_threshold_short"
+            blocker = "member_count"
+            next_action = "extend_tar_probe_or_index_full_member_list"
+
+        out.append(
+            {
+                "index_id": f"{index_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "accession_id": accession_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "first_npz_member": str(row.get("first_npz_member", "none")),
+                "compressed_probe_bytes": float(entry.get("compressed_probe_bytes", 0.0)) if isinstance(entry, dict) else 0.0,
+                "tar_probe_bytes": float(entry.get("tar_probe_bytes", row.get("tar_probe_bytes", 0.0))) if isinstance(entry, dict) else 0.0,
+                "prefix_npz_member_count": float(row.get("npz_member_count_in_probe", 0.0)),
+                "indexed_npz_member_count": float(indexed_count),
+                "required_member_count": float(min_member_count),
+                "member_count_threshold_pass": float(threshold_pass),
+                "full_member_id_list_visible": float(full_list_visible),
+                "member_index_complete_for_probe": float(complete_for_probe),
+                "split_labels_in_index": ";".join(split_labels) if split_labels else str(row.get("split_labels_in_probe", "none")),
+                "first_four_member_ids": ";".join(member_ids[:4]) if member_ids else "none",
+                "visible_npz_members": ";".join(member_names) if member_names else "none",
+                "multi_npz_extraction_ready": 0.0,
+                "real_reanalysis_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "member_index_stage": stage,
+            }
+        )
+    return out
+
+
 def sota_glassbench_visible_member_ensemble_audit_gate(
     *,
     audit_id: str,
     accession_id: str,
     tar_probe_rows: Sequence[dict[str, float | str]],
     ensemble_horizon_rows: Sequence[dict[str, float | str]],
+    member_index_rows: Sequence[dict[str, float | str]] | None = None,
 ) -> list[dict[str, float | str]]:
     """Audit visible NPZ member evidence before treating a prefix as an ensemble."""
 
@@ -4921,6 +5052,10 @@ def sota_glassbench_visible_member_ensemble_audit_gate(
     horizon_by_key = {
         (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
         for row in ensemble_horizon_rows
+    }
+    index_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in (member_index_rows or [])
     }
 
     def split_items(value: object) -> list[str]:
@@ -4945,14 +5080,18 @@ def sota_glassbench_visible_member_ensemble_audit_gate(
         if system_id == "none" or temperature == "none":
             continue
         horizon = horizon_by_key.get((system_id, temperature), {})
+        index_row = index_by_key.get((system_id, temperature), {})
         layout_ready = bool(float(row.get("trajectory_layout_ready", 0.0)))
         first_member = str(row.get("first_npz_member", "none"))
         first_id = member_id(first_member)
-        split_labels = str(row.get("split_labels_in_probe", "none"))
+        split_labels = str(index_row.get("split_labels_in_index", row.get("split_labels_in_probe", "none")))
         split_items_visible = split_items(split_labels)
-        visible_member_paths = split_items(row.get("visible_npz_members", "none"))
+        visible_member_paths = split_items(index_row.get("visible_npz_members", row.get("visible_npz_members", "none")))
         prefix_count = float(
-            horizon.get("prefix_npz_member_count", row.get("npz_member_count_in_probe", 0.0))
+            index_row.get(
+                "indexed_npz_member_count",
+                horizon.get("prefix_npz_member_count", row.get("npz_member_count_in_probe", 0.0)),
+            )
         )
         required_count = float(horizon.get("min_member_count", 4.0))
         additional_needed = max(0.0, required_count - prefix_count)

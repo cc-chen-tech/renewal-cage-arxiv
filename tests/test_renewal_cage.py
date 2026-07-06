@@ -129,6 +129,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
+    sota_glassbench_trajectory_npz_member_index_gate,
     sota_glassbench_short_window_trend_canary_gate,
     sota_glassbench_trajectory_timebase_bridge_gate,
     sota_glassbench_trajectory_inner_tar_header_probe_gate,
@@ -3723,6 +3724,60 @@ class DelayedRenewalCageTests(unittest.TestCase):
         ka = by_key[("KA", "none")]
         self.assertEqual(ka["horizon_stage"], "trajectory_layout_incomplete")
         self.assertEqual(ka["primary_blocker"], "trajectory_payload")
+
+    def test_sota_glassbench_trajectory_npz_member_index_promotes_member_list_without_inversion(self):
+        tar_probe_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "trajectory_layout_ready": 1.0,
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "npz_member_count_in_probe": 3.0,
+                "split_labels_in_probe": "train",
+            }
+        ]
+        member_index_manifest = {
+            "source": "remote_zip_member_to_extended_tar_member_index",
+            "entries": [
+                {
+                    "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "compressed_probe_bytes": 8_388_608,
+                    "tar_probe_bytes": 4_194_304,
+                    "member_index_complete_for_probe": True,
+                    "npz_members": [
+                        {"name": "T0.30/train/N1290T0.30_3_tc01.npz", "size_bytes": 444_786},
+                        {"name": "T0.30/train/N1290T0.30_10_tc01.npz", "size_bytes": 444_786},
+                        {"name": "T0.30/train/N1290T0.30_19_tc01.npz", "size_bytes": 444_786},
+                        {"name": "T0.30/train/N1290T0.30_28_tc01.npz", "size_bytes": 444_786},
+                        {"name": "T0.30/train/N1290T0.30_30_tc01.npz", "size_bytes": 444_786},
+                    ],
+                }
+            ],
+        }
+
+        rows = sota_glassbench_trajectory_npz_member_index_gate(
+            index_id="glassbench_npz_member_index",
+            accession_id="glassbench_zenodo_10118191",
+            tar_probe_rows=tar_probe_rows,
+            member_index_manifest=member_index_manifest,
+            min_member_count=4,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["member_index_stage"], "member_index_threshold_ready_extraction_pending")
+        self.assertEqual(float(row["indexed_npz_member_count"]), 5.0)
+        self.assertEqual(float(row["required_member_count"]), 4.0)
+        self.assertEqual(float(row["member_count_threshold_pass"]), 1.0)
+        self.assertEqual(float(row["full_member_id_list_visible"]), 1.0)
+        self.assertEqual(
+            row["first_four_member_ids"],
+            "N1290T0.30_3_tc01;N1290T0.30_10_tc01;N1290T0.30_19_tc01;N1290T0.30_28_tc01",
+        )
+        self.assertEqual(row["split_labels_in_index"], "train")
+        self.assertEqual(float(row["multi_npz_extraction_ready"]), 0.0)
+        self.assertEqual(float(row["real_reanalysis_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "multi_npz_observable_extraction")
 
     def test_sota_glassbench_visible_member_ensemble_audit_blocks_first_member_only_prefix(self):
         rows = sota_glassbench_visible_member_ensemble_audit_gate(
