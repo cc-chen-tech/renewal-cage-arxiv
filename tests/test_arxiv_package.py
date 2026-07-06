@@ -1493,12 +1493,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_published_semantics.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_observable_falsification_matrix.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_benchmark_fusion_readiness.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_raw_curve_ingestion_contract.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", main_tex)
         self.assertIn("figures/renewal_cage_benchmark_publication_ladder.pdf", main_tex)
-        self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange_protocol.pdf", main_tex)
         self.assertIn("figures/renewal_cage_persistence_exchange_joint_protocol.pdf", main_tex)
@@ -1532,11 +1527,6 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_remote_result_curve_published_semantics.pdf",
             "figures/renewal_cage_sota_remote_result_curve_payload_adapter.pdf",
             "figures/renewal_cage_sota_remote_result_curve_observable_semantics.pdf",
-            "figures/renewal_cage_observable_falsification_matrix.pdf",
-            "figures/renewal_cage_benchmark_fusion_readiness.pdf",
-            "figures/renewal_cage_raw_curve_ingestion_contract.pdf",
-            "figures/renewal_cage_raw_curve_diagnostic_readiness.pdf",
-            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
         ]
         for figure in readiness_figures:
             figure_index = main_tex.index(figure)
@@ -1546,11 +1536,11 @@ class ArxivPackageTests(unittest.TestCase):
 
     def test_readiness_page_float_batch_flushes_before_discussion(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
-        raw_protocol_index = main_tex.index(
-            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
+        ladder_index = main_tex.index(
+            "figures/renewal_cage_benchmark_publication_ladder.pdf"
         )
         discussion_index = main_tex.index("\\section{Discussion}")
-        self.assertIn("\\clearpage", main_tex[raw_protocol_index:discussion_index])
+        self.assertIn("\\clearpage", main_tex[ladder_index:discussion_index])
 
     def test_sota_trajectory_payload_locator_flushes_float_batch(self):
         main_tex = (ROOT / "paper" / "main.tex").read_text()
@@ -1586,6 +1576,11 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_literature_inversion_readiness.pdf",
             "figures/renewal_cage_sota_readme_schema.pdf",
             "figures/renewal_cage_trajectory_adapter_contract.pdf",
+            "figures/renewal_cage_observable_falsification_matrix.pdf",
+            "figures/renewal_cage_benchmark_fusion_readiness.pdf",
+            "figures/renewal_cage_raw_curve_ingestion_contract.pdf",
+            "figures/renewal_cage_raw_curve_diagnostic_readiness.pdf",
+            "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
