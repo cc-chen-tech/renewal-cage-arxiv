@@ -14870,6 +14870,127 @@ def microdynamic_prediction_scorecard(
     return rows
 
 
+def microdynamic_minimality_audit(
+    *,
+    audit_id: str,
+    required_micro_inputs: Sequence[str],
+    variant_rows: Sequence[dict[str, object]],
+    scorecard_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Audit which microdynamic inputs are necessary before prediction claims."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not required_micro_inputs:
+        raise ValueError("required_micro_inputs must be nonempty")
+    if not variant_rows:
+        raise ValueError("variant_rows must be nonempty")
+    if not scorecard_rows:
+        raise ValueError("scorecard_rows must be nonempty")
+    required = list(dict.fromkeys(str(item) for item in required_micro_inputs if str(item)))
+    if len(required) != len(required_micro_inputs):
+        raise ValueError("required_micro_inputs must contain nonempty names")
+
+    def parse_inputs(value: object) -> set[str]:
+        text = str(value)
+        if not text or text == "none":
+            return set()
+        return {item for item in text.split(";") if item and item != "none"}
+
+    rows: list[dict[str, float | str]] = []
+    for variant in variant_rows:
+        row_id = str(variant.get("variant_id", "unknown_variant"))
+        available = parse_inputs(variant.get("available_micro_inputs", "none"))
+        missing = [item for item in required if item not in available]
+        macro_fit_count = float(variant.get("macro_fit_parameter_count", 0.0) or 0.0)
+        heldout_count = float(variant.get("heldout_macro_prediction_count", 0.0) or 0.0)
+        pass_flag = float(variant.get("all_required_predictions_pass", 0.0) or 0.0) == 1.0
+        fit_only = macro_fit_count > 0.0 and heldout_count == 0.0
+        if fit_only:
+            stage = "macro_fit_only_overclaim_risk"
+            blocker = "heldout_macro_predictions"
+            claim = "fit_only_not_microdynamic_prediction"
+            overclaim = 1.0
+            minimal = 0.0
+        elif missing:
+            stage = "required_microstatistics_missing"
+            blocker = missing[0]
+            claim = "microdynamic_prediction_not_identified"
+            overclaim = 0.0
+            minimal = 0.0
+        elif pass_flag and heldout_count > 0.0:
+            stage = "necessary_microstatistics_sufficient"
+            blocker = "none"
+            claim = "minimal_microdynamic_prediction_basis"
+            overclaim = 0.0
+            minimal = 1.0
+        else:
+            stage = "necessary_microstatistics_present_but_not_predictive"
+            blocker = str(variant.get("primary_blocker", "heldout_macro_prediction"))
+            claim = "microdynamic_basis_requires_rejection_or_extension"
+            overclaim = 0.0
+            minimal = 0.0
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "audit_row_id": row_id,
+                "source_class": str(variant.get("source_class", "synthetic_variant")),
+                "required_micro_inputs": ";".join(required),
+                "available_micro_inputs": ";".join(sorted(available)) if available else "none",
+                "missing_required_inputs": ";".join(missing) if missing else "none",
+                "required_micro_input_count": float(len(required)),
+                "available_micro_input_count": float(len(available & set(required))),
+                "missing_required_input_count": float(len(missing)),
+                "heldout_macro_prediction_count": heldout_count,
+                "macro_fit_parameter_count": macro_fit_count,
+                "all_required_predictions_pass": float(pass_flag),
+                "microdynamic_basis_minimal": float(minimal),
+                "real_data_comparison_ready": 0.0,
+                "current_member_count": 0.0,
+                "required_member_count": 0.0,
+                "overclaim_risk": float(overclaim),
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_claim_level": claim,
+                "primary_blocker": blocker,
+                "minimality_stage": stage,
+            }
+        )
+
+    for scorecard in scorecard_rows:
+        if str(scorecard.get("source_class", "")) != "real_glassbench_public_data":
+            continue
+        row_id = str(scorecard.get("scorecard_row_id", "real_glassbench_row"))
+        ready = float(scorecard.get("real_data_comparison_ready", 0.0) or 0.0) == 1.0
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "audit_row_id": row_id,
+                "source_class": "real_glassbench_public_data",
+                "required_micro_inputs": ";".join(required),
+                "available_micro_inputs": "real_frame_microstatistics_only",
+                "missing_required_inputs": "physical_time_semantics;cage_jump_event_segmentation;persistence_exchange_event_clock",
+                "required_micro_input_count": float(len(required)),
+                "available_micro_input_count": 0.0,
+                "missing_required_input_count": float(len(required)),
+                "heldout_macro_prediction_count": 0.0,
+                "macro_fit_parameter_count": 0.0,
+                "all_required_predictions_pass": 0.0,
+                "microdynamic_basis_minimal": 0.0,
+                "real_data_comparison_ready": float(ready),
+                "current_member_count": float(scorecard.get("current_member_count", 0.0) or 0.0),
+                "required_member_count": float(scorecard.get("required_member_count", 0.0) or 0.0),
+                "overclaim_risk": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_claim_level": str(scorecard.get("allowed_claim_level", "real_signature_support_only")),
+                "primary_blocker": "none" if ready else str(scorecard.get("primary_blocker", "real_microdynamic_inputs")),
+                "minimality_stage": "real_data_microdynamic_inputs_ready"
+                if ready
+                else "real_data_microdynamic_inputs_missing",
+            }
+        )
+    return rows
+
+
 def persistence_exchange_scan(
     *,
     ratios: list[float],

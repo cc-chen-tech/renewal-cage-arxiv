@@ -108,6 +108,7 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_joint_diagnostic,
     simultaneous_dynamical_signature_closure_gate,
     microdynamic_prediction_scorecard,
+    microdynamic_minimality_audit,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
@@ -7647,6 +7648,76 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(glassbench["required_member_count"]), 128.0)
         self.assertEqual(float(glassbench["additional_member_count_needed"]), 120.0)
         self.assertEqual(glassbench["primary_blocker"], "cage_jump_event_segmentation")
+
+    def test_microdynamic_minimality_audit_marks_required_inputs_and_overclaim_modes(self):
+        rows = microdynamic_minimality_audit(
+            audit_id="microdynamic_minimality_audit",
+            required_micro_inputs=[
+                "persistence_mean",
+                "exchange_mean",
+                "jump_variance",
+                "cage_variance",
+            ],
+            variant_rows=[
+                {
+                    "variant_id": "full_event_clock_statistics",
+                    "available_micro_inputs": "persistence_mean;exchange_mean;jump_variance;cage_variance",
+                    "macro_fit_parameter_count": 0.0,
+                    "heldout_macro_prediction_count": 4.0,
+                    "all_required_predictions_pass": 1.0,
+                },
+                {
+                    "variant_id": "missing_exchange_clock",
+                    "available_micro_inputs": "persistence_mean;jump_variance;cage_variance",
+                    "macro_fit_parameter_count": 0.0,
+                    "heldout_macro_prediction_count": 0.0,
+                    "all_required_predictions_pass": 0.0,
+                },
+                {
+                    "variant_id": "macro_fit_only_alpha_transport",
+                    "available_micro_inputs": "none",
+                    "macro_fit_parameter_count": 2.0,
+                    "heldout_macro_prediction_count": 0.0,
+                    "all_required_predictions_pass": 0.0,
+                },
+            ],
+            scorecard_rows=[
+                {
+                    "scorecard_row_id": "glassbench_ka2d_0_23_current_closed_loop",
+                    "source_class": "real_glassbench_public_data",
+                    "scorecard_stage": "real_glassbench_prediction_blocked",
+                    "allowed_claim_level": "real_signature_support_not_microdynamic_prediction",
+                    "current_member_count": 8.0,
+                    "required_member_count": 128.0,
+                    "primary_blocker": "physical_time_semantics",
+                }
+            ],
+        )
+
+        by_id = {row["audit_row_id"]: row for row in rows}
+        full = by_id["full_event_clock_statistics"]
+        missing = by_id["missing_exchange_clock"]
+        fit_only = by_id["macro_fit_only_alpha_transport"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(full["minimality_stage"], "necessary_microstatistics_sufficient")
+        self.assertEqual(float(full["missing_required_input_count"]), 0.0)
+        self.assertEqual(float(full["microdynamic_basis_minimal"]), 1.0)
+        self.assertEqual(float(full["overclaim_risk"]), 0.0)
+
+        self.assertEqual(missing["minimality_stage"], "required_microstatistics_missing")
+        self.assertEqual(missing["missing_required_inputs"], "exchange_mean")
+        self.assertEqual(float(missing["microdynamic_basis_minimal"]), 0.0)
+        self.assertEqual(missing["primary_blocker"], "exchange_mean")
+
+        self.assertEqual(fit_only["minimality_stage"], "macro_fit_only_overclaim_risk")
+        self.assertEqual(float(fit_only["overclaim_risk"]), 1.0)
+        self.assertEqual(fit_only["allowed_claim_level"], "fit_only_not_microdynamic_prediction")
+
+        self.assertEqual(glassbench["minimality_stage"], "real_data_microdynamic_inputs_missing")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertEqual(float(glassbench["required_member_count"]), 128.0)
+        self.assertEqual(float(glassbench["thermodynamic_claim_allowed"]), 0.0)
 
     def test_trajectory_event_clock_threshold_robustness_detects_stable_window(self):
         positions = np.array(

@@ -293,6 +293,28 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
         self.assertGreater(float(glassbench["required_member_count"]), float(glassbench["current_member_count"]))
 
+    def test_microdynamic_minimality_audit_requires_event_clock_inputs_before_claim(self):
+        path = ROOT / "data" / "renewal_cage_microdynamic_minimality_audit.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["audit_row_id"]: row for row in rows}
+        full = by_id["full_event_clock_statistics"]
+        missing = by_id["missing_exchange_clock"]
+        fit_only = by_id["macro_fit_only_alpha_transport"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(full["minimality_stage"], "necessary_microstatistics_sufficient")
+        self.assertEqual(float(full["microdynamic_basis_minimal"]), 1.0)
+        self.assertEqual(missing["minimality_stage"], "required_microstatistics_missing")
+        self.assertEqual(missing["primary_blocker"], "exchange_mean")
+        self.assertEqual(fit_only["minimality_stage"], "macro_fit_only_overclaim_risk")
+        self.assertEqual(float(fit_only["overclaim_risk"]), 1.0)
+        self.assertEqual(glassbench["minimality_stage"], "real_data_microdynamic_inputs_missing")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertEqual(float(glassbench["thermodynamic_claim_allowed"]), 0.0)
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -2883,6 +2905,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_translation_rotation_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_simultaneous_closure.pdf", names)
             self.assertIn("figures/renewal_cage_microdynamic_prediction_scorecard.pdf", names)
+            self.assertIn("figures/renewal_cage_microdynamic_minimality_audit.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -3019,6 +3042,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_evidence_class.pdf",
             "figures/renewal_cage_simultaneous_closure.pdf",
             "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
+            "figures/renewal_cage_microdynamic_minimality_audit.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",

@@ -1813,6 +1813,66 @@ def write_microdynamic_prediction_scorecard_pdf(path: Path) -> None:
     c.save()
 
 
+def write_microdynamic_minimality_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_microdynamic_minimality_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Microdynamic minimality audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Prediction claims require persistence, exchange, jump variance, and cage scale; missing inputs remain underidentified or fit-only.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "row")
+    c.drawString(left + 220, top, "minimality stage")
+    c.drawString(left + 505, top, "inputs / held-out")
+    c.drawString(left + 660, top, "missing inputs")
+    palette = {
+        "necessary_microstatistics_sufficient": colors.HexColor("#2f855a"),
+        "required_microstatistics_missing": colors.HexColor("#c05621"),
+        "macro_fit_only_overclaim_risk": colors.HexColor("#b83280"),
+        "real_data_microdynamic_inputs_missing": colors.HexColor("#2b6cb0"),
+        "real_data_microdynamic_inputs_ready": colors.HexColor("#276749"),
+    }
+    c.setFont("Helvetica", 6.5)
+    for idx, row in enumerate(rows):
+        y = top - 20 - idx * 36
+        stage = row["minimality_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["audit_row_id"].replace("_", " ")[:35])
+        c.setFillColor(color)
+        c.rect(left + 220, y - 4, 250, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 225, y, stage.replace("_", " ")[:41])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 505,
+            y,
+            "missing={:.0f}; held={:.0f}; fit={:.0f}; risk={:.0f}".format(
+                float(row["missing_required_input_count"]),
+                float(row["heldout_macro_prediction_count"]),
+                float(row["macro_fit_parameter_count"]),
+                float(row["overclaim_risk"]),
+            ),
+        )
+        c.drawString(left + 660, y, row["missing_required_inputs"].replace("_", " ")[:58])
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This audit is a minimality and overclaim guard for dynamical predictions, not a thermodynamic glass-transition derivation.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7561,6 +7621,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     microdynamic_prediction_scorecard_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_microdynamic_prediction_scorecard.pdf"
     )
+    microdynamic_minimality_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_microdynamic_minimality_audit.pdf"
+    )
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -7817,6 +7880,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_evidence_class_pdf(sota_evidence_class_pdf)
     write_simultaneous_closure_pdf(simultaneous_closure_pdf)
     write_microdynamic_prediction_scorecard_pdf(microdynamic_prediction_scorecard_pdf)
+    write_microdynamic_minimality_audit_pdf(microdynamic_minimality_audit_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -8048,6 +8112,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             microdynamic_prediction_scorecard_pdf,
             "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
+        )
+        archive.write(
+            microdynamic_minimality_audit_pdf,
+            "figures/renewal_cage_microdynamic_minimality_audit.pdf",
         )
         archive.write(
             real_benchmark_assimilation_gate_pdf,
