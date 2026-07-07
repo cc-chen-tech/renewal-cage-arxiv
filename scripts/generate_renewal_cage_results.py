@@ -8294,6 +8294,8 @@ def write_sota_glassbench_alpha_threshold_horizon_svg(
         latest_tau = float(row["latest_lag_time_over_tau_alpha_metadata"])
         fs_anchor = float(row["latest_self_intermediate_scattering_anchor"])
         extension = float(row["estimated_lag_extension_factor"])
+        k_threshold = float(row["estimated_threshold_wave_number_at_latest_lag"])
+        k_ratio = float(row["threshold_wave_number_over_max_observed"])
         marks.append(
             f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
         )
@@ -8310,12 +8312,12 @@ def write_sota_glassbench_alpha_threshold_horizon_svg(
             f'<text x="{left + 530}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">latest t/tau_alpha(meta)={latest_tau:.3g}; anchor Fs={fs_anchor:.3g}; extrapolated extension={extension:.3g}x</text>'
         )
         marks.append(
-            f'<text x="{left + 530}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">PE inversion={int(float(row["real_pe_inversion_ready"]))}; thermodynamic claim={int(float(row["thermodynamic_claim_allowed"]))}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+            f'<text x="{left + 530}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">k* latest={k_threshold:.3g}; k*/kmax={k_ratio:.3g}; PE inversion={int(float(row["real_pe_inversion_ready"]))}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
         )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />
   <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench alpha-threshold horizon audit</text>
-  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The audit checks whether tau-alpha metadata agrees with the anchor self-intermediate-scattering threshold used for PE inversion.</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The audit checks whether tau-alpha metadata and the observed k-grid cover the Fs=e^-1 anchor needed for PE inversion.</text>
   <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
   <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">audit stage</text>
   <text x="{left + 530}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">threshold and inversion status</text>

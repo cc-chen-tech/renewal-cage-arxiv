@@ -1138,8 +1138,11 @@ class ArxivPackageTests(unittest.TestCase):
             float(ka2d_023["latest_self_intermediate_scattering_anchor"]),
             math.exp(-1.0),
         )
+        self.assertGreater(float(ka2d_023["estimated_threshold_wave_number_at_latest_lag"]), 1.6)
+        self.assertGreater(float(ka2d_023["threshold_wave_number_over_max_observed"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_threshold_wave_number_covered"]), 0.0)
         self.assertGreater(float(ka2d_023["estimated_lag_extension_factor"]), 1.0)
-        self.assertEqual(ka2d_023["primary_blocker"], "anchor_wave_number_or_alpha_definition_mismatch")
+        self.assertEqual(ka2d_023["primary_blocker"], "alpha_anchor_wave_number_outside_observed_grid")
         self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 

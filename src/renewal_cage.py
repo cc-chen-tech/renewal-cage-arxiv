@@ -5643,6 +5643,32 @@ def glassbench_alpha_threshold_horizon_audit(
 ) -> list[dict[str, float | str]]:
     """Audit whether GlassBench tau-alpha metadata matches the anchor Fs threshold."""
 
+    def estimate_threshold_wave_number(
+        wave_numbers: list[float],
+        fs_values: list[float],
+    ) -> float:
+        pairs = sorted(
+            (float(wave), float(fs_value))
+            for wave, fs_value in zip(wave_numbers, fs_values)
+            if float(wave) > 0.0 and 0.0 < float(fs_value) < 1.0
+        )
+        if not pairs:
+            return 0.0
+        for wave, fs_value in pairs:
+            if fs_value <= threshold:
+                return float(wave)
+        if len(pairs) < 2:
+            return 0.0
+        log_k = np.log(np.array([wave for wave, _fs_value in pairs], dtype=float))
+        log_minus_log_fs = np.log(-np.log(np.array([fs_value for _wave, fs_value in pairs], dtype=float)))
+        if not np.all(np.isfinite(log_k)) or not np.all(np.isfinite(log_minus_log_fs)):
+            return 0.0
+        slope, intercept = np.polyfit(log_k, log_minus_log_fs, 1)
+        if slope <= 0.0:
+            return 0.0
+        target = math.log(-math.log(threshold))
+        return float(math.exp((target - float(intercept)) / float(slope)))
+
     if not audit_id:
         raise ValueError("audit_id must be nonempty")
     if not timecode_rows:
@@ -5712,6 +5738,11 @@ def glassbench_alpha_threshold_horizon_audit(
                     "latest_lag_time": float(latest_lag),
                     "latest_lag_time_over_tau_alpha_metadata": float(latest_lag_over_tau),
                     "latest_self_intermediate_scattering_anchor": 0.0,
+                    "latest_wave_numbers": "none",
+                    "latest_self_intermediate_scattering_by_k": "none",
+                    "estimated_threshold_wave_number_at_latest_lag": 0.0,
+                    "threshold_wave_number_over_max_observed": 0.0,
+                    "alpha_threshold_wave_number_covered": 0.0,
                     "threshold": float(threshold),
                     "metadata_tau_alpha_reached": float(tau_alpha > 0.0 and latest_lag >= tau_alpha),
                     "alpha_threshold_crossed": 0.0,
@@ -5731,6 +5762,8 @@ def glassbench_alpha_threshold_horizon_audit(
 
         lag_times: list[float] = []
         fs_anchor: list[float] = []
+        latest_wave_numbers: list[float] = []
+        latest_fs_values: list[float] = []
         for row in sorted_group:
             wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
             fs_values = _parse_semicolon_float_values(
@@ -5748,8 +5781,22 @@ def glassbench_alpha_threshold_horizon_audit(
                 raise ValueError("GlassBench alpha horizon rows require positive lag times and Fs")
             lag_times.append(lag)
             fs_anchor.append(fs_value)
+            latest_wave_numbers = wave_numbers
+            latest_fs_values = fs_values
 
         latest_fs = float(fs_anchor[-1])
+        max_observed_wave_number = max(latest_wave_numbers) if latest_wave_numbers else 0.0
+        estimated_threshold_wave_number = estimate_threshold_wave_number(latest_wave_numbers, latest_fs_values)
+        threshold_wave_number_ratio = (
+            estimated_threshold_wave_number / max_observed_wave_number
+            if max_observed_wave_number > 0.0 and estimated_threshold_wave_number > 0.0
+            else 0.0
+        )
+        threshold_wave_number_covered = (
+            estimated_threshold_wave_number > 0.0
+            and max_observed_wave_number > 0.0
+            and estimated_threshold_wave_number <= max_observed_wave_number
+        )
         metadata_reached = tau_alpha > 0.0 and latest_lag >= tau_alpha
         alpha_crossed = latest_fs <= threshold
         metadata_consistent = (not metadata_reached) or alpha_crossed
@@ -5770,8 +5817,12 @@ def glassbench_alpha_threshold_horizon_audit(
         extension_above_minimum = estimated_extension_factor >= min_extension_factor
         if metadata_reached and not alpha_crossed:
             stage = "metadata_tau_alpha_anchor_fs_mismatch"
-            blocker = "anchor_wave_number_or_alpha_definition_mismatch"
-            next_action = "verify_alpha_definition_or_extend_archive_to_threshold_crossing"
+            if not threshold_wave_number_covered and estimated_threshold_wave_number > 0.0:
+                blocker = "alpha_anchor_wave_number_outside_observed_grid"
+                next_action = "extend_or_recompute_glassbench_fs_at_alpha_anchor_wave_number"
+            else:
+                blocker = "anchor_wave_number_or_alpha_definition_mismatch"
+                next_action = "verify_alpha_definition_or_extend_archive_to_threshold_crossing"
         elif real_pe_ready == 1.0 and alpha_crossed:
             stage = "alpha_threshold_horizon_inversion_ready"
             blocker = "none"
@@ -5797,6 +5848,13 @@ def glassbench_alpha_threshold_horizon_audit(
                 "latest_lag_time": float(latest_lag),
                 "latest_lag_time_over_tau_alpha_metadata": float(latest_lag_over_tau),
                 "latest_self_intermediate_scattering_anchor": latest_fs,
+                "latest_wave_numbers": ";".join(f"{value:.17g}" for value in latest_wave_numbers),
+                "latest_self_intermediate_scattering_by_k": ";".join(
+                    f"{value:.17g}" for value in latest_fs_values
+                ),
+                "estimated_threshold_wave_number_at_latest_lag": float(estimated_threshold_wave_number),
+                "threshold_wave_number_over_max_observed": float(threshold_wave_number_ratio),
+                "alpha_threshold_wave_number_covered": float(threshold_wave_number_covered),
                 "threshold": float(threshold),
                 "metadata_tau_alpha_reached": float(metadata_reached),
                 "alpha_threshold_crossed": float(alpha_crossed),

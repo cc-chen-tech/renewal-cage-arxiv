@@ -393,8 +393,11 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["metadata_tau_alpha_consistent_with_anchor_fs"]), 0.0)
         self.assertGreater(float(row["latest_lag_time_over_tau_alpha_metadata"]), 1.0)
         self.assertGreater(float(row["latest_self_intermediate_scattering_anchor"]), math.exp(-1.0))
+        self.assertGreater(float(row["estimated_threshold_wave_number_at_latest_lag"]), 1.6)
+        self.assertGreater(float(row["threshold_wave_number_over_max_observed"]), 1.0)
+        self.assertEqual(float(row["alpha_threshold_wave_number_covered"]), 0.0)
         self.assertGreater(float(row["estimated_lag_extension_factor"]), 1.0)
-        self.assertEqual(row["primary_blocker"], "anchor_wave_number_or_alpha_definition_mismatch")
+        self.assertEqual(row["primary_blocker"], "alpha_anchor_wave_number_outside_observed_grid")
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 

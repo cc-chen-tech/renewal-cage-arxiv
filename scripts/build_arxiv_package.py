@@ -3489,7 +3489,7 @@ def write_sota_glassbench_alpha_threshold_horizon_pdf(path: Path) -> None:
     c.drawString(
         42,
         page_h - 48,
-        "Tau-alpha metadata is checked against the anchor Fs=e^-1 crossing used by the persistence/exchange inversion.",
+        "Tau-alpha metadata and the observed k-grid are checked against the Fs=e^-1 anchor used by the persistence/exchange inversion.",
     )
     left, top = 48, page_h - 100
     row_h = 62
@@ -3541,9 +3541,10 @@ def write_sota_glassbench_alpha_threshold_horizon_pdf(path: Path) -> None:
         c.drawString(
             left + 365,
             y - 27,
-            "PE inversion={}; thermodynamic claim={}; next={}".format(
+            "k*={:.3g}; k*/kmax={:.3g}; PE inversion={}; next={}".format(
+                float(row.get("estimated_threshold_wave_number_at_latest_lag", 0.0) or 0.0),
+                float(row.get("threshold_wave_number_over_max_observed", 0.0) or 0.0),
                 int(float(row["real_pe_inversion_ready"])),
-                int(float(row["thermodynamic_claim_allowed"])),
                 row["next_required_action"][:58],
             ),
         )
@@ -3551,7 +3552,7 @@ def write_sota_glassbench_alpha_threshold_horizon_pdf(path: Path) -> None:
     c.drawString(
         42,
         34,
-        "A metadata/anchor-Fs mismatch blocks real-data inversion until the alpha definition or longer horizon is resolved.",
+        "A metadata/anchor-Fs mismatch blocks real-data inversion until the alpha wave number, definition, or horizon is resolved.",
     )
     c.showPage()
     c.save()

@@ -290,14 +290,17 @@ The time-code curve bridge now runs that `T=0.23` curve through the same
 trajectory pre-inversion schema used by the persistence/exchange protocol. It
 promotes the row from metadata-only evidence to a real physical-time
 observable curve, but it still blocks real inversion because the cached curve
-does not cross the alpha threshold and its latest point is only about
-`1.63 tau_alpha`; `T=0.30` remains blocked by sparse time-code coverage.
+does not cross the alpha threshold even though its latest point reaches about
+`1.63 tau_alpha`. The alpha-horizon audit now estimates that the latest-lag
+`F_s=e^-1` crossing would require `k*=2.70`, about `1.69x` the largest
+published GlassBench wave number `k=1.6`; `T=0.30` remains blocked by sparse
+time-code coverage.
 The companion signature-support gate then asks what can already be concluded
 without fitting: the real `T=0.23` curve supports MSD growth, substantial
 anchor-`F_s` decay, a transient NGP peak with partial recovery, and a transient
 overlap-`chi4` proxy peak with partial recovery. It still records
 `thermodynamic_claim_allowed=0` and keeps the real persistence/exchange
-inversion blocked by the missing alpha-threshold crossing.
+inversion blocked by alpha-anchor wave-number coverage.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve
