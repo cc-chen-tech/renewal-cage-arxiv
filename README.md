@@ -307,6 +307,12 @@ to test the same alpha threshold. It also records that this would only remove
 the alpha-definition blocker; physical-time event clocks, threshold sweeps, and
 held-out macro observables remain separate requirements before a real
 persistence/exchange closed-loop claim.
+The cached alpha-anchor `F_s` audit then tests that proposed wave number
+directly on the structure-151 cached displacement ladder. At the latest lag,
+`F_s(k=2.6966,t)` is `0.528`, still above `e^-1`; fitting the same cached
+latest-lag `F_s(k)` grid gives a structure-specific threshold estimate
+`k*=3.01`. This refines the next measurement target without promoting the
+result to an event-clock or thermodynamic claim.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve
@@ -473,6 +479,7 @@ figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.svg
 figures/renewal_cage_sota_glassbench_timecode_curve_bridge.svg
 figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg
+figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
 figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
 figures/renewal_cage_sota_dynamic_signature_alignment.svg
 figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
@@ -574,6 +581,7 @@ data/renewal_cage_sota_glassbench_ka2d_timecode_semantics.csv
 data/renewal_cage_sota_glassbench_timecode_curve_bridge.csv
 data/renewal_cage_sota_glassbench_alpha_threshold_horizon.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv
+data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
 data/renewal_cage_sota_glassbench_timecode_signature_support.csv
 data/renewal_cage_sota_dynamic_signature_alignment.csv
 data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
@@ -696,6 +704,7 @@ paper/figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf
+paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
 paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
 paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf

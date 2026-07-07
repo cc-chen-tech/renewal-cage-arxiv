@@ -135,6 +135,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_first_npz_structural_observable_plan_gate,
     glassbench_alpha_threshold_horizon_audit,
     glassbench_alpha_anchor_rescue_protocol,
+    glassbench_alpha_anchor_cached_fs_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -456,6 +457,47 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertIn("threshold_sweep_event_clock", row["remaining_post_rescue_blockers"])
         self.assertIn("persistence_exchange_event_clock", row["remaining_post_rescue_blockers"])
         self.assertNotIn("alpha_definition_consistency", row["remaining_post_rescue_blockers"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_alpha_anchor_cached_fs_audit_refines_required_k(self):
+        rescue_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "required_anchor_wave_number": 2.7,
+                "alpha_anchor_rescue_design_ready": 1.0,
+                "post_rescue_real_closed_loop_ready": 0.0,
+            }
+        ]
+        cached_anchor_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "candidate_anchor_wave_number": 2.7,
+                "cached_fs_at_candidate_anchor": 0.52,
+                "latest_wave_numbers": "0.7;1.1;1.6",
+                "latest_cached_fs_by_k": "0.90;0.80;0.69",
+            }
+        ]
+
+        row = glassbench_alpha_anchor_cached_fs_audit(
+            audit_id="glassbench_cached_alpha_anchor_fs",
+            rescue_rows=rescue_rows,
+            cached_anchor_rows=cached_anchor_rows,
+        )[0]
+
+        self.assertEqual(row["cached_anchor_stage"], "cached_anchor_measurement_refines_required_k")
+        self.assertEqual(float(row["candidate_anchor_wave_number"]), 2.7)
+        self.assertGreater(float(row["cached_fs_at_candidate_anchor"]), math.exp(-1.0))
+        self.assertEqual(float(row["candidate_anchor_threshold_crossed"]), 0.0)
+        self.assertGreater(float(row["cached_structure_threshold_wave_number"]), 2.7)
+        self.assertGreater(float(row["cached_structure_threshold_over_candidate"]), 1.0)
+        self.assertEqual(float(row["cached_alpha_anchor_rescue_ready"]), 0.0)
+        self.assertEqual(float(row["post_rescue_real_closed_loop_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "cached_structure_anchor_wave_number_higher_than_protocol")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

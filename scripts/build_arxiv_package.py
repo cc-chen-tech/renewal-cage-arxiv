@@ -3635,6 +3635,79 @@ def write_sota_glassbench_alpha_anchor_rescue_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_alpha_anchor_cached_fs_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cached alpha-anchor Fs audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Structure-matched cached displacements directly test the proposed higher-k alpha anchor.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "cached_anchor_measurement_closes_full_loop": colors.HexColor("#2f855a"),
+        "cached_anchor_measurement_closes_alpha_gap_event_clock_blocked": colors.HexColor("#b7791f"),
+        "cached_anchor_measurement_refines_required_k": colors.HexColor("#9f1239"),
+        "cached_anchor_measurement_missing": colors.HexColor("#c05621"),
+        "cached_anchor_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "cached stage")
+    c.drawString(left + 390, top + 24, "direct cached Fs measurement")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cached_anchor_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; lag={:.3g}; candidate k={:.3g}; cached Fs={:.3g}".format(
+                row["structure_id"],
+                float(row["lag_time"]),
+                float(row["candidate_anchor_wave_number"]),
+                float(row["cached_fs_at_candidate_anchor"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "cached k*={:.3g}; k*/candidate={:.3g}; crossed={}; blocker={}".format(
+                float(row["cached_structure_threshold_wave_number"]),
+                float(row["cached_structure_threshold_over_candidate"]),
+                int(float(row["candidate_anchor_threshold_crossed"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'next={row["next_required_action"][:74]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "A cached structure-specific refinement remains a dynamical alpha-anchor check, not an event-clock or thermodynamic claim.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5892,6 +5965,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_alpha_anchor_rescue_protocol_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf"
     )
+    sota_glassbench_alpha_anchor_cached_fs_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6056,6 +6132,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_alpha_anchor_rescue_protocol_pdf(
         sota_glassbench_alpha_anchor_rescue_protocol_pdf
+    )
+    write_sota_glassbench_alpha_anchor_cached_fs_pdf(
+        sota_glassbench_alpha_anchor_cached_fs_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6258,6 +6337,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_alpha_anchor_rescue_protocol_pdf,
             "figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf",
+        )
+        archive.write(
+            sota_glassbench_alpha_anchor_cached_fs_pdf,
+            "figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

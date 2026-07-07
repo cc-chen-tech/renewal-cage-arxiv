@@ -5996,6 +5996,142 @@ def glassbench_alpha_anchor_rescue_protocol(
     return out
 
 
+def glassbench_alpha_anchor_cached_fs_audit(
+    *,
+    audit_id: str,
+    rescue_rows: Sequence[dict[str, object]],
+    cached_anchor_rows: Sequence[dict[str, object]],
+    threshold: float = math.exp(-1.0),
+) -> list[dict[str, float | str]]:
+    """Audit an arbitrary-k cached-displacement Fs measurement for alpha rescue."""
+
+    def parse_float_list(value: object) -> list[float]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            if not value or value == "none":
+                return []
+            return [float(item) for item in value.split(";") if item]
+        if isinstance(value, Sequence):
+            return [float(item) for item in value]
+        return []
+
+    def estimate_threshold_wave_number(wave_numbers: list[float], fs_values: list[float]) -> float:
+        pairs = sorted(
+            (float(wave), float(fs_value))
+            for wave, fs_value in zip(wave_numbers, fs_values)
+            if float(wave) > 0.0 and 0.0 < float(fs_value) < 1.0
+        )
+        if not pairs:
+            return 0.0
+        for wave, fs_value in pairs:
+            if fs_value <= threshold:
+                return float(wave)
+        if len(pairs) < 2:
+            return 0.0
+        log_k = np.log(np.array([wave for wave, _fs_value in pairs], dtype=float))
+        log_minus_log_fs = np.log(-np.log(np.array([fs_value for _wave, fs_value in pairs], dtype=float)))
+        if not np.all(np.isfinite(log_k)) or not np.all(np.isfinite(log_minus_log_fs)):
+            return 0.0
+        slope, intercept = np.polyfit(log_k, log_minus_log_fs, 1)
+        if slope <= 0.0:
+            return 0.0
+        target = math.log(-math.log(threshold))
+        return float(math.exp((target - float(intercept)) / float(slope)))
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not rescue_rows:
+        raise ValueError("rescue_rows must be nonempty")
+    if threshold <= 0.0 or threshold >= 1.0:
+        raise ValueError("threshold must lie between zero and one")
+
+    cached_by_key: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in cached_anchor_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        cached_by_key.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for rescue in sorted(
+        rescue_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(rescue.get("system_id", "unknown"))
+        temperature = str(rescue.get("temperature", "none"))
+        candidate_k = float(rescue.get("required_anchor_wave_number", 0.0) or 0.0)
+        design_ready = float(rescue.get("alpha_anchor_rescue_design_ready", 0.0) or 0.0) == 1.0
+        post_rescue_closed_loop_ready = (
+            float(rescue.get("post_rescue_real_closed_loop_ready", 0.0) or 0.0) == 1.0
+        )
+        candidates = sorted(
+            cached_by_key.get((system_id, temperature), []),
+            key=lambda item: (
+                str(item.get("structure_id", "none")),
+                float(item.get("lag_time", 0.0) or 0.0),
+            ),
+        )
+        measured = [row for row in candidates if float(row.get("candidate_anchor_wave_number", 0.0) or 0.0) > 0.0]
+        latest = max(measured, key=lambda item: float(item.get("lag_time", 0.0) or 0.0)) if measured else {}
+        structure_id = str(latest.get("structure_id", "none"))
+        time_code = str(latest.get("time_code", "none"))
+        lag_time = float(latest.get("lag_time", 0.0) or 0.0)
+        cached_fs = float(latest.get("cached_fs_at_candidate_anchor", 0.0) or 0.0)
+        wave_numbers = parse_float_list(latest.get("latest_wave_numbers", "none"))
+        fs_by_k = parse_float_list(latest.get("latest_cached_fs_by_k", "none"))
+        cached_threshold_k = estimate_threshold_wave_number(wave_numbers, fs_by_k)
+        threshold_over_candidate = cached_threshold_k / candidate_k if candidate_k > 0.0 else 0.0
+        candidate_crossed = cached_fs > 0.0 and cached_fs <= threshold
+        cached_rescue_ready = design_ready and candidate_crossed
+
+        if cached_rescue_ready and post_rescue_closed_loop_ready:
+            stage = "cached_anchor_measurement_closes_full_loop"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        elif cached_rescue_ready:
+            stage = "cached_anchor_measurement_closes_alpha_gap_event_clock_blocked"
+            blocker = "real_event_clock"
+            next_action = "extract_event_clock_and_heldout_macro_observables"
+        elif design_ready and measured:
+            stage = "cached_anchor_measurement_refines_required_k"
+            blocker = "cached_structure_anchor_wave_number_higher_than_protocol"
+            next_action = "recompute_cached_fs_near_structure_specific_threshold_wave_number"
+        elif design_ready:
+            stage = "cached_anchor_measurement_missing"
+            blocker = "cached_structure_anchor_fs_measurement"
+            next_action = "compute_cached_displacement_fs_at_candidate_anchor_wave_number"
+        else:
+            stage = "cached_anchor_upstream_incomplete"
+            blocker = "alpha_anchor_rescue_design"
+            next_action = "complete_alpha_anchor_rescue_design_before_cached_fs_audit"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": time_code,
+                "lag_time": float(lag_time),
+                "candidate_anchor_wave_number": float(candidate_k),
+                "cached_fs_at_candidate_anchor": float(cached_fs),
+                "threshold": float(threshold),
+                "candidate_anchor_threshold_crossed": float(candidate_crossed),
+                "latest_wave_numbers": ";".join(f"{value:.17g}" for value in wave_numbers) if wave_numbers else "none",
+                "latest_cached_fs_by_k": ";".join(f"{value:.17g}" for value in fs_by_k) if fs_by_k else "none",
+                "cached_structure_threshold_wave_number": float(cached_threshold_k),
+                "cached_structure_threshold_over_candidate": float(threshold_over_candidate),
+                "alpha_anchor_rescue_design_ready": float(design_ready),
+                "cached_alpha_anchor_rescue_ready": float(cached_rescue_ready),
+                "post_rescue_real_closed_loop_ready": float(post_rescue_closed_loop_ready and cached_rescue_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "cached_anchor_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

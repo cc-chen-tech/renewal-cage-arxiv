@@ -49,6 +49,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
     gamma_exchange_temperature_scan,
+    glassbench_alpha_anchor_cached_fs_audit,
     glassbench_alpha_anchor_rescue_protocol,
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
@@ -3968,6 +3969,72 @@ def write_sota_glassbench_alpha_anchor_rescue_protocol_csv(
         alpha_horizon_rows=alpha_horizon_rows,
         event_clock_rows=event_clock_rows,
         closed_loop_rows=closed_loop_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_alpha_anchor_cached_fs_csv(
+    path: Path,
+    *,
+    rescue_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Measure the rescue anchor Fs directly from cached GlassBench displacements."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    semantics_manifest = json.loads(semantics_path.read_text(encoding="utf-8"))
+    wave_numbers = [float(value) for value in semantics_manifest.get("wave_numbers", [])]
+    rescue_by_key = {
+        (str(row["system_id"]), str(row["temperature"])): row
+        for row in rescue_rows
+    }
+    cached_anchor_rows: list[dict[str, float | str]] = []
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"])
+            rescue = rescue_by_key.get(key)
+            if rescue is None or float(rescue.get("alpha_anchor_rescue_design_ready", 0.0) or 0.0) != 1.0:
+                continue
+            candidate_k = float(rescue.get("required_anchor_wave_number", 0.0) or 0.0)
+            if candidate_k <= 0.0:
+                continue
+            cache_path = ROOT / row["particle_cache_path"]
+            with np.load(cache_path) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+            reference_displacements = positions - initial_positions[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
+            dx = reference_displacements[:, :, 0]
+            dy = reference_displacements[:, :, 1]
+            cached_fs_at_candidate = float(
+                0.5 * (np.mean(np.cos(candidate_k * dx)) + np.mean(np.cos(candidate_k * dy)))
+            )
+            fs_by_k = [
+                float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy))))
+                for wave_number in wave_numbers
+            ]
+            cached_anchor_rows.append(
+                {
+                    "system_id": row["system_id"],
+                    "temperature": row["temperature"],
+                    "structure_id": row["structure_id"],
+                    "time_code": row["time_code"],
+                    "lag_time": float(row["lag_time"]),
+                    "candidate_anchor_wave_number": float(candidate_k),
+                    "cached_fs_at_candidate_anchor": cached_fs_at_candidate,
+                    "latest_wave_numbers": ";".join(f"{value:.17g}" for value in wave_numbers),
+                    "latest_cached_fs_by_k": ";".join(f"{value:.17g}" for value in fs_by_k),
+                }
+            )
+    rows = glassbench_alpha_anchor_cached_fs_audit(
+        audit_id="glassbench_ka2d_alpha_anchor_cached_fs",
+        rescue_rows=rescue_rows,
+        cached_anchor_rows=cached_anchor_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8400,6 +8467,61 @@ def write_sota_glassbench_alpha_anchor_rescue_protocol_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_alpha_anchor_cached_fs_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_anchor_measurement_closes_full_loop": "#2f855a",
+        "cached_anchor_measurement_closes_alpha_gap_event_clock_blocked": "#b7791f",
+        "cached_anchor_measurement_refines_required_k": "#9f1239",
+        "cached_anchor_measurement_missing": "#c05621",
+        "cached_anchor_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["cached_anchor_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        candidate_k = float(row["candidate_anchor_wave_number"])
+        cached_fs = float(row["cached_fs_at_candidate_anchor"])
+        cached_k = float(row["cached_structure_threshold_wave_number"])
+        ratio = float(row["cached_structure_threshold_over_candidate"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; lag={float(row["lag_time"]):.3g}; candidate k={candidate_k:.3g}; cached Fs={cached_fs:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">cached k*={cached_k:.3g}; cached k*/candidate={ratio:.3g}; crossed={int(float(row["candidate_anchor_threshold_crossed"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached alpha-anchor Fs audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached structure-matched displacements test whether the proposed higher-k alpha anchor actually reaches Fs=e^-1.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached-anchor stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">direct cached Fs measurement</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11210,6 +11332,14 @@ def main() -> None:
     write_sota_glassbench_alpha_anchor_rescue_protocol_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg",
         glassbench_alpha_anchor_rescue_protocol_rows,
+    )
+    glassbench_alpha_anchor_cached_fs_rows = write_sota_glassbench_alpha_anchor_cached_fs_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv",
+        rescue_rows=glassbench_alpha_anchor_rescue_protocol_rows,
+    )
+    write_sota_glassbench_alpha_anchor_cached_fs_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg",
+        glassbench_alpha_anchor_cached_fs_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",
