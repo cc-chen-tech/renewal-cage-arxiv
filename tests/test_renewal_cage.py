@@ -137,6 +137,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_anchor_rescue_protocol,
     glassbench_alpha_anchor_cached_fs_audit,
     glassbench_direct_alpha_curve_audit,
+    glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_cage_jump_proxy_canary,
@@ -654,6 +655,57 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["conditional_pe_inference_ready"]), 1.0)
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "event_clock_jump_variance")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_displacement_tail_bound_marks_segmentation_target(self):
+        pe_bound_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "matched_msd": 0.9747508405755333,
+                "jump_variance_upper_bound": 0.4855550202214053,
+                "full_msd_jump_variance_feasible": 0.0,
+                "pe_feasibility_bound_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+        displacement_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "sample_count": 25800.0,
+                "q_all": 0.48737542028776676,
+                "q_bound": 0.4855550202214053,
+                "fraction_q_le_bound": 0.7650387596899225,
+                "fraction_q_gt_bound": 0.2349612403100775,
+                "mean_q_above_bound": 1.7929841231781933,
+                "q_median": 0.06625069389999988,
+                "q_p90": 1.3898784621800007,
+                "q_p95": 2.373878811687498,
+            }
+        ]
+
+        row = glassbench_direct_alpha_displacement_tail_bound(
+            audit_id="glassbench_direct_alpha_displacement_tail_bound",
+            pe_bound_rows=pe_bound_rows,
+            displacement_rows=displacement_rows,
+            min_tail_fraction=0.05,
+        )[0]
+
+        self.assertEqual(row["tail_bound_stage"], "direct_displacement_tail_exceeds_pe_single_event_bound")
+        self.assertEqual(float(row["tail_bound_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["fraction_q_gt_bound"]), 0.2349612403100775)
+        self.assertAlmostEqual(float(row["mean_q_above_bound"]), 1.7929841231781933)
+        self.assertAlmostEqual(float(row["mean_q_above_over_bound"]), 3.692648718492544)
+        self.assertAlmostEqual(float(row["q_all_over_bound"]), 1.003749111821625)
+        self.assertEqual(float(row["event_segmentation_required"]), 1.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_segmentation")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

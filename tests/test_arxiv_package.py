@@ -1291,6 +1291,32 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_023["primary_blocker"], "event_clock_jump_variance")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_direct_alpha_displacement_tail_bound_requires_segmentation(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["tail_bound_stage"],
+            "direct_displacement_tail_exceeds_pe_single_event_bound",
+        )
+        self.assertAlmostEqual(float(ka2d_023["q_bound"]), 0.4855550202214053)
+        self.assertAlmostEqual(float(ka2d_023["q_all"]), 0.48737542028776676)
+        self.assertAlmostEqual(float(ka2d_023["q_all_over_bound"]), 1.003749111821625)
+        self.assertAlmostEqual(float(ka2d_023["fraction_q_gt_bound"]), 0.2349612403100775)
+        self.assertAlmostEqual(float(ka2d_023["mean_q_above_bound"]), 1.7929841231781933)
+        self.assertAlmostEqual(float(ka2d_023["mean_q_above_over_bound"]), 3.692648718492544)
+        self.assertEqual(float(ka2d_023["event_segmentation_required"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "event_segmentation")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2312,6 +2338,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2499,6 +2526,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

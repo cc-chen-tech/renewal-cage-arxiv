@@ -334,6 +334,13 @@ explicit conditional reference `q=0.2 MSD`, the same equations give
 `tau_x=6.0e5`, `tau_p=1.409e6`, and `tau_p/tau_x=2.35`. This converts the
 real GlassBench proxy into a falsifiable jump-variance target while keeping
 `real_pe_inversion_ready=0`.
+The direct-alpha displacement-tail bound then compares the raw cached `tc40`
+displacement distribution with that PE single-event bound. In the
+structure-151 cache, `q_all/q_max=1.004`, about `23.5%` of displacement samples
+already exceed the single-event bound, and the above-bound tail has mean
+`q_tail/q_max=3.69`. This rules out treating the broad direct-lag displacement
+tail as one measured jump variance and makes cage-jump event segmentation the
+next required real-data step.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve
@@ -504,6 +511,7 @@ figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_curve.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_transport.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg
 figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
 figures/renewal_cage_sota_dynamic_signature_alignment.svg
 figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
@@ -609,6 +617,7 @@ data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
 data/renewal_cage_sota_glassbench_direct_alpha_curve.csv
 data/renewal_cage_sota_glassbench_direct_alpha_transport.csv
 data/renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv
+data/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv
 data/renewal_cage_sota_glassbench_timecode_signature_support.csv
 data/renewal_cage_sota_dynamic_signature_alignment.csv
 data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
@@ -735,6 +744,7 @@ paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
 paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
 paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf

@@ -56,6 +56,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_timecode_bridge,
     glassbench_cached_particle_observable_semantics_audit,
     glassbench_direct_alpha_curve_audit,
+    glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_event_clock_threshold_readiness_gate,
@@ -4163,6 +4164,79 @@ def write_sota_glassbench_direct_alpha_pe_bound_csv(
         audit_id="glassbench_ka2d_direct_alpha_pe_bound",
         transport_rows=transport_rows,
         reference_jump_variance_fraction=0.2,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_displacement_tail_bound_csv(
+    path: Path,
+    *,
+    pe_bound_rows: list[dict[str, float | str]],
+    transport_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute direct-lag displacement-tail statistics against the PE q-bound."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    cache_by_key: dict[tuple[str, str, str, str], dict[str, str]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"], row["time_code"])
+            cache_by_key[key] = row
+
+    q_bound_by_key = {
+        (str(row["system_id"]), str(row["temperature"]), str(row["structure_id"])): float(
+            row.get("jump_variance_upper_bound", 0.0) or 0.0
+        )
+        for row in pe_bound_rows
+    }
+    displacement_rows: list[dict[str, float | str]] = []
+    for row in transport_rows:
+        if float(row.get("direct_alpha_transport_proxy_ready", 0.0) or 0.0) != 1.0:
+            continue
+        system_id = str(row["system_id"])
+        temperature = str(row["temperature"])
+        structure_id = str(row["structure_id"])
+        time_code = str(row["threshold_crossing_time_code"])
+        q_bound = q_bound_by_key.get((system_id, temperature, structure_id), 0.0)
+        cache = cache_by_key.get((system_id, temperature, structure_id, time_code))
+        if cache is None or q_bound <= 0.0:
+            continue
+        cache_path = ROOT / cache["particle_cache_path"]
+        with np.load(cache_path) as npz:
+            positions = np.asarray(npz["positions"], dtype=float)
+            initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+            box = float(np.asarray(npz["box"]))
+        displacement = positions - initial_positions[None, :, :]
+        if math.isfinite(box) and box > 0.0:
+            displacement = displacement - box * np.round(displacement / box)
+        dimension = displacement.shape[-1]
+        q_values = np.sum(displacement * displacement, axis=2).reshape(-1) / float(dimension)
+        above = q_values > q_bound
+        displacement_rows.append(
+            {
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": time_code,
+                "sample_count": float(q_values.size),
+                "q_all": float(np.mean(q_values)),
+                "q_bound": float(q_bound),
+                "fraction_q_le_bound": float(np.mean(q_values <= q_bound)),
+                "fraction_q_gt_bound": float(np.mean(above)),
+                "mean_q_above_bound": float(np.mean(q_values[above])) if np.any(above) else 0.0,
+                "q_median": float(np.percentile(q_values, 50.0)),
+                "q_p90": float(np.percentile(q_values, 90.0)),
+                "q_p95": float(np.percentile(q_values, 95.0)),
+            }
+        )
+    rows = glassbench_direct_alpha_displacement_tail_bound(
+        audit_id="glassbench_ka2d_direct_alpha_displacement_tail_bound",
+        pe_bound_rows=pe_bound_rows,
+        displacement_rows=displacement_rows,
+        min_tail_fraction=0.05,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8812,6 +8886,59 @@ def write_sota_glassbench_direct_alpha_pe_bound_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_displacement_tail_bound_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "direct_displacement_tail_exceeds_pe_single_event_bound": "#9f1239",
+        "direct_displacement_tail_within_pe_single_event_bound": "#2f855a",
+        "direct_displacement_tail_stats_missing": "#c05621",
+        "pe_feasibility_bound_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["tail_bound_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        q_ratio = float(row["q_all_over_bound"])
+        tail_fraction = float(row["fraction_q_gt_bound"])
+        tail_ratio = float(row["mean_q_above_over_bound"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; crossing={row["time_code"]}; samples={float(row["sample_count"]):.0f}; q_all/q_max={q_ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">tail fraction above bound={tail_fraction:.3g}; tail mean/q_max={tail_ratio:.3g}; q90={float(row["q_p90"]):.3g}; q95={float(row["q_p95"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha displacement-tail bound</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The direct-lag displacement tail is compared with the PE single-event jump-variance bound, identifying the required event segmentation step.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">tail-bound stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">direct displacement tail vs PE bound</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11655,6 +11782,17 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_pe_bound_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg",
         glassbench_direct_alpha_pe_bound_rows,
+    )
+    glassbench_direct_alpha_displacement_tail_bound_rows = (
+        write_sota_glassbench_direct_alpha_displacement_tail_bound_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv",
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+            transport_rows=glassbench_direct_alpha_transport_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_displacement_tail_bound_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg",
+        glassbench_direct_alpha_displacement_tail_bound_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

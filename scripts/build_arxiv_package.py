@@ -3922,6 +3922,78 @@ def write_sota_glassbench_direct_alpha_pe_bound_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_direct_alpha_displacement_tail_bound_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha displacement-tail bound")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Direct-lag displacement tails are compared with the PE single-event jump-variance bound.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "direct_displacement_tail_exceeds_pe_single_event_bound": colors.HexColor("#9f1239"),
+        "direct_displacement_tail_within_pe_single_event_bound": colors.HexColor("#2f855a"),
+        "direct_displacement_tail_stats_missing": colors.HexColor("#c05621"),
+        "pe_feasibility_bound_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "tail-bound stage")
+    c.drawString(left + 390, top + 24, "direct displacement tail vs PE bound")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["tail_bound_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; crossing={}; samples={:.0f}; q_all/q_max={:.3g}".format(
+                row["structure_id"],
+                row["time_code"],
+                float(row["sample_count"]),
+                float(row["q_all_over_bound"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "tail fraction above bound={:.3g}; tail mean/q_max={:.3g}; q90={:.3g}; q95={:.3g}".format(
+                float(row["fraction_q_gt_bound"]),
+                float(row["mean_q_above_over_bound"]),
+                float(row["q_p90"]),
+                float(row["q_p95"]),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "A broad direct-lag tail is a segmentation target, not yet a measured persistence/exchange event clock.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6191,6 +6263,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_pe_bound_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf"
     )
+    sota_glassbench_direct_alpha_displacement_tail_bound_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6367,6 +6442,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_pe_bound_pdf(
         sota_glassbench_direct_alpha_pe_bound_pdf
+    )
+    write_sota_glassbench_direct_alpha_displacement_tail_bound_pdf(
+        sota_glassbench_direct_alpha_displacement_tail_bound_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6585,6 +6663,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_pe_bound_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_displacement_tail_bound_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

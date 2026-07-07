@@ -6502,6 +6502,112 @@ def glassbench_direct_alpha_pe_feasibility_bound(
     return out
 
 
+def glassbench_direct_alpha_displacement_tail_bound(
+    *,
+    audit_id: str,
+    pe_bound_rows: Sequence[dict[str, object]],
+    displacement_rows: Sequence[dict[str, object]],
+    min_tail_fraction: float = 0.05,
+) -> list[dict[str, float | str]]:
+    """Compare direct-lag displacement tails to the PE single-event variance bound."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not pe_bound_rows:
+        raise ValueError("pe_bound_rows must be nonempty")
+    if not displacement_rows:
+        raise ValueError("displacement_rows must be nonempty")
+    if not 0.0 < min_tail_fraction < 1.0:
+        raise ValueError("min_tail_fraction must lie between zero and one")
+
+    displacement_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in displacement_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        displacement_by_key[key] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        pe_bound_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        pe_ready = float(row.get("pe_feasibility_bound_ready", 0.0) or 0.0) == 1.0
+        q_bound = float(row.get("jump_variance_upper_bound", 0.0) or 0.0)
+        displacement = displacement_by_key.get((system_id, temperature, structure_id), {})
+        q_all = float(displacement.get("q_all", 0.0) or 0.0)
+        fraction_le = float(displacement.get("fraction_q_le_bound", 0.0) or 0.0)
+        fraction_gt = float(displacement.get("fraction_q_gt_bound", 0.0) or 0.0)
+        mean_q_above = float(displacement.get("mean_q_above_bound", 0.0) or 0.0)
+        has_tail_stats = q_bound > 0.0 and q_all > 0.0 and (fraction_le > 0.0 or fraction_gt > 0.0)
+        tail_exceeds = has_tail_stats and fraction_gt >= min_tail_fraction and mean_q_above > q_bound
+        q_all_exceeds = has_tail_stats and q_all > q_bound
+
+        if pe_ready and tail_exceeds:
+            stage = "direct_displacement_tail_exceeds_pe_single_event_bound"
+            blocker = "event_segmentation"
+            next_action = "segment_particle_cage_jump_events_and_measure_per_event_q"
+            ready = True
+        elif pe_ready and has_tail_stats:
+            stage = "direct_displacement_tail_within_pe_single_event_bound"
+            blocker = "event_clock_jump_variance"
+            next_action = "measure_event_clock_jump_variance_to_confirm_single_event_bound"
+            ready = True
+        elif pe_ready:
+            stage = "direct_displacement_tail_stats_missing"
+            blocker = "displacement_tail_statistics"
+            next_action = "compute_direct_alpha_displacement_tail_statistics"
+            ready = False
+        else:
+            stage = "pe_feasibility_bound_upstream_incomplete"
+            blocker = "pe_feasibility_bound"
+            next_action = "complete_direct_alpha_pe_feasibility_bound"
+            ready = False
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": str(displacement.get("time_code", "none")),
+                "sample_count": float(displacement.get("sample_count", 0.0) or 0.0),
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(row.get("tau_alpha_direct", 0.0) or 0.0),
+                "q_bound": float(q_bound),
+                "q_all": float(q_all),
+                "q_all_over_bound": float(q_all / q_bound) if q_bound > 0.0 else 0.0,
+                "fraction_q_le_bound": float(fraction_le),
+                "fraction_q_gt_bound": float(fraction_gt),
+                "mean_q_above_bound": float(mean_q_above),
+                "mean_q_above_over_bound": float(mean_q_above / q_bound) if q_bound > 0.0 else 0.0,
+                "q_median": float(displacement.get("q_median", 0.0) or 0.0),
+                "q_p90": float(displacement.get("q_p90", 0.0) or 0.0),
+                "q_p95": float(displacement.get("q_p95", 0.0) or 0.0),
+                "min_tail_fraction": float(min_tail_fraction),
+                "q_all_exceeds_bound": float(q_all_exceeds),
+                "event_segmentation_required": float(tail_exceeds),
+                "tail_bound_ready": float(ready),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "tail_bound_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
