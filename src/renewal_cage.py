@@ -6304,12 +6304,14 @@ def glassbench_multilag_particle_cache_targets(
         cached = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
         if not cached:
             continue
+        member_name = str(row.get("first_npz_member", row.get("target_member", "none")))
+        member_md5 = str(row.get("npz_member_md5", row.get("target_member_md5", "none")))
         cached_members.add(
             (
                 str(row.get("system_id", "unknown")),
                 str(row.get("temperature", "none")),
-                str(row.get("first_npz_member", "none")),
-                str(row.get("npz_member_md5", "none")),
+                member_name,
+                member_md5,
             )
         )
 

@@ -4136,9 +4136,13 @@ def write_sota_glassbench_multilag_particle_cache_targets_csv(
     """List structure-matched multi-lag NPZ members needed for particle caches."""
 
     cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv"
+    multilag_cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
     semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
     with cache_manifest_path.open() as f:
         cache_rows = list(csv.DictReader(f))
+    if multilag_cache_manifest_path.exists():
+        with multilag_cache_manifest_path.open() as f:
+            cache_rows.extend(csv.DictReader(f))
     rows = glassbench_multilag_particle_cache_targets(
         target_id="glassbench_multilag_particle_cache_targets",
         semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),

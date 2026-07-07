@@ -14,7 +14,10 @@ import sys
 
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from glassbench_particle_cache import extract_first_npz_positions_cache_from_xz_bytes  # noqa: E402
+from glassbench_particle_cache import (  # noqa: E402
+    build_real_multilag_particle_caches,
+    extract_first_npz_positions_cache_from_xz_bytes,
+)
 
 
 class GlassBenchParticleCacheExtractorTests(unittest.TestCase):
@@ -32,6 +35,22 @@ class GlassBenchParticleCacheExtractorTests(unittest.TestCase):
             info.size = len(npz_bytes)
             archive.addfile(info, io.BytesIO(npz_bytes))
         return lzma.compress(tar_buffer.getvalue()), member, hashlib.md5(npz_bytes).hexdigest()
+
+    def _multi_member_fixture_xz_bytes(self) -> tuple[bytes, dict[str, str]]:
+        md5s = {}
+        tar_buffer = io.BytesIO()
+        with tarfile.open(fileobj=tar_buffer, mode="w") as archive:
+            for code, offset in [("tc05", 0.0), ("tc10", 100.0)]:
+                positions = np.arange(24, dtype=float).reshape(3, 4, 2) + offset
+                npz_buffer = io.BytesIO()
+                np.savez_compressed(npz_buffer, positions=positions, box=np.array(10.0))
+                npz_bytes = npz_buffer.getvalue()
+                member = f"T0.99/test/N1290T0.99_151_{code}.npz"
+                md5s[member] = hashlib.md5(npz_bytes).hexdigest()
+                info = tarfile.TarInfo(member)
+                info.size = len(npz_bytes)
+                archive.addfile(info, io.BytesIO(npz_bytes))
+        return lzma.compress(tar_buffer.getvalue()), md5s
 
     def test_extract_first_npz_positions_cache_from_bounded_xz_bytes(self):
         xz_bytes, member, expected_md5 = self._fixture_xz_bytes()
@@ -106,6 +125,57 @@ class GlassBenchParticleCacheExtractorTests(unittest.TestCase):
                     compressed_probe_range_end=20,
                 )
             self.assertFalse(target.exists())
+
+    def test_build_real_multilag_particle_caches_records_extracted_and_prefix_missing_targets(self):
+        xz_bytes, md5s = self._multi_member_fixture_xz_bytes()
+        deflater = zlib.compressobj(wbits=-15)
+        payload = deflater.compress(xz_bytes) + deflater.flush()
+        visible_member = "T0.99/test/N1290T0.99_151_tc05.npz"
+        missing_member = "T0.99/test/N1290T0.99_151_tc10.npz"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            target_csv = root / "targets.csv"
+            target_csv.write_text(
+                "target_id,system_id,temperature,source_path,selected_structure_id,"
+                "selected_time_codes,target_members,target_member_md5s,target_lag_times\n"
+                "fixture,KA2D,0.99,GlassBench/fixture.tar.xz,151,"
+                f"tc05;tc10,{visible_member};{missing_member},"
+                f"{md5s[visible_member]};{md5s[missing_member]},0.1;1.1\n"
+            )
+            member_index = root / "member_index.json"
+            member_index.write_text(
+                """{
+  "archive_url": "https://example.invalid/archive.zip",
+  "entries": [
+    {
+      "path": "GlassBench/fixture.tar.xz",
+      "compressed_probe_range_start": 10,
+      "compressed_probe_range_end": 20,
+      "compressed_probe_bytes": 11,
+      "npz_members": [{"name": "T0.99/test/N1290T0.99_151_tc05.npz", "size_bytes": 1}]
+    }
+  ]
+}"""
+            )
+            output_manifest = root / "manifest.csv"
+
+            rows = build_real_multilag_particle_caches(
+                target_csv=target_csv,
+                member_index_manifest_path=member_index,
+                output_manifest_path=output_manifest,
+                output_root=root,
+                range_fetcher=lambda url, start, end: payload,
+            )
+
+            by_code = {row["time_code"]: row for row in rows}
+            self.assertEqual(by_code["tc05"]["cache_stage"], "multi_lag_particle_coordinate_cache_written")
+            self.assertEqual(float(by_code["tc05"]["particle_resolved_positions_cached"]), 1.0)
+            self.assertTrue((root / by_code["tc05"]["particle_cache_path"]).exists())
+            self.assertEqual(by_code["tc10"]["cache_stage"], "multi_lag_target_outside_bounded_prefix")
+            self.assertEqual(float(by_code["tc10"]["particle_resolved_positions_cached"]), 0.0)
+            self.assertEqual(by_code["tc10"]["primary_blocker"], "member_not_in_bounded_prefix_index")
+            self.assertTrue(output_manifest.exists())
 
 
 if __name__ == "__main__":
