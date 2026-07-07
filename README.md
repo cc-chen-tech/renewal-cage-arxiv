@@ -330,6 +330,12 @@ targets at this `k_root`: `F_s` decreases from `0.980` at `tc05` to `e^-1` at
 alpha-threshold crossing. The audit still keeps `event_clock_trajectory_ready=0`
 and `real_pe_inversion_ready=0`, because the NPZ axis is an isoconfigurational
 replica axis rather than a physical event-clock trajectory.
+The direct-alpha shape selection then compares this real cached alpha curve
+with a threshold-anchored exponential null and a KWW shape fit. The current
+curve strongly favors a stretched-alpha candidate (`beta=0.159`, KWW log-shape
+RMSE `0.510` versus exponential RMSE `7.77`), but the row remains blocked as a
+real alpha-shape claim because the sparse curve is not strictly monotone and no
+machine-readable uncertainty column is available.
 The direct-alpha transport proxy then matches that same `tc40` crossing to the
 reproduced GlassBench displacement observable: `MSD=0.9747508406`, giving
 `D_eff=1.6246e-7` and `D_eff tau_alpha=0.24369` in 2D. This is a useful
@@ -542,6 +548,7 @@ figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_curve.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_transport.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg
@@ -671,6 +678,7 @@ data/renewal_cage_sota_glassbench_alpha_threshold_horizon.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
 data/renewal_cage_sota_glassbench_direct_alpha_curve.csv
+data/renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv
 data/renewal_cage_sota_glassbench_direct_alpha_transport.csv
 data/renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv
 data/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv
@@ -821,6 +829,7 @@ paper/figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf

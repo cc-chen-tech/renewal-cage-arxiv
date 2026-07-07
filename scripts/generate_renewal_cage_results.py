@@ -59,6 +59,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_event_clock_threshold_readiness_gate,
@@ -4153,6 +4154,25 @@ def write_sota_glassbench_direct_alpha_curve_csv(
         audit_id="glassbench_ka2d_direct_alpha_curve",
         root_rows=root_rows,
         curve_rows=curve_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_shape_selection_csv(
+    path: Path,
+    *,
+    direct_alpha_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Select alpha-shape evidence from the cached direct-alpha curve."""
+
+    rows = glassbench_direct_alpha_shape_selection(
+        selection_id="glassbench_ka2d_direct_alpha_shape_selection",
+        direct_alpha_rows=direct_alpha_rows,
+        min_aic_improvement_for_kww=2.0,
+        min_points_for_shape_fit=6,
+        min_decay=0.35,
+        max_decay=0.99,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9353,6 +9373,60 @@ def write_sota_glassbench_direct_alpha_curve_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_shape_selection_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_alpha_shape_stretched_supported": "#2f855a",
+        "cached_alpha_shape_stretched_candidate_uncertainty_blocked": "#805ad5",
+        "cached_alpha_shape_exponential_not_rejected": "#2b6cb0",
+        "cached_alpha_shape_selection_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["alpha_shape_selection_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        beta = float(row["kww_beta"])
+        delta = float(row["delta_aic_exponential_minus_kww"])
+        exp_rmse = float(row["exponential_log_shape_rmse"])
+        kww_rmse = float(row["kww_log_shape_rmse"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; beta={beta:.3g}; delta AIC={delta:.3g}; points={float(row["shape_fit_points_used"]):.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">RMSE exp={exp_rmse:.3g}; RMSE KWW={kww_rmse:.3g}; candidate={int(float(row["stretched_alpha_candidate_supported"]))}; claim={int(float(row["real_alpha_shape_claim_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha shape selection</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached direct-alpha curve compares a threshold-anchored exponential null with a KWW shape fit while retaining monotonicity and uncertainty blockers.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">shape-selection stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">alpha-shape evidence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_transport_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13628,6 +13702,16 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_curve_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.svg",
         glassbench_direct_alpha_curve_rows,
+    )
+    glassbench_direct_alpha_shape_selection_rows = (
+        write_sota_glassbench_direct_alpha_shape_selection_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv",
+            direct_alpha_rows=glassbench_direct_alpha_curve_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_shape_selection_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg",
+        glassbench_direct_alpha_shape_selection_rows,
     )
     glassbench_direct_alpha_transport_rows = write_sota_glassbench_direct_alpha_transport_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv",

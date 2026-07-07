@@ -1343,6 +1343,29 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("0.979990664255", ka2d_023["direct_alpha_fs_curve"])
         self.assertIn("0.367879441171", ka2d_023["direct_alpha_fs_curve"])
 
+    def test_sota_glassbench_direct_alpha_shape_selection_blocks_overclaim(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["alpha_shape_selection_stage"],
+            "cached_alpha_shape_stretched_candidate_uncertainty_blocked",
+        )
+        self.assertEqual(float(ka2d_023["alpha_shape_selection_ready"]), 1.0)
+        self.assertLess(float(ka2d_023["kww_beta"]), 0.2)
+        self.assertGreater(float(ka2d_023["delta_aic_exponential_minus_kww"]), 40.0)
+        self.assertEqual(float(ka2d_023["stretched_alpha_candidate_supported"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "nonmonotone_sparse_curve_and_missing_uncertainty")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_direct_alpha_transport_records_proxy_not_inversion(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_transport.csv"
         self.assertTrue(path.exists())
@@ -2901,6 +2924,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf", names)
@@ -3115,6 +3139,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf",

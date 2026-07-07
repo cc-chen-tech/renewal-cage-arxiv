@@ -3967,6 +3967,78 @@ def write_sota_glassbench_direct_alpha_curve_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha shape selection")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A threshold-anchored exponential alpha null is compared with KWW shape while overclaim blockers remain explicit.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "cached_alpha_shape_stretched_supported": colors.HexColor("#2f855a"),
+        "cached_alpha_shape_stretched_candidate_uncertainty_blocked": colors.HexColor("#805ad5"),
+        "cached_alpha_shape_exponential_not_rejected": colors.HexColor("#2b6cb0"),
+        "cached_alpha_shape_selection_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "shape-selection stage")
+    c.drawString(left + 390, top + 24, "alpha-shape evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["alpha_shape_selection_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; beta={:.3g}; delta AIC={:.3g}; points={:.0f}".format(
+                row["structure_id"],
+                float(row["kww_beta"]),
+                float(row["delta_aic_exponential_minus_kww"]),
+                float(row["shape_fit_points_used"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "RMSE exp={:.3g}; RMSE KWW={:.3g}; candidate={}; claim={}".format(
+                float(row["exponential_log_shape_rmse"]),
+                float(row["kww_log_shape_rmse"]),
+                int(float(row["stretched_alpha_candidate_supported"])),
+                int(float(row["real_alpha_shape_claim_ready"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The cached curve supports a stretched-alpha candidate only; nonmonotone sparse data and missing uncertainties block a real fit claim.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_transport_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7910,6 +7982,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_curve_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.pdf"
     )
+    sota_glassbench_direct_alpha_shape_selection_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf"
+    )
     sota_glassbench_direct_alpha_transport_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.pdf"
     )
@@ -8152,6 +8227,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_curve_pdf(
         sota_glassbench_direct_alpha_curve_pdf
+    )
+    write_sota_glassbench_direct_alpha_shape_selection_pdf(
+        sota_glassbench_direct_alpha_shape_selection_pdf
     )
     write_sota_glassbench_direct_alpha_transport_pdf(
         sota_glassbench_direct_alpha_transport_pdf
@@ -8443,6 +8521,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_curve_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_shape_selection_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_transport_pdf,

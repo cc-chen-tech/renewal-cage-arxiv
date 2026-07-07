@@ -147,6 +147,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_sparse_lag_event_clock_audit,
@@ -662,6 +663,46 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "event_clock_trajectory")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_shape_selection_marks_stretched_candidate_but_blocks_claim(self):
+        direct_alpha_rows = [
+            {
+                "audit_id": "glassbench_ka2d_direct_alpha_curve",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "threshold": math.exp(-1.0),
+                "lag_count": 8.0,
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.10000000000000001;1.1000000000000001;11.640000000000001;122.47;1288.4100000000001;13554;142587;1500000",
+                "direct_alpha_fs_curve": "0.97999066425568238;0.89332522438385931;0.88708573286414538;0.87608824083483838;0.87976640765988079;0.8728876109695306;0.78268974790781609;0.36787944117144233",
+                "threshold_crossing_lag_time": 1500000.0,
+                "alpha_threshold_crossed": 1.0,
+                "strictly_monotone_decay": 0.0,
+                "direct_alpha_curve_stage": "cached_direct_alpha_curve_ready_event_clock_blocked",
+            }
+        ]
+
+        row = glassbench_direct_alpha_shape_selection(
+            selection_id="glassbench_direct_alpha_shape_selection",
+            direct_alpha_rows=direct_alpha_rows,
+            min_aic_improvement_for_kww=2.0,
+            min_points_for_shape_fit=6,
+            min_decay=0.35,
+            max_decay=0.99,
+        )[0]
+
+        self.assertEqual(row["alpha_shape_selection_stage"], "cached_alpha_shape_stretched_candidate_uncertainty_blocked")
+        self.assertEqual(float(row["alpha_shape_selection_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["kww_beta"]), 0.15933802823269586, delta=1e-12)
+        self.assertLess(float(row["kww_log_shape_rmse"]), 0.55)
+        self.assertGreater(float(row["exponential_log_shape_rmse"]), 7.0)
+        self.assertGreater(float(row["delta_aic_exponential_minus_kww"]), 40.0)
+        self.assertEqual(float(row["stretched_alpha_candidate_supported"]), 1.0)
+        self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "nonmonotone_sparse_curve_and_missing_uncertainty")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):

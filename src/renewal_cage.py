@@ -6250,6 +6250,164 @@ def glassbench_direct_alpha_curve_audit(
     return out
 
 
+def glassbench_direct_alpha_shape_selection(
+    *,
+    selection_id: str,
+    direct_alpha_rows: Sequence[dict[str, object]],
+    min_aic_improvement_for_kww: float,
+    min_points_for_shape_fit: int,
+    min_decay: float,
+    max_decay: float,
+) -> list[dict[str, float | str]]:
+    """Compare a threshold-anchored exponential alpha null with a KWW shape fit.
+
+    The null model uses the measured direct alpha crossing as ``tau_alpha``:
+    ``F_s(t)=exp(-t/tau_alpha)``.  The KWW comparison is therefore a shape
+    diagnostic, not a free transport or persistence/exchange inversion.
+    """
+
+    if not selection_id:
+        raise ValueError("selection_id must be nonempty")
+    if not direct_alpha_rows:
+        raise ValueError("direct_alpha_rows must be nonempty")
+    if min_aic_improvement_for_kww < 0.0:
+        raise ValueError("min_aic_improvement_for_kww must be nonnegative")
+    if min_points_for_shape_fit < 3:
+        raise ValueError("min_points_for_shape_fit must be at least three")
+    if not (0.0 < min_decay < max_decay < 1.0):
+        raise ValueError("decay window must lie inside (0, 1)")
+
+    def parse_float_series(text: object) -> np.ndarray:
+        value = str(text)
+        if value == "none" or not value:
+            return np.array([], dtype=float)
+        return np.array([float(part) for part in value.split(";") if part], dtype=float)
+
+    rows: list[dict[str, float | str]] = []
+    for direct in sorted(
+        direct_alpha_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(direct.get("system_id", "unknown"))
+        temperature = str(direct.get("temperature", "none"))
+        structure_id = str(direct.get("structure_id", "none"))
+        time = parse_float_series(direct.get("lag_times", "none"))
+        decay = parse_float_series(direct.get("direct_alpha_fs_curve", "none"))
+        tau_alpha = float(direct.get("threshold_crossing_lag_time", 0.0) or 0.0)
+        crossed = float(direct.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+        monotone = float(direct.get("strictly_monotone_decay", 0.0) or 0.0) == 1.0
+        uncertainty_ready = str(direct.get("sigma_direct_alpha_fs_curve", "none")) not in {"none", ""}
+        ready = (
+            crossed
+            and tau_alpha > 0.0
+            and time.size == decay.size
+            and time.size >= min_points_for_shape_fit
+        )
+
+        if ready:
+            mask = (
+                (time > 0.0)
+                & (decay > 0.0)
+                & (decay < 1.0)
+                & (decay >= min_decay)
+                & (decay <= max_decay)
+            )
+            points_used = int(np.count_nonzero(mask))
+        else:
+            mask = np.zeros_like(time, dtype=bool)
+            points_used = 0
+
+        if ready and points_used >= min_points_for_shape_fit:
+            fit = kww_alpha_fit(time, decay, min_decay=min_decay, max_decay=max_decay)
+            x = np.log(time[mask])
+            observed = np.log(-np.log(decay[mask]))
+            exponential_prediction = x - math.log(tau_alpha)
+            kww_prediction = float(fit["kww_beta"]) * x + float(fit["kww_intercept"])
+            exp_residual = observed - exponential_prediction
+            kww_residual = observed - kww_prediction
+            exp_rss = max(float(np.sum(exp_residual**2)), 1e-300)
+            kww_rss = max(float(np.sum(kww_residual**2)), 1e-300)
+            n = float(points_used)
+            exp_aic = n * math.log(exp_rss / n) + 2.0
+            kww_aic = n * math.log(kww_rss / n) + 4.0
+            delta_aic = exp_aic - kww_aic
+            kww_beta = float(fit["kww_beta"])
+            kww_tau = float(fit["kww_tau"])
+            kww_rmse = float(math.sqrt(kww_rss / n))
+            exp_rmse = float(math.sqrt(exp_rss / n))
+            candidate = kww_beta < 0.9 and delta_aic >= min_aic_improvement_for_kww
+            claim_ready = candidate and monotone and uncertainty_ready
+            if claim_ready:
+                stage = "cached_alpha_shape_stretched_supported"
+                blocker = "none"
+                next_action = "predict_heldout_multi_k_alpha_shape_from_event_clock"
+            elif candidate:
+                stage = "cached_alpha_shape_stretched_candidate_uncertainty_blocked"
+                blocker = (
+                    "missing_uncertainty"
+                    if monotone
+                    else "nonmonotone_sparse_curve_and_missing_uncertainty"
+                )
+                next_action = "measure_monotone_uncertainty_weighted_multi_k_alpha_curve"
+            else:
+                stage = "cached_alpha_shape_exponential_not_rejected"
+                blocker = "shape_selection_power"
+                next_action = "extend_alpha_shape_window_before_claiming_stretching"
+            selection_ready = True
+        else:
+            exp_aic = 0.0
+            kww_aic = 0.0
+            delta_aic = 0.0
+            kww_beta = 0.0
+            kww_tau = 0.0
+            kww_rmse = 0.0
+            exp_rmse = 0.0
+            candidate = False
+            claim_ready = False
+            stage = "cached_alpha_shape_selection_upstream_incomplete"
+            blocker = "direct_alpha_curve"
+            next_action = "complete_direct_alpha_curve_before_shape_selection"
+            selection_ready = False
+
+        rows.append(
+            {
+                "selection_id": selection_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(direct.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(tau_alpha),
+                "lag_count": float(time.size),
+                "shape_fit_points_used": float(points_used),
+                "min_decay": float(min_decay),
+                "max_decay": float(max_decay),
+                "threshold_anchored_exponential_aic": float(exp_aic),
+                "kww_aic": float(kww_aic),
+                "delta_aic_exponential_minus_kww": float(delta_aic),
+                "min_aic_improvement_for_kww": float(min_aic_improvement_for_kww),
+                "exponential_log_shape_rmse": float(exp_rmse),
+                "kww_log_shape_rmse": float(kww_rmse),
+                "kww_beta": float(kww_beta),
+                "kww_tau": float(kww_tau),
+                "stretched_alpha_candidate_supported": float(candidate),
+                "strictly_monotone_decay": float(monotone),
+                "uncertainty_columns_ready": float(uncertainty_ready),
+                "alpha_shape_selection_ready": float(selection_ready),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "alpha_shape_selection_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_direct_alpha_transport_coupling_audit(
     *,
     audit_id: str,
