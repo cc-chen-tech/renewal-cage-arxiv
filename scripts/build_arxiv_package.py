@@ -5020,6 +5020,58 @@ def write_trajectory_cage_jump_events_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_event_clock_macro_predictions_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Event-clock micro-to-macro prediction")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Particle jump clocks predict D, multi-k alpha, late NGP, and chi4 without fitting macro observables.",
+    )
+    left, top = 70, page_h - 105
+    metrics = [
+        ("D", "diffusion_z", colors.HexColor("#2b6cb0")),
+        ("tau alpha", "max_tau_alpha_z", colors.HexColor("#2f855a")),
+        ("late NGP", "late_ngp_z", colors.HexColor("#c05621")),
+        ("chi4", "chi4_peak_z", colors.HexColor("#805ad5")),
+    ]
+    max_z = max(max(float(row[key]) for _, key, _ in metrics) for row in rows)
+    max_z = max(max_z, 2.0)
+    c.setFont("Helvetica", 7.5)
+    threshold_y = top - 65 * 2.0 / max_z
+    c.setStrokeColor(colors.HexColor("#718096"))
+    c.setDash(3, 3)
+    c.line(left, threshold_y, left + 580, threshold_y)
+    c.setDash()
+    c.setFillColor(colors.HexColor("#718096"))
+    c.drawString(left + 590, threshold_y - 3, "z=2")
+    for row_idx, row in enumerate(rows):
+        y0 = top - row_idx * 135
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y0 + 12, row["protocol_id"])
+        c.setFont("Helvetica", 7.5)
+        for metric_idx, (label, key, color) in enumerate(metrics):
+            value = float(row[key])
+            x0 = left + metric_idx * 132
+            bar_h = 65 * min(value / max_z, 1.0)
+            c.setFillColor(color)
+            c.rect(x0, y0 - 68, 34, bar_h, stroke=0, fill=1)
+            c.setFillColor(colors.black)
+            c.drawString(x0, y0 - 82, label)
+            c.drawString(x0, y0 - 70 + bar_h, f"{value:.2g}")
+        c.setFillColor(colors.black)
+        c.drawString(left, y0 - 106, f"stage={row['prediction_stage']}; blocker={row['primary_blocker']}")
+    c.showPage()
+    c.save()
+
+
 def write_trajectory_uncertainty_protocol_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5411,6 +5463,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     trajectory_observable_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.pdf"
     trajectory_cage_jump_events_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_cage_jump_events.pdf"
+    trajectory_event_clock_macro_predictions_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
+    )
     trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
     trajectory_member_ensemble_uncertainty_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.pdf"
@@ -5541,6 +5596,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_raw_curve_persistence_exchange_protocol_pdf(raw_curve_persistence_exchange_protocol_pdf)
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
     write_trajectory_cage_jump_events_pdf(trajectory_cage_jump_events_pdf)
+    write_trajectory_event_clock_macro_predictions_pdf(trajectory_event_clock_macro_predictions_pdf)
     write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
     write_trajectory_member_ensemble_uncertainty_pdf(trajectory_member_ensemble_uncertainty_pdf)
     write_trajectory_inversion_readiness_pdf(trajectory_inversion_readiness_pdf)
@@ -5753,6 +5809,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         )
         archive.write(trajectory_observable_protocol_pdf, "figures/renewal_cage_trajectory_observable_protocol.pdf")
         archive.write(trajectory_cage_jump_events_pdf, "figures/renewal_cage_trajectory_cage_jump_events.pdf")
+        archive.write(
+            trajectory_event_clock_macro_predictions_pdf,
+            "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
+        )
         archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
         archive.write(
             trajectory_member_ensemble_uncertainty_pdf,

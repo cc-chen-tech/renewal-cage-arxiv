@@ -1649,6 +1649,30 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(float(ready["exchange_interval_count"]), 0.0)
         self.assertEqual(ready["primary_blocker"], "none")
 
+    def test_trajectory_event_clock_macro_predictions_score_direct_micro_closure(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_event_clock_macro_predictions.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["protocol_id"]: row for row in rows}
+        ready = by_id["synthetic_event_clock_macro_prediction"]
+        self.assertEqual(ready["prediction_stage"], "event_clock_micro_to_macro_prediction_ready")
+        self.assertEqual(float(ready["micro_to_macro_prediction_ready"]), 1.0)
+        self.assertEqual(float(ready["micro_to_macro_predictions_pass"]), 1.0)
+        self.assertEqual(float(ready["calibrated_from_event_clock_only"]), 1.0)
+        self.assertEqual(float(ready["fit_parameters_from_macro_observables"]), 0.0)
+        self.assertLess(float(ready["diffusion_z"]), 1.0)
+        self.assertLess(float(ready["max_tau_alpha_z"]), 1.0)
+        self.assertLess(float(ready["late_ngp_z"]), 1.0)
+        self.assertLess(float(ready["chi4_peak_z"]), 1.0)
+        self.assertEqual(float(ready["thermodynamic_claim_allowed"]), 0.0)
+
+        mismatch = by_id["synthetic_event_clock_macro_late_ngp_mismatch"]
+        self.assertEqual(mismatch["prediction_stage"], "event_clock_micro_to_macro_prediction_failed")
+        self.assertEqual(float(mismatch["micro_to_macro_predictions_pass"]), 0.0)
+        self.assertEqual(mismatch["primary_blocker"], "heldout_macro_signature_mismatch")
+
     def test_trajectory_adapter_demo_exports_observables_from_local_table(self):
         path = ROOT / "data" / "renewal_cage_trajectory_adapter_demo.csv"
         self.assertTrue(path.exists())
@@ -1948,6 +1972,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_cage_jump_events.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_inversion_readiness.pdf", names)
@@ -2112,6 +2137,8 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
+            "figures/renewal_cage_trajectory_cage_jump_events.pdf",
+            "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
             "figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf",
             "figures/renewal_cage_trajectory_inversion_readiness.pdf",
@@ -2306,6 +2333,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_trajectory_cage_jump_events = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_cage_jump_events.pdf"
+            ).read_bytes()
+            first_trajectory_event_clock_macro_predictions = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
             ).read_bytes()
             first_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
@@ -2511,6 +2541,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_trajectory_cage_jump_events = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_cage_jump_events.pdf"
             ).read_bytes()
+            second_trajectory_event_clock_macro_predictions = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
+            ).read_bytes()
             second_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
             ).read_bytes()
@@ -2648,6 +2681,10 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(first_trajectory_observable_protocol, second_trajectory_observable_protocol)
         self.assertEqual(first_trajectory_cage_jump_events, second_trajectory_cage_jump_events)
+        self.assertEqual(
+            first_trajectory_event_clock_macro_predictions,
+            second_trajectory_event_clock_macro_predictions,
+        )
         self.assertEqual(first_trajectory_uncertainty_protocol, second_trajectory_uncertainty_protocol)
         self.assertEqual(
             first_trajectory_member_ensemble_uncertainty,

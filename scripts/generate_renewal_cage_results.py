@@ -158,6 +158,7 @@ from renewal_cage import (  # noqa: E402
     temperature_scan,
     trajectory_adapter_contract,
     trajectory_cage_jump_event_protocol,
+    trajectory_event_clock_macro_prediction_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_observable_curve_bridge,
@@ -4662,6 +4663,71 @@ def write_trajectory_cage_jump_events_csv(path: Path) -> list[dict[str, float | 
         }
     )
     rows = [row]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_trajectory_event_clock_macro_predictions_csv(
+    path: Path,
+    event_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Score direct macro predictions from particle-resolved event clocks."""
+
+    event_row = event_rows[0]
+    params = PersistenceExchangeParams(
+        cage_variance=0.5,
+        cage_tau=0.2,
+        jump_variance=float(event_row["mean_squared_jump_length"]) / float(event_row["dimension"]),
+        persistence_mean=float(event_row["persistence_mean"]),
+        exchange_mean=float(event_row["exchange_mean"]),
+    )
+    wave_numbers = [0.8, 1.1]
+    late_time = 12.0
+    time_grid = np.geomspace(0.05, 30.0, 800)
+    observed_tau_alpha_by_k = {
+        wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+        for wave_number in wave_numbers
+    }
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    observed_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(0.8, time_grid, params))
+    )
+    common_kwargs = {
+        "event_row": event_row,
+        "anchor_wave_number": 0.8,
+        "wave_numbers": wave_numbers,
+        "observed_diffusion_coefficient": persistence_exchange_diffusion_coefficient(params),
+        "diffusion_relative_error": 0.05,
+        "observed_tau_alpha_by_k": observed_tau_alpha_by_k,
+        "tau_alpha_relative_error_by_k": {0.8: 0.05, 1.1: 0.05},
+        "late_time": late_time,
+        "late_ngp_relative_error": 0.10,
+        "observed_chi4_peak": observed_chi4_peak,
+        "chi4_peak_relative_error": 0.10,
+        "time_grid": time_grid,
+        "cage_variance": 0.5,
+        "cage_tau": 0.2,
+    }
+    ready = trajectory_event_clock_macro_prediction_protocol(
+        protocol_id="synthetic_event_clock_macro_prediction",
+        observed_late_ngp=observed_late_ngp,
+        **common_kwargs,
+    )
+    mismatch = trajectory_event_clock_macro_prediction_protocol(
+        protocol_id="synthetic_event_clock_macro_late_ngp_mismatch",
+        observed_late_ngp=3.0 * observed_late_ngp,
+        **common_kwargs,
+    )
+    for row in [ready, mismatch]:
+        row.update(
+            {
+                "benchmark_id": "synthetic_particle_cage_jump_events",
+                "target_protocol": "event_clock_to_macro_signature_prediction",
+                "real_benchmark_closed_loop_ready": 0.0,
+                "scope_note": "synthetic_direct_prediction_canary_not_glassbench_claim",
+            }
+        )
+    rows = [ready, mismatch]
     write_sweep_csv(path, rows)
     return rows
 
@@ -9331,6 +9397,57 @@ def write_trajectory_cage_jump_events_svg(
     path.write_text(svg)
 
 
+def write_trajectory_event_clock_macro_predictions_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1060, 480
+    left, top = 85, 102
+    metrics = [
+        ("D", "diffusion_z", "#2b6cb0"),
+        ("tau_alpha", "max_tau_alpha_z", "#2f855a"),
+        ("late NGP", "late_ngp_z", "#c05621"),
+        ("chi4 peak", "chi4_peak_z", "#805ad5"),
+    ]
+    max_z = max(max(float(row[key]) for _, key, _ in metrics) for row in rows)
+    max_z = max(max_z, 2.0)
+    marks = []
+    for row_idx, row in enumerate(rows):
+        y0 = top + row_idx * 145
+        marks.append(
+            f'<text x="{left}" y="{y0 - 20}" font-family="Arial, sans-serif" font-size="13" font-weight="700">{row["protocol_id"]}</text>'
+        )
+        for metric_idx, (label, key, color) in enumerate(metrics):
+            value = float(row[key])
+            x0 = left + metric_idx * 225
+            bar_h = 72 * min(value / max_z, 1.0)
+            y_bar = y0 + 78 - bar_h
+            marks.append(
+                f'<rect x="{x0}" y="{y_bar:.1f}" width="58" height="{bar_h:.1f}" fill="{color}" opacity="0.88" />'
+            )
+            marks.append(
+                f'<text x="{x0}" y="{y0 + 98}" font-family="Arial, sans-serif" font-size="12">{label}</text>'
+            )
+            marks.append(
+                f'<text x="{x0}" y="{y_bar - 6:.1f}" font-family="Arial, sans-serif" font-size="11">{value:.2g}</text>'
+            )
+        marks.append(
+            f'<text x="{left}" y="{y0 + 124}" font-family="Arial, sans-serif" font-size="11">stage: {row["prediction_stage"]}; blocker: {row["primary_blocker"]}</text>'
+        )
+    threshold_y = top + 78 - 72 * 2.0 / max_z
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="85" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Event-clock micro-to-macro prediction</text>
+  <text x="85" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Particle jump clocks predict D, multi-k alpha, late NGP, and chi4 without fitting macro observables.</text>
+  <line x1="{left}" y1="{threshold_y:.1f}" x2="{left + 840}" y2="{threshold_y:.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{left + 850}" y="{threshold_y + 4:.1f}" font-family="Arial, sans-serif" font-size="11" fill="#718096">z=2</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_trajectory_uncertainty_protocol_svg(
     path: Path,
     rows: list[dict[str, float | str]],
@@ -10736,6 +10853,14 @@ def main() -> None:
     write_trajectory_cage_jump_events_svg(
         FIGURE_DIR / "renewal_cage_trajectory_cage_jump_events.svg",
         trajectory_cage_jump_event_rows,
+    )
+    trajectory_event_clock_macro_prediction_rows = write_trajectory_event_clock_macro_predictions_csv(
+        DATA_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.csv",
+        trajectory_cage_jump_event_rows,
+    )
+    write_trajectory_event_clock_macro_predictions_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.svg",
+        trajectory_event_clock_macro_prediction_rows,
     )
     write_trajectory_adapter_demo_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_demo.csv"

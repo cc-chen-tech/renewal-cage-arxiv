@@ -8624,6 +8624,7 @@ def trajectory_cage_jump_event_protocol(
     last_jump_time = float(np.max(jump_times)) if total_jump_event_count else math.nan
     mean_jump_length = float(np.mean(jump_lengths)) if total_jump_event_count else math.nan
     jump_length_variance = float(np.var(jump_lengths)) if total_jump_event_count else math.nan
+    mean_squared_jump_length = float(np.mean(jump_lengths * jump_lengths)) if total_jump_event_count else math.nan
     persistence_mean = float(np.mean(persistence_intervals)) if persistence_intervals else math.nan
     exchange_mean = float(np.mean(exchange_intervals)) if exchange_intervals else math.nan
 
@@ -8641,6 +8642,7 @@ def trajectory_cage_jump_event_protocol(
         "last_jump_time_max": last_jump_time,
         "mean_jump_length": mean_jump_length,
         "jump_length_variance": jump_length_variance,
+        "mean_squared_jump_length": mean_squared_jump_length,
         "persistence_mean": persistence_mean,
         "exchange_mean": exchange_mean,
         "particle_resolved_jump_events_ready": float(particle_ready),
@@ -8798,6 +8800,195 @@ def _parse_wave_number_value_map(value: object, *, name: str) -> dict[float, flo
             raise ValueError(f"{name} wave numbers must be positive")
         out[wave_number] = float(value_text)
     return out
+
+
+def trajectory_event_clock_macro_prediction_protocol(
+    *,
+    protocol_id: str,
+    event_row: dict[str, object],
+    anchor_wave_number: float,
+    wave_numbers: Sequence[float],
+    observed_diffusion_coefficient: float,
+    diffusion_relative_error: float,
+    observed_tau_alpha_by_k: dict[float, float],
+    tau_alpha_relative_error_by_k: dict[float, float],
+    late_time: float,
+    observed_late_ngp: float,
+    late_ngp_relative_error: float,
+    observed_chi4_peak: float,
+    chi4_peak_relative_error: float,
+    time_grid: np.ndarray,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    z_threshold: float = 2.0,
+) -> dict[str, float | str]:
+    """Predict macro dynamical signatures directly from a trajectory event clock."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    event_ready = float(event_row.get("persistence_exchange_event_clock_ready", 0.0)) == 1.0
+    if not event_ready:
+        return {
+            "protocol_id": protocol_id,
+            "source_event_protocol_id": str(event_row.get("protocol_id", "unknown")),
+            "micro_to_macro_prediction_ready": 0.0,
+            "micro_to_macro_predictions_pass": 0.0,
+            "calibrated_from_event_clock_only": 0.0,
+            "fit_parameters_from_macro_observables": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": str(event_row.get("primary_blocker", "persistence_exchange_event_clock_ready")),
+            "prediction_stage": "event_clock_incomplete",
+        }
+
+    required_event_fields = [
+        "persistence_mean",
+        "exchange_mean",
+        "mean_squared_jump_length",
+        "dimension",
+    ]
+    missing_event_fields = [field for field in required_event_fields if field not in event_row]
+    if missing_event_fields:
+        return {
+            "protocol_id": protocol_id,
+            "source_event_protocol_id": str(event_row.get("protocol_id", "unknown")),
+            "micro_to_macro_prediction_ready": 0.0,
+            "micro_to_macro_predictions_pass": 0.0,
+            "calibrated_from_event_clock_only": 0.0,
+            "fit_parameters_from_macro_observables": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": missing_event_fields[0],
+            "prediction_stage": "event_clock_missing_jump_statistics",
+        }
+
+    if anchor_wave_number <= 0.0:
+        raise ValueError("anchor_wave_number must be positive")
+    if not wave_numbers:
+        raise ValueError("wave_numbers must be nonempty")
+    if observed_diffusion_coefficient <= 0.0 or late_time <= 0.0:
+        raise ValueError("observed_diffusion_coefficient and late_time must be positive")
+    if observed_late_ngp <= 0.0 or observed_chi4_peak <= 0.0:
+        raise ValueError("observed_late_ngp and observed_chi4_peak must be positive")
+    if cage_variance <= 0.0 or cage_tau <= 0.0:
+        raise ValueError("cage parameters must be positive")
+    if z_threshold <= 0.0:
+        raise ValueError("z_threshold must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must be between zero and one")
+
+    unique_wave_numbers = list(dict.fromkeys(float(wave_number) for wave_number in wave_numbers))
+    if anchor_wave_number not in unique_wave_numbers:
+        unique_wave_numbers.insert(0, float(anchor_wave_number))
+    for wave_number in unique_wave_numbers:
+        if wave_number <= 0.0:
+            raise ValueError("wave_numbers must be positive")
+        if wave_number not in observed_tau_alpha_by_k:
+            raise ValueError("observed_tau_alpha_by_k must include every wave number")
+        if wave_number not in tau_alpha_relative_error_by_k:
+            raise ValueError("tau_alpha_relative_error_by_k must include every wave number")
+        if observed_tau_alpha_by_k[wave_number] <= 0.0:
+            raise ValueError("observed tau_alpha values must be positive")
+
+    persistence_mean = float(event_row["persistence_mean"])
+    exchange_mean = float(event_row["exchange_mean"])
+    dimension = float(event_row["dimension"])
+    mean_squared_jump_length = float(event_row["mean_squared_jump_length"])
+    if persistence_mean <= 0.0 or exchange_mean <= 0.0 or dimension <= 0.0 or mean_squared_jump_length <= 0.0:
+        raise ValueError("event-clock means, dimension, and jump second moment must be positive")
+    jump_variance = mean_squared_jump_length / dimension
+
+    time_grid = np.asarray(time_grid, dtype=float)
+    if time_grid.ndim != 1 or time_grid.size == 0 or np.any(time_grid <= 0.0):
+        raise ValueError("time_grid must be a positive one-dimensional array")
+
+    params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=persistence_mean,
+        exchange_mean=exchange_mean,
+    )
+    predicted_diffusion = persistence_exchange_diffusion_coefficient(params)
+    predicted_tau_by_k = {
+        wave_number: persistence_exchange_alpha_relaxation_time(
+            wave_number,
+            params,
+            threshold=threshold,
+        )
+        for wave_number in unique_wave_numbers
+    }
+    predicted_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    predicted_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(anchor_wave_number, time_grid, params))
+    )
+
+    diffusion_z = abs(math.log(observed_diffusion_coefficient / predicted_diffusion)) / _log_sigma_from_relative_error(
+        diffusion_relative_error,
+        "diffusion_relative_error",
+    )
+    max_tau_z = 0.0
+    for wave_number in unique_wave_numbers:
+        sigma = _log_sigma_from_relative_error(
+            tau_alpha_relative_error_by_k[wave_number],
+            "tau_alpha_relative_error_by_k",
+        )
+        residual = math.log(observed_tau_alpha_by_k[wave_number] / predicted_tau_by_k[wave_number])
+        max_tau_z = max(max_tau_z, abs(residual) / sigma)
+    late_ngp_z = abs(math.log(observed_late_ngp / predicted_late_ngp)) / _log_sigma_from_relative_error(
+        late_ngp_relative_error,
+        "late_ngp_relative_error",
+    )
+    chi4_z = abs(math.log(observed_chi4_peak / predicted_chi4_peak)) / _log_sigma_from_relative_error(
+        chi4_peak_relative_error,
+        "chi4_peak_relative_error",
+    )
+    diffusion_pass = diffusion_z <= z_threshold
+    tau_pass = max_tau_z <= z_threshold
+    late_ngp_pass = late_ngp_z <= z_threshold
+    chi4_pass = chi4_z <= z_threshold
+    predictions_pass = diffusion_pass and tau_pass and late_ngp_pass and chi4_pass
+
+    return {
+        "protocol_id": protocol_id,
+        "source_event_protocol_id": str(event_row.get("protocol_id", "unknown")),
+        "wave_numbers": ";".join(f"{wave_number:g}" for wave_number in unique_wave_numbers),
+        "anchor_wave_number": float(anchor_wave_number),
+        "jump_variance_from_event_clock": float(jump_variance),
+        "persistence_mean": persistence_mean,
+        "exchange_mean": exchange_mean,
+        "persistence_exchange_ratio": persistence_mean / exchange_mean,
+        "observed_diffusion_coefficient": float(observed_diffusion_coefficient),
+        "predicted_diffusion_coefficient": float(predicted_diffusion),
+        "diffusion_z": float(diffusion_z),
+        "observed_tau_alpha_by_k": ";".join(
+            f"{wave_number:g}:{observed_tau_alpha_by_k[wave_number]:.12g}" for wave_number in unique_wave_numbers
+        ),
+        "predicted_tau_alpha_by_k": ";".join(
+            f"{wave_number:g}:{predicted_tau_by_k[wave_number]:.12g}" for wave_number in unique_wave_numbers
+        ),
+        "max_tau_alpha_z": float(max_tau_z),
+        "late_time": float(late_time),
+        "observed_late_ngp": float(observed_late_ngp),
+        "predicted_late_ngp": float(predicted_late_ngp),
+        "late_ngp_z": float(late_ngp_z),
+        "observed_chi4_peak": float(observed_chi4_peak),
+        "predicted_chi4_peak": float(predicted_chi4_peak),
+        "chi4_peak_z": float(chi4_z),
+        "z_threshold": float(z_threshold),
+        "diffusion_prediction_pass": float(diffusion_pass),
+        "tau_alpha_prediction_pass": float(tau_pass),
+        "late_ngp_prediction_pass": float(late_ngp_pass),
+        "chi4_peak_prediction_pass": float(chi4_pass),
+        "micro_to_macro_prediction_ready": 1.0,
+        "micro_to_macro_predictions_pass": float(predictions_pass),
+        "calibrated_from_event_clock_only": 1.0,
+        "fit_parameters_from_macro_observables": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+        "primary_blocker": "none" if predictions_pass else "heldout_macro_signature_mismatch",
+        "prediction_stage": "event_clock_micro_to_macro_prediction_ready"
+        if predictions_pass
+        else "event_clock_micro_to_macro_prediction_failed",
+    }
 
 
 def trajectory_curve_persistence_exchange_gate(

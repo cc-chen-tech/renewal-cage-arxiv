@@ -175,6 +175,7 @@ from renewal_cage import (  # noqa: E402
     benchmark_publication_ladder,
     trajectory_inversion_readiness_gate,
     trajectory_cage_jump_event_protocol,
+    trajectory_event_clock_macro_prediction_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_table_csv_adapter,
@@ -5639,7 +5640,65 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["exchange_interval_count"]), 1.0)
         self.assertAlmostEqual(float(row["persistence_mean"]), 3.0)
         self.assertAlmostEqual(float(row["exchange_mean"]), 2.0)
+        self.assertAlmostEqual(float(row["mean_squared_jump_length"]), 1.5075)
         self.assertGreater(float(row["jump_length_variance"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_trajectory_event_clock_macro_prediction_scores_heldout_signatures(self):
+        event_row = {
+            "protocol_id": "synthetic_particle_cage_jump_events",
+            "persistence_exchange_event_clock_ready": 1.0,
+            "persistence_mean": 3.0,
+            "exchange_mean": 2.0,
+            "mean_squared_jump_length": 1.5075,
+            "dimension": 1.0,
+        }
+        params = PersistenceExchangeParams(
+            cage_variance=0.5,
+            cage_tau=0.2,
+            jump_variance=1.5075,
+            persistence_mean=3.0,
+            exchange_mean=2.0,
+        )
+        wave_numbers = [0.8, 1.1]
+        late_time = 12.0
+        time_grid = np.geomspace(0.05, 30.0, 800)
+        observed_tau_alpha_by_k = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+        observed_chi4_peak = float(np.max(persistence_exchange_scattering_susceptibility(0.8, time_grid, params)))
+
+        row = trajectory_event_clock_macro_prediction_protocol(
+            protocol_id="synthetic_event_clock_macro_prediction",
+            event_row=event_row,
+            anchor_wave_number=0.8,
+            wave_numbers=wave_numbers,
+            observed_diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            diffusion_relative_error=0.05,
+            observed_tau_alpha_by_k=observed_tau_alpha_by_k,
+            tau_alpha_relative_error_by_k={0.8: 0.05, 1.1: 0.05},
+            late_time=late_time,
+            observed_late_ngp=observed_late_ngp,
+            late_ngp_relative_error=0.10,
+            observed_chi4_peak=observed_chi4_peak,
+            chi4_peak_relative_error=0.10,
+            time_grid=time_grid,
+            cage_variance=0.5,
+            cage_tau=0.2,
+        )
+
+        self.assertEqual(row["prediction_stage"], "event_clock_micro_to_macro_prediction_ready")
+        self.assertEqual(float(row["micro_to_macro_prediction_ready"]), 1.0)
+        self.assertEqual(float(row["micro_to_macro_predictions_pass"]), 1.0)
+        self.assertEqual(float(row["calibrated_from_event_clock_only"]), 1.0)
+        self.assertEqual(float(row["fit_parameters_from_macro_observables"]), 0.0)
+        self.assertLess(float(row["diffusion_z"]), 1.0)
+        self.assertLess(float(row["max_tau_alpha_z"]), 1.0)
+        self.assertLess(float(row["late_ngp_z"]), 1.0)
+        self.assertLess(float(row["chi4_peak_z"]), 1.0)
         self.assertEqual(row["primary_blocker"], "none")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
