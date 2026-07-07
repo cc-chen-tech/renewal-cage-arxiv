@@ -1191,16 +1191,20 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(
             ka2d_023["cached_anchor_stage"],
-            "cached_anchor_measurement_refines_required_k",
+            "cached_direct_anchor_root_refines_required_k",
         )
         self.assertAlmostEqual(float(ka2d_023["candidate_anchor_wave_number"]), 2.696613405006454)
         self.assertAlmostEqual(float(ka2d_023["cached_fs_at_candidate_anchor"]), 0.5283262805867766)
         self.assertGreater(float(ka2d_023["cached_fs_at_candidate_anchor"]), math.exp(-1.0))
         self.assertEqual(float(ka2d_023["candidate_anchor_threshold_crossed"]), 0.0)
-        self.assertAlmostEqual(float(ka2d_023["cached_structure_threshold_wave_number"]), 3.009201552318917)
+        self.assertAlmostEqual(float(ka2d_023["cached_structure_threshold_wave_number"]), 3.009201552318913)
         self.assertGreater(float(ka2d_023["cached_structure_threshold_over_candidate"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_023["cached_direct_threshold_wave_number"]), 4.7984485103142)
+        self.assertAlmostEqual(float(ka2d_023["cached_direct_fs_at_threshold_wave_number"]), math.exp(-1.0))
+        self.assertGreater(float(ka2d_023["cached_direct_threshold_over_candidate"]), 1.7)
+        self.assertEqual(float(ka2d_023["cached_direct_root_bracketed"]), 1.0)
         self.assertEqual(float(ka2d_023["cached_alpha_anchor_rescue_ready"]), 0.0)
-        self.assertEqual(ka2d_023["primary_blocker"], "cached_structure_anchor_wave_number_higher_than_protocol")
+        self.assertEqual(ka2d_023["primary_blocker"], "cached_direct_anchor_wave_number_higher_than_protocol")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
         ka2d_030 = next(row for row in rows if row["system_id"] == "KA2D" and row["temperature"] == "0.30")

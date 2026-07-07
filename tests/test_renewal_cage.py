@@ -480,6 +480,9 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 "cached_fs_at_candidate_anchor": 0.52,
                 "latest_wave_numbers": "0.7;1.1;1.6",
                 "latest_cached_fs_by_k": "0.90;0.80;0.69",
+                "direct_threshold_wave_number": 4.8,
+                "direct_fs_at_threshold_wave_number": math.exp(-1.0),
+                "direct_root_bracketed": 1.0,
             }
         ]
 
@@ -489,15 +492,18 @@ class DelayedRenewalCageTests(unittest.TestCase):
             cached_anchor_rows=cached_anchor_rows,
         )[0]
 
-        self.assertEqual(row["cached_anchor_stage"], "cached_anchor_measurement_refines_required_k")
+        self.assertEqual(row["cached_anchor_stage"], "cached_direct_anchor_root_refines_required_k")
         self.assertEqual(float(row["candidate_anchor_wave_number"]), 2.7)
         self.assertGreater(float(row["cached_fs_at_candidate_anchor"]), math.exp(-1.0))
         self.assertEqual(float(row["candidate_anchor_threshold_crossed"]), 0.0)
         self.assertGreater(float(row["cached_structure_threshold_wave_number"]), 2.7)
         self.assertGreater(float(row["cached_structure_threshold_over_candidate"]), 1.0)
+        self.assertAlmostEqual(float(row["cached_direct_threshold_wave_number"]), 4.8)
+        self.assertGreater(float(row["cached_direct_threshold_over_candidate"]), 1.5)
+        self.assertEqual(float(row["cached_direct_root_bracketed"]), 1.0)
         self.assertEqual(float(row["cached_alpha_anchor_rescue_ready"]), 0.0)
         self.assertEqual(float(row["post_rescue_real_closed_loop_ready"]), 0.0)
-        self.assertEqual(row["primary_blocker"], "cached_structure_anchor_wave_number_higher_than_protocol")
+        self.assertEqual(row["primary_blocker"], "cached_direct_anchor_wave_number_higher_than_protocol")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

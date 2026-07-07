@@ -309,10 +309,11 @@ held-out macro observables remain separate requirements before a real
 persistence/exchange closed-loop claim.
 The cached alpha-anchor `F_s` audit then tests that proposed wave number
 directly on the structure-151 cached displacement ladder. At the latest lag,
-`F_s(k=2.6966,t)` is `0.528`, still above `e^-1`; fitting the same cached
-latest-lag `F_s(k)` grid gives a structure-specific threshold estimate
-`k*=3.01`. This refines the next measurement target without promoting the
-result to an event-clock or thermodynamic claim.
+`F_s(k=2.6966,t)` is `0.528`, still above `e^-1`. Fitting the same cached
+latest-lag `F_s(k)` grid gives a structure-specific estimate `k*=3.01`, but a
+direct bisection solve on the cached displacement tensor gives the stricter
+root `k_root=4.80`. This refines the next measurement target without promoting
+the result to an event-clock or thermodynamic claim.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve

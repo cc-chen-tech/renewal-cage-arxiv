@@ -6080,6 +6080,10 @@ def glassbench_alpha_anchor_cached_fs_audit(
         fs_by_k = parse_float_list(latest.get("latest_cached_fs_by_k", "none"))
         cached_threshold_k = estimate_threshold_wave_number(wave_numbers, fs_by_k)
         threshold_over_candidate = cached_threshold_k / candidate_k if candidate_k > 0.0 else 0.0
+        direct_threshold_k = float(latest.get("direct_threshold_wave_number", 0.0) or 0.0)
+        direct_fs_at_threshold = float(latest.get("direct_fs_at_threshold_wave_number", 0.0) or 0.0)
+        direct_root_bracketed = float(latest.get("direct_root_bracketed", 0.0) or 0.0) == 1.0
+        direct_threshold_over_candidate = direct_threshold_k / candidate_k if candidate_k > 0.0 else 0.0
         candidate_crossed = cached_fs > 0.0 and cached_fs <= threshold
         cached_rescue_ready = design_ready and candidate_crossed
 
@@ -6091,6 +6095,10 @@ def glassbench_alpha_anchor_cached_fs_audit(
             stage = "cached_anchor_measurement_closes_alpha_gap_event_clock_blocked"
             blocker = "real_event_clock"
             next_action = "extract_event_clock_and_heldout_macro_observables"
+        elif design_ready and measured and direct_root_bracketed and direct_threshold_k > candidate_k:
+            stage = "cached_direct_anchor_root_refines_required_k"
+            blocker = "cached_direct_anchor_wave_number_higher_than_protocol"
+            next_action = "recompute_cached_fs_at_direct_alpha_anchor_wave_number"
         elif design_ready and measured:
             stage = "cached_anchor_measurement_refines_required_k"
             blocker = "cached_structure_anchor_wave_number_higher_than_protocol"
@@ -6120,6 +6128,10 @@ def glassbench_alpha_anchor_cached_fs_audit(
                 "latest_cached_fs_by_k": ";".join(f"{value:.17g}" for value in fs_by_k) if fs_by_k else "none",
                 "cached_structure_threshold_wave_number": float(cached_threshold_k),
                 "cached_structure_threshold_over_candidate": float(threshold_over_candidate),
+                "cached_direct_threshold_wave_number": float(direct_threshold_k),
+                "cached_direct_fs_at_threshold_wave_number": float(direct_fs_at_threshold),
+                "cached_direct_threshold_over_candidate": float(direct_threshold_over_candidate),
+                "cached_direct_root_bracketed": float(direct_root_bracketed),
                 "alpha_anchor_rescue_design_ready": float(design_ready),
                 "cached_alpha_anchor_rescue_ready": float(cached_rescue_ready),
                 "post_rescue_real_closed_loop_ready": float(post_rescue_closed_loop_ready and cached_rescue_ready),

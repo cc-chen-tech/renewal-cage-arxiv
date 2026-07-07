@@ -3690,14 +3690,14 @@ def write_sota_glassbench_alpha_anchor_cached_fs_pdf(path: Path) -> None:
         c.drawString(
             left + 390,
             y - 14,
-            "cached k*={:.3g}; k*/candidate={:.3g}; crossed={}; blocker={}".format(
+            "log-grid k*={:.3g}; direct k_root={:.3g}; direct/candidate={:.3g}; crossed={}".format(
                 float(row["cached_structure_threshold_wave_number"]),
-                float(row["cached_structure_threshold_over_candidate"]),
+                float(row["cached_direct_threshold_wave_number"]),
+                float(row["cached_direct_threshold_over_candidate"]),
                 int(float(row["candidate_anchor_threshold_crossed"])),
-                row["primary_blocker"],
             ),
         )
-        c.drawString(left + 390, y - 27, f'next={row["next_required_action"][:74]}')
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
     c.setFont("Helvetica", 8)
     c.drawString(
         42,

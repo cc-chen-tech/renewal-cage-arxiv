@@ -4011,13 +4011,43 @@ def write_sota_glassbench_alpha_anchor_cached_fs_csv(
                 reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
             dx = reference_displacements[:, :, 0]
             dy = reference_displacements[:, :, 1]
+            def fs_at_wave_number(wave_number: float) -> float:
+                return float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy))))
+
             cached_fs_at_candidate = float(
-                0.5 * (np.mean(np.cos(candidate_k * dx)) + np.mean(np.cos(candidate_k * dy)))
+                fs_at_wave_number(candidate_k)
             )
             fs_by_k = [
-                float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy))))
+                fs_at_wave_number(wave_number)
                 for wave_number in wave_numbers
             ]
+            threshold = math.exp(-1.0)
+            direct_threshold_k = 0.0
+            direct_fs_at_threshold = 0.0
+            direct_root_bracketed = 0.0
+            if candidate_k > 0.0 and cached_fs_at_candidate > threshold:
+                low = candidate_k
+                high = max(candidate_k * 1.25, candidate_k + 0.25)
+                high_fs = fs_at_wave_number(high)
+                while high_fs > threshold and high < 50.0:
+                    low = high
+                    high *= 1.25
+                    high_fs = fs_at_wave_number(high)
+                if high_fs <= threshold:
+                    for _ in range(80):
+                        mid = 0.5 * (low + high)
+                        mid_fs = fs_at_wave_number(mid)
+                        if mid_fs > threshold:
+                            low = mid
+                        else:
+                            high = mid
+                    direct_threshold_k = float(high)
+                    direct_fs_at_threshold = fs_at_wave_number(direct_threshold_k)
+                    direct_root_bracketed = 1.0
+            elif candidate_k > 0.0 and cached_fs_at_candidate <= threshold:
+                direct_threshold_k = candidate_k
+                direct_fs_at_threshold = cached_fs_at_candidate
+                direct_root_bracketed = 1.0
             cached_anchor_rows.append(
                 {
                     "system_id": row["system_id"],
@@ -4029,6 +4059,9 @@ def write_sota_glassbench_alpha_anchor_cached_fs_csv(
                     "cached_fs_at_candidate_anchor": cached_fs_at_candidate,
                     "latest_wave_numbers": ";".join(f"{value:.17g}" for value in wave_numbers),
                     "latest_cached_fs_by_k": ";".join(f"{value:.17g}" for value in fs_by_k),
+                    "direct_threshold_wave_number": float(direct_threshold_k),
+                    "direct_fs_at_threshold_wave_number": float(direct_fs_at_threshold),
+                    "direct_root_bracketed": float(direct_root_bracketed),
                 }
             )
     rows = glassbench_alpha_anchor_cached_fs_audit(
@@ -8490,7 +8523,9 @@ def write_sota_glassbench_alpha_anchor_cached_fs_svg(
         candidate_k = float(row["candidate_anchor_wave_number"])
         cached_fs = float(row["cached_fs_at_candidate_anchor"])
         cached_k = float(row["cached_structure_threshold_wave_number"])
+        direct_k = float(row["cached_direct_threshold_wave_number"])
         ratio = float(row["cached_structure_threshold_over_candidate"])
+        direct_ratio = float(row["cached_direct_threshold_over_candidate"])
         marks.append(
             f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
         )
@@ -8504,10 +8539,10 @@ def write_sota_glassbench_alpha_anchor_cached_fs_svg(
             f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; lag={float(row["lag_time"]):.3g}; candidate k={candidate_k:.3g}; cached Fs={cached_fs:.3g}</text>'
         )
         marks.append(
-            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">cached k*={cached_k:.3g}; cached k*/candidate={ratio:.3g}; crossed={int(float(row["candidate_anchor_threshold_crossed"]))}; blocker={row["primary_blocker"]}</text>'
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">log-grid k*={cached_k:.3g}; direct k_root={direct_k:.3g}; direct/candidate={direct_ratio:.3g}; crossed={int(float(row["candidate_anchor_threshold_crossed"]))}</text>'
         )
         marks.append(
-            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:86]}</text>'
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
         )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />
