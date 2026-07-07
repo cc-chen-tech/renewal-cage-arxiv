@@ -345,6 +345,12 @@ stretched-alpha candidate, but not a completed real alpha-shape claim: all
 three threshold crossings occur at the final cached lag `tc40`, so the remaining
 blocker is post-alpha window depth rather than mechanism selection or sparse
 nonmonotonicity.
+The held-out multi-k alpha prediction gate then makes this stricter: each of
+the three high-`k` curves is held out, the other two calibrate the KWW shape
+exponent, and the held-out curve is predicted without refitting that curve. The
+maximum held-out beta error is `0.00995`, and the maximum normalized shape RMSE
+is `0.226`. This moves the GlassBench alpha-shape evidence from consistency
+toward prediction, while preserving the same `tc40` edge-crossing blocker.
 The direct-alpha transport proxy then matches that same `tc40` crossing to the
 reproduced GlassBench displacement observable: `MSD=0.9747508406`, giving
 `D_eff=1.6246e-7` and `D_eff tau_alpha=0.24369` in 2D. This is a useful
@@ -559,6 +565,7 @@ figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_curve.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_transport.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg
@@ -690,6 +697,7 @@ data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
 data/renewal_cage_sota_glassbench_direct_alpha_curve.csv
 data/renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv
 data/renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv
+data/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv
 data/renewal_cage_sota_glassbench_direct_alpha_transport.csv
 data/renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv
 data/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv
@@ -842,6 +850,7 @@ paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf

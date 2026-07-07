@@ -6568,6 +6568,181 @@ def glassbench_direct_alpha_multik_shape_gate(
     return out
 
 
+def glassbench_direct_alpha_multik_heldout_prediction_gate(
+    *,
+    prediction_id: str,
+    multik_rows: Sequence[dict[str, object]],
+    min_calibration_k_count: int,
+    max_heldout_beta_abs_error: float,
+    max_heldout_shape_rmse: float,
+    min_decay: float = 0.30,
+    max_decay: float = 0.99,
+) -> list[dict[str, float | str]]:
+    """Leave one high-k alpha curve out and predict its normalized KWW shape."""
+
+    if not prediction_id:
+        raise ValueError("prediction_id must be nonempty")
+    if not multik_rows:
+        raise ValueError("multik_rows must be nonempty")
+    if min_calibration_k_count < 1:
+        raise ValueError("min_calibration_k_count must be positive")
+    if max_heldout_beta_abs_error < 0.0:
+        raise ValueError("max_heldout_beta_abs_error must be nonnegative")
+    if max_heldout_shape_rmse < 0.0:
+        raise ValueError("max_heldout_shape_rmse must be nonnegative")
+    if not (0.0 < min_decay < max_decay <= 1.0):
+        raise ValueError("decay bounds must satisfy 0 < min_decay < max_decay <= 1")
+
+    def parse_float_series(value: object) -> np.ndarray:
+        text = str(value or "")
+        if not text or text == "none":
+            return np.array([], dtype=float)
+        return np.array([float(part) for part in text.split(";") if part and part != "none"], dtype=float)
+
+    def parse_text_series(value: object) -> list[str]:
+        text = str(value or "")
+        if not text or text == "none":
+            return []
+        return [part for part in text.split(";") if part and part != "none"]
+
+    grouped: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in multik_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature, structure_id), group in sorted(grouped.items()):
+        eligible = [
+            row for row in sorted(group, key=lambda item: float(item.get("direct_alpha_wave_number", 0.0) or 0.0))
+            if float(row.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+            and float(row.get("uncertainty_columns_ready", 0.0) or 0.0) == 1.0
+            and float(row.get("monotone_compatible_with_uncertainty", 0.0) or 0.0) == 1.0
+        ]
+
+        heldout_errors: list[float] = []
+        heldout_shape_rmse: list[float] = []
+        heldout_k_values: list[float] = []
+        calibrated_betas: list[float] = []
+        per_holdout_points: list[int] = []
+        for holdout_index, heldout in enumerate(eligible):
+            calibration = [row for index, row in enumerate(eligible) if index != holdout_index]
+            if len(calibration) < min_calibration_k_count:
+                continue
+            beta_values = [float(row.get("kww_beta", 0.0) or 0.0) for row in calibration]
+            calibrated_beta = float(np.mean(beta_values)) if beta_values else 0.0
+            observed_beta = float(heldout.get("kww_beta", 0.0) or 0.0)
+            lag_times = parse_float_series(heldout.get("lag_times", "none"))
+            decay = parse_float_series(heldout.get("direct_alpha_fs_curve", "none"))
+            time_codes = parse_text_series(heldout.get("time_codes", "none"))
+            crossing_code = str(heldout.get("threshold_crossing_time_code", "none"))
+            if lag_times.size != decay.size or lag_times.size == 0:
+                continue
+            if crossing_code in time_codes:
+                tau_alpha = float(lag_times[time_codes.index(crossing_code)])
+            else:
+                crossing_index = next(
+                    (idx for idx, value in enumerate(decay) if value <= math.exp(-1.0) + 1e-12),
+                    None,
+                )
+                tau_alpha = float(lag_times[crossing_index]) if crossing_index is not None else 0.0
+            if tau_alpha <= 0.0 or calibrated_beta <= 0.0:
+                continue
+            mask = (lag_times > 0.0) & (decay >= min_decay) & (decay <= max_decay)
+            if not np.any(mask):
+                continue
+            observed_shape = -np.log(np.clip(decay[mask], 1e-12, 1.0))
+            predicted_shape = (lag_times[mask] / tau_alpha) ** calibrated_beta
+            shape_rmse = float(np.sqrt(np.mean((observed_shape - predicted_shape) ** 2)))
+            heldout_errors.append(abs(observed_beta - calibrated_beta))
+            heldout_shape_rmse.append(shape_rmse)
+            heldout_k_values.append(float(heldout.get("direct_alpha_wave_number", 0.0) or 0.0))
+            calibrated_betas.append(calibrated_beta)
+            per_holdout_points.append(int(np.count_nonzero(mask)))
+
+        heldout_count = len(heldout_errors)
+        max_beta_error = max(heldout_errors) if heldout_errors else 0.0
+        max_shape_error = max(heldout_shape_rmse) if heldout_shape_rmse else 0.0
+        all_edge = bool(eligible) and all(
+            float(row.get("threshold_crossing_is_last_lag", 0.0) or 0.0) == 1.0
+            for row in eligible
+        )
+        enough = heldout_count >= len(eligible) and heldout_count >= min_calibration_k_count + 1
+        errors_pass = (
+            enough
+            and max_beta_error <= max_heldout_beta_abs_error
+            and max_shape_error <= max_heldout_shape_rmse
+        )
+
+        if errors_pass and all_edge:
+            stage = "cached_multik_heldout_prediction_window_edge_blocked"
+            blocker = "post_alpha_window_depth"
+            next_action = "extend_cached_lag_window_beyond_alpha_crossing_for_heldout_prediction"
+            claim_ready = False
+            candidate_ready = True
+        elif errors_pass:
+            stage = "cached_multik_heldout_prediction_supported"
+            blocker = "none"
+            next_action = "predict_unfitted_macro_alpha_transport_signature"
+            claim_ready = True
+            candidate_ready = True
+        elif heldout_count:
+            stage = "cached_multik_heldout_prediction_mismatch"
+            blocker = "heldout_alpha_shape_residual"
+            next_action = "increase_multi_k_sampling_or_reject_shared_shape"
+            claim_ready = False
+            candidate_ready = False
+        else:
+            stage = "cached_multik_heldout_prediction_upstream_incomplete"
+            blocker = "heldout_curve_inputs"
+            next_action = "compute_per_k_alpha_curves_before_heldout_prediction"
+            claim_ready = False
+            candidate_ready = False
+
+        out.append(
+            {
+                "prediction_id": prediction_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "eligible_k_count": float(len(eligible)),
+                "heldout_count": float(heldout_count),
+                "heldout_k_values": ";".join(f"{value:.12g}" for value in heldout_k_values)
+                if heldout_k_values
+                else "none",
+                "calibrated_betas": ";".join(f"{value:.12g}" for value in calibrated_betas)
+                if calibrated_betas
+                else "none",
+                "heldout_beta_abs_errors": ";".join(f"{value:.12g}" for value in heldout_errors)
+                if heldout_errors
+                else "none",
+                "heldout_shape_rmse": ";".join(f"{value:.12g}" for value in heldout_shape_rmse)
+                if heldout_shape_rmse
+                else "none",
+                "heldout_shape_point_counts": ";".join(str(value) for value in per_holdout_points)
+                if per_holdout_points
+                else "none",
+                "min_calibration_k_count": float(min_calibration_k_count),
+                "max_heldout_beta_abs_error": float(max_beta_error),
+                "max_allowed_heldout_beta_abs_error": float(max_heldout_beta_abs_error),
+                "max_heldout_shape_rmse": float(max_shape_error),
+                "max_allowed_heldout_shape_rmse": float(max_heldout_shape_rmse),
+                "all_crossings_at_window_edge": float(all_edge),
+                "heldout_prediction_candidate_ready": float(candidate_ready),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "heldout_prediction_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_direct_alpha_transport_coupling_audit(
     *,
     audit_id: str,

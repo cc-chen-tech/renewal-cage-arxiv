@@ -4113,6 +4113,77 @@ def write_sota_glassbench_direct_alpha_multik_shape_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_direct_alpha_multik_heldout_prediction_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench held-out multi-k alpha prediction")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Each high-k alpha curve is held out and predicted from the other two before any real alpha-shape claim is promoted.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 58
+    colors_by_stage = {
+        "cached_multik_heldout_prediction_supported": colors.HexColor("#2f855a"),
+        "cached_multik_heldout_prediction_window_edge_blocked": colors.HexColor("#2563eb"),
+        "cached_multik_heldout_prediction_mismatch": colors.HexColor("#c05621"),
+        "cached_multik_heldout_prediction_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "held-out stage")
+    c.drawString(left + 390, top + 24, "prediction residuals")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["heldout_prediction_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; held-out k={}; held={:.0f}/{:.0f}".format(
+                row["structure_id"],
+                row["heldout_k_values"][:30],
+                float(row["heldout_count"]),
+                float(row["eligible_k_count"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "max beta error={:.3g}; max shape RMSE={:.3g}; edge crossings={}".format(
+                float(row["max_heldout_beta_abs_error"]),
+                float(row["max_heldout_shape_rmse"]),
+                int(float(row["all_crossings_at_window_edge"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Passing held-out residuals create a candidate, but tc40 edge crossings keep the real claim blocked.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_transport_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8062,6 +8133,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_multik_shape_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf"
     )
+    sota_glassbench_direct_alpha_multik_heldout_prediction_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf"
+    )
     sota_glassbench_direct_alpha_transport_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.pdf"
     )
@@ -8310,6 +8384,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_multik_shape_pdf(
         sota_glassbench_direct_alpha_multik_shape_pdf
+    )
+    write_sota_glassbench_direct_alpha_multik_heldout_prediction_pdf(
+        sota_glassbench_direct_alpha_multik_heldout_prediction_pdf
     )
     write_sota_glassbench_direct_alpha_transport_pdf(
         sota_glassbench_direct_alpha_transport_pdf
@@ -8609,6 +8686,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_multik_shape_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_multik_heldout_prediction_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_transport_pdf,

@@ -59,6 +59,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_multik_heldout_prediction_gate,
     glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_pe_feasibility_bound,
@@ -4190,12 +4191,10 @@ def write_sota_glassbench_direct_alpha_shape_selection_csv(
     return rows
 
 
-def write_sota_glassbench_direct_alpha_multik_shape_csv(
-    path: Path,
-    *,
+def compute_sota_glassbench_direct_alpha_multik_rows(
     root_rows: list[dict[str, float | str]],
 ) -> list[dict[str, float | str]]:
-    """Compute a high-k cached multi-k alpha-shape gate from particle tensors."""
+    """Compute per-k cached high-k alpha curves from particle tensors."""
 
     cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
     root_by_key = {
@@ -4245,7 +4244,7 @@ def write_sota_glassbench_direct_alpha_multik_shape_csv(
                 )
             decay = np.array(fs_values, dtype=float)
             sigma = np.array(sigma_values, dtype=float)
-            crossing_index = next((idx for idx, value in enumerate(fs_values) if value <= threshold), None)
+            crossing_index = next((idx for idx, value in enumerate(fs_values) if value <= threshold + 1e-12), None)
             crossed = crossing_index is not None
             fit = kww_alpha_fit(lag_times, decay, min_decay=0.30, max_decay=0.99) if crossed else {
                 "kww_beta": 0.0,
@@ -4271,6 +4270,7 @@ def write_sota_glassbench_direct_alpha_multik_shape_csv(
                     "sigma_direct_alpha_fs_curve": ";".join(f"{value:.12g}" for value in sigma_values),
                     "alpha_threshold_crossed": float(crossed),
                     "threshold_crossing_time_code": time_codes[crossing_index] if crossed else "none",
+                    "threshold_crossing_lag_time": float(lag_times[crossing_index]) if crossed else 0.0,
                     "threshold_crossing_is_last_lag": float(crossed and crossing_index == len(time_codes) - 1),
                     "kww_beta": float(fit["kww_beta"]),
                     "kww_log_shape_rmse": float(fit["rms_log_residual"]),
@@ -4279,13 +4279,42 @@ def write_sota_glassbench_direct_alpha_multik_shape_csv(
                     "uncertainty_columns_ready": float(np.all(sigma > 0.0)),
                 }
             )
+    return multik_rows
 
+
+def write_sota_glassbench_direct_alpha_multik_shape_csv(
+    path: Path,
+    *,
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute a high-k cached multi-k alpha-shape gate from particle tensors."""
+
+    multik_rows = compute_sota_glassbench_direct_alpha_multik_rows(root_rows)
     rows = glassbench_direct_alpha_multik_shape_gate(
         gate_id="glassbench_ka2d_direct_alpha_multik_shape_gate",
         multik_rows=multik_rows,
         min_crossed_k_count=3,
         max_beta_spread=0.03,
         monotone_z_threshold=2.0,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_multik_heldout_prediction_csv(
+    path: Path,
+    *,
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Run leave-one-k-out high-k alpha-shape prediction from cached curves."""
+
+    multik_rows = compute_sota_glassbench_direct_alpha_multik_rows(root_rows)
+    rows = glassbench_direct_alpha_multik_heldout_prediction_gate(
+        prediction_id="glassbench_ka2d_direct_alpha_multik_heldout_prediction",
+        multik_rows=multik_rows,
+        min_calibration_k_count=2,
+        max_heldout_beta_abs_error=0.02,
+        max_heldout_shape_rmse=0.25,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9598,6 +9627,60 @@ def write_sota_glassbench_direct_alpha_multik_shape_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_multik_heldout_prediction_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 75, 120
+    row_h = 82
+    colors = {
+        "cached_multik_heldout_prediction_supported": "#2f855a",
+        "cached_multik_heldout_prediction_window_edge_blocked": "#2563eb",
+        "cached_multik_heldout_prediction_mismatch": "#c05621",
+        "cached_multik_heldout_prediction_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["heldout_prediction_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        beta_error = float(row["max_heldout_beta_abs_error"])
+        shape_rmse = float(row["max_heldout_shape_rmse"])
+        heldout = float(row["heldout_count"])
+        eligible = float(row["eligible_k_count"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; held-out k={row["heldout_k_values"]}; held={heldout:.0f}/{eligible:.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">max beta error={beta_error:.3g}; max shape RMSE={shape_rmse:.3g}; edge crossings={int(float(row["all_crossings_at_window_edge"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench held-out multi-k alpha prediction</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Each high-k curve is held out, the other two calibrate beta, and the held-out normalized alpha shape is predicted before any real claim is promoted.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">held-out stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">prediction residuals</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_transport_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13893,6 +13976,16 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_multik_shape_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.svg",
         glassbench_direct_alpha_multik_shape_rows,
+    )
+    glassbench_direct_alpha_multik_heldout_prediction_rows = (
+        write_sota_glassbench_direct_alpha_multik_heldout_prediction_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv",
+            root_rows=glassbench_alpha_anchor_cached_fs_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_multik_heldout_prediction_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.svg",
+        glassbench_direct_alpha_multik_heldout_prediction_rows,
     )
     glassbench_direct_alpha_transport_rows = write_sota_glassbench_direct_alpha_transport_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv",

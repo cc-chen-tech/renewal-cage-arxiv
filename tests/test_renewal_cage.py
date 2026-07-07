@@ -147,6 +147,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_multik_heldout_prediction_gate,
     glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_transport_coupling_audit,
@@ -775,6 +776,81 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(float(row["kww_beta_spread"]), 0.01298755861676447, delta=1e-12)
         self.assertLess(float(row["max_monotonicity_violation_z"]), 1.0)
         self.assertEqual(float(row["monotone_compatible_k_count"]), 3.0)
+        self.assertEqual(float(row["all_crossings_at_window_edge"]), 1.0)
+        self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "post_alpha_window_depth")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_multik_heldout_prediction_stays_window_edge_blocked(self):
+        lag_times = "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0"
+        time_codes = "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40"
+        multik_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.15933802823269633,
+                "max_monotonicity_violation_z": 0.778224421773086,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+                "lag_times": lag_times,
+                "time_codes": time_codes,
+                "direct_alpha_fs_curve": "0.9799906642556826;0.89332522438385953;0.88708573286414527;0.87608824083483827;0.87976640765988101;0.87288761096953071;0.78268974790781598;0.36787944117144239",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 5.4,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.1524283423709747,
+                "max_monotonicity_violation_z": 0.7923188268620164,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+                "lag_times": lag_times,
+                "time_codes": time_codes,
+                "direct_alpha_fs_curve": "0.97472667509467625;0.86702775923517428;0.85945189151099144;0.846042195770773;0.85061038669786537;0.84343531831339202;0.74947402529637142;0.33260384834463197",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 6.0,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.14635046961593134,
+                "max_monotonicity_violation_z": 0.8038877529881566,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+                "lag_times": lag_times,
+                "time_codes": time_codes,
+                "direct_alpha_fs_curve": "0.9688907452308847;0.83868783278456116;0.82975711506750438;0.81388869869227032;0.81937953296017518;0.81200819828463122;0.71498304861579798;0.30225796285381623",
+            },
+        ]
+
+        row = glassbench_direct_alpha_multik_heldout_prediction_gate(
+            prediction_id="glassbench_direct_alpha_multik_heldout_prediction",
+            multik_rows=multik_rows,
+            min_calibration_k_count=2,
+            max_heldout_beta_abs_error=0.02,
+            max_heldout_shape_rmse=0.25,
+        )[0]
+
+        self.assertEqual(
+            row["heldout_prediction_stage"],
+            "cached_multik_heldout_prediction_window_edge_blocked",
+        )
+        self.assertEqual(float(row["heldout_prediction_candidate_ready"]), 1.0)
+        self.assertEqual(float(row["heldout_count"]), 3.0)
+        self.assertAlmostEqual(float(row["max_heldout_beta_abs_error"]), 0.00994862223924331, delta=1e-12)
+        self.assertAlmostEqual(float(row["max_heldout_shape_rmse"]), 0.2256804745702842, delta=1e-12)
         self.assertEqual(float(row["all_crossings_at_window_edge"]), 1.0)
         self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "post_alpha_window_depth")
