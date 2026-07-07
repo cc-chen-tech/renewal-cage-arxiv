@@ -150,6 +150,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
     glassbench_late_recovery_cache_request_contract,
+    glassbench_late_recovery_membership_probe_contract,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1337,6 +1338,86 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(incomplete["inferred_target_member"], "none")
         self.assertEqual(float(incomplete["inferred_member_path_ready"]), 0.0)
         self.assertEqual(incomplete["primary_blocker"], "late_recovery_timecode_target")
+
+    def test_glassbench_late_recovery_membership_probe_contract_records_prefix_absence(self):
+        cache_request_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "cache_request_ready": 1.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+                "inferred_target_member": "T0.23/test/N1290T0.23_151_tc50.npz",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "cache_request_ready": 0.0,
+                "target_time_code": "none",
+                "inferred_target_member": "none",
+            },
+        ]
+        member_index_manifest = {
+            "compressed_probe_bytes": 12582912,
+            "tar_probe_limit_bytes": 25165824,
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                    "compressed_probe_range_start": 2980602255,
+                    "compressed_probe_range_end": 2993185166,
+                    "compressed_probe_bytes": 12582912,
+                    "tar_probe_bytes": 25165824,
+                    "npz_member_count_in_probe": 55,
+                    "npz_members": [
+                        {"name": "T0.23/test/N1290T0.23_151_tc05.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc10.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc15.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc20.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc25.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc30.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc35.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc40.npz", "size_bytes": 465710},
+                    ],
+                }
+            ],
+        }
+
+        rows = glassbench_late_recovery_membership_probe_contract(
+            probe_id="glassbench_late_recovery_membership_probe_contract",
+            cache_request_rows=cache_request_rows,
+            member_index_manifest=member_index_manifest,
+        )
+
+        by_key = {(row["system_id"], row["temperature"], row["structure_id"]): row for row in rows}
+        cold = by_key[("KA2D", "0.23", "151")]
+        warm = by_key[("KA2D", "0.30", "3")]
+
+        self.assertEqual(cold["membership_probe_stage"], "late_recovery_target_absent_from_extended_prefix")
+        self.assertEqual(float(cold["membership_probe_ready"]), 1.0)
+        self.assertEqual(cold["target_time_code"], "tc50")
+        self.assertEqual(cold["inferred_target_member"], "T0.23/test/N1290T0.23_151_tc50.npz")
+        self.assertEqual(float(cold["target_member_visible_in_probe"]), 0.0)
+        self.assertEqual(float(cold["same_structure_member_count_in_probe"]), 8.0)
+        self.assertEqual(cold["same_structure_visible_time_codes"], "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40")
+        self.assertEqual(cold["max_visible_time_code"], "tc40")
+        self.assertAlmostEqual(float(cold["compressed_probe_bytes"]), 12582912.0)
+        self.assertAlmostEqual(float(cold["tar_probe_bytes"]), 25165824.0)
+        self.assertEqual(float(cold["late_recovery_observable_ready"]), 0.0)
+        self.assertEqual(cold["primary_blocker"], "late_recovery_member_index_depth")
+        self.assertEqual(
+            cold["next_required_action"],
+            "extend_glassbench_tar_prefix_probe_for_structure_151_tc50_or_full_index",
+        )
+        self.assertEqual(float(cold["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(warm["membership_probe_stage"], "late_recovery_cache_request_incomplete")
+        self.assertEqual(warm["primary_blocker"], "late_recovery_cache_request")
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

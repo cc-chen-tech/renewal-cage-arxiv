@@ -7846,6 +7846,129 @@ def glassbench_late_recovery_cache_request_contract(
     return rows
 
 
+def glassbench_late_recovery_membership_probe_contract(
+    *,
+    probe_id: str,
+    cache_request_rows: Sequence[dict[str, object]],
+    member_index_manifest: dict[str, object],
+) -> list[dict[str, float | str]]:
+    """Check whether a late-recovery target member is visible in bounded tar probes."""
+
+    if not probe_id:
+        raise ValueError("probe_id must be nonempty")
+    if not cache_request_rows:
+        raise ValueError("cache_request_rows must be nonempty")
+    entries = member_index_manifest.get("entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("member_index_manifest entries must be a list")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def member_names(entry: dict[str, object]) -> list[str]:
+        members = entry.get("npz_members", [])
+        if not isinstance(members, list):
+            return []
+        names: list[str] = []
+        for member in members:
+            if isinstance(member, dict):
+                names.append(str(member.get("name", "none")))
+        return names
+
+    def time_code_number(code: str) -> int:
+        match = re.fullmatch(r"tc(\d+)", code)
+        return int(match.group(1)) if match is not None else -1
+
+    entries_by_path = {
+        str(entry.get("path", entry.get("source_path", "none"))): entry
+        for entry in entries
+        if isinstance(entry, dict)
+    }
+
+    rows: list[dict[str, float | str]] = []
+    for request in sorted(cache_request_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(request)
+        source_path = str(request.get("source_path", "none"))
+        request_ready = float(request.get("cache_request_ready", 0.0) or 0.0) == 1.0
+        target_member = str(request.get("inferred_target_member", "none"))
+        target_time_code = str(request.get("target_time_code", "none"))
+        target_lag = float(request.get("target_lag_time", 0.0) or 0.0)
+        entry = entries_by_path.get(source_path, {})
+
+        names = member_names(entry)
+        target_visible = target_member in names
+        same_structure: list[tuple[str, str]] = []
+        for name in names:
+            match = re.search(rf"_{re.escape(structure_id)}_(tc\d+)\.npz$", name)
+            if match is not None:
+                same_structure.append((match.group(1), name))
+        same_structure.sort(key=lambda item: time_code_number(item[0]))
+        visible_codes = [code for code, _name in same_structure]
+        max_code = visible_codes[-1] if visible_codes else "none"
+        manifest_entry_ready = bool(entry)
+        compressed_probe_bytes = float(entry.get("compressed_probe_bytes", 0.0) or 0.0)
+        tar_probe_bytes = float(entry.get("tar_probe_bytes", 0.0) or 0.0)
+        member_count = float(entry.get("npz_member_count_in_probe", len(names)) or 0.0)
+
+        if not request_ready:
+            stage = "late_recovery_cache_request_incomplete"
+            blocker = "late_recovery_cache_request"
+            next_action = "complete_late_recovery_cache_request_contract"
+            probe_ready = False
+        elif not manifest_entry_ready:
+            stage = "late_recovery_member_index_probe_missing"
+            blocker = "late_recovery_member_index_probe"
+            next_action = "probe_glassbench_tar_prefix_for_late_recovery_target"
+            probe_ready = False
+        elif target_visible:
+            stage = "late_recovery_target_member_visible_in_probe"
+            blocker = "late_recovery_particle_cache"
+            next_action = f"extract_late_recovery_particle_cache_for_{target_time_code}"
+            probe_ready = True
+        else:
+            stage = "late_recovery_target_absent_from_extended_prefix"
+            blocker = "late_recovery_member_index_depth"
+            next_action = (
+                f"extend_glassbench_tar_prefix_probe_for_structure_{structure_id}_"
+                f"{target_time_code}_or_full_index"
+            )
+            probe_ready = True
+
+        rows.append(
+            {
+                "probe_id": probe_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "source_path": source_path,
+                "cache_request_ready": float(request_ready),
+                "target_time_code": target_time_code,
+                "target_lag_time": float(target_lag),
+                "inferred_target_member": target_member,
+                "member_index_entry_ready": float(manifest_entry_ready),
+                "compressed_probe_bytes": float(compressed_probe_bytes),
+                "tar_probe_bytes": float(tar_probe_bytes),
+                "npz_member_count_in_probe": float(member_count),
+                "target_member_visible_in_probe": float(target_visible),
+                "same_structure_member_count_in_probe": float(len(same_structure)),
+                "same_structure_visible_time_codes": ";".join(visible_codes) if visible_codes else "none",
+                "max_visible_time_code": max_code,
+                "membership_probe_ready": float(probe_ready),
+                "late_recovery_observable_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "membership_probe_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
