@@ -5814,6 +5814,131 @@ def glassbench_alpha_threshold_horizon_audit(
     return out
 
 
+def glassbench_cage_jump_proxy_canary(
+    *,
+    canary_id: str,
+    trajectory_rows: Sequence[dict[str, object]],
+    min_frame_count: int = 2,
+    min_member_count: float = 4.0,
+) -> list[dict[str, float | str]]:
+    """Extract aggregate frame-index cage-jump proxy candidates without claiming events."""
+
+    if not canary_id:
+        raise ValueError("canary_id must be nonempty")
+    if not trajectory_rows:
+        raise ValueError("trajectory_rows must be nonempty")
+    if min_frame_count <= 0:
+        raise ValueError("min_frame_count must be positive")
+    if min_member_count <= 0.0:
+        raise ValueError("min_member_count must be positive")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in trajectory_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("frame_index", 0.0)))
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        usable = [
+            row
+            for row in sorted_group
+            if float(row.get("frame_index", 0.0)) > 0.0
+            and float(row.get("frame_index_uncertainty_ready", 0.0)) == 1.0
+            and float(row.get("member_count", 0.0) or 0.0) >= min_member_count
+        ]
+
+        candidate_rows: list[dict[str, float]] = []
+        for row in usable:
+            msd = float(row.get("msd", 0.0) or 0.0)
+            ngp = max(0.0, float(row.get("ngp_2d", 0.0) or 0.0))
+            fs_decay = 0.0
+            fs_text = str(row.get("self_intermediate_scattering_by_k", "none"))
+            if fs_text and fs_text != "none":
+                fs_values = _parse_semicolon_float_values(
+                    fs_text,
+                    name="self_intermediate_scattering_by_k",
+                )
+                if fs_values:
+                    fs_decay = max(0.0, 1.0 - min(fs_values))
+            displacement = math.sqrt(msd) if msd > 0.0 else 0.0
+            score = displacement * max(ngp, 1e-12) * max(fs_decay, 1e-12)
+            candidate_rows.append(
+                {
+                    "frame_index": float(row.get("frame_index", 0.0)),
+                    "displacement": float(displacement),
+                    "ngp": float(ngp),
+                    "fs_decay": float(fs_decay),
+                    "score": float(score),
+                    "physical_time_ready": float(row.get("physical_time_ready", 0.0) or 0.0),
+                }
+            )
+
+        aggregate_ready = len(candidate_rows) >= min_frame_count and any(row["score"] > 0.0 for row in candidate_rows)
+        if candidate_rows:
+            peak = max(candidate_rows, key=lambda row: row["score"])
+            peak_ngp = max(candidate_rows, key=lambda row: row["ngp"])
+            max_fs_decay = max(row["fs_decay"] for row in candidate_rows)
+            physical_time_ready = aggregate_ready and all(row["physical_time_ready"] == 1.0 for row in candidate_rows)
+        else:
+            peak = {
+                "frame_index": 0.0,
+                "displacement": 0.0,
+                "ngp": 0.0,
+                "fs_decay": 0.0,
+                "score": 0.0,
+                "physical_time_ready": 0.0,
+            }
+            peak_ngp = peak
+            max_fs_decay = 0.0
+            physical_time_ready = False
+
+        if aggregate_ready:
+            stage = "aggregate_cage_jump_proxy_ready_particle_events_blocked"
+            blocker = "particle_resolved_displacements"
+            next_action = "extract_particle_resolved_cage_jump_events_and_physical_time_clock"
+        else:
+            stage = "aggregate_cage_jump_proxy_incomplete"
+            blocker = "frame_index_member_ensemble_microstatistics"
+            next_action = "extract_member_ensemble_frame_microstatistics"
+        missing = ["particle_resolved_displacements"]
+        if not physical_time_ready:
+            missing.append("physical_time_semantics")
+        missing.extend(["cage_identity_tracking", "persistence_exchange_event_clock"])
+
+        out.append(
+            {
+                "canary_id": canary_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "frame_count": float(len(sorted_group)),
+                "usable_frame_count": float(len(candidate_rows)),
+                "member_count_minimum": float(min_member_count),
+                "aggregate_jump_proxy_ready": float(aggregate_ready),
+                "particle_resolved_jump_events_ready": 0.0,
+                "physical_time_jump_clock_ready": float(physical_time_ready),
+                "persistence_exchange_event_clock_ready": 0.0,
+                "peak_proxy_event_frame": float(peak["frame_index"]),
+                "proxy_jump_length": float(peak["displacement"]),
+                "proxy_event_score": float(peak["score"]),
+                "peak_ngp_frame": float(peak_ngp["frame_index"]),
+                "peak_ngp_value": float(peak_ngp["ngp"]),
+                "max_short_frame_fs_decay": float(max_fs_decay),
+                "missing_event_clock_inputs": ";".join(dict.fromkeys(missing)),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "canary_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_microdynamic_closed_loop_audit(
     *,
     audit_id: str,

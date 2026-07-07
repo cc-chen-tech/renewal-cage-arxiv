@@ -3695,6 +3695,76 @@ def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_cage_jump_proxy_canary_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cage-jump proxy canary")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Aggregate frame-index MSD, NGP, and Fs decay mark jump-like candidates; particle-resolved event clocks remain blocked.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "aggregate_cage_jump_proxy_ready_particle_events_blocked": colors.HexColor("#9f1239"),
+        "aggregate_cage_jump_proxy_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "canary stage")
+    c.drawString(left + 370, top + 24, "aggregate proxy status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["canary_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 252, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 370,
+            y,
+            "proxy={}; particle events={}; physical clock={}; blocker={}".format(
+                int(float(row["aggregate_jump_proxy_ready"])),
+                int(float(row["particle_resolved_jump_events_ready"])),
+                int(float(row["physical_time_jump_clock_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            "peak frame={:.0f}; proxy jump length={:.3g}; score={:.3g}; short Fs decay={:.3g}".format(
+                float(row["peak_proxy_event_frame"]),
+                float(row["proxy_jump_length"]),
+                float(row["proxy_event_score"]),
+                float(row["max_short_frame_fs_decay"]),
+            ),
+        )
+        c.drawString(left + 370, y - 27, f'missing={row["missing_event_clock_inputs"][:82]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This canary is an aggregate trajectory proxy only; it does not replace particle-resolved cage-jump segmentation.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5254,6 +5324,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_microdynamic_closed_loop_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
     )
+    sota_glassbench_cage_jump_proxy_canary_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -5390,6 +5463,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_microdynamic_closed_loop_pdf(
         sota_glassbench_microdynamic_closed_loop_pdf
+    )
+    write_sota_glassbench_cage_jump_proxy_canary_pdf(
+        sota_glassbench_cage_jump_proxy_canary_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5569,6 +5645,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_microdynamic_closed_loop_pdf,
             "figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf",
+        )
+        archive.write(
+            sota_glassbench_cage_jump_proxy_canary_pdf,
+            "figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

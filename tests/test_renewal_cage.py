@@ -134,6 +134,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
     glassbench_alpha_threshold_horizon_audit,
+    glassbench_cage_jump_proxy_canary,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
     glassbench_timecode_curve_bridge,
@@ -463,6 +464,73 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["closed_loop_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "physical_time_semantics")
         self.assertIn("cage_jump_event_segmentation", row["missing_closed_loop_inputs"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_cage_jump_proxy_canary_extracts_aggregate_event_candidates(self):
+        trajectory_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 0.0,
+                "member_count": 4.0,
+                "msd": 0.0,
+                "ngp_2d": 0.0,
+                "self_intermediate_scattering_by_k": "1;1;1",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 1.0,
+                "member_count": 4.0,
+                "msd": 0.01,
+                "ngp_2d": 0.02,
+                "self_intermediate_scattering_by_k": "0.998;0.995;0.990",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 2.0,
+                "member_count": 4.0,
+                "msd": 0.09,
+                "ngp_2d": 0.25,
+                "self_intermediate_scattering_by_k": "0.970;0.940;0.900",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 3.0,
+                "member_count": 4.0,
+                "msd": 0.08,
+                "ngp_2d": 0.10,
+                "self_intermediate_scattering_by_k": "0.975;0.950;0.920",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+        ]
+
+        row = glassbench_cage_jump_proxy_canary(
+            canary_id="glassbench_cage_jump_proxy",
+            trajectory_rows=trajectory_rows,
+        )[0]
+
+        self.assertEqual(row["canary_stage"], "aggregate_cage_jump_proxy_ready_particle_events_blocked")
+        self.assertEqual(float(row["aggregate_jump_proxy_ready"]), 1.0)
+        self.assertEqual(float(row["particle_resolved_jump_events_ready"]), 0.0)
+        self.assertEqual(float(row["physical_time_jump_clock_ready"]), 0.0)
+        self.assertEqual(float(row["peak_proxy_event_frame"]), 2.0)
+        self.assertGreater(float(row["proxy_jump_length"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "particle_resolved_displacements")
+        self.assertIn("particle_resolved_displacements", row["missing_event_clock_inputs"])
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):

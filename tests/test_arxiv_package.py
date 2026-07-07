@@ -1171,6 +1171,26 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_030["closed_loop_stage"], "macro_timecode_upstream_incomplete")
         self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
 
+    def test_sota_glassbench_cage_jump_proxy_canary_marks_proxy_not_event_clock(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(
+            ka2d_023["canary_stage"],
+            "aggregate_cage_jump_proxy_ready_particle_events_blocked",
+        )
+        self.assertEqual(float(ka2d_023["aggregate_jump_proxy_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["particle_resolved_jump_events_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["physical_time_jump_clock_ready"]), 0.0)
+        self.assertGreater(float(ka2d_023["proxy_jump_length"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "particle_resolved_displacements")
+        self.assertIn("persistence_exchange_event_clock", ka2d_023["missing_event_clock_inputs"])
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
         self.assertTrue(path.exists())
@@ -1885,6 +1905,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf", names)
             self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
@@ -1960,6 +1981,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)

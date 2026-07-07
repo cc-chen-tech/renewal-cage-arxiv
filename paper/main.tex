@@ -1513,6 +1513,27 @@ scope boundary.
   separate blockers.}
 \end{figure}
 
+The member-ensemble trajectory probe can also be reduced to an intentionally
+weaker cage-jump canary. For each frame-index row, we combine the aggregate
+displacement scale, the short-frame NGP, and the multi-\(k\) scattering decay
+into a single jump-like proxy score. This is useful because it identifies where
+the streamed trajectory prefix already contains intermittent, cage-breaking
+candidate frames. It is not a cage-jump event clock: the rows are aggregate
+observables, not particle-resolved waiting and exchange events, and they still
+lack physical time semantics. The canary therefore tightens the next target
+from ``get more data'' to ``extract particle-resolved cage-jump events with a
+physical clock'' \cite{weeks2002cage,pastore2017cage,hedges2007persistence}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf}
+  \caption{GlassBench cage-jump proxy canary. Aggregate frame-index MSD, NGP,
+  and self-intermediate-scattering decay mark jump-like candidate frames in the
+  streamed member-ensemble trajectory prefix. The gate explicitly keeps
+  particle-resolved cage-jump events, physical time semantics, and
+  persistence/exchange event clocks blocked.}
+\end{figure}
+
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out
 macro-dynamical predictions. The current answer is useful but negative. The
