@@ -149,6 +149,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
+    glassbench_late_recovery_cache_request_contract,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1236,6 +1237,106 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertEqual(incomplete["timecode_target_stage"], "late_recovery_timecode_target_upstream_incomplete")
         self.assertEqual(incomplete["primary_blocker"], "finite_exchange_envelope")
+
+    def test_glassbench_late_recovery_cache_request_contract_marks_tc50_metadata_gap(self):
+        timecode_target_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "timecode_target_ready": 1.0,
+                "required_followup_lag_time": 42972781.2315918,
+                "current_max_time_code": "tc40",
+                "current_max_lag_time": 1500000.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "timecode_target_ready": 0.0,
+                "target_time_code": "none",
+                "target_lag_time": 0.0,
+            },
+        ]
+        multilag_target_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "selected_structure_id": "151",
+                "selected_time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "target_members": (
+                    "T0.23/test/N1290T0.23_151_tc05.npz;"
+                    "T0.23/test/N1290T0.23_151_tc10.npz;"
+                    "T0.23/test/N1290T0.23_151_tc15.npz;"
+                    "T0.23/test/N1290T0.23_151_tc20.npz;"
+                    "T0.23/test/N1290T0.23_151_tc25.npz;"
+                    "T0.23/test/N1290T0.23_151_tc30.npz;"
+                    "T0.23/test/N1290T0.23_151_tc35.npz;"
+                    "T0.23/test/N1290T0.23_151_tc40.npz"
+                ),
+                "target_member_md5s": "md5-05;md5-10;md5-15;md5-20;md5-25;md5-30;md5-35;md5-40",
+                "target_lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+            },
+        ]
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "target_member": "T0.23/test/N1290T0.23_151_tc40.npz",
+                "target_member_md5": "md5-40",
+                "particle_cache_path": (
+                    "data/third_party/glassbench/particle_cache/"
+                    "glassbench_ka2d_T0_23_N1290T0.23_151_tc40_positions.npz"
+                ),
+                "particle_resolved_positions_cached": 1.0,
+            },
+        ]
+
+        rows = glassbench_late_recovery_cache_request_contract(
+            contract_id="glassbench_late_recovery_cache_request_contract",
+            timecode_target_rows=timecode_target_rows,
+            multilag_target_rows=multilag_target_rows,
+            cache_rows=cache_rows,
+        )
+
+        by_key = {(row["system_id"], row["temperature"], row["structure_id"]): row for row in rows}
+        request = by_key[("KA2D", "0.23", "151")]
+        incomplete = by_key[("KA2D", "0.30", "3")]
+
+        self.assertEqual(request["cache_request_stage"], "late_recovery_member_metadata_required")
+        self.assertEqual(float(request["cache_request_ready"]), 1.0)
+        self.assertEqual(request["source_path"], "GlassBench/KA2D_trajectories/T0.23.tar.xz")
+        self.assertEqual(request["current_max_time_code"], "tc40")
+        self.assertAlmostEqual(float(request["current_max_lag_time"]), 1500000.0)
+        self.assertEqual(request["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(request["target_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertEqual(request["inferred_target_member"], "T0.23/test/N1290T0.23_151_tc50.npz")
+        self.assertEqual(float(request["inferred_member_path_ready"]), 1.0)
+        self.assertEqual(float(request["official_target_member_metadata_ready"]), 0.0)
+        self.assertEqual(request["target_member_md5"], "none")
+        self.assertEqual(
+            request["expected_particle_cache_path"],
+            "data/third_party/glassbench/particle_cache/glassbench_ka2d_T0_23_N1290T0.23_151_tc50_positions.npz",
+        )
+        self.assertEqual(float(request["particle_cache_ready"]), 0.0)
+        self.assertEqual(float(request["late_recovery_observable_ready"]), 0.0)
+        self.assertEqual(float(request["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(request["primary_blocker"], "late_recovery_npz_member_metadata")
+        self.assertEqual(
+            request["next_required_action"],
+            "verify_glassbench_archive_contains_time_code_tc50_for_structure_151",
+        )
+        self.assertEqual(float(request["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(incomplete["cache_request_stage"], "late_recovery_timecode_target_incomplete")
+        self.assertEqual(incomplete["inferred_target_member"], "none")
+        self.assertEqual(float(incomplete["inferred_member_path_ready"]), 0.0)
+        self.assertEqual(incomplete["primary_blocker"], "late_recovery_timecode_target")
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

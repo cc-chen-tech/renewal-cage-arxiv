@@ -4644,6 +4644,72 @@ def write_sota_glassbench_late_recovery_timecode_target_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_late_recovery_cache_request_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_cache_request_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late recovery cache request")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The tc50 target is converted into an inferred NPZ member path while preserving official metadata and cache gaps.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "late_recovery_particle_cache_ready": colors.HexColor("#2f855a"),
+        "late_recovery_particle_cache_required": colors.HexColor("#2b6cb0"),
+        "late_recovery_member_metadata_required": colors.HexColor("#b7791f"),
+        "late_recovery_member_path_inference_incomplete": colors.HexColor("#c05621"),
+        "late_recovery_timecode_target_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "cache contract stage")
+    c.drawString(left + 395, top + 24, "late-recovery member request")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cache_request_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.3)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; target={}; lag={:.3g}; metadata={:.0f}; cache={:.0f}; observable={:.0f}".format(
+                row["structure_id"],
+                row["target_time_code"],
+                float(row["target_lag_time"]),
+                float(row["official_target_member_metadata_ready"]),
+                float(row["particle_cache_ready"]),
+                float(row["late_recovery_observable_ready"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(left + 395, y - 14, f'member={row["inferred_target_member"][:70]}')
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The inferred tc50 path is a request contract: official member metadata and particle cache remain missing.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6943,6 +7009,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_late_recovery_timecode_target_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf"
     )
+    sota_glassbench_late_recovery_cache_request_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_cache_request_contract.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -7149,6 +7218,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_late_recovery_timecode_target_pdf(
         sota_glassbench_late_recovery_timecode_target_pdf
+    )
+    write_sota_glassbench_late_recovery_cache_request_contract_pdf(
+        sota_glassbench_late_recovery_cache_request_contract_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7407,6 +7479,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_late_recovery_timecode_target_pdf,
             "figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_cache_request_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_cache_request_contract.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

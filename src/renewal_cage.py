@@ -7701,6 +7701,151 @@ def glassbench_late_recovery_timecode_target(
     return rows
 
 
+def glassbench_late_recovery_cache_request_contract(
+    *,
+    contract_id: str,
+    timecode_target_rows: Sequence[dict[str, object]],
+    multilag_target_rows: Sequence[dict[str, object]],
+    cache_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Turn a late-recovery time-code target into a concrete cache request."""
+
+    if not contract_id:
+        raise ValueError("contract_id must be nonempty")
+    if not timecode_target_rows:
+        raise ValueError("timecode_target_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", row.get("selected_structure_id", "none"))),
+        )
+
+    def split_semicolon(value: object) -> list[str]:
+        return [item for item in str(value or "").split(";") if item]
+
+    def infer_member(existing_members: list[str], current_code: str, target_code: str) -> str:
+        for member in reversed(existing_members):
+            if current_code != "none" and current_code in member:
+                return member.replace(current_code, target_code)
+        for member in reversed(existing_members):
+            match = re.search(r"tc\d+", member)
+            if match is not None:
+                return member[: match.start()] + target_code + member[match.end() :]
+        return "none"
+
+    def cache_path_for(system_id: str, temperature: str, member: str) -> str:
+        stem = Path(member).stem
+        temp_label = temperature.replace(".", "_")
+        return (
+            "data/third_party/glassbench/particle_cache/"
+            f"glassbench_{system_id.lower()}_T{temp_label}_{stem}_positions.npz"
+        )
+
+    multilag_by_key = {key_for(row): row for row in multilag_target_rows}
+    cached_members: set[tuple[str, str, str, str]] = set()
+    for row in cache_rows:
+        if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+            continue
+        cached_members.add(
+            (
+                str(row.get("system_id", "unknown")),
+                str(row.get("temperature", "none")),
+                str(row.get("structure_id", "none")),
+                str(row.get("target_member", row.get("first_npz_member", "none"))),
+            )
+        )
+
+    rows: list[dict[str, float | str]] = []
+    for target in sorted(timecode_target_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(target)
+        target_ready = float(target.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        target_time_code = str(target.get("target_time_code", "none"))
+        current_time_code = str(target.get("current_max_time_code", "none"))
+        required_lag = float(target.get("required_followup_lag_time", 0.0) or 0.0)
+        current_lag = float(target.get("current_max_lag_time", 0.0) or 0.0)
+        target_lag = float(target.get("target_lag_time", 0.0) or 0.0)
+        multilag = multilag_by_key.get((system_id, temperature, structure_id), {})
+        source_path = str(multilag.get("source_path", "none"))
+        members = split_semicolon(multilag.get("target_members", ""))
+        member_md5s = split_semicolon(multilag.get("target_member_md5s", ""))
+        code_list = split_semicolon(multilag.get("selected_time_codes", ""))
+        inferred_member = (
+            infer_member(members, current_time_code, target_time_code)
+            if target_ready and target_time_code != "none"
+            else "none"
+        )
+        inferred_ready = inferred_member != "none" and target_time_code != "none"
+        md5_by_member = dict(zip(members, member_md5s))
+        target_member_md5 = md5_by_member.get(inferred_member, "none")
+        official_metadata_ready = target_member_md5 != "none" and target_time_code in code_list
+        expected_cache_path = (
+            cache_path_for(system_id, temperature, inferred_member) if inferred_ready else "none"
+        )
+        particle_cache_ready = (
+            system_id,
+            temperature,
+            structure_id,
+            inferred_member,
+        ) in cached_members
+        cache_request_ready = target_ready and inferred_ready
+
+        if not target_ready:
+            stage = "late_recovery_timecode_target_incomplete"
+            blocker = "late_recovery_timecode_target"
+            next_action = "complete_late_recovery_timecode_target"
+        elif not inferred_ready:
+            stage = "late_recovery_member_path_inference_incomplete"
+            blocker = "late_recovery_member_path_template"
+            next_action = "provide_structure_matched_late_recovery_member_template"
+        elif not official_metadata_ready:
+            stage = "late_recovery_member_metadata_required"
+            blocker = "late_recovery_npz_member_metadata"
+            next_action = (
+                f"verify_glassbench_archive_contains_time_code_{target_time_code}_"
+                f"for_structure_{structure_id}"
+            )
+        elif not particle_cache_ready:
+            stage = "late_recovery_particle_cache_required"
+            blocker = "late_recovery_particle_cache"
+            next_action = f"extract_late_recovery_particle_cache_for_{target_time_code}"
+        else:
+            stage = "late_recovery_particle_cache_ready"
+            blocker = "late_recovery_observable"
+            next_action = "compute_late_ngp_and_van_hove_recovery_observables"
+
+        rows.append(
+            {
+                "contract_id": contract_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "source_path": source_path,
+                "timecode_target_ready": float(target_ready),
+                "required_followup_lag_time": float(required_lag),
+                "current_max_time_code": current_time_code,
+                "current_max_lag_time": float(current_lag),
+                "target_time_code": target_time_code,
+                "target_lag_time": float(target_lag),
+                "inferred_target_member": inferred_member,
+                "inferred_member_path_ready": float(inferred_ready),
+                "official_target_member_metadata_ready": float(official_metadata_ready),
+                "target_member_md5": target_member_md5,
+                "expected_particle_cache_path": expected_cache_path,
+                "particle_cache_ready": float(particle_cache_ready),
+                "cache_request_ready": float(cache_request_ready),
+                "late_recovery_observable_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "cache_request_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
