@@ -336,6 +336,30 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermodynamic["sota_verdict_stage"], "thermodynamic_transition_out_of_scope")
         self.assertEqual(thermodynamic["allowed_claim_level"], "dynamical_theory_only")
 
+    def test_glassbench_real_cached_microdynamic_verdict_marks_persistence_but_blocks_inversion(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        persistence = by_id["real_cached_persistence_clock"]
+        pe_bound = by_id["conditional_persistence_exchange_bound"]
+        recovery = by_id["late_recovery_decision_protocol"]
+        inversion = by_id["real_pe_inversion_boundary"]
+        self.assertEqual(
+            persistence["cached_microdynamic_verdict_stage"],
+            "real_cached_persistence_clock_quantified",
+        )
+        self.assertEqual(float(persistence["real_cached_evidence_ready"]), 1.0)
+        self.assertGreater(float(pe_bound["conditional_pe_ratio_lower_bound"]), 3.0)
+        self.assertEqual(pe_bound["cached_microdynamic_verdict_stage"], "conditional_pe_decoupling_bound_ready")
+        self.assertEqual(recovery["cached_microdynamic_verdict_stage"], "late_recovery_protocol_preregistered")
+        self.assertEqual(float(recovery["mechanism_selection_claim_allowed_now"]), 0.0)
+        self.assertEqual(inversion["cached_microdynamic_verdict_stage"], "real_pe_inversion_still_blocked")
+        self.assertEqual(float(inversion["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(inversion["thermodynamic_claim_allowed"]), 0.0)
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -2871,6 +2895,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf", names)
@@ -3083,6 +3108,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
             "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
             "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
+            "figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf",

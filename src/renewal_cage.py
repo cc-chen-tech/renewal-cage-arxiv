@@ -7334,6 +7334,191 @@ def glassbench_finite_exchange_falsification_envelope(
     return rows
 
 
+def glassbench_real_cached_microdynamic_verdict(
+    *,
+    verdict_id: str,
+    persistence_fit_rows: Sequence[dict[str, object]],
+    finite_exchange_envelope_rows: Sequence[dict[str, object]],
+    event_clock_contract_rows: Sequence[dict[str, object]],
+    late_recovery_outcome_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Summarize real cached GlassBench microdynamic evidence without claiming full PE inversion."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not persistence_fit_rows:
+        raise ValueError("persistence_fit_rows must be nonempty")
+    if not finite_exchange_envelope_rows:
+        raise ValueError("finite_exchange_envelope_rows must be nonempty")
+    if not event_clock_contract_rows:
+        raise ValueError("event_clock_contract_rows must be nonempty")
+    if not late_recovery_outcome_rows:
+        raise ValueError("late_recovery_outcome_rows must be nonempty")
+
+    def number(row: dict[str, object], key: str) -> float:
+        return float(row.get(key, 0.0) or 0.0)
+
+    def first_ready(rows: Sequence[dict[str, object]], key: str) -> dict[str, object]:
+        for row in rows:
+            if number(row, key) == 1.0:
+                return row
+        return rows[0] if rows else {}
+
+    persistence = first_ready(persistence_fit_rows, "persistence_fit_ready")
+    envelope = first_ready(finite_exchange_envelope_rows, "envelope_ready")
+    contract = first_ready(event_clock_contract_rows, "event_segmentation_target_ready")
+    ready_outcomes = [
+        row
+        for row in late_recovery_outcome_rows
+        if number(row, "uncertainty_decision_ready") == 1.0
+    ]
+    support_scenarios = [
+        row for row in ready_outcomes if "supported" in str(row.get("claim_if_observed", ""))
+    ]
+    rejection_scenarios = [
+        row
+        for row in ready_outcomes
+        if "rejected" in str(row.get("claim_if_observed", ""))
+        or "reparameterization" in str(row.get("claim_if_observed", ""))
+    ]
+
+    persistence_ready = number(persistence, "persistence_fit_ready") == 1.0
+    envelope_ready = number(envelope, "envelope_ready") == 1.0
+    event_target_ready = number(contract, "event_segmentation_target_ready") == 1.0
+    event_clock_ready = number(contract, "event_clock_extraction_ready") == 1.0
+    exchange_clock_ready = max(number(persistence, "exchange_clock_ready"), number(envelope, "exchange_clock_ready"))
+    real_pe_ready = float(event_clock_ready and exchange_clock_ready == 1.0)
+    crossing_residual = abs(
+        number(persistence, "observed_crossed_fraction")
+        - number(persistence, "predicted_crossed_fraction_at_latest_lag")
+    )
+
+    blockers = []
+    if not event_clock_ready:
+        blockers.append(str(contract.get("primary_blocker", "physical_time_trajectory_axis")))
+    if exchange_clock_ready == 0.0:
+        blockers.append("exchange_clock")
+    if number(envelope, "late_ngp_followup_ready") == 0.0:
+        blockers.append("late_ngp_followup")
+    blocker = ";".join(dict.fromkeys(item for item in blockers if item and item != "none")) or "none"
+
+    base = {
+        "verdict_id": verdict_id,
+        "system_id": str(persistence.get("system_id", envelope.get("system_id", "unknown"))),
+        "temperature": str(persistence.get("temperature", envelope.get("temperature", "none"))),
+        "structure_id": str(persistence.get("structure_id", envelope.get("structure_id", "none"))),
+    }
+
+    def verdict_row(
+        *,
+        verdict_row_id: str,
+        stage: str,
+        allowed_claim_level: str,
+        real_cached_evidence_ready: float = 0.0,
+        interval_persistence_fit_ready: float = 0.0,
+        finite_exchange_envelope_ready: float = 0.0,
+        late_recovery_decision_protocol_ready: float = 0.0,
+        event_segmentation_target_ready: float = 0.0,
+        event_clock_extraction_ready: float = 0.0,
+        exchange_clock_ready_value: float = 0.0,
+        mechanism_selection_claim_allowed_now: float = 0.0,
+        real_pe_inversion_ready_value: float = 0.0,
+        primary_blocker: str = "none",
+    ) -> dict[str, float | str]:
+        return {
+            **base,
+            "verdict_row_id": verdict_row_id,
+            "real_cached_evidence_ready": float(real_cached_evidence_ready),
+            "interval_persistence_fit_ready": float(interval_persistence_fit_ready),
+            "finite_exchange_envelope_ready": float(finite_exchange_envelope_ready),
+            "late_recovery_decision_protocol_ready": float(late_recovery_decision_protocol_ready),
+            "event_segmentation_target_ready": float(event_segmentation_target_ready),
+            "event_clock_extraction_ready": float(event_clock_extraction_ready),
+            "exchange_clock_ready": float(exchange_clock_ready_value),
+            "mean_persistence_time": number(persistence, "exponential_mean_persistence_time"),
+            "tau_alpha_direct": number(persistence, "tau_alpha_direct"),
+            "mean_persistence_over_tau_alpha": number(persistence, "mean_persistence_over_tau_alpha_direct"),
+            "crossing_fraction_abs_residual": float(crossing_residual),
+            "conditional_pe_ratio_lower_bound": number(envelope, "conditional_persistence_exchange_ratio_lower_bound"),
+            "gaussian_recovery_lag_upper_bound": number(envelope, "gaussian_recovery_lag_upper_bound"),
+            "required_followup_lag_multiplier_over_current": number(
+                envelope,
+                "required_followup_lag_multiplier_over_current",
+            ),
+            "ready_late_recovery_outcome_count": float(len(ready_outcomes)),
+            "support_outcome_count": float(len(support_scenarios)),
+            "rejection_outcome_count": float(len(rejection_scenarios)),
+            "mechanism_selection_claim_allowed_now": float(mechanism_selection_claim_allowed_now),
+            "real_pe_inversion_ready": float(real_pe_inversion_ready_value),
+            "thermodynamic_claim_allowed": 0.0,
+            "allowed_claim_level": allowed_claim_level,
+            "primary_blocker": primary_blocker,
+            "cached_microdynamic_verdict_stage": stage,
+        }
+
+    return [
+        verdict_row(
+            verdict_row_id="real_cached_persistence_clock",
+            stage="real_cached_persistence_clock_quantified"
+            if persistence_ready
+            else "real_cached_persistence_clock_incomplete",
+            allowed_claim_level="interval_censored_persistence_candidate",
+            real_cached_evidence_ready=float(persistence_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            primary_blocker=str(persistence.get("primary_blocker", "interval_censored_clock"))
+            if not persistence_ready
+            else "exchange_clock_and_replica_identity",
+        ),
+        verdict_row(
+            verdict_row_id="conditional_persistence_exchange_bound",
+            stage="conditional_pe_decoupling_bound_ready"
+            if envelope_ready
+            else "conditional_pe_decoupling_bound_incomplete",
+            allowed_claim_level="conditional_pe_ratio_bound_not_full_inversion",
+            real_cached_evidence_ready=float(envelope_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            finite_exchange_envelope_ready=float(envelope_ready),
+            exchange_clock_ready_value=exchange_clock_ready,
+            real_pe_inversion_ready_value=real_pe_ready,
+            primary_blocker=str(envelope.get("primary_blocker", "finite_exchange_envelope")),
+        ),
+        verdict_row(
+            verdict_row_id="late_recovery_decision_protocol",
+            stage="late_recovery_protocol_preregistered"
+            if support_scenarios and rejection_scenarios
+            else "late_recovery_protocol_incomplete",
+            allowed_claim_level="preregistered_late_recovery_decision_protocol",
+            real_cached_evidence_ready=float(envelope_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            finite_exchange_envelope_ready=float(envelope_ready),
+            late_recovery_decision_protocol_ready=float(bool(support_scenarios and rejection_scenarios)),
+            event_segmentation_target_ready=float(event_target_ready),
+            event_clock_extraction_ready=float(event_clock_ready),
+            exchange_clock_ready_value=exchange_clock_ready,
+            mechanism_selection_claim_allowed_now=0.0,
+            real_pe_inversion_ready_value=real_pe_ready,
+            primary_blocker="late_recovery_measurement" if support_scenarios and rejection_scenarios else "outcome_matrix",
+        ),
+        verdict_row(
+            verdict_row_id="real_pe_inversion_boundary",
+            stage="real_pe_inversion_ready" if real_pe_ready == 1.0 else "real_pe_inversion_still_blocked",
+            allowed_claim_level="real_pe_inversion_claim_blocked"
+            if real_pe_ready == 0.0
+            else "real_persistence_exchange_inversion_ready",
+            real_cached_evidence_ready=float(persistence_ready and envelope_ready and event_target_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            finite_exchange_envelope_ready=float(envelope_ready),
+            late_recovery_decision_protocol_ready=float(bool(support_scenarios and rejection_scenarios)),
+            event_segmentation_target_ready=float(event_target_ready),
+            event_clock_extraction_ready=float(event_clock_ready),
+            exchange_clock_ready_value=exchange_clock_ready,
+            mechanism_selection_claim_allowed_now=0.0,
+            real_pe_inversion_ready_value=real_pe_ready,
+            primary_blocker=blocker,
+        ),
+    ]
+
+
 def glassbench_late_recovery_falsification_protocol(
     *,
     protocol_id: str,

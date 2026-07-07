@@ -68,6 +68,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
     glassbench_finite_exchange_falsification_envelope,
+    glassbench_real_cached_microdynamic_verdict,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
@@ -4476,6 +4477,27 @@ def write_sota_glassbench_finite_exchange_envelope_csv(
         persistence_fit_rows=persistence_fit_rows,
         max_exchange_mean_over_tau_alpha=1.0,
         min_exchange_events_for_gaussian_recovery=25.0,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_cached_microdynamic_verdict_csv(
+    path: Path,
+    *,
+    persistence_fit_rows: list[dict[str, float | str]],
+    finite_exchange_envelope_rows: list[dict[str, float | str]],
+    event_clock_contract_rows: list[dict[str, float | str]],
+    late_recovery_outcome_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the real cached GlassBench microdynamic evidence verdict."""
+
+    rows = glassbench_real_cached_microdynamic_verdict(
+        verdict_id="glassbench_real_cached_microdynamic_verdict",
+        persistence_fit_rows=persistence_fit_rows,
+        finite_exchange_envelope_rows=finite_exchange_envelope_rows,
+        event_clock_contract_rows=event_clock_contract_rows,
+        late_recovery_outcome_rows=late_recovery_outcome_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9752,6 +9774,63 @@ def write_sota_glassbench_interval_censored_persistence_fit_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_cached_microdynamic_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1240, 390
+    left, top = 70, 112
+    row_h = 58
+    colors = {
+        "real_cached_persistence_clock_quantified": "#2f855a",
+        "real_cached_persistence_clock_incomplete": "#9f1239",
+        "conditional_pe_decoupling_bound_ready": "#276749",
+        "conditional_pe_decoupling_bound_incomplete": "#9f1239",
+        "late_recovery_protocol_preregistered": "#2b6cb0",
+        "late_recovery_protocol_incomplete": "#9f1239",
+        "real_pe_inversion_ready": "#2f855a",
+        "real_pe_inversion_still_blocked": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["cached_microdynamic_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["verdict_row_id"]).replace("_", " ")[:38]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 280}" y="{y}" width="335" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 290}" y="{y + 16}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:54]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 640}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">evidence={int(float(row["real_cached_evidence_ready"]))}; persistence={int(float(row["interval_persistence_fit_ready"]))}; envelope={int(float(row["finite_exchange_envelope_ready"]))}; inversion={int(float(row["real_pe_inversion_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 915}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">taup/taua={float(row["mean_persistence_over_tau_alpha"]):.2f}; PE bound={float(row["conditional_pe_ratio_lower_bound"]):.2f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 280}" y="{y + 42}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:58]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:46]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-cached microdynamic verdict</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached KA2D coordinates quantify interval-censored persistence evidence and a conditional finite-exchange bound, while full PE inversion remains blocked.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">verdict row</text>
+  <text x="{left + 280}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 640}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness flags</text>
+  <text x="{left + 915}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">microdynamic scales</text>
+  {"".join(marks)}
+  <rect x="70" y="346" width="14" height="14" fill="#2f855a" /><text x="92" y="358" font-family="Arial, sans-serif" font-size="12">real cached persistence quantified</text>
+  <rect x="330" y="346" width="14" height="14" fill="#2b6cb0" /><text x="352" y="358" font-family="Arial, sans-serif" font-size="12">late-recovery protocol registered</text>
+  <rect x="610" y="346" width="14" height="14" fill="#805ad5" /><text x="632" y="358" font-family="Arial, sans-serif" font-size="12">full PE inversion blocked</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_finite_exchange_envelope_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13689,6 +13768,19 @@ def main() -> None:
     write_sota_glassbench_late_recovery_outcome_matrix_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.svg",
         glassbench_late_recovery_outcome_matrix_rows,
+    )
+    glassbench_real_cached_microdynamic_verdict_rows = (
+        write_sota_glassbench_real_cached_microdynamic_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv",
+            persistence_fit_rows=glassbench_interval_censored_persistence_fit_rows,
+            finite_exchange_envelope_rows=glassbench_finite_exchange_envelope_rows,
+            event_clock_contract_rows=glassbench_direct_alpha_event_clock_contract_rows,
+            late_recovery_outcome_rows=glassbench_late_recovery_outcome_matrix_rows,
+        )
+    )
+    write_sota_glassbench_real_cached_microdynamic_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.svg",
+        glassbench_real_cached_microdynamic_verdict_rows,
     )
     glassbench_late_recovery_decision_power_plan_rows = (
         write_sota_glassbench_late_recovery_decision_power_plan_csv(

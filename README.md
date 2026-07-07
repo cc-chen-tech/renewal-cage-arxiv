@@ -358,6 +358,13 @@ first-crossing `q` is `3.44 q_max`; however, `23.6%` of post-crossing samples
 recross below the threshold and the leading axis remains an isoconfigurational
 replica axis. The canary therefore supplies a concrete segmentation target but
 still records `persistence_exchange_event_clock_ready=0`.
+The real-cached microdynamic verdict then consolidates this lag ladder into a
+stronger real-data statement: the interval-censored fit quantifies a cached
+persistence-clock candidate with `tau_p/tau_alpha=3.65` and a crossed-fraction
+residual below `10^-3`, while the conditional finite-exchange envelope gives a
+`tau_p/tau_x` lower bound under the explicit exchange-clock assumption. It still
+blocks full persistence/exchange inversion because the exchange clock, true
+physical-time trajectory axis, and late-recovery measurement are not present.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve
@@ -538,6 +545,7 @@ figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.svg
 figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg
 figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.svg
 figures/renewal_cage_sota_glassbench_finite_exchange_envelope.svg
+figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.svg
 figures/renewal_cage_sota_glassbench_late_recovery_protocol.svg
 figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.svg
 figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.svg
@@ -665,6 +673,7 @@ data/renewal_cage_sota_glassbench_sparse_lag_event_clock.csv
 data/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv
 data/renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv
 data/renewal_cage_sota_glassbench_finite_exchange_envelope.csv
+data/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv
 data/renewal_cage_sota_glassbench_late_recovery_protocol.csv
 data/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.csv
 data/renewal_cage_sota_glassbench_late_recovery_timecode_target.csv
@@ -813,6 +822,7 @@ paper/figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf
 paper/figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf
 paper/figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf
 paper/figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf
+paper/figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf
 paper/figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf
 paper/figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf
 paper/figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf

@@ -149,6 +149,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
     glassbench_finite_exchange_falsification_envelope,
+    glassbench_real_cached_microdynamic_verdict,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
@@ -1052,6 +1053,98 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "late_ngp_followup_and_exchange_clock")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_cached_microdynamic_verdict_separates_evidence_from_inversion(self):
+        rows = glassbench_real_cached_microdynamic_verdict(
+            verdict_id="glassbench_real_cached_microdynamic_verdict",
+            persistence_fit_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "persistence_fit_ready": 1.0,
+                    "exponential_mean_persistence_time": 5472781.231591796,
+                    "tau_alpha_direct": 1500000.0,
+                    "mean_persistence_over_tau_alpha_direct": 3.6485208210611972,
+                    "observed_crossed_fraction": 0.24007751937984495,
+                    "predicted_crossed_fraction_at_latest_lag": 0.23973154391606166,
+                    "exchange_clock_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "primary_blocker": "exchange_clock_and_replica_identity",
+                }
+            ],
+            finite_exchange_envelope_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "envelope_ready": 1.0,
+                    "conditional_persistence_exchange_ratio_lower_bound": 3.6485208210611972,
+                    "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+                    "required_followup_lag_multiplier_over_current": 28.648520821061197,
+                    "late_ngp_followup_ready": 0.0,
+                    "exchange_clock_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "primary_blocker": "late_ngp_followup_and_exchange_clock",
+                }
+            ],
+            event_clock_contract_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "event_segmentation_target_ready": 1.0,
+                    "cached_replica_ladder_ready": 1.0,
+                    "axis0_is_physical_time": 0.0,
+                    "event_clock_extraction_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "primary_blocker": "physical_time_trajectory_axis",
+                }
+            ],
+            late_recovery_outcome_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "outcome_scenario": "low_late_ngp_gaussian_recovery",
+                    "uncertainty_decision_ready": 1.0,
+                    "claim_if_observed": "finite_exchange_supported_static_disorder_rejected",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "outcome_scenario": "high_late_ngp_or_missing_recovery",
+                    "uncertainty_decision_ready": 1.0,
+                    "claim_if_observed": "finite_exchange_rejected_or_model_reparameterization_required",
+                },
+            ],
+        )
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        persistence = by_id["real_cached_persistence_clock"]
+        pe_bound = by_id["conditional_persistence_exchange_bound"]
+        recovery = by_id["late_recovery_decision_protocol"]
+        inversion = by_id["real_pe_inversion_boundary"]
+
+        self.assertEqual(persistence["cached_microdynamic_verdict_stage"], "real_cached_persistence_clock_quantified")
+        self.assertEqual(float(persistence["real_cached_evidence_ready"]), 1.0)
+        self.assertAlmostEqual(float(persistence["mean_persistence_over_tau_alpha"]), 3.6485208210611972)
+        self.assertLess(float(persistence["crossing_fraction_abs_residual"]), 0.001)
+
+        self.assertEqual(pe_bound["cached_microdynamic_verdict_stage"], "conditional_pe_decoupling_bound_ready")
+        self.assertGreater(float(pe_bound["conditional_pe_ratio_lower_bound"]), 3.0)
+        self.assertEqual(float(pe_bound["real_pe_inversion_ready"]), 0.0)
+
+        self.assertEqual(recovery["cached_microdynamic_verdict_stage"], "late_recovery_protocol_preregistered")
+        self.assertEqual(float(recovery["late_recovery_decision_protocol_ready"]), 1.0)
+        self.assertEqual(float(recovery["mechanism_selection_claim_allowed_now"]), 0.0)
+
+        self.assertEqual(inversion["cached_microdynamic_verdict_stage"], "real_pe_inversion_still_blocked")
+        self.assertEqual(float(inversion["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(inversion["event_clock_extraction_ready"]), 0.0)
+        self.assertIn("physical_time_trajectory_axis", inversion["primary_blocker"])
+        self.assertEqual(float(inversion["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_late_recovery_protocol_classifies_support_and_rejection(self):
         envelope_rows = [

@@ -4609,6 +4609,68 @@ def write_sota_glassbench_finite_exchange_envelope_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_real_cached_microdynamic_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real-cached microdynamic verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cached KA2D coordinates quantify censored persistence evidence and a conditional PE bound while full PE inversion remains blocked.",
+    )
+    left, top = 42, page_h - 90
+    row_h = 42
+    colors_by_stage = {
+        "real_cached_persistence_clock_quantified": colors.HexColor("#2f855a"),
+        "conditional_pe_decoupling_bound_ready": colors.HexColor("#276749"),
+        "late_recovery_protocol_preregistered": colors.HexColor("#2b6cb0"),
+        "real_pe_inversion_still_blocked": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top + 18, "verdict row")
+    c.drawString(left + 205, top + 18, "stage")
+    c.drawString(left + 500, top + 18, "readiness / scale")
+    c.drawString(left + 650, top + 18, "claim boundary")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cached_microdynamic_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.2)
+        c.drawString(left, y, row["verdict_row_id"].replace("_", " ")[:31])
+        c.setFillColor(color)
+        c.rect(left + 205, y - 12, 270, 22, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.7)
+        c.drawString(left + 213, y - 3, stage.replace("_", " ")[:45])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 500,
+            y,
+            "evidence={:.0f}; inv={:.0f}; taup/taua={:.2f}; PE>={:.2f}".format(
+                float(row["real_cached_evidence_ready"]),
+                float(row["real_pe_inversion_ready"]),
+                float(row["mean_persistence_over_tau_alpha"]),
+                float(row["conditional_pe_ratio_lower_bound"]),
+            ),
+        )
+        c.drawString(left + 650, y, row["allowed_claim_level"].replace("_", " ")[:40])
+        c.drawString(left + 650, y - 10, f'blocker={row["primary_blocker"].replace("_", " ")[:38]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The verdict upgrades real cached trajectory evidence while preserving exchange-clock, physical-time-axis, and thermodynamic scope blockers.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_late_recovery_protocol_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7806,6 +7868,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_finite_exchange_envelope_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.pdf"
     )
+    sota_glassbench_real_cached_microdynamic_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf"
+    )
     sota_glassbench_late_recovery_protocol_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.pdf"
     )
@@ -8042,6 +8107,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_finite_exchange_envelope_pdf(
         sota_glassbench_finite_exchange_envelope_pdf
+    )
+    write_sota_glassbench_real_cached_microdynamic_verdict_pdf(
+        sota_glassbench_real_cached_microdynamic_verdict_pdf
     )
     write_sota_glassbench_late_recovery_protocol_pdf(
         sota_glassbench_late_recovery_protocol_pdf
@@ -8336,6 +8404,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_finite_exchange_envelope_pdf,
             "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_cached_microdynamic_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf",
         )
         archive.write(
             sota_glassbench_late_recovery_protocol_pdf,
