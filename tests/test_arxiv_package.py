@@ -1150,6 +1150,34 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_030["audit_stage"], "timecode_curve_upstream_incomplete")
         self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
 
+    def test_sota_glassbench_alpha_anchor_rescue_protocol_keeps_event_clock_blocked(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(
+            ka2d_023["rescue_stage"],
+            "alpha_anchor_rescue_design_ready_real_event_clock_blocked",
+        )
+        self.assertGreater(float(ka2d_023["required_anchor_wave_number"]), 1.6)
+        self.assertGreater(float(ka2d_023["required_anchor_wave_number_over_observed_max"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_anchor_measurement_required"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_anchor_rescue_design_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["post_rescue_alpha_definition_consistent"]), 1.0)
+        self.assertEqual(float(ka2d_023["post_rescue_real_closed_loop_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "physical_time_semantics")
+        self.assertIn("threshold_sweep_event_clock", ka2d_023["remaining_post_rescue_blockers"])
+        self.assertIn("persistence_exchange_event_clock", ka2d_023["remaining_post_rescue_blockers"])
+        self.assertNotIn("alpha_definition_consistency", ka2d_023["remaining_post_rescue_blockers"])
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["rescue_stage"], "alpha_anchor_rescue_upstream_incomplete")
+        self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2166,6 +2194,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2348,6 +2377,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
+            "figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

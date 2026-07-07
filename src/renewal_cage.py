@@ -5873,6 +5873,129 @@ def glassbench_alpha_threshold_horizon_audit(
     return out
 
 
+def glassbench_alpha_anchor_rescue_protocol(
+    *,
+    protocol_id: str,
+    alpha_horizon_rows: Sequence[dict[str, object]],
+    event_clock_rows: Sequence[dict[str, object]],
+    closed_loop_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """State what an added GlassBench alpha-anchor Fs measurement would unlock."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not alpha_horizon_rows:
+        raise ValueError("alpha_horizon_rows must be nonempty")
+    if not event_clock_rows:
+        raise ValueError("event_clock_rows must be nonempty")
+    if not closed_loop_rows:
+        raise ValueError("closed_loop_rows must be nonempty")
+
+    event_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in event_clock_rows
+    }
+    closed_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in closed_loop_rows
+    }
+
+    def split_missing(value: object) -> list[str]:
+        text = str(value or "none")
+        if not text or text == "none":
+            return []
+        return [part for part in text.split(";") if part and part != "none"]
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        alpha_horizon_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        key = (system_id, temperature)
+        event = event_by_key.get(key, {})
+        closed = closed_by_key.get(key, {})
+
+        required_k = float(row.get("estimated_threshold_wave_number_at_latest_lag", 0.0) or 0.0)
+        k_ratio = float(row.get("threshold_wave_number_over_max_observed", 0.0) or 0.0)
+        k_covered = float(row.get("alpha_threshold_wave_number_covered", 0.0) or 0.0) == 1.0
+        alpha_consistent_now = (
+            float(row.get("metadata_tau_alpha_consistent_with_anchor_fs", 0.0) or 0.0) == 1.0
+        )
+        alpha_blocker = str(row.get("primary_blocker", "none"))
+        alpha_measurement_required = (
+            alpha_blocker == "alpha_anchor_wave_number_outside_observed_grid"
+            and required_k > 0.0
+            and not k_covered
+        )
+        rescue_design_ready = alpha_measurement_required and k_ratio > 1.0
+        post_rescue_alpha_consistent = alpha_consistent_now or rescue_design_ready
+
+        remaining = split_missing(event.get("missing_real_threshold_inputs", "none"))
+        remaining.extend(split_missing(closed.get("missing_closed_loop_inputs", "none")))
+        if post_rescue_alpha_consistent:
+            remaining = [
+                item
+                for item in remaining
+                if item
+                not in {
+                    "alpha_definition_consistency",
+                    "alpha_anchor_wave_number_outside_observed_grid",
+                    "alpha_threshold_crossing",
+                }
+            ]
+        remaining = list(dict.fromkeys(remaining))
+
+        event_ready = float(event.get("real_event_clock_threshold_robustness_ready", 0.0) or 0.0) == 1.0
+        closed_ready_now = float(closed.get("closed_loop_ready", 0.0) or 0.0) == 1.0
+        post_rescue_closed_loop_ready = post_rescue_alpha_consistent and event_ready and closed_ready_now
+
+        if post_rescue_closed_loop_ready:
+            stage = "alpha_anchor_rescue_closed_loop_ready"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        elif rescue_design_ready:
+            stage = "alpha_anchor_rescue_design_ready_real_event_clock_blocked"
+            blocker = remaining[0] if remaining else str(event.get("primary_blocker", "real_event_clock"))
+            next_action = "recompute_fs_at_required_anchor_wave_number_then_extract_event_clock"
+        elif str(row.get("audit_stage", "")).endswith("upstream_incomplete"):
+            stage = "alpha_anchor_rescue_upstream_incomplete"
+            blocker = alpha_blocker
+            next_action = "complete_timecode_curve_before_alpha_anchor_rescue"
+        elif alpha_consistent_now:
+            stage = "alpha_anchor_already_consistent_real_event_clock_blocked"
+            blocker = remaining[0] if remaining else str(event.get("primary_blocker", "real_event_clock"))
+            next_action = "extract_event_clock_and_heldout_macro_observables"
+        else:
+            stage = "alpha_anchor_rescue_design_blocked"
+            blocker = alpha_blocker
+            next_action = "estimate_required_anchor_wave_number_before_rescue"
+
+        out.append(
+            {
+                "protocol_id": protocol_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "required_anchor_wave_number": float(required_k),
+                "required_anchor_wave_number_over_observed_max": float(k_ratio),
+                "observed_alpha_anchor_wave_number_covered": float(k_covered),
+                "alpha_anchor_measurement_required": float(alpha_measurement_required),
+                "alpha_anchor_rescue_design_ready": float(rescue_design_ready),
+                "current_alpha_definition_consistent": float(alpha_consistent_now),
+                "post_rescue_alpha_definition_consistent": float(post_rescue_alpha_consistent),
+                "post_rescue_event_clock_ready": float(event_ready),
+                "post_rescue_real_closed_loop_ready": float(post_rescue_closed_loop_ready),
+                "remaining_post_rescue_blockers": ";".join(remaining) if remaining else "none",
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "rescue_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

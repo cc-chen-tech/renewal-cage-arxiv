@@ -49,6 +49,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
     gamma_exchange_temperature_scan,
+    glassbench_alpha_anchor_rescue_protocol,
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_cached_particle_timecode_bridge,
@@ -3948,6 +3949,25 @@ def write_sota_glassbench_alpha_threshold_horizon_csv(
         timecode_rows=timecode_rows,
         bridge_rows=bridge_rows,
         anchor_wave_number=1.1,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_alpha_anchor_rescue_protocol_csv(
+    path: Path,
+    *,
+    alpha_horizon_rows: list[dict[str, float | str]],
+    event_clock_rows: list[dict[str, float | str]],
+    closed_loop_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Convert the GlassBench alpha-anchor k-grid blocker into a rescue protocol."""
+
+    rows = glassbench_alpha_anchor_rescue_protocol(
+        protocol_id="glassbench_ka2d_alpha_anchor_rescue",
+        alpha_horizon_rows=alpha_horizon_rows,
+        event_clock_rows=event_clock_rows,
+        closed_loop_rows=closed_loop_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8327,6 +8347,59 @@ def write_sota_glassbench_alpha_threshold_horizon_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_alpha_anchor_rescue_protocol_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "alpha_anchor_rescue_closed_loop_ready": "#2f855a",
+        "alpha_anchor_rescue_design_ready_real_event_clock_blocked": "#9f1239",
+        "alpha_anchor_already_consistent_real_event_clock_blocked": "#b7791f",
+        "alpha_anchor_rescue_upstream_incomplete": "#2b6cb0",
+        "alpha_anchor_rescue_design_blocked": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["rescue_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        required_k = float(row["required_anchor_wave_number"])
+        k_ratio = float(row["required_anchor_wave_number_over_observed_max"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">required k={required_k:.3g}; k/kmax={k_ratio:.3g}; anchor measurement={int(float(row["alpha_anchor_measurement_required"]))}; design={int(float(row["alpha_anchor_rescue_design_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">post-rescue alpha consistent={int(float(row["post_rescue_alpha_definition_consistent"]))}; closed-loop ready={int(float(row["post_rescue_real_closed_loop_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">remaining={str(row["remaining_post_rescue_blockers"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench alpha-anchor rescue protocol</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A proposed higher-k Fs measurement can resolve the alpha-anchor blocker, but event-clock and held-out prediction gates remain separate.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">rescue stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">post-rescue claim boundary</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11125,6 +11198,18 @@ def main() -> None:
     write_sota_glassbench_microdynamic_closed_loop_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.svg",
         microdynamic_closed_loop_rows,
+    )
+    glassbench_alpha_anchor_rescue_protocol_rows = (
+        write_sota_glassbench_alpha_anchor_rescue_protocol_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv",
+            alpha_horizon_rows=glassbench_alpha_threshold_horizon_rows,
+            event_clock_rows=glassbench_event_clock_threshold_readiness_rows,
+            closed_loop_rows=microdynamic_closed_loop_rows,
+        )
+    )
+    write_sota_glassbench_alpha_anchor_rescue_protocol_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg",
+        glassbench_alpha_anchor_rescue_protocol_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

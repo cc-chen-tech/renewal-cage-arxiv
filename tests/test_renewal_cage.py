@@ -134,6 +134,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
     glassbench_alpha_threshold_horizon_audit,
+    glassbench_alpha_anchor_rescue_protocol,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -399,6 +400,62 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(float(row["estimated_lag_extension_factor"]), 1.0)
         self.assertEqual(row["primary_blocker"], "alpha_anchor_wave_number_outside_observed_grid")
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_alpha_anchor_rescue_protocol_separates_anchor_from_event_clock(self):
+        alpha_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "estimated_threshold_wave_number_at_latest_lag": 2.7,
+                "threshold_wave_number_over_max_observed": 1.69,
+                "alpha_threshold_wave_number_covered": 0.0,
+                "metadata_tau_alpha_reached": 1.0,
+                "alpha_threshold_crossed": 0.0,
+                "metadata_tau_alpha_consistent_with_anchor_fs": 0.0,
+                "primary_blocker": "alpha_anchor_wave_number_outside_observed_grid",
+                "audit_stage": "metadata_tau_alpha_anchor_fs_mismatch",
+            }
+        ]
+        event_clock_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "threshold_sweep_event_clock_ready": 0.0,
+                "macro_heldout_observables_ready": 0.0,
+                "real_event_clock_threshold_robustness_ready": 0.0,
+                "missing_real_threshold_inputs": "physical_time_semantics;macro_heldout_observables;threshold_sweep_event_clock",
+                "primary_blocker": "physical_time_semantics",
+            }
+        ]
+        closed_loop_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "missing_closed_loop_inputs": "physical_time_semantics;cage_jump_event_segmentation;persistence_exchange_event_clock;alpha_definition_consistency;real_persistence_exchange_inversion",
+                "closed_loop_ready": 0.0,
+                "primary_blocker": "physical_time_semantics",
+            }
+        ]
+
+        row = glassbench_alpha_anchor_rescue_protocol(
+            protocol_id="glassbench_alpha_anchor_rescue",
+            alpha_horizon_rows=alpha_rows,
+            event_clock_rows=event_clock_rows,
+            closed_loop_rows=closed_loop_rows,
+        )[0]
+
+        self.assertEqual(row["rescue_stage"], "alpha_anchor_rescue_design_ready_real_event_clock_blocked")
+        self.assertEqual(float(row["required_anchor_wave_number"]), 2.7)
+        self.assertGreater(float(row["required_anchor_wave_number_over_observed_max"]), 1.0)
+        self.assertEqual(float(row["alpha_anchor_measurement_required"]), 1.0)
+        self.assertEqual(float(row["alpha_anchor_rescue_design_ready"]), 1.0)
+        self.assertEqual(float(row["post_rescue_alpha_definition_consistent"]), 1.0)
+        self.assertEqual(float(row["post_rescue_real_closed_loop_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+        self.assertIn("threshold_sweep_event_clock", row["remaining_post_rescue_blockers"])
+        self.assertIn("persistence_exchange_event_clock", row["remaining_post_rescue_blockers"])
+        self.assertNotIn("alpha_definition_consistency", row["remaining_post_rescue_blockers"])
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

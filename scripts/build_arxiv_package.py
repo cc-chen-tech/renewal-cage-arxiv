@@ -3558,6 +3558,83 @@ def write_sota_glassbench_alpha_threshold_horizon_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_alpha_anchor_rescue_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench alpha-anchor rescue protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A higher-k Fs measurement is separated from event-clock and held-out prediction gates.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "alpha_anchor_rescue_closed_loop_ready": colors.HexColor("#2f855a"),
+        "alpha_anchor_rescue_design_ready_real_event_clock_blocked": colors.HexColor("#9f1239"),
+        "alpha_anchor_already_consistent_real_event_clock_blocked": colors.HexColor("#b7791f"),
+        "alpha_anchor_rescue_upstream_incomplete": colors.HexColor("#2b6cb0"),
+        "alpha_anchor_rescue_design_blocked": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "rescue stage")
+    c.drawString(left + 390, top + 24, "post-rescue claim boundary")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["rescue_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "required k={:.3g}; k/kmax={:.3g}; anchor measurement={}; design={}; blocker={}".format(
+                float(row["required_anchor_wave_number"]),
+                float(row["required_anchor_wave_number_over_observed_max"]),
+                int(float(row["alpha_anchor_measurement_required"])),
+                int(float(row["alpha_anchor_rescue_design_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "post-rescue alpha consistent={}; event clock={}; closed loop={}".format(
+                int(float(row["post_rescue_alpha_definition_consistent"])),
+                int(float(row["post_rescue_event_clock_ready"])),
+                int(float(row["post_rescue_real_closed_loop_ready"])),
+            ),
+        )
+        c.drawString(
+            left + 390,
+            y - 27,
+            f'remaining={row["remaining_post_rescue_blockers"].replace("_", " ")[:74]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Resolving the alpha-anchor k-grid gap does not by itself establish a persistence/exchange event-clock inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5812,6 +5889,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_alpha_threshold_horizon_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf"
     )
+    sota_glassbench_alpha_anchor_rescue_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -5973,6 +6053,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_alpha_threshold_horizon_pdf(
         sota_glassbench_alpha_threshold_horizon_pdf
+    )
+    write_sota_glassbench_alpha_anchor_rescue_protocol_pdf(
+        sota_glassbench_alpha_anchor_rescue_protocol_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6171,6 +6254,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_alpha_threshold_horizon_pdf,
             "figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf",
+        )
+        archive.write(
+            sota_glassbench_alpha_anchor_rescue_protocol_pdf,
+            "figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,
