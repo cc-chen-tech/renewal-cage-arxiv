@@ -930,6 +930,76 @@ def write_glass_audit_pdf(path: Path) -> None:
     c.save()
 
 
+def write_glass_signature_claim_ladder_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_glass_signature_claim_ladder.csv").open() as f:
+        rows = list(csv.DictReader(f))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Dynamical-glass claim ladder")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The delayed-renewal theory promotes derived dynamical signatures while blocking thermodynamic and direct spatial overclaims.",
+    )
+
+    left, bottom = 55, 74
+    chart_w, chart_h = page_w - 110, 345
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(left, bottom + chart_h + 18, "Supported public-claim levels")
+    c.line(left, bottom, left + chart_w, bottom)
+    c.line(left, bottom, left, bottom + chart_h)
+
+    colors_by_status = {
+        "derived_dynamic_signature": colors.HexColor("#2f855a"),
+        "conditional_barrier_law_signature": colors.HexColor("#d69e2e"),
+        "proxy_spatial_closure": colors.HexColor("#2b6cb0"),
+        "out_of_scope_thermodynamic_transition": colors.HexColor("#805ad5"),
+        "unsupported_in_current_parameter_law": colors.HexColor("#a0aec0"),
+    }
+    bar_gap = 8
+    bar_w = chart_w / len(rows) - bar_gap
+    for idx, row in enumerate(rows):
+        x = left + idx * (bar_w + bar_gap)
+        support = float(row["model_support"])
+        c.setFillColor(colors_by_status.get(row["theory_status"], colors.grey))
+        c.rect(x, bottom, bar_w, support * (chart_h - 55), fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 5.8)
+        c.saveState()
+        c.translate(x + 4, bottom - 8)
+        c.rotate(-44)
+        c.drawRightString(0, 0, row["signature"].replace("_", " ")[:42])
+        c.restoreState()
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(x + bar_w / 2, bottom + support * (chart_h - 55) + 6, f"{support:.1f}")
+
+    legend_x, legend_y = 58, page_h - 86
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(legend_x, legend_y, "Theory status")
+    c.setFont("Helvetica", 7)
+    for idx, (claim_class, color) in enumerate(colors_by_status.items()):
+        y = legend_y - 15 - idx * 14
+        c.setFillColor(color)
+        c.rect(legend_x, y - 3, 8, 8, fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.drawString(legend_x + 13, y - 1, claim_class.replace("_", " "))
+
+    notes = [
+        "Fragility remains conditional on an imposed barrier law.",
+        "chi4 is a renewal/domain proxy, not a direct four-point spatial derivation.",
+        "Thermodynamic transition claims are explicitly outside the dynamical renewal scope.",
+    ]
+    c.setFont("Helvetica", 8)
+    for idx, note in enumerate(notes):
+        c.drawString(370, page_h - 104 - idx * 14, note)
+    c.showPage()
+    c.save()
+
+
 def write_glass_phase_diagram_pdf(path: Path) -> None:
     data = read_csv_columns(DATA_DIR / "renewal_cage_glass_phase_diagram.csv")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1075,6 +1145,70 @@ def write_thermodynamic_closure_pdf(path: Path) -> None:
         ],
         "AF. Adam-Gibbs kinetic coupling",
         xlabel="inverse-temperature shift",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_thermodynamic_nonidentifiability_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_thermodynamic_nonidentifiability.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    row = rows[0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Thermodynamic non-identifiability certificate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Matched renewal dynamics do not identify configurational entropy, heat capacity, or Kauzmann closure.",
+    )
+    left, top = 70, page_h - 108
+    dyn_distance = float(row["dynamic_observable_distance"])
+    thermo_distance = float(row["thermodynamic_observable_distance"])
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(left, top, "matched dynamical observables")
+    c.setFillColor(colors.HexColor("#e2e8f0"))
+    c.rect(left, top - 28, 220, 18, fill=1, stroke=0)
+    c.setFillColor(colors.HexColor("#2f855a"))
+    c.rect(left, top - 28, 220 * (1.0 - min(dyn_distance, 1.0)), 18, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    c.drawString(left + 235, top - 24, f"distance={dyn_distance:.3g}")
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(left, top - 78, "distinct thermodynamic closure")
+    c.setFillColor(colors.HexColor("#e2e8f0"))
+    c.rect(left, top - 106, 220, 18, fill=1, stroke=0)
+    c.setFillColor(colors.HexColor("#c05621"))
+    c.rect(left, top - 106, 220 * min(thermo_distance, 1.0), 18, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    c.drawString(left + 235, top - 102, f"distance={thermo_distance:.3g}")
+    c.setFillColor(colors.HexColor("#805ad5"))
+    c.rect(455, top - 118, 285, 102, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica", 8)
+    c.drawString(472, top - 42, row["certificate_stage"].replace("_", " ")[:46])
+    c.drawString(
+        472,
+        top - 66,
+        "thermo identifiable from dynamics = {}".format(
+            int(float(row["thermodynamic_identifiable_from_dynamics"]))
+        ),
+    )
+    c.drawString(
+        472,
+        top - 88,
+        f'thermodynamic claim allowed = {int(float(row["thermodynamic_claim_allowed"]))}',
+    )
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This no-go certificate turns the thermodynamic scope boundary into a falsifiable identifiability statement.",
     )
     c.showPage()
     c.save()
@@ -8371,9 +8505,13 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     translation_rotation_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_translation_rotation_protocol.pdf"
     glass_audit_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_audit.pdf"
+    glass_signature_claim_ladder_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_signature_claim_ladder.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
     thermodynamic_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_closure.pdf"
+    thermodynamic_nonidentifiability_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_nonidentifiability.pdf"
+    )
     mct_beta_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_mct_beta_closure.pdf"
     sota_benchmark_consistency_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_benchmark_consistency.pdf"
     sota_claim_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_claim_alignment.pdf"
@@ -8665,9 +8803,11 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_persistence_exchange_uncertainty_protocol_pdf(persistence_exchange_uncertainty_protocol_pdf)
     write_translation_rotation_protocol_pdf(translation_rotation_protocol_pdf)
     write_glass_audit_pdf(glass_audit_pdf)
+    write_glass_signature_claim_ladder_pdf(glass_signature_claim_ladder_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_spatial_chi4_pdf(spatial_chi4_pdf)
     write_thermodynamic_closure_pdf(thermodynamic_closure_pdf)
+    write_thermodynamic_nonidentifiability_pdf(thermodynamic_nonidentifiability_pdf)
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
     write_sota_benchmark_consistency_pdf(sota_benchmark_consistency_pdf)
     write_sota_claim_alignment_pdf(sota_claim_alignment_pdf)
@@ -8926,9 +9066,17 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         )
         archive.write(translation_rotation_protocol_pdf, "figures/renewal_cage_translation_rotation_protocol.pdf")
         archive.write(glass_audit_pdf, "figures/renewal_cage_glass_audit.pdf")
+        archive.write(
+            glass_signature_claim_ladder_pdf,
+            "figures/renewal_cage_glass_signature_claim_ladder.pdf",
+        )
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")
         archive.write(thermodynamic_closure_pdf, "figures/renewal_cage_thermodynamic_closure.pdf")
+        archive.write(
+            thermodynamic_nonidentifiability_pdf,
+            "figures/renewal_cage_thermodynamic_nonidentifiability.pdf",
+        )
         archive.write(mct_beta_closure_pdf, "figures/renewal_cage_mct_beta_closure.pdf")
         archive.write(sota_benchmark_consistency_pdf, "figures/renewal_cage_sota_benchmark_consistency.pdf")
         archive.write(sota_claim_alignment_pdf, "figures/renewal_cage_sota_claim_alignment.pdf")

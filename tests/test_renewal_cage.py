@@ -36,6 +36,7 @@ from renewal_cage import (  # noqa: E402
     fractional_stokes_einstein_exponents,
     gamma_exchange_temperature_scan,
     glass_phenomenon_audit,
+    glass_signature_claim_ladder,
     glass_signature_phase_diagram,
     dynamic_heterogeneity_benchmark_consistency,
     dynamic_signature_alignment_ledger,
@@ -214,6 +215,7 @@ from renewal_cage import (  # noqa: E402
     sota_zip_structure_gate,
     sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
+    thermodynamic_nonidentifiability_certificate,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
@@ -4429,6 +4431,81 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(rows[-1]["thermodynamic_slowdown"], 10.0)
         self.assertGreater(rows[-1]["inverse_entropy_control"], rows[0]["inverse_entropy_control"])
         self.assertGreater(rows[-1]["excess_heat_capacity"], 0.0)
+
+    def test_thermodynamic_nonidentifiability_certificate_blocks_dynamic_overclaim(self):
+        dynamic_a = {
+            "diffusion_coefficient": 0.01,
+            "tau_alpha": 100.0,
+            "ngp_peak_value": 0.22,
+            "late_ngp": 0.01,
+            "self_intermediate_anchor": math.exp(-1.0),
+        }
+        dynamic_b = dict(dynamic_a)
+        thermodynamic_a = {
+            "configurational_entropy": 0.42,
+            "excess_heat_capacity": 1.3,
+            "kauzmann_temperature": 0.45,
+        }
+        thermodynamic_b = {
+            "configurational_entropy": 0.8,
+            "excess_heat_capacity": 0.55,
+            "kauzmann_temperature": 0.2,
+        }
+
+        row = thermodynamic_nonidentifiability_certificate(
+            certificate_id="thermodynamic_nonidentifiability",
+            dynamic_observables_a=dynamic_a,
+            dynamic_observables_b=dynamic_b,
+            thermodynamic_observables_a=thermodynamic_a,
+            thermodynamic_observables_b=thermodynamic_b,
+        )
+
+        self.assertEqual(row["certificate_stage"], "dynamical_equivalence_thermodynamic_nonidentifiability")
+        self.assertEqual(float(row["dynamic_observable_distance"]), 0.0)
+        self.assertGreater(float(row["thermodynamic_observable_distance"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_identifiable_from_dynamics"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "thermodynamic_closure_not_identified_by_dynamics")
+
+    def test_glass_signature_claim_ladder_separates_derived_proxy_and_scope_boundary_claims(self):
+        audit = {
+            "diffusion_slowdown": 1.0,
+            "alpha_slowdown": 1.0,
+            "ngp_peak_shift": 1.0,
+            "stokes_einstein_violation": 1.0,
+            "fragility_growth": 1.0,
+            "heterogeneity_growth": 1.0,
+            "stretched_alpha_window": 1.0,
+            "chi4_peak_growth": 1.0,
+            "gaussian_recovery": 1.0,
+            "thermodynamic_transition": 0.0,
+        }
+
+        rows = glass_signature_claim_ladder("unit_claim_ladder", audit)
+        by_signature = {row["signature"]: row for row in rows}
+
+        self.assertEqual(by_signature["gaussian_recovery"]["theory_status"], "derived_dynamic_signature")
+        self.assertEqual(float(by_signature["gaussian_recovery"]["public_dynamic_claim_allowed"]), 1.0)
+
+        fragility = by_signature["fragility_growth"]
+        self.assertEqual(fragility["theory_status"], "conditional_barrier_law_signature")
+        self.assertEqual(float(fragility["public_dynamic_claim_allowed"]), 1.0)
+        self.assertEqual(float(fragility["microscopic_origin_claim_allowed"]), 0.0)
+        self.assertEqual(fragility["primary_blocker"], "barrier_law_origin")
+
+        chi4 = by_signature["chi4_peak_growth"]
+        self.assertEqual(chi4["theory_status"], "proxy_spatial_closure")
+        self.assertEqual(float(chi4["requires_external_closure"]), 1.0)
+        self.assertEqual(float(chi4["direct_spatial_claim_allowed"]), 0.0)
+
+        thermodynamic = by_signature["thermodynamic_transition"]
+        self.assertEqual(thermodynamic["theory_status"], "out_of_scope_thermodynamic_transition")
+        self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(thermodynamic["public_dynamic_claim_allowed"]), 0.0)
+        self.assertNotIn(
+            "complete_glass_transition_theory",
+            {row["allowed_public_claim_level"] for row in rows},
+        )
 
     def test_mct_beta_correlator_has_critical_and_von_schweidler_slopes(self):
         beta = MCTBetaParams(

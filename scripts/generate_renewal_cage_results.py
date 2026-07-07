@@ -93,6 +93,8 @@ from renewal_cage import (  # noqa: E402
     glassbench_timecode_signature_support_gate,
     glassbench_direct_four_point_claim_gate,
     glassbench_real_data_closure_priority_ledger,
+    glass_signature_claim_ladder,
+    thermodynamic_nonidentifiability_certificate,
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
@@ -517,6 +519,22 @@ def write_glass_audit_csv(
                 "flag_value": value,
             }
         )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_glass_signature_claim_ladder_csv(
+    path: Path,
+    glass_audit_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write manuscript-safe claim levels from the glass phenomenon audit."""
+
+    audit = {
+        str(row["signature"]): float(row["flag_value"])
+        for row in glass_audit_rows
+        if row["record_type"] == "summary_flag"
+    }
+    rows = glass_signature_claim_ladder("glass_signature_claim_ladder", audit)
     write_sweep_csv(path, rows)
     return rows
 
@@ -1133,6 +1151,36 @@ def write_thermodynamic_closure_csv(
         cage_tau=cage_tau,
         jump_variance=jump_variance,
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_thermodynamic_nonidentifiability_csv(path: Path) -> list[dict[str, float | str]]:
+    """Show that matched dynamics do not identify the thermodynamic closure."""
+
+    dynamic_observables = {
+        "diffusion_coefficient": 0.01,
+        "tau_alpha": 100.0,
+        "ngp_peak_value": 0.22,
+        "late_ngp": 0.01,
+        "self_intermediate_anchor": math.exp(-1.0),
+    }
+    row = thermodynamic_nonidentifiability_certificate(
+        certificate_id="thermodynamic_nonidentifiability",
+        dynamic_observables_a=dynamic_observables,
+        dynamic_observables_b=dict(dynamic_observables),
+        thermodynamic_observables_a={
+            "configurational_entropy": 0.42,
+            "excess_heat_capacity": 1.3,
+            "kauzmann_temperature": 0.45,
+        },
+        thermodynamic_observables_b={
+            "configurational_entropy": 0.8,
+            "excess_heat_capacity": 0.55,
+            "kauzmann_temperature": 0.2,
+        },
+    )
+    rows = [row]
     write_sweep_csv(path, rows)
     return rows
 
@@ -7205,6 +7253,56 @@ def write_glass_audit_svg(path: Path, rows: list[dict[str, float | str]]) -> Non
     path.write_text(svg)
 
 
+def write_glass_signature_claim_ladder_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 520
+    left, top = 70, 96
+    row_height = 34
+    colors = {
+        "derived_dynamic_signature": "#2f855a",
+        "conditional_barrier_law_signature": "#d69e2e",
+        "proxy_spatial_closure": "#2b6cb0",
+        "out_of_scope_thermodynamic_transition": "#805ad5",
+        "unsupported_in_current_parameter_law": "#a0aec0",
+    }
+    labels = {
+        "derived_dynamic_signature": "derived",
+        "conditional_barrier_law_signature": "conditional",
+        "proxy_spatial_closure": "proxy",
+        "out_of_scope_thermodynamic_transition": "scope boundary",
+        "unsupported_in_current_parameter_law": "unsupported",
+    }
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        '<rect width="100%" height="100%" fill="#ffffff" />',
+        '<text x="70" y="44" font-family="Arial, sans-serif" font-size="24" font-weight="700">Glass signature claim ladder</text>',
+        '<text x="70" y="68" font-family="Arial, sans-serif" font-size="13" fill="#444">The same dynamical audit is converted into safe manuscript claims: derived signatures, conditional barrier-law trends, proxy spatial closures, and thermodynamic scope boundaries.</text>',
+        f'<text x="{left}" y="{top - 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">signature</text>',
+        f'<text x="{left + 310}" y="{top - 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim class</text>',
+        f'<text x="{left + 540}" y="{top - 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">allowed public claim</text>',
+        f'<text x="{left + 880}" y="{top - 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">blocker</text>',
+    ]
+    for idx, row in enumerate(rows):
+        y = top + idx * row_height
+        status = str(row["theory_status"])
+        color = colors.get(status, "#a0aec0")
+        out.extend(
+            [
+                f'<rect x="{left}" y="{y}" width="1070" height="25" fill="#f7fafc" />',
+                f'<rect x="{left + 310}" y="{y}" width="185" height="25" rx="3" fill="{color}" opacity="0.9" />',
+                f'<text x="{left + 10}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["signature"]).replace("_", " ")}</text>',
+                f'<text x="{left + 322}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{labels.get(status, status)}</text>',
+                f'<text x="{left + 540}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["allowed_public_claim_level"]).replace("_", " ")}</text>',
+                f'<text x="{left + 880}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">{str(row["primary_blocker"]).replace("_", " ")}</text>',
+            ]
+        )
+    out.append("</svg>")
+    path.write_text("\n".join(out) + "\n")
+
+
 def write_glass_phase_diagram_svg(path: Path, rows: list[dict[str, float]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 620
@@ -7375,6 +7473,36 @@ def write_thermodynamic_closure_svg(path: Path, rows: list[dict[str, float]]) ->
   {plot(left_a, right_a, [("s_c", entropy / entropy[0], "#2b6cb0"), ("Delta c_p", heat_capacity / heat_capacity[0], "#2f855a")])}
   {axes(left_b, right_b, "B. Adam-Gibbs kinetic coupling", "inverse-temperature shift")}
   {plot(left_b, right_b, [("tau_AG / hot", tau_ag, "#c05621"), ("tau_alpha / hot", tau_alpha, "#805ad5")])}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_thermodynamic_nonidentifiability_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    row = rows[0]
+    width, height = 1080, 300
+    dynamic_width = 260 * (1.0 - min(float(row["dynamic_observable_distance"]), 1.0))
+    thermo_width = 260 * min(float(row["thermodynamic_observable_distance"]), 1.0)
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Thermodynamic non-identifiability certificate</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Two systems can share the same renewal dynamical observables while requiring distinct entropy and heat-capacity closures.</text>
+  <text x="88" y="118" font-family="Arial, sans-serif" font-size="13" font-weight="700">matched dynamical observables</text>
+  <rect x="88" y="132" width="260" height="24" fill="#e2e8f0" />
+  <rect x="88" y="132" width="{dynamic_width:.1f}" height="24" fill="#2f855a" />
+  <text x="365" y="149" font-family="Arial, sans-serif" font-size="12">distance={float(row["dynamic_observable_distance"]):.3g}</text>
+  <text x="88" y="192" font-family="Arial, sans-serif" font-size="13" font-weight="700">distinct thermodynamic closure</text>
+  <rect x="88" y="206" width="260" height="24" fill="#e2e8f0" />
+  <rect x="88" y="206" width="{thermo_width:.1f}" height="24" fill="#c05621" />
+  <text x="365" y="223" font-family="Arial, sans-serif" font-size="12">distance={float(row["thermodynamic_observable_distance"]):.3g}</text>
+  <rect x="585" y="112" width="365" height="102" fill="#805ad5" opacity="0.9" />
+  <text x="607" y="143" font-family="Arial, sans-serif" font-size="13" fill="#fff">stage: {str(row["certificate_stage"]).replace("_", " ")}</text>
+  <text x="607" y="169" font-family="Arial, sans-serif" font-size="12" fill="#fff">thermo identifiable from dynamics = {int(float(row["thermodynamic_identifiable_from_dynamics"]))}</text>
+  <text x="607" y="193" font-family="Arial, sans-serif" font-size="12" fill="#fff">thermodynamic claim allowed = {int(float(row["thermodynamic_claim_allowed"]))}</text>
+  <text x="70" y="270" font-family="Arial, sans-serif" font-size="12" fill="#555">blocker: {str(row["primary_blocker"]).replace("_", " ")}</text>
 </svg>
 """
     path.write_text(svg)
@@ -14865,6 +14993,14 @@ def main() -> None:
         wave_number=1.1,
     )
     write_glass_audit_svg(FIGURE_DIR / "renewal_cage_glass_audit.svg", glass_audit_rows)
+    glass_claim_ladder_rows = write_glass_signature_claim_ladder_csv(
+        DATA_DIR / "renewal_cage_glass_signature_claim_ladder.csv",
+        glass_audit_rows,
+    )
+    write_glass_signature_claim_ladder_svg(
+        FIGURE_DIR / "renewal_cage_glass_signature_claim_ladder.svg",
+        glass_claim_ladder_rows,
+    )
     glass_phase_rows = write_glass_phase_diagram_csv(
         DATA_DIR / "renewal_cage_glass_phase_diagram.csv",
         temperatures,
@@ -14927,6 +15063,13 @@ def main() -> None:
     write_thermodynamic_closure_svg(
         FIGURE_DIR / "renewal_cage_thermodynamic_closure.svg",
         thermodynamic_rows,
+    )
+    thermodynamic_nonidentifiability_rows = write_thermodynamic_nonidentifiability_csv(
+        DATA_DIR / "renewal_cage_thermodynamic_nonidentifiability.csv"
+    )
+    write_thermodynamic_nonidentifiability_svg(
+        FIGURE_DIR / "renewal_cage_thermodynamic_nonidentifiability.svg",
+        thermodynamic_nonidentifiability_rows,
     )
     mct_beta = MCTBetaParams(
         plateau=0.68,

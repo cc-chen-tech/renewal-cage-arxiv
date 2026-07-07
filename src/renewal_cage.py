@@ -552,6 +552,83 @@ def adam_gibbs_thermodynamic_scan(
     return rows
 
 
+def thermodynamic_nonidentifiability_certificate(
+    *,
+    certificate_id: str,
+    dynamic_observables_a: dict[str, float],
+    dynamic_observables_b: dict[str, float],
+    thermodynamic_observables_a: dict[str, float],
+    thermodynamic_observables_b: dict[str, float],
+    dynamic_tolerance: float = 1e-12,
+) -> dict[str, float | str]:
+    """Certify that identical dynamics do not identify a thermodynamic closure."""
+
+    if not certificate_id:
+        raise ValueError("certificate_id must be nonempty")
+    if dynamic_tolerance < 0.0:
+        raise ValueError("dynamic_tolerance must be nonnegative")
+    for name, observables in {
+        "dynamic_observables_a": dynamic_observables_a,
+        "dynamic_observables_b": dynamic_observables_b,
+        "thermodynamic_observables_a": thermodynamic_observables_a,
+        "thermodynamic_observables_b": thermodynamic_observables_b,
+    }.items():
+        if not observables:
+            raise ValueError(f"{name} must be nonempty")
+
+    def normalized_distance(a: dict[str, float], b: dict[str, float]) -> float:
+        keys = sorted(set(a) | set(b))
+        if not keys:
+            return 0.0
+        distances = []
+        for key in keys:
+            left = float(a.get(key, 0.0))
+            right = float(b.get(key, 0.0))
+            scale = max(abs(left), abs(right), 1.0)
+            distances.append(abs(left - right) / scale)
+        return float(max(distances, default=0.0))
+
+    dynamic_distance = normalized_distance(dynamic_observables_a, dynamic_observables_b)
+    thermodynamic_distance = normalized_distance(thermodynamic_observables_a, thermodynamic_observables_b)
+    dynamically_equivalent = dynamic_distance <= dynamic_tolerance
+    thermodynamically_distinct = thermodynamic_distance > dynamic_tolerance
+    identifiable = not (dynamically_equivalent and thermodynamically_distinct)
+    if dynamically_equivalent and thermodynamically_distinct:
+        stage = "dynamical_equivalence_thermodynamic_nonidentifiability"
+        blocker = "thermodynamic_closure_not_identified_by_dynamics"
+        next_action = "supply_independent_entropy_or_calorimetry_closure"
+        claim = "thermodynamic_scope_boundary_only"
+    elif not dynamically_equivalent:
+        stage = "dynamical_observables_not_matched"
+        blocker = "dynamic_control_case_mismatch"
+        next_action = "match_dynamic_observables_before_nonidentifiability_claim"
+        claim = "no_thermodynamic_identifiability_certificate"
+    else:
+        stage = "thermodynamic_closure_not_distinct"
+        blocker = "thermodynamic_control_case_mismatch"
+        next_action = "provide_distinct_entropy_or_heat_capacity_closure"
+        claim = "no_thermodynamic_identifiability_certificate"
+
+    return {
+        "certificate_id": certificate_id,
+        "dynamic_observable_keys": ";".join(sorted(set(dynamic_observables_a) | set(dynamic_observables_b))),
+        "thermodynamic_observable_keys": ";".join(
+            sorted(set(thermodynamic_observables_a) | set(thermodynamic_observables_b))
+        ),
+        "dynamic_observable_distance": dynamic_distance,
+        "thermodynamic_observable_distance": thermodynamic_distance,
+        "dynamic_tolerance": float(dynamic_tolerance),
+        "dynamically_equivalent": float(dynamically_equivalent),
+        "thermodynamically_distinct": float(thermodynamically_distinct),
+        "thermodynamic_identifiable_from_dynamics": float(identifiable),
+        "thermodynamic_claim_allowed": 0.0,
+        "allowed_claim_level": claim,
+        "primary_blocker": blocker,
+        "next_required_action": next_action,
+        "certificate_stage": stage,
+    }
+
+
 def mct_exponent_parameter_from_exponents(critical_exponent: float, von_schweidler_exponent: float) -> dict[str, float]:
     """Return the MCT exponent-parameter values implied by ``a`` and ``b``.
 
@@ -18870,6 +18947,103 @@ def glass_phenomenon_audit(
         "tested_dynamic_signatures": float(len(dynamic_keys)),
         "rows": rows,
     }
+
+
+def glass_signature_claim_ladder(
+    ladder_id: str,
+    audit: dict[str, object],
+) -> list[dict[str, float | str]]:
+    """Convert a glass-signature audit into manuscript-safe claim levels."""
+
+    if not ladder_id:
+        raise ValueError("ladder_id must be nonempty")
+    if not audit:
+        raise ValueError("audit must be nonempty")
+
+    def flag(name: str) -> float:
+        return float(audit.get(name, 0.0) or 0.0)
+
+    rows: list[dict[str, float | str]] = []
+
+    def add(
+        signature: str,
+        theory_status: str,
+        allowed_public_claim_level: str,
+        *,
+        public_dynamic_claim_allowed: float,
+        requires_external_closure: float = 0.0,
+        direct_spatial_claim_allowed: float = 0.0,
+        microscopic_origin_claim_allowed: float = 1.0,
+        thermodynamic_claim_allowed: float = 0.0,
+        primary_blocker: str = "none",
+        preserve_scope_status: bool = False,
+    ) -> None:
+        support = flag(signature)
+        supported_or_scope = support > 0.0 or preserve_scope_status
+        rows.append(
+            {
+                "ladder_id": ladder_id,
+                "signature": signature,
+                "model_support": support,
+                "public_dynamic_claim_allowed": float(public_dynamic_claim_allowed if support > 0.0 else 0.0),
+                "requires_external_closure": float(requires_external_closure),
+                "direct_spatial_claim_allowed": float(direct_spatial_claim_allowed),
+                "microscopic_origin_claim_allowed": float(microscopic_origin_claim_allowed),
+                "thermodynamic_claim_allowed": float(thermodynamic_claim_allowed),
+                "primary_blocker": primary_blocker if supported_or_scope else "signature_not_supported_by_current_scan",
+                "allowed_public_claim_level": allowed_public_claim_level
+                if supported_or_scope
+                else "not_supported_by_current_parameter_law",
+                "theory_status": theory_status if supported_or_scope else "unsupported_in_current_parameter_law",
+            }
+        )
+
+    for signature in (
+        "diffusion_slowdown",
+        "alpha_slowdown",
+        "ngp_peak_shift",
+        "stokes_einstein_violation",
+        "heterogeneity_growth",
+        "stretched_alpha_window",
+        "gaussian_recovery",
+    ):
+        add(
+            signature,
+            "derived_dynamic_signature",
+            "dynamical_signature_claim",
+            public_dynamic_claim_allowed=1.0,
+        )
+
+    add(
+        "fragility_growth",
+        "conditional_barrier_law_signature",
+        "conditional_fragility_trend_claim",
+        public_dynamic_claim_allowed=1.0,
+        microscopic_origin_claim_allowed=0.0,
+        primary_blocker="barrier_law_origin",
+    )
+    add(
+        "chi4_peak_growth",
+        "proxy_spatial_closure",
+        "chi4_proxy_closure_claim",
+        public_dynamic_claim_allowed=1.0,
+        requires_external_closure=1.0,
+        direct_spatial_claim_allowed=0.0,
+        microscopic_origin_claim_allowed=0.0,
+        primary_blocker="spatial_correlation_closure",
+    )
+    add(
+        "thermodynamic_transition",
+        "out_of_scope_thermodynamic_transition",
+        "thermodynamic_scope_boundary_only",
+        public_dynamic_claim_allowed=0.0,
+        requires_external_closure=1.0,
+        microscopic_origin_claim_allowed=0.0,
+        thermodynamic_claim_allowed=0.0,
+        primary_blocker="thermodynamic_input_law",
+        preserve_scope_status=True,
+    )
+    return rows
 
 
 def glass_signature_phase_diagram(

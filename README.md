@@ -4,7 +4,7 @@
 
 This repository contains a reproducible theoretical note on a minimal delayed
 renewal cage model for dynamical glass signatures. It is an effective
-microdynamic diagnostic theory with an explicit thermodynamic entropy closure,
+microdynamic diagnostic theory with an explicit external thermodynamic entropy closure,
 not a first-principles derivation of the thermodynamic glass transition.
 
 The model combines:
@@ -19,7 +19,7 @@ The model combines:
   diagnostics, alpha-shape time-temperature-superposition collapse residuals,
   renewal-count susceptibility, renewal-domain chi4/cooperative-size
   diagnostics, spatial facilitation chi4-length closure,
-  thermodynamic entropy/Adam-Gibbs closure,
+  external thermodynamic entropy/Adam-Gibbs closure,
   effective MCT beta-window closure,
   NGP peak/alpha-relaxation coupling, finite-exchange
   heterogeneity diagnostics, a temperature-dependent facilitated-exchange law,
@@ -549,9 +549,11 @@ figures/renewal_cage_persistence_exchange_joint_protocol.svg
 figures/renewal_cage_persistence_exchange_uncertainty_protocol.svg
 figures/renewal_cage_translation_rotation_protocol.svg
 figures/renewal_cage_glass_audit.svg
+figures/renewal_cage_glass_signature_claim_ladder.svg
 figures/renewal_cage_glass_phase_diagram.svg
 figures/renewal_cage_spatial_chi4.svg
 figures/renewal_cage_thermodynamic_closure.svg
+figures/renewal_cage_thermodynamic_nonidentifiability.svg
 figures/renewal_cage_mct_beta_closure.svg
 figures/renewal_cage_sota_benchmark_consistency.svg
 figures/renewal_cage_sota_claim_alignment.svg
@@ -684,10 +686,12 @@ data/renewal_cage_persistence_exchange_joint_protocol.csv
 data/renewal_cage_persistence_exchange_uncertainty_protocol.csv
 data/renewal_cage_translation_rotation_protocol.csv
 data/renewal_cage_glass_audit.csv
+data/renewal_cage_glass_signature_claim_ladder.csv
 data/renewal_cage_glass_phase_diagram.csv
 data/renewal_cage_spatial_chi4.csv
 data/renewal_cage_spatial_facilitation_inversion.csv
 data/renewal_cage_thermodynamic_closure.csv
+data/renewal_cage_thermodynamic_nonidentifiability.csv
 data/renewal_cage_mct_beta_closure.csv
 data/renewal_cage_sota_benchmark_consistency.csv
 data/renewal_cage_sota_claim_alignment.csv
@@ -844,9 +848,11 @@ paper/figures/renewal_cage_persistence_exchange_joint_protocol.pdf
 paper/figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf
 paper/figures/renewal_cage_translation_rotation_protocol.pdf
 paper/figures/renewal_cage_glass_audit.pdf
+paper/figures/renewal_cage_glass_signature_claim_ladder.pdf
 paper/figures/renewal_cage_glass_phase_diagram.pdf
 paper/figures/renewal_cage_spatial_chi4.pdf
 paper/figures/renewal_cage_thermodynamic_closure.pdf
+paper/figures/renewal_cage_thermodynamic_nonidentifiability.pdf
 paper/figures/renewal_cage_mct_beta_closure.pdf
 paper/figures/renewal_cage_sota_benchmark_consistency.pdf
 paper/figures/renewal_cage_sota_claim_alignment.pdf

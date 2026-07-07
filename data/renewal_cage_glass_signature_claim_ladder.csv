@@ -1,0 +1,11 @@
+ladder_id,signature,model_support,public_dynamic_claim_allowed,requires_external_closure,direct_spatial_claim_allowed,microscopic_origin_claim_allowed,thermodynamic_claim_allowed,primary_blocker,allowed_public_claim_level,theory_status
+glass_signature_claim_ladder,diffusion_slowdown,1.0,1.0,0.0,0.0,1.0,0.0,none,dynamical_signature_claim,derived_dynamic_signature
+glass_signature_claim_ladder,alpha_slowdown,1.0,1.0,0.0,0.0,1.0,0.0,none,dynamical_signature_claim,derived_dynamic_signature
+glass_signature_claim_ladder,ngp_peak_shift,1.0,1.0,0.0,0.0,1.0,0.0,none,dynamical_signature_claim,derived_dynamic_signature
+glass_signature_claim_ladder,stokes_einstein_violation,1.0,1.0,0.0,0.0,1.0,0.0,none,dynamical_signature_claim,derived_dynamic_signature
+glass_signature_claim_ladder,heterogeneity_growth,1.0,1.0,0.0,0.0,1.0,0.0,none,dynamical_signature_claim,derived_dynamic_signature
+glass_signature_claim_ladder,stretched_alpha_window,1.0,1.0,0.0,0.0,1.0,0.0,none,dynamical_signature_claim,derived_dynamic_signature
+glass_signature_claim_ladder,gaussian_recovery,1.0,1.0,0.0,0.0,1.0,0.0,none,dynamical_signature_claim,derived_dynamic_signature
+glass_signature_claim_ladder,fragility_growth,1.0,1.0,0.0,0.0,0.0,0.0,barrier_law_origin,conditional_fragility_trend_claim,conditional_barrier_law_signature
+glass_signature_claim_ladder,chi4_peak_growth,1.0,1.0,1.0,0.0,0.0,0.0,spatial_correlation_closure,chi4_proxy_closure_claim,proxy_spatial_closure
+glass_signature_claim_ladder,thermodynamic_transition,0.0,0.0,1.0,0.0,0.0,0.0,thermodynamic_input_law,thermodynamic_scope_boundary_only,out_of_scope_thermodynamic_transition

@@ -472,6 +472,40 @@ class ArxivPackageTests(unittest.TestCase):
         thermo = by_id["thermodynamic_entropy_boundary"]
         self.assertEqual(thermo["prediction_class"], "scope_boundary")
 
+    def test_thermodynamic_nonidentifiability_certificate_blocks_dynamic_overclaim(self):
+        path = ROOT / "data" / "renewal_cage_thermodynamic_nonidentifiability.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        row = rows[0]
+        self.assertEqual(row["certificate_stage"], "dynamical_equivalence_thermodynamic_nonidentifiability")
+        self.assertEqual(float(row["dynamic_observable_distance"]), 0.0)
+        self.assertGreater(float(row["thermodynamic_observable_distance"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_identifiable_from_dynamics"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["allowed_claim_level"], "thermodynamic_scope_boundary_only")
+        self.assertEqual(row["primary_blocker"], "thermodynamic_closure_not_identified_by_dynamics")
+
+    def test_glass_signature_claim_ladder_classifies_safe_public_claims(self):
+        path = ROOT / "data" / "renewal_cage_glass_signature_claim_ladder.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+        by_signature = {row["signature"]: row for row in rows}
+
+        self.assertEqual(by_signature["gaussian_recovery"]["theory_status"], "derived_dynamic_signature")
+        self.assertEqual(float(by_signature["gaussian_recovery"]["public_dynamic_claim_allowed"]), 1.0)
+        self.assertEqual(by_signature["fragility_growth"]["theory_status"], "conditional_barrier_law_signature")
+        self.assertEqual(float(by_signature["fragility_growth"]["microscopic_origin_claim_allowed"]), 0.0)
+        self.assertEqual(by_signature["chi4_peak_growth"]["theory_status"], "proxy_spatial_closure")
+        self.assertEqual(float(by_signature["chi4_peak_growth"]["direct_spatial_claim_allowed"]), 0.0)
+        self.assertEqual(
+            by_signature["thermodynamic_transition"]["theory_status"],
+            "out_of_scope_thermodynamic_transition",
+        )
+        self.assertEqual(float(by_signature["thermodynamic_transition"]["thermodynamic_claim_allowed"]), 0.0)
+
     def test_inversion_identifiability_audit_marks_protocols_before_real_fit(self):
         path = ROOT / "data" / "renewal_cage_inversion_identifiability_audit.csv"
         self.assertTrue(path.exists())
@@ -3064,6 +3098,8 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_glass_phase_diagram.pdf", names)
             self.assertIn("figures/renewal_cage_spatial_chi4.pdf", names)
             self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", names)
+            self.assertIn("figures/renewal_cage_thermodynamic_nonidentifiability.pdf", names)
+            self.assertIn("figures/renewal_cage_glass_signature_claim_ladder.pdf", names)
             self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", names)
             self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", names)
             self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", names)
@@ -3195,6 +3231,8 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("figures/renewal_cage_glass_phase_diagram.pdf", main_tex)
         self.assertIn("figures/renewal_cage_spatial_chi4.pdf", main_tex)
         self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_thermodynamic_nonidentifiability.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_glass_signature_claim_ladder.pdf", main_tex)
         self.assertIn("figures/renewal_cage_mct_beta_closure.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_benchmark_consistency.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_claim_alignment.pdf", main_tex)
