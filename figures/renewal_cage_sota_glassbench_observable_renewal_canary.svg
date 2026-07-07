@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="380" viewBox="0 0 1180 380">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-observable renewal canary</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Structure-matched real MSD, NGP, and multi-k Fs are strong enough to reject treating lag codes as a single renewal event clock.</text>
+  <text x="70" y="96" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="255" y="96" font-family="Arial, sans-serif" font-size="12" font-weight="700">canary verdict</text>
+  <text x="600" y="96" font-family="Arial, sans-serif" font-size="12" font-weight="700">real observable constraints</text>
+  <text x="70" y="138" font-family="Arial, sans-serif" font-size="12">KA2D T=0.23 structure 151</text><rect x="255" y="118" width="315" height="28" fill="#c05621" opacity="0.92" /><text x="265" y="136" font-family="Arial, sans-serif" font-size="10" fill="#fff">real observable ladder rejects naive lag clock</text><text x="600" y="130" font-family="Arial, sans-serif" font-size="11">lags=8; max NGP=7.3; max Fs decay=0.31</text><text x="600" y="147" font-family="Arial, sans-serif" font-size="11">q_eff CV=1.8; q_eff span=9e+02; blocker=event clock segmentation required</text><text x="70" y="196" font-family="Arial, sans-serif" font-size="12">KA2D T=0.30 structure 3</text><rect x="255" y="176" width="315" height="28" fill="#718096" opacity="0.92" /><text x="265" y="194" font-family="Arial, sans-serif" font-size="10" fill="#fff">real observable ladder incomplete</text><text x="600" y="188" font-family="Arial, sans-serif" font-size="11">lags=1; max NGP=0.012; max Fs decay=0.0032</text><text x="600" y="205" font-family="Arial, sans-serif" font-size="11">q_eff CV=inf; q_eff span=inf; blocker=structure matched lag ladder</text>
+</svg>

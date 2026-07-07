@@ -70,6 +70,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_multilag_particle_cache_targets,
     glassbench_sparse_lag_event_clock_audit,
+    glassbench_structure_matched_observable_renewal_canary,
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
     glassbench_interval_censored_waiting_law_selection,
@@ -5367,6 +5368,25 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
         cached_observable_rows=cached_rows,
         official_observable_rows=official_rows,
         max_reproducible_relative_error=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_observable_renewal_canary_csv(
+    path: Path,
+    observable_semantics_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Check whether real structure-matched lag observables pass a naive renewal-clock fit."""
+
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    semantics_manifest = json.loads(semantics_path.read_text(encoding="utf-8"))
+    rows = glassbench_structure_matched_observable_renewal_canary(
+        audit_id="glassbench_observable_renewal_canary",
+        observable_rows=observable_semantics_rows,
+        wave_numbers=[float(value) for value in semantics_manifest.get("wave_numbers", [])],
+        min_lag_count=3,
+        max_jump_variance_cv=0.5,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -12716,6 +12736,51 @@ def write_sota_glassbench_cached_particle_observable_semantics_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_observable_renewal_canary_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 380
+    left, top = 70, 118
+    row_h = 58
+    colors = {
+        "real_observable_ladder_rejects_naive_lag_clock": "#c05621",
+        "real_observable_ladder_shape_consistent_event_clock_blocked": "#2b6cb0",
+        "real_observable_ladder_naive_clock_ready": "#2f855a",
+        "real_observable_ladder_inconclusive_for_renewal_clock": "#805ad5",
+        "real_observable_ladder_incomplete": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["canary_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 20}" font-family="Arial, sans-serif" font-size="12">{row["system_id"]} T={row["temperature"]} structure {row["structure_id"]}</text>'
+        )
+        marks.append(f'<rect x="{left + 185}" y="{y}" width="315" height="28" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 195}" y="{y + 18}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:52]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">lags={float(row["lag_count"]):.0f}; max NGP={float(row["max_ngp_2d"]):.2g}; max Fs decay={float(row["max_fs_decay"]):.2g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 29}" font-family="Arial, sans-serif" font-size="11">q_eff CV={float(row["effective_jump_variance_cv"]):.2g}; q_eff span={float(row["effective_jump_variance_span"]):.2g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-observable renewal canary</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Structure-matched real MSD, NGP, and multi-k Fs are strong enough to reject treating lag codes as a single renewal event clock.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 185}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">canary verdict</text>
+  <text x="{left + 530}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">real observable constraints</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 660
@@ -14442,6 +14507,14 @@ def main() -> None:
     write_sota_glassbench_cached_particle_observable_semantics_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.svg",
         glassbench_cached_particle_observable_semantics_rows,
+    )
+    glassbench_observable_renewal_canary_rows = write_sota_glassbench_observable_renewal_canary_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_observable_renewal_canary.csv",
+        glassbench_cached_particle_observable_semantics_rows,
+    )
+    write_sota_glassbench_observable_renewal_canary_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_observable_renewal_canary.svg",
+        glassbench_observable_renewal_canary_rows,
     )
     glassbench_event_clock_threshold_readiness_rows = (
         write_sota_glassbench_event_clock_threshold_readiness_csv(

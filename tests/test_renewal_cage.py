@@ -179,6 +179,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_timecode_bridge,
     glassbench_multilag_particle_cache_targets,
     glassbench_cached_particle_observable_semantics_audit,
+    glassbench_structure_matched_observable_renewal_canary,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -3269,6 +3270,64 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["primary_blocker"], "none")
         self.assertEqual(row["observable_semantics_stage"], "official_displacement_observable_reproduced")
         self.assertEqual(row["next_required_action"], "run_structure_matched_displacement_inversion")
+
+    def test_glassbench_structure_matched_observable_renewal_canary_rejects_naive_lag_clock(self):
+        rows = glassbench_structure_matched_observable_renewal_canary(
+            audit_id="glassbench_observable_renewal_canary",
+            observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "time_code": "tc05",
+                    "lag_time": 0.1,
+                    "official_msd": 0.0035,
+                    "official_ngp_2d": 0.001,
+                    "official_fs_by_k": "0.999;0.997",
+                    "official_displacement_observable_reproducible": 1.0,
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "time_code": "tc10",
+                    "lag_time": 1.1,
+                    "official_msd": 0.020,
+                    "official_ngp_2d": 0.10,
+                    "official_fs_by_k": "0.994;0.987",
+                    "official_displacement_observable_reproducible": 1.0,
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "time_code": "tc40",
+                    "lag_time": 1500000.0,
+                    "official_msd": 0.97,
+                    "official_ngp_2d": 2.1,
+                    "official_fs_by_k": "0.80;0.69",
+                    "official_displacement_observable_reproducible": 1.0,
+                },
+            ],
+            wave_numbers=[1.0, 1.6],
+            min_lag_count=3,
+            max_jump_variance_cv=0.5,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["system_id"], "KA2D")
+        self.assertEqual(row["structure_id"], "151")
+        self.assertEqual(float(row["real_displacement_ladder_ready"]), 1.0)
+        self.assertEqual(float(row["naive_lag_clock_renewal_fit_pass"]), 0.0)
+        self.assertEqual(float(row["naive_lag_clock_rejected"]), 1.0)
+        self.assertGreater(float(row["effective_jump_variance_cv"]), 0.5)
+        self.assertGreater(float(row["max_ngp_2d"]), 2.0)
+        self.assertGreater(float(row["max_fs_decay"]), 0.25)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_clock_segmentation_required")
+        self.assertEqual(row["canary_stage"], "real_observable_ladder_rejects_naive_lag_clock")
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
         claim_rows = [

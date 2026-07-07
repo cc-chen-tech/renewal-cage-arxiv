@@ -6878,6 +6878,73 @@ def write_sota_glassbench_cached_particle_observable_semantics_pdf(path: Path) -
     c.save()
 
 
+def write_sota_glassbench_observable_renewal_canary_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_observable_renewal_canary.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real-observable renewal canary")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real structure-matched MSD, NGP, and multi-k Fs reject treating lag codes as a single renewal event clock.",
+    )
+    left, top = 52, page_h - 104
+    row_h = 68
+    colors_by_stage = {
+        "real_observable_ladder_rejects_naive_lag_clock": colors.HexColor("#c05621"),
+        "real_observable_ladder_shape_consistent_event_clock_blocked": colors.HexColor("#2b6cb0"),
+        "real_observable_ladder_naive_clock_ready": colors.HexColor("#2f855a"),
+        "real_observable_ladder_inconclusive_for_renewal_clock": colors.HexColor("#805ad5"),
+        "real_observable_ladder_incomplete": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 25, "target")
+    c.drawString(left + 120, top + 25, "canary verdict")
+    c.drawString(left + 430, top + 25, "real-observable constraints")
+    for idx, row in enumerate(rows):
+        y = top - idx * row_h
+        stage = row["canary_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]}')
+        c.setFillColor(color)
+        c.rect(left + 120, y - 13, 290, 27, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 128, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 430,
+            y + 5,
+            "lags={:.0f}; max NGP={:.3g}; max Fs decay={:.3g}; q_eff CV={:.3g}; q_eff span={:.3g}".format(
+                float(row["lag_count"]),
+                float(row["max_ngp_2d"]),
+                float(row["max_fs_decay"]),
+                float(row["effective_jump_variance_cv"]),
+                float(row["effective_jump_variance_span"]),
+            ),
+        )
+        c.drawString(
+            left + 430,
+            y - 10,
+            f'blocker={row["primary_blocker"]}; next={row["next_required_action"][:55]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a real-data falsification canary for a naive lag-clock closure, not a completed event-clock inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8730,6 +8797,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_cached_particle_observable_semantics_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf"
     )
+    sota_glassbench_observable_renewal_canary_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_observable_renewal_canary.pdf"
+    )
     sota_glassbench_first_npz_particle_cache_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf"
     )
@@ -8998,6 +9068,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_cached_particle_observable_semantics_pdf(
         sota_glassbench_cached_particle_observable_semantics_pdf
+    )
+    write_sota_glassbench_observable_renewal_canary_pdf(
+        sota_glassbench_observable_renewal_canary_pdf
     )
     write_sota_glassbench_first_npz_particle_cache_contract_pdf(
         sota_glassbench_first_npz_particle_cache_contract_pdf
@@ -9359,6 +9432,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_cached_particle_observable_semantics_pdf,
             "figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf",
+        )
+        archive.write(
+            sota_glassbench_observable_renewal_canary_pdf,
+            "figures/renewal_cage_sota_glassbench_observable_renewal_canary.pdf",
         )
         archive.write(
             sota_glassbench_first_npz_particle_cache_contract_pdf,

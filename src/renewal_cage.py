@@ -10781,6 +10781,152 @@ def glassbench_cached_particle_observable_semantics_audit(
     return out
 
 
+def glassbench_structure_matched_observable_renewal_canary(
+    *,
+    audit_id: str,
+    observable_rows: Sequence[dict[str, object]],
+    wave_numbers: Sequence[float],
+    min_lag_count: int,
+    max_jump_variance_cv: float,
+) -> list[dict[str, float | str]]:
+    """Test whether real structure-matched lag observables pass a naive renewal-clock fit."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not observable_rows:
+        raise ValueError("observable_rows must be nonempty")
+    if not wave_numbers:
+        raise ValueError("wave_numbers must be nonempty")
+    if int(min_lag_count) != min_lag_count or min_lag_count < 2:
+        raise ValueError("min_lag_count must be an integer >= 2")
+    if max_jump_variance_cv <= 0.0:
+        raise ValueError("max_jump_variance_cv must be positive")
+    k_values = [float(value) for value in wave_numbers]
+    if any(value <= 0.0 for value in k_values):
+        raise ValueError("wave_numbers must be positive")
+
+    grouped: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in observable_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature, structure_id), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1]), item[0][2]),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("lag_time", 0.0) or 0.0))
+        reproducible_rows = [
+            row
+            for row in sorted_group
+            if float(row.get("official_displacement_observable_reproducible", 0.0) or 0.0) == 1.0
+        ]
+        ladder_ready = len(reproducible_rows) >= int(min_lag_count)
+
+        msd = np.asarray([float(row.get("official_msd", 0.0) or 0.0) for row in reproducible_rows], dtype=float)
+        ngp = np.asarray([float(row.get("official_ngp_2d", 0.0) or 0.0) for row in reproducible_rows], dtype=float)
+        lag_times = np.asarray([float(row.get("lag_time", 0.0) or 0.0) for row in reproducible_rows], dtype=float)
+        fs_values = [
+            _parse_semicolon_float_values(row.get("official_fs_by_k", "none"), name="official_fs_by_k")
+            for row in reproducible_rows
+        ]
+
+        plateau_msd = float(msd[0]) if len(msd) else 0.0
+        effective_q: list[float] = []
+        effective_R: list[float] = []
+        for value_msd, value_ngp in zip(msd[1:], ngp[1:]):
+            renewal_msd = float(value_msd - plateau_msd)
+            if renewal_msd <= max(1.0e-12, 1.0e-8 * max(float(value_msd), 1.0)) or value_ngp <= 0.0:
+                continue
+            q_eff = float(value_ngp * value_msd * value_msd / renewal_msd)
+            if q_eff <= 0.0 or not math.isfinite(q_eff):
+                continue
+            effective_q.append(q_eff)
+            effective_R.append(float(renewal_msd / q_eff))
+
+        if effective_q:
+            q_array = np.asarray(effective_q, dtype=float)
+            q_mean = float(np.mean(q_array))
+            q_cv = float(np.std(q_array) / q_mean) if q_mean > 0.0 else math.inf
+            q_span = float(np.max(q_array) / max(np.min(q_array), 1.0e-300))
+            median_R = float(np.median(np.asarray(effective_R, dtype=float))) if effective_R else 0.0
+        else:
+            q_mean = 0.0
+            q_cv = math.inf
+            q_span = math.inf
+            median_R = 0.0
+
+        gaussian_residuals: list[float] = []
+        fs_decay: list[float] = []
+        for value_msd, row_fs in zip(msd, fs_values):
+            for idx, fs_obs in enumerate(row_fs[: len(k_values)]):
+                k = k_values[idx]
+                fs_gaussian = math.exp(-0.25 * k * k * float(value_msd))
+                gaussian_residuals.append(abs(float(fs_obs) - fs_gaussian))
+                fs_decay.append(max(0.0, 1.0 - float(fs_obs)))
+
+        naive_fit_pass = ladder_ready and bool(effective_q) and q_cv <= max_jump_variance_cv
+        naive_rejected = ladder_ready and bool(effective_q) and q_cv > max_jump_variance_cv
+        event_clock_ready = False
+
+        if naive_fit_pass and event_clock_ready:
+            stage = "real_observable_ladder_naive_clock_ready"
+            blocker = "none"
+            next_action = "run_uncertainty_weighted_persistence_exchange_inversion"
+        elif naive_fit_pass:
+            stage = "real_observable_ladder_shape_consistent_event_clock_blocked"
+            blocker = "event_clock_segmentation_required"
+            next_action = "extract_particle_event_clock_before_pe_inversion"
+        elif naive_rejected:
+            stage = "real_observable_ladder_rejects_naive_lag_clock"
+            blocker = "event_clock_segmentation_required"
+            next_action = "segment_particle_cage_jumps_instead_of_treating_lags_as_renewal_clock"
+        elif ladder_ready:
+            stage = "real_observable_ladder_inconclusive_for_renewal_clock"
+            blocker = "effective_jump_variance_unidentifiable"
+            next_action = "add_late_lags_or_event_clock_segmentation"
+        else:
+            stage = "real_observable_ladder_incomplete"
+            blocker = "structure_matched_lag_ladder"
+            next_action = "cache_more_structure_matched_lag_members"
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}_s{structure_id}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "lag_count": float(len(reproducible_rows)),
+                "min_lag_time": float(np.min(lag_times)) if len(lag_times) else 0.0,
+                "max_lag_time": float(np.max(lag_times)) if len(lag_times) else 0.0,
+                "lag_span": float(np.max(lag_times) - np.min(lag_times)) if len(lag_times) else 0.0,
+                "plateau_msd_proxy": plateau_msd,
+                "max_msd": float(np.max(msd)) if len(msd) else 0.0,
+                "max_ngp_2d": float(np.max(ngp)) if len(ngp) else 0.0,
+                "max_fs_decay": float(max(fs_decay)) if fs_decay else 0.0,
+                "gaussian_fs_max_abs_residual": float(max(gaussian_residuals)) if gaussian_residuals else 0.0,
+                "effective_jump_variance_mean": q_mean,
+                "effective_jump_variance_cv": q_cv,
+                "effective_jump_variance_span": q_span,
+                "median_effective_renewal_count": median_R,
+                "real_displacement_ladder_ready": float(ladder_ready),
+                "naive_lag_clock_renewal_fit_pass": float(naive_fit_pass),
+                "naive_lag_clock_rejected": float(naive_rejected),
+                "event_clock_trajectory_ready": float(event_clock_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "canary_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_microdynamic_closed_loop_audit(
     *,
     audit_id: str,

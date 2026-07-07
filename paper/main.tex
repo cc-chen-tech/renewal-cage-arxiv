@@ -1583,6 +1583,15 @@ archive-to-observable semantic gap is closed for MSD, NGP, and multi-\(k\)
 \(F_s\) on this fixed-lag ladder; the remaining promotion blockers are event
 segmentation, persistence/exchange clocks, and alpha-threshold coverage, not
 fixed-lag observable reproducibility.
+The same fixed-lag ladder already rejects one tempting shortcut. If the
+structure-151 lag codes are treated as a single delayed-renewal event clock,
+the plateau-plus-renewal moment equations imply a lag-dependent effective jump
+variance \(q_{\rm eff}\). In the real \(T=0.23\) ladder, \(q_{\rm eff}\) has
+coefficient of variation \(1.76\) and spans a factor \(899\), while the same
+rows show a large NGP peak \(7.27\) and multi-\(k\) scattering decay. Thus the
+real coordinate data do not merely wait for a fit; they already reject the
+naive lag-clock closure and require particle-level cage-jump event
+segmentation before persistence/exchange inversion.
 
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out
@@ -1597,6 +1606,17 @@ clock, and the anchor alpha definition is still inconsistent with the metadata
 \(\tau_\alpha\). We therefore treat the real data as supporting the diagnostic
 direction, but not yet as a successful microstatistics-to-held-out-prediction
 test.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_observable_renewal_canary.pdf}
+  \caption{GlassBench real-observable renewal canary. The cached structure-151
+  \(T=0.23\) lag ladder supplies real MSD, NGP, and multi-\(k\) \(F_s\)
+  observables, but the effective jump variance inferred by treating lag codes
+  as a single renewal clock drifts too strongly across lag. The gate therefore
+  rejects the naive lag-clock closure while preserving particle-level
+  cage-jump segmentation as the next required input.}
+\end{figure}
 
 \begin{figure}[p]
   \centering

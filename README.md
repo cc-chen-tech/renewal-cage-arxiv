@@ -303,6 +303,15 @@ using the axis-averaged convention
 rejected. This upgrades the remaining blocker from fixed-lag observable
 semantics to event segmentation, persistence/exchange clocks, and
 alpha-threshold coverage.
+The structure-matched observable-renewal canary then asks a stricter question:
+can the eight real fixed-lag observables be treated directly as a single
+delayed-renewal event clock? The answer is no. For the cold structure-151
+ladder, the real observables are strong (`max NGP=7.27`, maximum multi-`k`
+`F_s` decay `0.311`), but the jump variance inferred from the minimal
+plateau-plus-renewal moment equations has `q_eff` coefficient of variation
+`1.76` and span `899`. This rejects the naive lag-clock closure while making
+the next required step precise: segment particle-level cage-jump events rather
+than fitting the lag ladder as if it were already a renewal clock.
 The time-code curve bridge now runs that `T=0.23` curve through the same
 trajectory pre-inversion schema used by the persistence/exchange protocol. It
 promotes the row from metadata-only evidence to a real physical-time
@@ -630,6 +639,7 @@ figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
 figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg
 figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg
 figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.svg
+figures/renewal_cage_sota_glassbench_observable_renewal_canary.svg
 figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.svg
 figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.svg
 figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.svg
@@ -770,6 +780,7 @@ data/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv
 data/renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv
 data/renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv
 data/renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv
+data/renewal_cage_sota_glassbench_observable_renewal_canary.csv
 data/renewal_cage_sota_glassbench_event_clock_threshold_readiness.csv
 data/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.csv
 data/renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv
@@ -929,6 +940,7 @@ paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf
 paper/figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf
+paper/figures/renewal_cage_sota_glassbench_observable_renewal_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf
 paper/figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf
 paper/figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf
