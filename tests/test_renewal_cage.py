@@ -142,6 +142,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
+    glassbench_sparse_lag_event_clock_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -825,6 +826,62 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["primary_blocker"], "physical_time_trajectory_axis")
         self.assertIn("positions[time,particle,dimension]", row["required_arrays"])
         self.assertIn("isoconfigurational_replica_axis", row["forbidden_substitutes"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_sparse_lag_event_clock_audit_promotes_candidate_not_real_inversion(self):
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "structure_id": "151",
+                "time_code": code,
+                "lag_time": lag,
+                "positions_shape": "20x1290x2",
+                "initial_reference_positions_cached": 1.0,
+                "particle_resolved_positions_cached": 1.0,
+                "max_initial_position_mismatch": 0.0,
+            }
+            for code, lag in [
+                ("tc05", 0.1),
+                ("tc10", 1.1),
+                ("tc15", 11.64),
+                ("tc20", 122.47),
+                ("tc25", 1288.41),
+                ("tc30", 13554.0),
+                ("tc35", 142587.0),
+                ("tc40", 1500000.0),
+            ]
+        ]
+        contract_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "q_bound": 0.4855550202214053,
+                "event_segmentation_target_ready": 1.0,
+                "cached_replica_ladder_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+
+        row = glassbench_sparse_lag_event_clock_audit(
+            audit_id="glassbench_sparse_lag_event_clock",
+            cache_rows=cache_rows,
+            contract_rows=contract_rows,
+            required_time_codes=("tc05", "tc10", "tc15", "tc20", "tc25", "tc30", "tc35", "tc40"),
+        )[0]
+
+        self.assertEqual(row["sparse_lag_event_clock_stage"], "sparse_lag_tensor_ready_replica_identity_unverified")
+        self.assertEqual(float(row["physical_lag_tensor_ready"]), 1.0)
+        self.assertEqual(float(row["same_initial_structure_verified"]), 1.0)
+        self.assertEqual(float(row["same_shape_across_lags"]), 1.0)
+        self.assertEqual(float(row["time_code_coverage_fraction"]), 1.0)
+        self.assertEqual(float(row["coarse_event_clock_candidate_ready"]), 1.0)
+        self.assertEqual(float(row["replica_identity_alignment_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "replica_identity_alignment")
+        self.assertEqual(row["event_clock_resolution"], "sparse_lag_interval")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

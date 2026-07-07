@@ -6849,6 +6849,131 @@ def glassbench_direct_alpha_event_clock_extraction_contract(
     return out
 
 
+def glassbench_sparse_lag_event_clock_audit(
+    *,
+    audit_id: str,
+    cache_rows: Sequence[dict[str, object]],
+    contract_rows: Sequence[dict[str, object]],
+    required_time_codes: Sequence[str],
+    max_initial_mismatch_tolerance: float = 1e-10,
+) -> list[dict[str, float | str]]:
+    """Audit whether cached lag files form a sparse physical-lag tensor candidate."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not cache_rows:
+        raise ValueError("cache_rows must be nonempty")
+    if not contract_rows:
+        raise ValueError("contract_rows must be nonempty")
+    if not required_time_codes:
+        raise ValueError("required_time_codes must be nonempty")
+    if max_initial_mismatch_tolerance < 0.0:
+        raise ValueError("max_initial_mismatch_tolerance must be nonnegative")
+
+    required_codes = tuple(str(code) for code in required_time_codes)
+    grouped_cache: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in cache_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped_cache.setdefault(key, []).append(row)
+
+    contract_by_key = {
+        (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        ): row
+        for row in contract_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for key in sorted(set(grouped_cache) | set(contract_by_key)):
+        system_id, temperature, structure_id = key
+        rows = grouped_cache.get(key, [])
+        contract = contract_by_key.get(key, {})
+        observed_codes = sorted(
+            {str(row.get("time_code", "none")) for row in rows if str(row.get("time_code", "none")) != "none"},
+            key=lambda code: required_codes.index(code) if code in required_codes else len(required_codes),
+        )
+        observed_required = [code for code in observed_codes if code in required_codes]
+        coverage = len(set(observed_required)) / float(len(required_codes))
+        cached_ready = all(float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0 for row in rows)
+        initial_cached = all(float(row.get("initial_reference_positions_cached", 0.0) or 0.0) == 1.0 for row in rows)
+        shapes = {str(row.get("positions_shape", "none")) for row in rows}
+        same_shape = len(shapes) == 1 and "none" not in shapes and bool(rows)
+        max_mismatch = max(
+            (float(row.get("max_initial_position_mismatch", 0.0) or 0.0) for row in rows),
+            default=float("inf"),
+        )
+        same_initial = bool(initial_cached and max_mismatch <= max_initial_mismatch_tolerance)
+        lag_times = [
+            float(row.get("lag_time", 0.0) or 0.0)
+            for row in rows
+            if str(row.get("time_code", "none")) in required_codes
+        ]
+        positive_lag_order = bool(lag_times and all(value > 0.0 for value in lag_times))
+        full_coverage = coverage >= 1.0
+        physical_tensor_ready = bool(cached_ready and same_shape and same_initial and full_coverage and positive_lag_order)
+        target_ready = float(contract.get("event_segmentation_target_ready", 0.0) or 0.0) == 1.0
+        coarse_candidate_ready = bool(physical_tensor_ready and target_ready)
+        replica_identity_ready = bool(
+            str(contract.get("replica_identity_semantics", "none")) == "stable_replica_ids_across_time_codes"
+        )
+
+        if coarse_candidate_ready and not replica_identity_ready:
+            stage = "sparse_lag_tensor_ready_replica_identity_unverified"
+            blocker = "replica_identity_alignment"
+            next_action = "verify_stable_replica_ids_or_segment_with_interval_censoring"
+        elif coarse_candidate_ready and replica_identity_ready:
+            stage = "sparse_lag_event_clock_ready_for_interval_segmentation"
+            blocker = "interval_censored_event_segmentation"
+            next_action = "run_interval_censored_threshold_sweep"
+        elif full_coverage and target_ready:
+            stage = "sparse_lag_tensor_identity_incomplete"
+            blocker = "lag_tensor_identity"
+            next_action = "verify_shapes_initial_positions_and_particle_cache"
+        else:
+            stage = "sparse_lag_event_clock_upstream_incomplete"
+            blocker = "time_code_coverage" if not full_coverage else "event_segmentation_target"
+            next_action = (
+                "extract_all_required_time_code_particle_caches"
+                if not full_coverage
+                else "complete_direct_alpha_event_clock_contract"
+            )
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "required_time_codes": ";".join(required_codes),
+                "observed_time_codes": ";".join(observed_codes) if observed_codes else "none",
+                "time_code_coverage_fraction": float(coverage),
+                "lag_count": float(len(observed_required)),
+                "positions_shape": next(iter(shapes)) if same_shape else "mixed_or_missing",
+                "same_shape_across_lags": float(same_shape),
+                "same_initial_structure_verified": float(same_initial),
+                "max_initial_position_mismatch": float(max_mismatch if math.isfinite(max_mismatch) else 0.0),
+                "particle_cache_ready": float(cached_ready),
+                "physical_lag_tensor_ready": float(physical_tensor_ready),
+                "event_segmentation_target_ready": float(target_ready),
+                "coarse_event_clock_candidate_ready": float(coarse_candidate_ready),
+                "replica_identity_alignment_ready": float(replica_identity_ready),
+                "event_clock_resolution": "sparse_lag_interval" if coarse_candidate_ready else "none",
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "sparse_lag_event_clock_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

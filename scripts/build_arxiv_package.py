@@ -4140,6 +4140,79 @@ def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> N
     c.save()
 
 
+def write_sota_glassbench_sparse_lag_event_clock_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench sparse-lag event-clock audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The lag ladder is promoted only to a coarse interval candidate; explicit replica identity remains a blocker.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 70
+    colors_by_stage = {
+        "sparse_lag_tensor_ready_replica_identity_unverified": colors.HexColor("#805ad5"),
+        "sparse_lag_event_clock_ready_for_interval_segmentation": colors.HexColor("#2f855a"),
+        "sparse_lag_tensor_identity_incomplete": colors.HexColor("#c05621"),
+        "sparse_lag_event_clock_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "sparse-lag stage")
+    c.drawString(left + 395, top + 24, "event-clock evidence and blocker")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["sparse_lag_event_clock_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; coverage={:.2f}; lags={:.0f}; shape={}".format(
+                row["structure_id"],
+                float(row["time_code_coverage_fraction"]),
+                float(row["lag_count"]),
+                row["positions_shape"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "same initial={}; tensor={}; candidate={}; replica IDs={}; resolution={}".format(
+                int(float(row["same_initial_structure_verified"])),
+                int(float(row["physical_lag_tensor_ready"])),
+                int(float(row["coarse_event_clock_candidate_ready"])),
+                int(float(row["replica_identity_alignment_ready"])),
+                row["event_clock_resolution"],
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This narrows the blocker from missing lag data to explicit replica-identity alignment and interval-censored segmentation.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6418,6 +6491,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_event_clock_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
     )
+    sota_glassbench_sparse_lag_event_clock_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6603,6 +6679,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
         sota_glassbench_direct_alpha_event_clock_contract_pdf
+    )
+    write_sota_glassbench_sparse_lag_event_clock_pdf(
+        sota_glassbench_sparse_lag_event_clock_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6833,6 +6912,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_event_clock_contract_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf",
+        )
+        archive.write(
+            sota_glassbench_sparse_lag_event_clock_pdf,
+            "figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

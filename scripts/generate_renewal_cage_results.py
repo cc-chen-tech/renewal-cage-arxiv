@@ -64,6 +64,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_multilag_particle_cache_targets,
+    glassbench_sparse_lag_event_clock_audit,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4366,6 +4367,46 @@ def write_sota_glassbench_direct_alpha_event_clock_contract_csv(
         pe_bound_rows=pe_bound_rows,
         tail_rows=tail_rows,
         crossing_rows=crossing_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_sparse_lag_event_clock_csv(
+    path: Path,
+    *,
+    contract_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit whether multi-lag caches form a sparse physical-lag event-clock candidate."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    cache_rows: list[dict[str, float | str]] = []
+    reference_initial_by_key: dict[tuple[str, str, str], np.ndarray] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            cache_row: dict[str, float | str] = dict(row)
+            mismatch = 0.0
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0:
+                cache_path = ROOT / row["particle_cache_path"]
+                with np.load(cache_path) as npz:
+                    initial = np.asarray(npz["initial_positions"], dtype=float)
+                key = (row["system_id"], row["temperature"], row["structure_id"])
+                if key not in reference_initial_by_key:
+                    reference_initial_by_key[key] = initial
+                else:
+                    reference = reference_initial_by_key[key]
+                    if reference.shape == initial.shape:
+                        mismatch = float(np.max(np.abs(initial - reference)))
+                    else:
+                        mismatch = float("inf")
+            cache_row["max_initial_position_mismatch"] = mismatch
+            cache_rows.append(cache_row)
+    rows = glassbench_sparse_lag_event_clock_audit(
+        audit_id="glassbench_ka2d_sparse_lag_event_clock",
+        cache_rows=cache_rows,
+        contract_rows=contract_rows,
+        required_time_codes=("tc05", "tc10", "tc15", "tc20", "tc25", "tc30", "tc35", "tc40"),
+        max_initial_mismatch_tolerance=1e-10,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9181,6 +9222,59 @@ def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_sparse_lag_event_clock_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 390
+    left, top = 75, 125
+    row_h = 105
+    colors = {
+        "sparse_lag_tensor_ready_replica_identity_unverified": "#805ad5",
+        "sparse_lag_event_clock_ready_for_interval_segmentation": "#2f855a",
+        "sparse_lag_tensor_identity_incomplete": "#c05621",
+        "sparse_lag_event_clock_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["sparse_lag_event_clock_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; coverage={float(row["time_code_coverage_fraction"]):.2f}; lags={float(row["lag_count"]):.0f}; shape={row["positions_shape"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">same initial={int(float(row["same_initial_structure_verified"]))}; tensor={int(float(row["physical_lag_tensor_ready"]))}; coarse candidate={int(float(row["coarse_event_clock_candidate_ready"]))}; replica IDs={int(float(row["replica_identity_alignment_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">resolution={row["event_clock_resolution"]}; max initial mismatch={float(row["max_initial_position_mismatch"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 78}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:52]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench sparse-lag event-clock audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Multi-lag particle caches can define a coarse interval candidate only after lag coverage, shared initial structure, and replica identity are separated.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">sparse-lag stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">event-clock evidence and remaining blocker</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -12057,6 +12151,14 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_event_clock_contract_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.svg",
         glassbench_direct_alpha_event_clock_contract_rows,
+    )
+    glassbench_sparse_lag_event_clock_rows = write_sota_glassbench_sparse_lag_event_clock_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.csv",
+        contract_rows=glassbench_direct_alpha_event_clock_contract_rows,
+    )
+    write_sota_glassbench_sparse_lag_event_clock_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.svg",
+        glassbench_sparse_lag_event_clock_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",
