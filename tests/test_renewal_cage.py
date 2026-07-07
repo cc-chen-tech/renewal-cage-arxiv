@@ -135,6 +135,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_first_npz_structural_observable_plan_gate,
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
+    glassbench_event_clock_threshold_readiness_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
     glassbench_timecode_curve_bridge,
@@ -534,6 +535,54 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(float(row["proxy_jump_length"]), 0.0)
         self.assertEqual(row["primary_blocker"], "particle_resolved_displacements")
         self.assertIn("particle_resolved_displacements", row["missing_event_clock_inputs"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_event_clock_threshold_readiness_gate_blocks_without_particle_cache(self):
+        rows = glassbench_event_clock_threshold_readiness_gate(
+            benchmark_id="glassbench_ka2d_threshold_readiness",
+            system_id="KA2D",
+            temperature=0.23,
+            positions_schema_ready=True,
+            first_npz_observable_curve_ready=True,
+            member_ensemble_observable_ready=True,
+            particle_resolved_positions_cached=False,
+            physical_time_semantics_ready=False,
+            event_clock_threshold_protocol_available=True,
+            macro_heldout_observables_ready=False,
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["readiness_stage"], "real_event_clock_threshold_robustness_blocked")
+        self.assertEqual(row["primary_blocker"], "particle_resolved_positions_cache")
+        self.assertEqual(float(row["positions_schema_ready"]), 1.0)
+        self.assertEqual(float(row["member_ensemble_observable_ready"]), 1.0)
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 0.0)
+        self.assertEqual(float(row["real_event_clock_threshold_robustness_ready"]), 0.0)
+        self.assertIn("threshold_sweep_event_clock", row["missing_real_threshold_inputs"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_event_clock_threshold_readiness_gate_accepts_complete_real_inputs(self):
+        rows = glassbench_event_clock_threshold_readiness_gate(
+            benchmark_id="glassbench_ka2d_threshold_readiness",
+            system_id="KA2D",
+            temperature=0.23,
+            positions_schema_ready=True,
+            first_npz_observable_curve_ready=True,
+            member_ensemble_observable_ready=True,
+            particle_resolved_positions_cached=True,
+            physical_time_semantics_ready=True,
+            event_clock_threshold_protocol_available=True,
+            macro_heldout_observables_ready=True,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["readiness_stage"], "real_event_clock_threshold_robustness_ready")
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 1.0)
+        self.assertEqual(float(row["real_event_clock_threshold_robustness_ready"]), 1.0)
+        self.assertEqual(float(row["real_benchmark_closed_loop_ready"]), 1.0)
+        self.assertEqual(row["missing_real_threshold_inputs"], "none")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):

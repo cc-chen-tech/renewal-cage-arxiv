@@ -3765,6 +3765,68 @@ def write_sota_glassbench_cage_jump_proxy_canary_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_event_clock_threshold_readiness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench event-clock threshold readiness")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real threshold-robustness claims require cached particle trajectories, physical time, and held-out macro observables.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "real_event_clock_threshold_robustness_ready": colors.HexColor("#2f855a"),
+        "real_event_clock_threshold_robustness_blocked": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "readiness stage")
+    c.drawString(left + 390, top + 24, "real-input gate")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["readiness_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 270, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "schema={}; curve={}; members={}; particle cache={}; threshold sweep={}; blocker={}".format(
+                int(float(row["positions_schema_ready"])),
+                int(float(row["first_npz_observable_curve_ready"])),
+                int(float(row["member_ensemble_observable_ready"])),
+                int(float(row["particle_resolved_positions_cached"])),
+                int(float(row["threshold_sweep_event_clock_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 390, y - 14, f'missing={row["missing_real_threshold_inputs"][:92]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The gate is intentionally conservative: schema visibility is not treated as a real particle-event threshold sweep.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5490,6 +5552,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_cage_jump_proxy_canary_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf"
     )
+    sota_glassbench_event_clock_threshold_readiness_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -5636,6 +5701,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_cage_jump_proxy_canary_pdf(
         sota_glassbench_cage_jump_proxy_canary_pdf
+    )
+    write_sota_glassbench_event_clock_threshold_readiness_pdf(
+        sota_glassbench_event_clock_threshold_readiness_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5822,6 +5890,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_cage_jump_proxy_canary_pdf,
             "figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf",
+        )
+        archive.write(
+            sota_glassbench_event_clock_threshold_readiness_pdf,
+            "figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

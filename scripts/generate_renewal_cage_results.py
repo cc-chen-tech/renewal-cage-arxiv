@@ -51,6 +51,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_temperature_scan,
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
+    glassbench_event_clock_threshold_readiness_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -3996,6 +3997,69 @@ def write_sota_glassbench_cage_jump_proxy_canary_csv(
         canary_id="glassbench_ka2d_cage_jump_proxy_canary",
         trajectory_rows=trajectory_rows,
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_event_clock_threshold_readiness_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """Gate real GlassBench threshold robustness against cached particle inputs."""
+
+    schema_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_npz_schema_probe_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+    curve_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_first_npz_observable_curve_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+    member_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_member_ensemble_observable_curve_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    curve_keys = {
+        (str(entry["system_id"]), str(entry["temperature"]))
+        for entry in curve_manifest["entries"]
+    }
+    member_keys = {
+        (str(entry["system_id"]), str(entry["temperature"]))
+        for entry in member_manifest["entries"]
+    }
+    rows: list[dict[str, float | str]] = []
+    for entry in schema_manifest["entries"]:
+        system_id = str(entry["system_id"])
+        temperature = str(entry["temperature"])
+        arrays = entry.get("arrays", [])
+        has_positions = any(array.get("name") == "positions.npy" for array in arrays)
+        key = (system_id, temperature)
+        rows.extend(
+            glassbench_event_clock_threshold_readiness_gate(
+                benchmark_id=f"glassbench_{system_id.lower()}_t{temperature.replace('.', '_')}_threshold_readiness",
+                system_id=system_id,
+                temperature=temperature,
+                positions_schema_ready=has_positions,
+                first_npz_observable_curve_ready=key in curve_keys,
+                member_ensemble_observable_ready=key in member_keys,
+                particle_resolved_positions_cached=False,
+                physical_time_semantics_ready=False,
+                event_clock_threshold_protocol_available=True,
+                macro_heldout_observables_ready=False,
+            )
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -9099,6 +9163,54 @@ def write_sota_glassbench_cage_jump_proxy_canary_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_event_clock_threshold_readiness_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "real_event_clock_threshold_robustness_ready": "#2f855a",
+        "real_event_clock_threshold_robustness_blocked": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["readiness_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="410" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">schema={int(float(row["positions_schema_ready"]))}; first-NPZ curve={int(float(row["first_npz_observable_curve_ready"]))}; members={int(float(row["member_ensemble_observable_ready"]))}; particle cache={int(float(row["particle_resolved_positions_cached"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">threshold sweep={int(float(row["threshold_sweep_event_clock_ready"]))}; held-out macro={int(float(row["macro_heldout_observables_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing={str(row["missing_real_threshold_inputs"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench event-clock threshold readiness</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Real threshold-robustness claims are blocked until particle-resolved coordinate cache, physical time, and held-out macro observables are available.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness stage</text>
+  <text x="{left + 565}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">real-input gate</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 660
@@ -10551,6 +10663,15 @@ def main() -> None:
     write_sota_glassbench_cage_jump_proxy_canary_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg",
         cage_jump_proxy_canary_rows,
+    )
+    glassbench_event_clock_threshold_readiness_rows = (
+        write_sota_glassbench_event_clock_threshold_readiness_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.csv"
+        )
+    )
+    write_sota_glassbench_event_clock_threshold_readiness_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.svg",
+        glassbench_event_clock_threshold_readiness_rows,
     )
     microdynamic_closed_loop_rows = write_sota_glassbench_microdynamic_closed_loop_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv",

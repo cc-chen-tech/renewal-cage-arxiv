@@ -5939,6 +5939,101 @@ def glassbench_cage_jump_proxy_canary(
     return out
 
 
+def glassbench_event_clock_threshold_readiness_gate(
+    *,
+    benchmark_id: str,
+    system_id: str,
+    temperature: float | str,
+    positions_schema_ready: bool | float,
+    first_npz_observable_curve_ready: bool | float,
+    member_ensemble_observable_ready: bool | float,
+    particle_resolved_positions_cached: bool | float,
+    physical_time_semantics_ready: bool | float,
+    event_clock_threshold_protocol_available: bool | float,
+    macro_heldout_observables_ready: bool | float,
+) -> list[dict[str, float | str]]:
+    """Gate real GlassBench event-clock threshold robustness without overclaiming.
+
+    The synthetic threshold protocol is already available in the package. This
+    gate states whether the corresponding real GlassBench trajectory inputs are
+    present, including a reusable particle-resolved coordinate cache.
+    """
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not system_id:
+        raise ValueError("system_id must be nonempty")
+
+    flags = {
+        "positions_schema_ready": float(bool(positions_schema_ready)),
+        "first_npz_observable_curve_ready": float(bool(first_npz_observable_curve_ready)),
+        "member_ensemble_observable_ready": float(bool(member_ensemble_observable_ready)),
+        "particle_resolved_positions_cached": float(bool(particle_resolved_positions_cached)),
+        "physical_time_semantics_ready": float(bool(physical_time_semantics_ready)),
+        "event_clock_threshold_protocol_available": float(bool(event_clock_threshold_protocol_available)),
+        "macro_heldout_observables_ready": float(bool(macro_heldout_observables_ready)),
+    }
+    threshold_sweep_ready = float(
+        bool(particle_resolved_positions_cached)
+        and bool(physical_time_semantics_ready)
+        and bool(event_clock_threshold_protocol_available)
+    )
+
+    blocker_order = [
+        ("positions_schema_ready", "positions_schema"),
+        ("first_npz_observable_curve_ready", "first_npz_observable_curve"),
+        ("member_ensemble_observable_ready", "member_ensemble_observable"),
+        ("particle_resolved_positions_cached", "particle_resolved_positions_cache"),
+        ("physical_time_semantics_ready", "physical_time_semantics"),
+        ("event_clock_threshold_protocol_available", "threshold_protocol"),
+        ("macro_heldout_observables_ready", "macro_heldout_observables"),
+    ]
+    missing = [blocker for key, blocker in blocker_order if flags[key] == 0.0]
+    if threshold_sweep_ready == 0.0 and "threshold_sweep_event_clock" not in missing:
+        missing.append("threshold_sweep_event_clock")
+
+    ready = float(
+        all(value == 1.0 for value in flags.values())
+        and threshold_sweep_ready == 1.0
+    )
+    stage = (
+        "real_event_clock_threshold_robustness_ready"
+        if ready
+        else "real_event_clock_threshold_robustness_blocked"
+    )
+    primary_blocker = "none"
+    if not ready:
+        for candidate in [
+            "positions_schema",
+            "first_npz_observable_curve",
+            "member_ensemble_observable",
+            "particle_resolved_positions_cache",
+            "physical_time_semantics",
+            "threshold_sweep_event_clock",
+            "macro_heldout_observables",
+        ]:
+            if candidate in missing:
+                primary_blocker = candidate
+                break
+
+    return [
+        {
+            "benchmark_id": benchmark_id,
+            "system_id": system_id,
+            "temperature": str(temperature),
+            **flags,
+            "threshold_sweep_event_clock_ready": threshold_sweep_ready,
+            "real_event_clock_threshold_robustness_ready": ready,
+            "real_benchmark_closed_loop_ready": ready,
+            "fit_parameters_from_macro_observables": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": primary_blocker,
+            "missing_real_threshold_inputs": ";".join(missing) if missing else "none",
+            "readiness_stage": stage,
+        }
+    ]
+
+
 def glassbench_microdynamic_closed_loop_audit(
     *,
     audit_id: str,
