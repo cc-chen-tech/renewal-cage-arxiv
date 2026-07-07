@@ -1204,15 +1204,15 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(row["positions_schema_ready"]), 1.0)
             self.assertEqual(float(row["first_npz_observable_curve_ready"]), 1.0)
             self.assertEqual(float(row["member_ensemble_observable_ready"]), 1.0)
-            self.assertEqual(float(row["particle_resolved_positions_cached"]), 0.0)
+            self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
             self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 0.0)
             self.assertEqual(float(row["real_event_clock_threshold_robustness_ready"]), 0.0)
-            self.assertEqual(row["primary_blocker"], "particle_resolved_positions_cache")
-            self.assertIn("particle_resolved_positions_cache", row["missing_real_threshold_inputs"])
+            self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+            self.assertNotIn("particle_resolved_positions_cache", row["missing_real_threshold_inputs"])
             self.assertIn("threshold_sweep_event_clock", row["missing_real_threshold_inputs"])
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
-    def test_sota_glassbench_first_npz_particle_cache_contract_pins_missing_cache(self):
+    def test_sota_glassbench_first_npz_particle_cache_contract_records_cached_positions(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.csv"
         self.assertTrue(path.exists())
         with path.open() as f:
@@ -1222,7 +1222,7 @@ class ArxivPackageTests(unittest.TestCase):
         ka2d_023 = by_key[("KA2D", "0.23")]
         self.assertEqual(
             ka2d_023["cache_contract_stage"],
-            "first_npz_particle_cache_contract_ready_cache_missing",
+            "first_npz_particle_cache_contract_ready_time_blocked",
         )
         self.assertEqual(ka2d_023["first_npz_member"], "T0.23/test/N1290T0.23_202_tc05.npz")
         self.assertEqual(ka2d_023["positions_shape"], "20x1290x2")
@@ -1230,15 +1230,38 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_023["npz_member_bytes"]), 465710.0)
         self.assertEqual(ka2d_023["npz_member_md5"], "26b4b9af10138fbd04a840fe8275de8e")
         self.assertEqual(float(ka2d_023["particle_cache_contract_ready"]), 1.0)
-        self.assertEqual(float(ka2d_023["particle_resolved_positions_cached"]), 0.0)
+        self.assertEqual(float(ka2d_023["particle_resolved_positions_cached"]), 1.0)
         self.assertEqual(float(ka2d_023["threshold_sweep_event_clock_ready"]), 0.0)
-        self.assertEqual(ka2d_023["primary_blocker"], "persist_particle_coordinate_cache")
+        self.assertEqual(ka2d_023["primary_blocker"], "physical_time_semantics")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
         ka2d_030 = by_key[("KA2D", "0.30")]
         self.assertEqual(ka2d_030["positions_shape"], "20x1290x2")
         self.assertEqual(float(ka2d_030["npz_member_bytes"]), 444786.0)
         self.assertEqual(ka2d_030["npz_member_md5"], "f51fd76f59b8288405a9e7abb61cdd0a")
+        self.assertEqual(float(ka2d_030["particle_resolved_positions_cached"]), 1.0)
+
+    def test_sota_glassbench_first_npz_particle_cache_manifest_records_real_cache(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key, expected_md5 in [
+            (("KA2D", "0.23"), "26b4b9af10138fbd04a840fe8275de8e"),
+            (("KA2D", "0.30"), "f51fd76f59b8288405a9e7abb61cdd0a"),
+        ]:
+            row = by_key[key]
+            cache_path = Path(row["particle_cache_path"])
+            self.assertTrue(cache_path.exists())
+            self.assertEqual(row["cache_stage"], "particle_coordinate_cache_written")
+            self.assertEqual(row["probe_encoding"], "zip_deflate_xz")
+            self.assertEqual(row["positions_shape"], "20x1290x2")
+            self.assertEqual(row["npz_member_md5"], expected_md5)
+            self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+            self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 0.0)
+            self.assertEqual(row["primary_blocker"], "physical_time_semantics")
 
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"

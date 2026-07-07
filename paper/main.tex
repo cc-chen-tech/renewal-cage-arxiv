@@ -1537,14 +1537,12 @@ physical clock'' \cite{weeks2002cage,pastore2017cage,hedges2007persistence}.
 The same distinction is enforced for the event-clock threshold robustness test.
 The package includes a GlassBench threshold-readiness ledger showing that the
 KA2D archive exposes the required particle-coordinate schema and short-window
-member-ensemble observables, but that these are not yet a reusable
-particle-resolved coordinate cache with physical time, threshold sweeps, and
-held-out macro observables. Thus the synthetic threshold-robustness diagnostic
-is a protocol target for real trajectories, not a completed real-data claim.
-The companion first-NPZ particle-cache contract pins the exact byte ranges, NPZ
-member identities, MD5 hashes, coordinate shape \(20\times1290\times2\), and
-local cache targets that would be needed to turn this readiness gate into a
-particle-resolved threshold sweep.
+member-ensemble observables. The companion first-NPZ particle-cache manifest
+uses bounded HTTP range reads to persist the two first-NPZ coordinate caches and
+verifies their NPZ MD5 hashes and coordinate shape \(20\times1290\times2\).
+The real threshold-robustness claim remains blocked, however, because those
+cached coordinates still lack physical time semantics, threshold-sweep event
+clocks, and held-out macro observables.
 
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out

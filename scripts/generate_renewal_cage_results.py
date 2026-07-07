@@ -4101,6 +4101,10 @@ def write_sota_glassbench_first_npz_particle_cache_contract_csv(
         schema_entries=schema_manifest["entries"],
         curve_entries=curve_manifest["entries"],
         cache_root="data/third_party/glassbench/particle_cache",
+        cached_particle_cache_targets=[
+            str(path.relative_to(ROOT))
+            for path in (DATA_DIR / "third_party" / "glassbench" / "particle_cache").glob("*.npz")
+        ],
     )
     write_sweep_csv(path, rows)
     return rows
