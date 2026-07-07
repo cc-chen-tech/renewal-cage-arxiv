@@ -6034,6 +6034,149 @@ def glassbench_event_clock_threshold_readiness_gate(
     ]
 
 
+def glassbench_first_npz_particle_cache_contract_gate(
+    *,
+    contract_id: str,
+    schema_entries: Sequence[dict[str, object]],
+    curve_entries: Sequence[dict[str, object]],
+    cache_root: str,
+    cached_particle_cache_targets: Sequence[str] | None = None,
+    physical_time_semantics_ready: bool | float = False,
+) -> list[dict[str, float | str]]:
+    """Pin the first-NPZ coordinate cache target needed for event-clock sweeps."""
+
+    if not contract_id:
+        raise ValueError("contract_id must be nonempty")
+    if not schema_entries:
+        raise ValueError("schema_entries must be nonempty")
+    if not curve_entries:
+        raise ValueError("curve_entries must be nonempty")
+    if not cache_root:
+        raise ValueError("cache_root must be nonempty")
+
+    curve_by_key = {
+        (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("first_npz_member", "none")),
+        ): row
+        for row in curve_entries
+    }
+    cached_targets = {str(target) for target in (cached_particle_cache_targets or [])}
+    root = cache_root.rstrip("/")
+
+    out: list[dict[str, float | str]] = []
+    for entry in sorted(
+        schema_entries,
+        key=lambda row: (str(row.get("system_id", "unknown")), float(row.get("temperature", 0.0))),
+    ):
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        first_npz_member = str(entry.get("first_npz_member", "none"))
+        source_path = str(entry.get("path", "none"))
+        key = (system_id, temperature, first_npz_member)
+        curve = curve_by_key.get(key, {})
+
+        positions_shape_values: list[int] = []
+        positions_dtype = "none"
+        for array in entry.get("arrays", []):
+            if isinstance(array, dict) and array.get("name") == "positions.npy":
+                positions_shape_values = [int(value) for value in array.get("shape", [])]
+                positions_dtype = str(array.get("dtype", "none"))
+                break
+        positions_shape = "x".join(str(value) for value in positions_shape_values) if positions_shape_values else "none"
+        frame_count = float(positions_shape_values[0]) if len(positions_shape_values) >= 1 else 0.0
+        particle_count = float(positions_shape_values[1]) if len(positions_shape_values) >= 2 else 0.0
+        spatial_dimension = float(positions_shape_values[2]) if len(positions_shape_values) >= 3 else 0.0
+
+        schema_ready = float(bool(positions_shape_values))
+        curve_ready = float(bool(curve))
+        md5 = str(entry.get("npz_member_md5", "none"))
+        npz_bytes = float(entry.get("npz_member_bytes", 0.0) or 0.0)
+        md5_matches_curve = float(
+            bool(curve)
+            and md5 != "none"
+            and md5 == str(curve.get("npz_member_md5", "none"))
+        )
+        byte_count_matches_curve = float(
+            bool(curve)
+            and npz_bytes > 0.0
+            and npz_bytes == float(curve.get("npz_member_bytes", -1.0) or -1.0)
+        )
+        contract_ready = float(
+            schema_ready == 1.0
+            and curve_ready == 1.0
+            and md5_matches_curve == 1.0
+            and byte_count_matches_curve == 1.0
+        )
+
+        safe_temp = temperature.replace(".", "_")
+        target = f"{root}/glassbench_{system_id.lower()}_T{safe_temp}_first_npz_positions.npz"
+        cached = float(target in cached_targets)
+        physical_time_ready = float(bool(physical_time_semantics_ready))
+        threshold_ready = float(contract_ready == 1.0 and cached == 1.0 and physical_time_ready == 1.0)
+
+        missing: list[str] = []
+        if schema_ready == 0.0:
+            missing.append("positions_schema")
+        if curve_ready == 0.0:
+            missing.append("first_npz_observable_curve")
+        if md5_matches_curve == 0.0 or byte_count_matches_curve == 0.0:
+            missing.append("npz_member_identity")
+        if contract_ready == 1.0 and cached == 0.0:
+            missing.append("particle_coordinate_cache")
+        if contract_ready == 1.0 and cached == 1.0 and physical_time_ready == 0.0:
+            missing.append("physical_time_semantics")
+
+        if threshold_ready == 1.0:
+            stage = "first_npz_particle_cache_ready_for_threshold_sweep"
+            blocker = "none"
+        elif contract_ready == 1.0 and cached == 0.0:
+            stage = "first_npz_particle_cache_contract_ready_cache_missing"
+            blocker = "persist_particle_coordinate_cache"
+        elif contract_ready == 1.0:
+            stage = "first_npz_particle_cache_contract_ready_time_blocked"
+            blocker = "physical_time_semantics"
+        else:
+            stage = "first_npz_particle_cache_contract_incomplete"
+            blocker = missing[0] if missing else "coordinate_cache_contract"
+
+        out.append(
+            {
+                "contract_id": contract_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "first_npz_member": first_npz_member,
+                "compressed_probe_range_start": float(curve.get("compressed_probe_range_start", 0.0) or 0.0),
+                "compressed_probe_range_end": float(curve.get("compressed_probe_range_end", 0.0) or 0.0),
+                "compressed_probe_bytes": float(curve.get("compressed_probe_bytes", 0.0) or 0.0),
+                "npz_member_bytes": npz_bytes,
+                "npz_member_md5": md5,
+                "positions_shape": positions_shape,
+                "positions_dtype": positions_dtype,
+                "frame_count": frame_count,
+                "particle_count": particle_count,
+                "spatial_dimension": spatial_dimension,
+                "coordinate_schema_ready": schema_ready,
+                "first_npz_observable_curve_ready": curve_ready,
+                "npz_identity_matches_observable_curve": float(
+                    md5_matches_curve == 1.0 and byte_count_matches_curve == 1.0
+                ),
+                "particle_cache_contract_ready": contract_ready,
+                "particle_cache_target": target,
+                "particle_resolved_positions_cached": cached,
+                "physical_time_semantics_ready": physical_time_ready,
+                "threshold_sweep_event_clock_ready": threshold_ready,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "missing_particle_cache_inputs": ";".join(missing) if missing else "none",
+                "cache_contract_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_microdynamic_closed_loop_audit(
     *,
     audit_id: str,

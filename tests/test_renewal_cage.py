@@ -136,6 +136,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
+    glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
     glassbench_timecode_curve_bridge,
@@ -584,6 +585,96 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["real_benchmark_closed_loop_ready"]), 1.0)
         self.assertEqual(row["missing_real_threshold_inputs"], "none")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_first_npz_particle_cache_contract_pins_coordinate_payload(self):
+        schema_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "npz_member_bytes": 465710,
+                "npz_member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+                "arrays": [
+                    {"name": "positions.npy", "shape": [20, 1290, 2], "dtype": "float64"},
+                    {"name": "box.npy", "shape": [], "dtype": "float64"},
+                ],
+            }
+        ]
+        curve_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "compressed_probe_range_start": 2980602255,
+                "compressed_probe_range_end": 2984796558,
+                "compressed_probe_bytes": 4194304,
+                "npz_member_bytes": 465710,
+                "npz_member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+            }
+        ]
+
+        rows = glassbench_first_npz_particle_cache_contract_gate(
+            contract_id="glassbench_first_npz_particle_cache_contract",
+            schema_entries=schema_entries,
+            curve_entries=curve_entries,
+            cache_root="data/third_party/glassbench/particle_cache",
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["cache_contract_stage"], "first_npz_particle_cache_contract_ready_cache_missing")
+        self.assertEqual(row["positions_shape"], "20x1290x2")
+        self.assertEqual(float(row["frame_count"]), 20.0)
+        self.assertEqual(float(row["particle_count"]), 1290.0)
+        self.assertEqual(float(row["spatial_dimension"]), 2.0)
+        self.assertEqual(float(row["particle_cache_contract_ready"]), 1.0)
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "persist_particle_coordinate_cache")
+        self.assertIn("glassbench_ka2d_T0_23_first_npz_positions.npz", row["particle_cache_target"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_first_npz_particle_cache_contract_accepts_existing_cache(self):
+        schema_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "npz_member_bytes": 444786,
+                "npz_member_md5": "f51fd76f59b8288405a9e7abb61cdd0a",
+                "arrays": [{"name": "positions.npy", "shape": [20, 1290, 2], "dtype": "float64"}],
+            }
+        ]
+        curve_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "compressed_probe_range_start": 464175,
+                "compressed_probe_range_end": 4658478,
+                "compressed_probe_bytes": 4194304,
+                "npz_member_bytes": 444786,
+                "npz_member_md5": "f51fd76f59b8288405a9e7abb61cdd0a",
+            }
+        ]
+        cache_path = "data/third_party/glassbench/particle_cache/glassbench_ka2d_T0_30_first_npz_positions.npz"
+
+        row = glassbench_first_npz_particle_cache_contract_gate(
+            contract_id="glassbench_first_npz_particle_cache_contract",
+            schema_entries=schema_entries,
+            curve_entries=curve_entries,
+            cache_root="data/third_party/glassbench/particle_cache",
+            cached_particle_cache_targets=[cache_path],
+            physical_time_semantics_ready=True,
+        )[0]
+
+        self.assertEqual(row["cache_contract_stage"], "first_npz_particle_cache_ready_for_threshold_sweep")
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+        self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
         claim_rows = [

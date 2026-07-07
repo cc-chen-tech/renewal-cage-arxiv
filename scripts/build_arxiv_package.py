@@ -3827,6 +3827,77 @@ def write_sota_glassbench_event_clock_threshold_readiness_pdf(path: Path) -> Non
     c.save()
 
 
+def write_sota_glassbench_first_npz_particle_cache_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench first-NPZ particle cache contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The contract pins byte ranges, NPZ identity, coordinate shape, and the local cache target needed before real event-clock sweeps.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 64
+    colors_by_stage = {
+        "first_npz_particle_cache_ready_for_threshold_sweep": colors.HexColor("#2f855a"),
+        "first_npz_particle_cache_contract_ready_cache_missing": colors.HexColor("#b7791f"),
+        "first_npz_particle_cache_contract_ready_time_blocked": colors.HexColor("#805ad5"),
+        "first_npz_particle_cache_contract_incomplete": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "contract stage")
+    c.drawString(left + 395, top + 24, "coordinate-cache payload")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cache_contract_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 395,
+            y,
+            "shape={}; npz={} B; md5={}; cache={}; blocker={}".format(
+                row["positions_shape"],
+                int(float(row["npz_member_bytes"])),
+                row["npz_member_md5"][:10],
+                int(float(row["particle_resolved_positions_cached"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "range={}-{}; target={}".format(
+                int(float(row["compressed_probe_range_start"])),
+                int(float(row["compressed_probe_range_end"])),
+                row["particle_cache_target"][:72],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is an extraction contract, not a cached coordinate array or a completed real threshold sweep.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5555,6 +5626,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_event_clock_threshold_readiness_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf"
     )
+    sota_glassbench_first_npz_particle_cache_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -5704,6 +5778,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_event_clock_threshold_readiness_pdf(
         sota_glassbench_event_clock_threshold_readiness_pdf
+    )
+    write_sota_glassbench_first_npz_particle_cache_contract_pdf(
+        sota_glassbench_first_npz_particle_cache_contract_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5894,6 +5971,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_event_clock_threshold_readiness_pdf,
             "figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf",
+        )
+        archive.write(
+            sota_glassbench_first_npz_particle_cache_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,
