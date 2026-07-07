@@ -7969,6 +7969,154 @@ def glassbench_late_recovery_membership_probe_contract(
     return rows
 
 
+def glassbench_late_recovery_public_timecode_ceiling(
+    *,
+    ceiling_id: str,
+    timecode_target_rows: Sequence[dict[str, object]],
+    semantics_manifest: dict[str, object],
+    membership_probe_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Compare late-recovery targets with the public GlassBench time-code ceiling."""
+
+    if not ceiling_id:
+        raise ValueError("ceiling_id must be nonempty")
+    if not timecode_target_rows:
+        raise ValueError("timecode_target_rows must be nonempty")
+    entries = semantics_manifest.get("entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("semantics_manifest entries must be a list")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def time_code_number(code: str) -> int:
+        match = re.fullmatch(r"tc(\d+)", code)
+        return int(match.group(1)) if match is not None else -1
+
+    def code_sort(codes: set[str]) -> list[str]:
+        return sorted(codes, key=time_code_number)
+
+    semantic_by_key: dict[tuple[str, str], dict[str, object]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        semantic_by_key[(str(entry.get("system_id", "unknown")), str(entry.get("temperature", "none")))] = entry
+    membership_by_key = {key_for(row): row for row in membership_probe_rows}
+
+    rows: list[dict[str, float | str]] = []
+    for target in sorted(timecode_target_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(target)
+        target_ready = float(target.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        target_code = str(target.get("target_time_code", "none"))
+        target_lag = float(target.get("target_lag_time", 0.0) or 0.0)
+        required_lag = float(target.get("required_followup_lag_time", 0.0) or 0.0)
+        semantic = semantic_by_key.get((system_id, temperature), {})
+        members = semantic.get("members", []) if isinstance(semantic, dict) else []
+        public_codes: set[str] = set()
+        structure_codes: set[str] = set()
+        lag_by_code: dict[str, float] = {}
+        if isinstance(members, list):
+            for member in members:
+                if not isinstance(member, dict):
+                    continue
+                code = str(member.get("time_code", "none"))
+                if code == "none":
+                    continue
+                public_codes.add(code)
+                lag_by_code[code] = max(
+                    lag_by_code.get(code, 0.0),
+                    float(member.get("lag_time", 0.0) or 0.0),
+                )
+                if str(member.get("structure_id", "none")) == structure_id:
+                    structure_codes.add(code)
+
+        public_sorted = code_sort(public_codes)
+        structure_sorted = code_sort(structure_codes)
+        public_max = public_sorted[-1] if public_sorted else "none"
+        structure_max = structure_sorted[-1] if structure_sorted else "none"
+        public_max_lag = lag_by_code.get(public_max, 0.0)
+        target_published = target_code in public_codes
+        target_beyond_public = (
+            target_ready
+            and target_code != "none"
+            and public_max != "none"
+            and time_code_number(target_code) > time_code_number(public_max)
+        )
+        membership = membership_by_key.get((system_id, temperature, structure_id), {})
+        membership_ready = float(membership.get("membership_probe_ready", 0.0) or 0.0) == 1.0
+        target_visible = float(membership.get("target_member_visible_in_probe", 0.0) or 0.0) == 1.0
+
+        if not target_ready:
+            stage = "late_recovery_timecode_target_incomplete"
+            blocker = "late_recovery_timecode_target"
+            next_action = "complete_late_recovery_timecode_target"
+            ceiling_ready = False
+        elif not public_codes:
+            stage = "public_timecode_semantics_missing"
+            blocker = "public_timecode_semantics"
+            next_action = "load_official_glassbench_timecode_semantics"
+            ceiling_ready = False
+        elif target_published and target_visible:
+            stage = "late_recovery_public_timecode_member_visible"
+            blocker = "late_recovery_particle_cache"
+            next_action = f"extract_late_recovery_particle_cache_for_{target_code}"
+            ceiling_ready = True
+        elif target_published:
+            stage = "late_recovery_public_timecode_published_probe_needed"
+            blocker = "late_recovery_member_index_probe"
+            next_action = f"probe_or_extract_published_time_code_{target_code}"
+            ceiling_ready = True
+        elif target_beyond_public:
+            stage = "late_recovery_beyond_public_timecode_ceiling"
+            blocker = "public_glassbench_timecode_ceiling"
+            next_action = (
+                f"obtain_new_glassbench_export_or_trajectory_beyond_{public_max}_"
+                "for_late_recovery"
+            )
+            ceiling_ready = True
+        else:
+            stage = "late_recovery_timecode_not_in_public_semantics"
+            blocker = "public_glassbench_timecode_semantics"
+            next_action = "verify_target_time_code_against_public_semantics"
+            ceiling_ready = bool(membership_ready)
+
+        rows.append(
+            {
+                "ceiling_id": ceiling_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "timecode_target_ready": float(target_ready),
+                "target_time_code": target_code,
+                "target_lag_time": float(target_lag),
+                "required_followup_lag_time": float(required_lag),
+                "public_time_codes": ";".join(public_sorted) if public_sorted else "none",
+                "structure_time_codes": ";".join(structure_sorted) if structure_sorted else "none",
+                "public_max_time_code": public_max,
+                "structure_max_time_code": structure_max,
+                "public_max_lag_time": float(public_max_lag),
+                "target_lag_over_public_max": float(target_lag / public_max_lag)
+                if public_max_lag > 0.0
+                else 0.0,
+                "target_time_code_published": float(target_published),
+                "membership_probe_ready": float(membership_ready),
+                "target_member_visible_in_probe": float(target_visible),
+                "public_ceiling_ready": float(ceiling_ready),
+                "late_recovery_observation_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "public_ceiling_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

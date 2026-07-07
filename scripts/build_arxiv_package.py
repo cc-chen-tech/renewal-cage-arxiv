@@ -4782,6 +4782,85 @@ def write_sota_glassbench_late_recovery_membership_probe_contract_pdf(path: Path
     c.save()
 
 
+def write_sota_glassbench_late_recovery_public_timecode_ceiling_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench public time-code ceiling")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The tc50 late-recovery target is compared with published GlassBench time-code semantics before claiming reanalysis feasibility.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 78
+    colors_by_stage = {
+        "late_recovery_public_timecode_member_visible": colors.HexColor("#2f855a"),
+        "late_recovery_public_timecode_published_probe_needed": colors.HexColor("#2b6cb0"),
+        "late_recovery_beyond_public_timecode_ceiling": colors.HexColor("#b7791f"),
+        "late_recovery_timecode_not_in_public_semantics": colors.HexColor("#c05621"),
+        "public_timecode_semantics_missing": colors.HexColor("#9f1239"),
+        "late_recovery_timecode_target_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "public ceiling stage")
+    c.drawString(left + 405, top + 24, "published time-code support")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["public_ceiling_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 288, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:54])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 405,
+            y,
+            "structure={}; target={}; public max={}; structure max={}; published={:.0f}".format(
+                row["structure_id"],
+                row["target_time_code"],
+                row["public_max_time_code"],
+                row["structure_max_time_code"],
+                float(row["target_time_code_published"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 405,
+            y - 14,
+            "target lag={:.3g}; public max lag={:.3g}; target/public={:.3g}".format(
+                float(row["target_lag_time"]),
+                float(row["public_max_lag_time"]),
+                float(row["target_lag_over_public_max"]),
+            ),
+        )
+        c.drawString(left + 405, y - 27, f'public codes={row["public_time_codes"][:68]}')
+        c.drawString(
+            left + 405,
+            y - 40,
+            f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:48]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "For KA2D T=0.23, public GlassBench time-code semantics stop at tc40; the required late-recovery target is tc50.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7087,6 +7166,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_late_recovery_membership_probe_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf"
     )
+    sota_glassbench_late_recovery_public_timecode_ceiling_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -7299,6 +7381,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_late_recovery_membership_probe_contract_pdf(
         sota_glassbench_late_recovery_membership_probe_contract_pdf
+    )
+    write_sota_glassbench_late_recovery_public_timecode_ceiling_pdf(
+        sota_glassbench_late_recovery_public_timecode_ceiling_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7565,6 +7650,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_late_recovery_membership_probe_contract_pdf,
             "figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_public_timecode_ceiling_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

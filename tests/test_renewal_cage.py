@@ -151,6 +151,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_timecode_target,
     glassbench_late_recovery_cache_request_contract,
     glassbench_late_recovery_membership_probe_contract,
+    glassbench_late_recovery_public_timecode_ceiling,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1418,6 +1419,87 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertEqual(warm["membership_probe_stage"], "late_recovery_cache_request_incomplete")
         self.assertEqual(warm["primary_blocker"], "late_recovery_cache_request")
+
+    def test_glassbench_late_recovery_public_timecode_ceiling_blocks_unpublished_tc50(self):
+        timecode_target_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "timecode_target_ready": 1.0,
+                "current_max_time_code": "tc40",
+                "current_max_lag_time": 1500000.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+                "required_followup_lag_time": 42972781.2315918,
+            }
+        ]
+        semantics_manifest = {
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                    "members": [
+                        {
+                            "structure_id": 151,
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                        },
+                        {
+                            "structure_id": 151,
+                            "time_code": "tc40",
+                            "lag_time": 1500000.0,
+                            "member": "T0.23/test/N1290T0.23_151_tc40.npz",
+                        },
+                        {
+                            "structure_id": 152,
+                            "time_code": "tc40",
+                            "lag_time": 1500000.0,
+                            "member": "T0.23/test/N1290T0.23_152_tc40.npz",
+                        },
+                    ],
+                }
+            ]
+        }
+        membership_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "membership_probe_ready": 1.0,
+                "target_member_visible_in_probe": 0.0,
+                "max_visible_time_code": "tc40",
+                "same_structure_visible_time_codes": "tc05;tc40",
+                "membership_probe_stage": "late_recovery_target_absent_from_extended_prefix",
+            }
+        ]
+
+        rows = glassbench_late_recovery_public_timecode_ceiling(
+            ceiling_id="glassbench_late_recovery_public_timecode_ceiling",
+            timecode_target_rows=timecode_target_rows,
+            semantics_manifest=semantics_manifest,
+            membership_probe_rows=membership_rows,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["public_ceiling_stage"], "late_recovery_beyond_public_timecode_ceiling")
+        self.assertEqual(float(row["public_ceiling_ready"]), 1.0)
+        self.assertEqual(row["target_time_code"], "tc50")
+        self.assertEqual(row["public_max_time_code"], "tc40")
+        self.assertEqual(row["structure_max_time_code"], "tc40")
+        self.assertAlmostEqual(float(row["public_max_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(row["target_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertGreater(float(row["target_lag_over_public_max"]), 100.0)
+        self.assertEqual(float(row["target_time_code_published"]), 0.0)
+        self.assertEqual(float(row["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "public_glassbench_timecode_ceiling")
+        self.assertEqual(
+            row["next_required_action"],
+            "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
+        )
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [
