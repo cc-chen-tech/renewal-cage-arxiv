@@ -357,6 +357,11 @@ log-time interpolated `tc45`, it preregisters high-`k` predictions:
 `F_s(tc45)=0.236--0.241` and `F_s(tc50)=0.125--0.133`, with a fixed
 absolute-log tolerance band. These rows are falsification targets for a future
 GlassBench extension, not observed post-window evidence.
+The post-alpha verdict gate then maps those preregistered targets and any
+future post-window `F_s` observations into supported, rejected, indeterminate,
+or not-ready rows. The current GlassBench verdict remains not-ready because no
+post-window observation has been ingested, so this is a falsifiable verdict
+protocol rather than observed support.
 The direct-alpha transport proxy then matches that same `tc40` crossing to the
 reproduced GlassBench displacement observable: `MSD=0.9747508406`, giving
 `D_eff=1.6246e-7` and `D_eff tau_alpha=0.24369` in 2D. This is a useful
@@ -573,6 +578,7 @@ figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_transport.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg
@@ -706,6 +712,7 @@ data/renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv
 data/renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv
 data/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv
 data/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.csv
+data/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv
 data/renewal_cage_sota_glassbench_direct_alpha_transport.csv
 data/renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv
 data/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv
@@ -860,6 +867,7 @@ paper/figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf

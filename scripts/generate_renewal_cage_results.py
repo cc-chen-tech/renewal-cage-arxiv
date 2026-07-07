@@ -61,6 +61,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_multik_heldout_prediction_gate,
     glassbench_direct_alpha_post_window_prediction_targets,
+    glassbench_direct_alpha_post_window_verdict,
     glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_pe_feasibility_bound,
@@ -4361,6 +4362,22 @@ def write_sota_glassbench_direct_alpha_post_window_prediction_targets_csv(
             terminal_target_lag_time=float(ready_target["target_lag_time"]),
             abs_log_fs_tolerance=0.35,
         )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_post_window_verdict_csv(
+    path: Path,
+    *,
+    target_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Score post-alpha F_s targets when future GlassBench observations exist."""
+
+    rows = glassbench_direct_alpha_post_window_verdict(
+        verdict_id="glassbench_ka2d_direct_alpha_post_window_verdict",
+        target_rows=target_rows,
+        observed_rows=[],
+    )
     write_sweep_csv(path, rows)
     return rows
 
@@ -9774,6 +9791,54 @@ def write_sota_glassbench_direct_alpha_post_window_prediction_targets_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_post_window_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 470
+    left, top = 75, 118
+    row_h = 48
+    colors = {
+        "post_alpha_prediction_supported": "#2f855a",
+        "post_alpha_prediction_rejected": "#c05621",
+        "post_alpha_prediction_indeterminate": "#b7791f",
+        "post_alpha_observation_not_ready": "#2563eb",
+        "post_alpha_prediction_target_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows[:7]):
+        y = top + idx * row_h
+        stage = str(row["post_window_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 70}" y="{y - 5}" width="305" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 80}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 395}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">k={row["direct_alpha_wave_number"]}; pred={float(row["predicted_fs"]):.3g}; obs={float(row["observed_fs"]):.3g}; residual={float(row["abs_log_fs_residual"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 790}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#555">support={int(float(row["post_window_prediction_supported"]))}; reject={int(float(row["post_window_prediction_rejected"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench post-alpha verdict</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The preregistered high-k F_s targets are converted into support/reject/indeterminate verdicts when post-window observations exist.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time</text>
+  <text x="{left + 70}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">verdict stage</text>
+  <text x="{left + 395}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">residual</text>
+  <text x="{left + 790}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">decision</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_transport_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -14220,6 +14285,16 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_post_window_prediction_targets_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.svg",
         glassbench_direct_alpha_post_window_prediction_target_rows,
+    )
+    glassbench_direct_alpha_post_window_verdict_rows = (
+        write_sota_glassbench_direct_alpha_post_window_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv",
+            target_rows=glassbench_direct_alpha_post_window_prediction_target_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_post_window_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.svg",
+        glassbench_direct_alpha_post_window_verdict_rows,
     )
     glassbench_late_recovery_cache_request_contract_rows = (
         write_sota_glassbench_late_recovery_cache_request_contract_csv(

@@ -4250,6 +4250,78 @@ def write_sota_glassbench_direct_alpha_post_window_prediction_targets_pdf(path: 
     c.save()
 
 
+def write_sota_glassbench_direct_alpha_post_window_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench post-alpha verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Preregistered high-k F_s targets become support/reject/indeterminate verdicts once post-window observations exist.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 38
+    colors_by_stage = {
+        "post_alpha_prediction_supported": colors.HexColor("#2f855a"),
+        "post_alpha_prediction_rejected": colors.HexColor("#c05621"),
+        "post_alpha_prediction_indeterminate": colors.HexColor("#b7791f"),
+        "post_alpha_observation_not_ready": colors.HexColor("#2563eb"),
+        "post_alpha_prediction_target_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 22, "time")
+    c.drawString(left + 55, top + 22, "verdict stage")
+    c.drawString(left + 320, top + 22, "residual")
+    c.drawString(left + 610, top + 22, "decision")
+    for index, row in enumerate(rows[:10]):
+        y = top - index * row_h
+        stage = row["post_window_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawString(left, y, row["target_time_code"])
+        c.setFillColor(color)
+        c.rect(left + 55, y - 12, 248, 23, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 63, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 320,
+            y,
+            "k={}; pred={:.3g}; obs={:.3g}; residual={:.3g}".format(
+                row["direct_alpha_wave_number"],
+                float(row["predicted_fs"]),
+                float(row["observed_fs"]),
+                float(row["abs_log_fs_residual"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 610,
+            y,
+            "support={}; reject={}; blocker={}".format(
+                int(float(row["post_window_prediction_supported"])),
+                int(float(row["post_window_prediction_rejected"])),
+                row["primary_blocker"][:32],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Current rows are not-ready because post-window F_s observations are not yet available.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_transport_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8205,6 +8277,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_post_window_prediction_targets_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf"
     )
+    sota_glassbench_direct_alpha_post_window_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf"
+    )
     sota_glassbench_direct_alpha_transport_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.pdf"
     )
@@ -8459,6 +8534,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_post_window_prediction_targets_pdf(
         sota_glassbench_direct_alpha_post_window_prediction_targets_pdf
+    )
+    write_sota_glassbench_direct_alpha_post_window_verdict_pdf(
+        sota_glassbench_direct_alpha_post_window_verdict_pdf
     )
     write_sota_glassbench_direct_alpha_transport_pdf(
         sota_glassbench_direct_alpha_transport_pdf
@@ -8766,6 +8844,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_post_window_prediction_targets_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_post_window_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_transport_pdf,

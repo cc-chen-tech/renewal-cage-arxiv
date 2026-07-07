@@ -149,6 +149,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_multik_heldout_prediction_gate,
     glassbench_direct_alpha_post_window_prediction_targets,
+    glassbench_direct_alpha_post_window_verdict,
     glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_transport_coupling_audit,
@@ -897,6 +898,101 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(first["real_alpha_shape_claim_ready"]), 0.0)
         self.assertEqual(first["primary_blocker"], "post_alpha_window_observation")
         self.assertEqual(float(first["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_post_window_verdict_support_rejects_or_blocks(self):
+        target_rows = [
+            {
+                "target_id": "targets",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "target_lag_time": 15779839.676828865,
+                "direct_alpha_wave_number": 4.79844851031,
+                "predicted_fs": 0.24140638485539556,
+                "abs_log_fs_tolerance": 0.35,
+                "prediction_target_ready": 1.0,
+            },
+            {
+                "target_id": "targets",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "target_lag_time": 15779839.676828865,
+                "direct_alpha_wave_number": 5.4,
+                "predicted_fs": 0.23862170166964963,
+                "abs_log_fs_tolerance": 0.35,
+                "prediction_target_ready": 1.0,
+            },
+            {
+                "target_id": "targets",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.8176154,
+                "direct_alpha_wave_number": 6.0,
+                "predicted_fs": 0.12459213356529883,
+                "abs_log_fs_tolerance": 0.35,
+                "prediction_target_ready": 1.0,
+            },
+        ]
+        observed_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "direct_alpha_wave_number": 4.79844851031,
+                "observed_fs": 0.25,
+                "sigma_log_fs": 0.02,
+                "observed_post_window_fs_ready": 1.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "direct_alpha_wave_number": 5.4,
+                "observed_fs": 0.60,
+                "sigma_log_fs": 0.03,
+                "observed_post_window_fs_ready": 1.0,
+            },
+        ]
+
+        rows = glassbench_direct_alpha_post_window_verdict(
+            verdict_id="glassbench_direct_alpha_post_window_verdict",
+            target_rows=target_rows,
+            observed_rows=observed_rows,
+        )
+
+        by_key = {
+            (row["target_time_code"], row["direct_alpha_wave_number"]): row
+            for row in rows
+        }
+        supported = by_key[("tc45", "4.79844851031")]
+        rejected = by_key[("tc45", "5.4")]
+        missing = by_key[("tc50", "6")]
+        self.assertEqual(supported["post_window_verdict_stage"], "post_alpha_prediction_supported")
+        self.assertLess(float(supported["abs_log_fs_residual"]), 0.04)
+        self.assertEqual(float(supported["post_window_prediction_supported"]), 1.0)
+        self.assertEqual(float(supported["post_window_prediction_rejected"]), 0.0)
+        self.assertEqual(float(supported["real_alpha_shape_claim_ready"]), 1.0)
+        self.assertEqual(supported["primary_blocker"], "none")
+
+        self.assertEqual(rejected["post_window_verdict_stage"], "post_alpha_prediction_rejected")
+        self.assertGreater(float(rejected["abs_log_fs_residual"]), 0.9)
+        self.assertEqual(float(rejected["post_window_prediction_supported"]), 0.0)
+        self.assertEqual(float(rejected["post_window_prediction_rejected"]), 1.0)
+        self.assertEqual(float(rejected["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(rejected["primary_blocker"], "post_alpha_shape_residual")
+
+        self.assertEqual(missing["post_window_verdict_stage"], "post_alpha_observation_not_ready")
+        self.assertEqual(float(missing["observed_post_window_fs_ready"]), 0.0)
+        self.assertEqual(float(missing["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(missing["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(float(missing["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):
         direct_rows = [

@@ -1446,6 +1446,32 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(root_tc45["primary_blocker"], "post_alpha_window_observation")
         self.assertEqual(float(root_tc45["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_direct_alpha_post_window_verdict_waits_for_observation(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        self.assertEqual(len(ka2d_023), 6)
+        root_tc45 = next(
+            row for row in ka2d_023
+            if row["target_time_code"] == "tc45"
+            and row["direct_alpha_wave_number"] == "4.79844851031"
+        )
+        self.assertEqual(root_tc45["post_window_verdict_stage"], "post_alpha_observation_not_ready")
+        self.assertAlmostEqual(float(root_tc45["predicted_fs"]), 0.24140638485539556, delta=1e-12)
+        self.assertEqual(float(root_tc45["observed_post_window_fs_ready"]), 0.0)
+        self.assertEqual(float(root_tc45["post_window_prediction_supported"]), 0.0)
+        self.assertEqual(float(root_tc45["post_window_prediction_rejected"]), 0.0)
+        self.assertEqual(float(root_tc45["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(root_tc45["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(float(root_tc45["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_direct_alpha_transport_records_proxy_not_inversion(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_transport.csv"
         self.assertTrue(path.exists())
@@ -3008,6 +3034,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf", names)
@@ -3226,6 +3253,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf",

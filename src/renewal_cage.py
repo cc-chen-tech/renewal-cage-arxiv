@@ -6884,6 +6884,111 @@ def glassbench_direct_alpha_post_window_prediction_targets(
     return rows
 
 
+def glassbench_direct_alpha_post_window_verdict(
+    *,
+    verdict_id: str,
+    target_rows: Sequence[dict[str, object]],
+    observed_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Compare post-alpha F_s observations against preregistered prediction bands."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not target_rows:
+        raise ValueError("target_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str, str, str]:
+        wave_number = float(row.get("direct_alpha_wave_number", 0.0) or 0.0)
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+            str(row.get("target_time_code", "none")),
+            f"{wave_number:.12g}",
+        )
+
+    observed_by_key = {key_for(row): row for row in observed_rows}
+    out: list[dict[str, float | str]] = []
+    for target in sorted(target_rows, key=key_for):
+        system_id, temperature, structure_id, target_time_code, wave_text = key_for(target)
+        prediction_ready = float(target.get("prediction_target_ready", 0.0) or 0.0) == 1.0
+        predicted_fs = float(target.get("predicted_fs", 0.0) or 0.0)
+        tolerance = float(target.get("abs_log_fs_tolerance", 0.0) or 0.0)
+        observed = observed_by_key.get((system_id, temperature, structure_id, target_time_code, wave_text), {})
+        observed_ready = float(observed.get("observed_post_window_fs_ready", 0.0) or 0.0) == 1.0
+        observed_fs = float(observed.get("observed_fs", 0.0) or 0.0)
+        sigma_log_fs = float(observed.get("sigma_log_fs", 0.0) or 0.0)
+
+        if prediction_ready and observed_ready and predicted_fs > 0.0 and observed_fs > 0.0:
+            abs_residual = abs(math.log(observed_fs / predicted_fs))
+            support_margin = tolerance - (abs_residual + 2.0 * sigma_log_fs)
+            rejection_margin = (abs_residual - 2.0 * sigma_log_fs) - tolerance
+            supported = support_margin >= 0.0
+            rejected = rejection_margin > 0.0
+        else:
+            abs_residual = 0.0
+            support_margin = 0.0
+            rejection_margin = 0.0
+            supported = False
+            rejected = False
+
+        if not prediction_ready:
+            stage = "post_alpha_prediction_target_incomplete"
+            blocker = "post_alpha_prediction_target"
+            next_action = "complete_post_alpha_prediction_targets"
+            claim_ready = False
+        elif not observed_ready:
+            stage = "post_alpha_observation_not_ready"
+            blocker = "post_alpha_window_observation"
+            next_action = f"measure_glassbench_{target_time_code}_fs_at_k_{wave_text}"
+            claim_ready = False
+        elif supported:
+            stage = "post_alpha_prediction_supported"
+            blocker = "none"
+            next_action = "combine_post_alpha_targets_into_real_alpha_shape_claim"
+            claim_ready = True
+        elif rejected:
+            stage = "post_alpha_prediction_rejected"
+            blocker = "post_alpha_shape_residual"
+            next_action = "reject_or_reparameterize_shared_alpha_shape_extrapolation"
+            claim_ready = False
+        else:
+            stage = "post_alpha_prediction_indeterminate"
+            blocker = "post_alpha_window_uncertainty"
+            next_action = "reduce_post_alpha_fs_uncertainty_or_measure_additional_k"
+            claim_ready = False
+
+        out.append(
+            {
+                "verdict_id": verdict_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "target_time_code": target_time_code,
+                "target_lag_time": float(target.get("target_lag_time", 0.0) or 0.0),
+                "direct_alpha_wave_number": wave_text,
+                "predicted_fs": float(predicted_fs),
+                "observed_fs": float(observed_fs),
+                "sigma_log_fs": float(sigma_log_fs),
+                "abs_log_fs_residual": float(abs_residual),
+                "abs_log_fs_tolerance": float(tolerance),
+                "support_margin_2sigma": float(support_margin),
+                "rejection_margin_2sigma": float(rejection_margin),
+                "observed_post_window_fs_ready": float(observed_ready),
+                "prediction_target_ready": float(prediction_ready),
+                "post_window_prediction_supported": float(supported),
+                "post_window_prediction_rejected": float(rejected),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "post_window_verdict_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_direct_alpha_transport_coupling_audit(
     *,
     audit_id: str,
