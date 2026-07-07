@@ -138,6 +138,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_anchor_cached_fs_audit,
     glassbench_direct_alpha_curve_audit,
     glassbench_direct_alpha_displacement_tail_bound,
+    glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
@@ -756,6 +757,74 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["event_segmentation_target_ready"]), 1.0)
         self.assertEqual(float(row["persistence_exchange_event_clock_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_event_clock_contract_requires_true_time_axis(self):
+        pe_bound_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "jump_variance_upper_bound": 0.4855550202214053,
+                "conditional_pe_inference_ready": 1.0,
+                "pe_feasibility_bound_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+        tail_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "q_all_over_bound": 1.003749111821625,
+                "fraction_q_gt_bound": 0.2349612403100775,
+                "mean_q_above_over_bound": 3.692648718492544,
+                "event_segmentation_required": 1.0,
+                "tail_bound_ready": 1.0,
+                "primary_blocker": "event_segmentation",
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                "axis0_is_isoconfigurational_replica": 1.0,
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+                "sample_count": 25800.0,
+                "ever_crossed_fraction": 0.24007751937984495,
+                "post_crossing_recross_fraction": 0.23599320882852293,
+                "first_crossing_q_mean_over_bound": 3.4430132801814253,
+                "event_segmentation_target_ready": 1.0,
+                "crossing_canary_ready": 1.0,
+                "persistence_exchange_event_clock_ready": 0.0,
+                "primary_blocker": "frame_axis_is_isoconfigurational_replicates",
+            }
+        ]
+
+        row = glassbench_direct_alpha_event_clock_extraction_contract(
+            audit_id="glassbench_direct_alpha_event_clock_contract",
+            pe_bound_rows=pe_bound_rows,
+            tail_rows=tail_rows,
+            crossing_rows=crossing_rows,
+        )[0]
+
+        self.assertEqual(row["event_clock_contract_stage"], "segmentation_target_ready_true_event_clock_missing")
+        self.assertEqual(float(row["conditional_pe_inference_ready"]), 1.0)
+        self.assertEqual(float(row["direct_displacement_tail_ready"]), 1.0)
+        self.assertEqual(float(row["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(row["cached_replica_ladder_ready"]), 1.0)
+        self.assertEqual(float(row["axis0_is_physical_time"]), 0.0)
+        self.assertEqual(float(row["requires_true_time_trajectory"]), 1.0)
+        self.assertEqual(float(row["event_clock_extraction_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "physical_time_trajectory_axis")
+        self.assertIn("positions[time,particle,dimension]", row["required_arrays"])
+        self.assertIn("isoconfigurational_replica_axis", row["forbidden_substitutes"])
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

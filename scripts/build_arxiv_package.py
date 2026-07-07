@@ -4065,6 +4065,81 @@ def write_sota_glassbench_direct_alpha_multilag_crossing_canary_pdf(path: Path) 
     c.save()
 
 
+def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha event-clock extraction contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "This gate separates a real segmentation target from a true persistence/exchange event-clock inversion.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "segmentation_target_ready_true_event_clock_missing": colors.HexColor("#9f1239"),
+        "true_event_clock_payload_ready_for_segmentation": colors.HexColor("#2f855a"),
+        "direct_tail_ready_crossing_target_missing": colors.HexColor("#c05621"),
+        "pe_bound_ready_tail_contract_missing": colors.HexColor("#c05621"),
+        "event_clock_contract_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "contract stage")
+    c.drawString(left + 395, top + 24, "required evidence before PE inversion")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["event_clock_contract_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; q_max={:.3g}; PE={}; tail={}; target={}; true-time={}".format(
+                row["structure_id"],
+                float(row["q_bound"]),
+                int(float(row["conditional_pe_inference_ready"])),
+                int(float(row["direct_displacement_tail_ready"])),
+                int(float(row["event_segmentation_target_ready"])),
+                int(float(row["axis0_is_physical_time"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "tail above={:.3g}; ever crossed={:.3g}; first-cross q/q_max={:.3g}".format(
+                float(row["fraction_q_gt_bound"]),
+                float(row["ever_crossed_fraction"]),
+                float(row["first_crossing_q_mean_over_bound"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'required={row["required_arrays"][:74]}')
+        c.drawString(left + 395, y - 40, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Direct-lag and lag-ladder evidence constrain the target, but cached replica axes are forbidden substitutes for true time trajectories.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6340,6 +6415,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_multilag_crossing_canary_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf"
     )
+    sota_glassbench_direct_alpha_event_clock_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6522,6 +6600,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_multilag_crossing_canary_pdf(
         sota_glassbench_direct_alpha_multilag_crossing_canary_pdf
+    )
+    write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
+        sota_glassbench_direct_alpha_event_clock_contract_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6748,6 +6829,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_multilag_crossing_canary_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_event_clock_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

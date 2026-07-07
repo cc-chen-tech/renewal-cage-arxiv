@@ -57,6 +57,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_observable_semantics_audit,
     glassbench_direct_alpha_curve_audit,
     glassbench_direct_alpha_displacement_tail_bound,
+    glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_direct_alpha_transport_coupling_audit,
@@ -4346,6 +4347,25 @@ def write_sota_glassbench_direct_alpha_multilag_crossing_canary_csv(
         pe_bound_rows=pe_bound_rows,
         crossing_rows=crossing_rows,
         min_crossing_fraction=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_event_clock_contract_csv(
+    path: Path,
+    *,
+    pe_bound_rows: list[dict[str, float | str]],
+    tail_rows: list[dict[str, float | str]],
+    crossing_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the true-time trajectory contract for PE event-clock extraction."""
+
+    rows = glassbench_direct_alpha_event_clock_extraction_contract(
+        audit_id="glassbench_ka2d_direct_alpha_event_clock_contract",
+        pe_bound_rows=pe_bound_rows,
+        tail_rows=tail_rows,
+        crossing_rows=crossing_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9101,6 +9121,66 @@ def write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 380
+    left, top = 75, 125
+    row_h = 105
+    colors = {
+        "segmentation_target_ready_true_event_clock_missing": "#9f1239",
+        "true_event_clock_payload_ready_for_segmentation": "#2f855a",
+        "direct_tail_ready_crossing_target_missing": "#c05621",
+        "pe_bound_ready_tail_contract_missing": "#c05621",
+        "event_clock_contract_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["event_clock_contract_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        checks = (
+            f'PE={int(float(row["conditional_pe_inference_ready"]))}; '
+            f'tail={int(float(row["direct_displacement_tail_ready"]))}; '
+            f'target={int(float(row["event_segmentation_target_ready"]))}; '
+            f'true-time={int(float(row["axis0_is_physical_time"]))}'
+        )
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="445" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; q_max={float(row["q_bound"]):.3g}; {checks}; requires true trajectory={int(float(row["requires_true_time_trajectory"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">ever crossed={float(row["ever_crossed_fraction"]):.3g}; tail above bound={float(row["fraction_q_gt_bound"]):.3g}; first-cross q/q_max={float(row["first_crossing_q_mean_over_bound"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">required={str(row["required_arrays"]).replace(";", "; ")[:82]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 78}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:52]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha event-clock extraction contract</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A contract-level gate separates a real segmentation target from a true persistence/exchange event-clock inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">contract stage</text>
+  <text x="{left + 600}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">required evidence before PE inversion</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11965,6 +12045,18 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.svg",
         glassbench_direct_alpha_multilag_crossing_canary_rows,
+    )
+    glassbench_direct_alpha_event_clock_contract_rows = (
+        write_sota_glassbench_direct_alpha_event_clock_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv",
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+            tail_rows=glassbench_direct_alpha_displacement_tail_bound_rows,
+            crossing_rows=glassbench_direct_alpha_multilag_crossing_canary_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_event_clock_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.svg",
+        glassbench_direct_alpha_event_clock_contract_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

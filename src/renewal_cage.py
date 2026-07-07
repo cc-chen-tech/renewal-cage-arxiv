@@ -6719,6 +6719,136 @@ def glassbench_direct_alpha_multilag_crossing_canary(
     return out
 
 
+def glassbench_direct_alpha_event_clock_extraction_contract(
+    *,
+    audit_id: str,
+    pe_bound_rows: Sequence[dict[str, object]],
+    tail_rows: Sequence[dict[str, object]],
+    crossing_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """State the exact data contract required before claiming PE event clocks."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not pe_bound_rows:
+        raise ValueError("pe_bound_rows must be nonempty")
+    if not tail_rows:
+        raise ValueError("tail_rows must be nonempty")
+    if not crossing_rows:
+        raise ValueError("crossing_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    tail_by_key = {key_for(row): row for row in tail_rows}
+    crossing_by_key = {key_for(row): row for row in crossing_rows}
+    required_arrays = (
+        "positions[time,particle,dimension];time_or_lag;trajectory_id;"
+        "box_or_unwrapped_positions;event_threshold_sweep"
+    )
+    forbidden_substitutes = (
+        "isoconfigurational_replica_axis;direct_lag_displacement_tail;"
+        "lag_ladder_crossing_canary;single_alpha_transport_proxy"
+    )
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        pe_bound_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id, temperature, structure_id = key_for(row)
+        tail = tail_by_key.get((system_id, temperature, structure_id), {})
+        crossing = crossing_by_key.get((system_id, temperature, structure_id), {})
+        conditional_ready = float(row.get("conditional_pe_inference_ready", 0.0) or 0.0) == 1.0
+        pe_bound_ready = float(row.get("pe_feasibility_bound_ready", 0.0) or 0.0) == 1.0
+        tail_ready = float(tail.get("tail_bound_ready", 0.0) or 0.0) == 1.0
+        segmentation_required = float(tail.get("event_segmentation_required", 0.0) or 0.0) == 1.0
+        target_ready = float(crossing.get("event_segmentation_target_ready", 0.0) or 0.0) == 1.0
+        crossing_ready = float(crossing.get("crossing_canary_ready", 0.0) or 0.0) == 1.0
+        axis0_replica = float(crossing.get("axis0_is_isoconfigurational_replica", 0.0) or 0.0) == 1.0
+        axis0_semantics = str(crossing.get("axis0_semantics", "unknown"))
+        axis0_physical = axis0_semantics in {
+            "physical_time",
+            "physical_time_frames",
+            "particle_time_trajectory",
+        }
+        true_time_required = pe_bound_ready and tail_ready and target_ready and not axis0_physical
+
+        if pe_bound_ready and tail_ready and target_ready and axis0_replica:
+            stage = "segmentation_target_ready_true_event_clock_missing"
+            blocker = "physical_time_trajectory_axis"
+            next_action = "extract_positions_time_particle_dimension_before_pe_inversion"
+            event_clock_ready = False
+        elif pe_bound_ready and tail_ready and target_ready and axis0_physical:
+            stage = "true_event_clock_payload_ready_for_segmentation"
+            blocker = "event_clock_segmentation_not_run"
+            next_action = "run_threshold_sweep_event_clock_segmentation"
+            event_clock_ready = True
+        elif pe_bound_ready and tail_ready:
+            stage = "direct_tail_ready_crossing_target_missing"
+            blocker = "multilag_crossing_target"
+            next_action = "compute_multilag_displacement_crossing_canary"
+            event_clock_ready = False
+        elif pe_bound_ready:
+            stage = "pe_bound_ready_tail_contract_missing"
+            blocker = "direct_displacement_tail_bound"
+            next_action = "compute_direct_alpha_displacement_tail_bound"
+            event_clock_ready = False
+        else:
+            stage = "event_clock_contract_upstream_incomplete"
+            blocker = "pe_feasibility_bound"
+            next_action = "complete_direct_alpha_pe_feasibility_bound"
+            event_clock_ready = False
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(row.get("tau_alpha_direct", 0.0) or 0.0),
+                "q_bound": float(row.get("jump_variance_upper_bound", 0.0) or 0.0),
+                "conditional_pe_inference_ready": float(conditional_ready),
+                "pe_feasibility_bound_ready": float(pe_bound_ready),
+                "direct_displacement_tail_ready": float(tail_ready),
+                "event_segmentation_required": float(segmentation_required),
+                "event_segmentation_target_ready": float(target_ready),
+                "cached_replica_ladder_ready": float(crossing_ready and axis0_replica),
+                "axis0_semantics": axis0_semantics,
+                "axis0_is_physical_time": float(axis0_physical),
+                "requires_true_time_trajectory": float(true_time_required),
+                "event_clock_extraction_ready": float(event_clock_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "sample_count": float(crossing.get("sample_count", 0.0) or 0.0),
+                "ever_crossed_fraction": float(crossing.get("ever_crossed_fraction", 0.0) or 0.0),
+                "post_crossing_recross_fraction": float(
+                    crossing.get("post_crossing_recross_fraction", 0.0) or 0.0
+                ),
+                "fraction_q_gt_bound": float(tail.get("fraction_q_gt_bound", 0.0) or 0.0),
+                "mean_q_above_over_bound": float(tail.get("mean_q_above_over_bound", 0.0) or 0.0),
+                "first_crossing_q_mean_over_bound": float(
+                    crossing.get("first_crossing_q_mean_over_bound", 0.0) or 0.0
+                ),
+                "required_arrays": required_arrays,
+                "forbidden_substitutes": forbidden_substitutes,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "event_clock_contract_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
