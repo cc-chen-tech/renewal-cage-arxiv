@@ -59,6 +59,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_direct_alpha_transport_coupling_audit,
@@ -4184,6 +4185,107 @@ def write_sota_glassbench_direct_alpha_shape_selection_csv(
         min_points_for_shape_fit=6,
         min_decay=0.35,
         max_decay=0.99,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_multik_shape_csv(
+    path: Path,
+    *,
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute a high-k cached multi-k alpha-shape gate from particle tensors."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    root_by_key = {
+        (str(row["system_id"]), str(row["temperature"]), str(row["structure_id"])): row
+        for row in root_rows
+        if float(row.get("cached_direct_root_bracketed", 0.0) or 0.0) == 1.0
+    }
+    manifest_by_key: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            if key in root_by_key:
+                manifest_by_key.setdefault(key, []).append(row)
+
+    threshold = math.exp(-1.0)
+    multik_rows: list[dict[str, float | str]] = []
+    for key, manifest_rows in sorted(manifest_by_key.items()):
+        root = root_by_key[key]
+        k_values = [float(root["cached_direct_threshold_wave_number"]), 5.4, 6.0]
+        sorted_manifest = sorted(manifest_rows, key=lambda row: float(row["lag_time"]))
+        lag_times = np.array([float(row["lag_time"]) for row in sorted_manifest], dtype=float)
+        time_codes = [row["time_code"] for row in sorted_manifest]
+        for wave_number in k_values:
+            fs_values: list[float] = []
+            sigma_values: list[float] = []
+            for row in sorted_manifest:
+                with np.load(ROOT / row["particle_cache_path"]) as npz:
+                    positions = np.asarray(npz["positions"], dtype=float)
+                    initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                    box = float(np.asarray(npz["box"]))
+                displacement = positions - initial_positions[None, :, :]
+                if math.isfinite(box) and box > 0.0:
+                    displacement = displacement - box * np.round(displacement / box)
+                dx = displacement[:, :, 0]
+                dy = displacement[:, :, 1]
+                frame_fs = 0.5 * (
+                    np.mean(np.cos(wave_number * dx), axis=1)
+                    + np.mean(np.cos(wave_number * dy), axis=1)
+                )
+                fs_values.append(float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy)))))
+                sigma_values.append(
+                    float(np.std(frame_fs, ddof=1) / math.sqrt(frame_fs.size))
+                    if frame_fs.size > 1
+                    else 0.0
+                )
+            decay = np.array(fs_values, dtype=float)
+            sigma = np.array(sigma_values, dtype=float)
+            crossing_index = next((idx for idx, value in enumerate(fs_values) if value <= threshold), None)
+            crossed = crossing_index is not None
+            fit = kww_alpha_fit(lag_times, decay, min_decay=0.30, max_decay=0.99) if crossed else {
+                "kww_beta": 0.0,
+                "rms_log_residual": 0.0,
+            }
+            if decay.size >= 2 and np.all(sigma > 0.0):
+                upward = decay[1:] - decay[:-1]
+                combined_sigma = np.sqrt(sigma[1:] ** 2 + sigma[:-1] ** 2)
+                upward_z = np.divide(upward, combined_sigma, out=np.zeros_like(upward), where=combined_sigma > 0.0)
+                max_z = float(np.max(np.maximum(upward_z, 0.0)))
+            else:
+                max_z = 0.0
+            multik_rows.append(
+                {
+                    "system_id": key[0],
+                    "temperature": key[1],
+                    "structure_id": key[2],
+                    "direct_alpha_wave_number": float(wave_number),
+                    "lag_count": float(len(lag_times)),
+                    "time_codes": ";".join(time_codes),
+                    "lag_times": ";".join(f"{value:.17g}" for value in lag_times),
+                    "direct_alpha_fs_curve": ";".join(f"{value:.17g}" for value in fs_values),
+                    "sigma_direct_alpha_fs_curve": ";".join(f"{value:.12g}" for value in sigma_values),
+                    "alpha_threshold_crossed": float(crossed),
+                    "threshold_crossing_time_code": time_codes[crossing_index] if crossed else "none",
+                    "threshold_crossing_is_last_lag": float(crossed and crossing_index == len(time_codes) - 1),
+                    "kww_beta": float(fit["kww_beta"]),
+                    "kww_log_shape_rmse": float(fit["rms_log_residual"]),
+                    "max_monotonicity_violation_z": float(max_z),
+                    "monotone_compatible_with_uncertainty": float(max_z <= 2.0),
+                    "uncertainty_columns_ready": float(np.all(sigma > 0.0)),
+                }
+            )
+
+    rows = glassbench_direct_alpha_multik_shape_gate(
+        gate_id="glassbench_ka2d_direct_alpha_multik_shape_gate",
+        multik_rows=multik_rows,
+        min_crossed_k_count=3,
+        max_beta_spread=0.03,
+        monotone_z_threshold=2.0,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9441,6 +9543,61 @@ def write_sota_glassbench_direct_alpha_shape_selection_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_multik_shape_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 75, 120
+    row_h = 82
+    colors = {
+        "cached_multik_alpha_shape_supported": "#2f855a",
+        "cached_multik_alpha_shape_window_edge_blocked": "#2563eb",
+        "cached_multik_alpha_shape_inconsistent": "#c05621",
+        "cached_multik_alpha_shape_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["multik_shape_gate_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        beta_spread = float(row["kww_beta_spread"])
+        max_z = float(row["max_monotonicity_violation_z"])
+        crossed = float(row["crossed_k_count"])
+        tested = float(row["tested_k_count"])
+        edge = int(float(row["all_crossings_at_window_edge"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; k={row["tested_k_values"]}; crossed={crossed:.0f}/{tested:.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">beta spread={beta_spread:.3g}; zmax={max_z:.2f}; compatible k={float(row["monotone_compatible_k_count"]):.0f}; edge crossings={edge}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha multi-k shape gate</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Three high-k cached F_s curves are tested for consistent KWW shape, while window-edge alpha crossings block the real alpha-shape claim.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">multi-k gate stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">high-k alpha-shape evidence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_transport_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13726,6 +13883,16 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_shape_selection_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg",
         glassbench_direct_alpha_shape_selection_rows,
+    )
+    glassbench_direct_alpha_multik_shape_rows = (
+        write_sota_glassbench_direct_alpha_multik_shape_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv",
+            root_rows=glassbench_alpha_anchor_cached_fs_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_multik_shape_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.svg",
+        glassbench_direct_alpha_multik_shape_rows,
     )
     glassbench_direct_alpha_transport_rows = write_sota_glassbench_direct_alpha_transport_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv",

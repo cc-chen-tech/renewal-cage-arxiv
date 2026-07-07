@@ -6454,6 +6454,120 @@ def glassbench_direct_alpha_shape_selection(
     return rows
 
 
+def glassbench_direct_alpha_multik_shape_gate(
+    *,
+    gate_id: str,
+    multik_rows: Sequence[dict[str, object]],
+    min_crossed_k_count: int,
+    max_beta_spread: float,
+    monotone_z_threshold: float,
+) -> list[dict[str, float | str]]:
+    """Gate cached multi-k alpha-shape support before promoting a real claim."""
+
+    if not gate_id:
+        raise ValueError("gate_id must be nonempty")
+    if not multik_rows:
+        raise ValueError("multik_rows must be nonempty")
+    if min_crossed_k_count < 2:
+        raise ValueError("min_crossed_k_count must be at least two")
+    if max_beta_spread < 0.0:
+        raise ValueError("max_beta_spread must be nonnegative")
+    if monotone_z_threshold <= 0.0:
+        raise ValueError("monotone_z_threshold must be positive")
+
+    grouped: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in multik_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature, structure_id), group in sorted(grouped.items()):
+        sorted_group = sorted(
+            group,
+            key=lambda item: float(item.get("direct_alpha_wave_number", 0.0) or 0.0),
+        )
+        crossed_rows = [
+            row for row in sorted_group
+            if float(row.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+        ]
+        compatible_rows = [
+            row for row in crossed_rows
+            if float(row.get("uncertainty_columns_ready", 0.0) or 0.0) == 1.0
+            and float(row.get("monotone_compatible_with_uncertainty", 0.0) or 0.0) == 1.0
+            and float(row.get("max_monotonicity_violation_z", 0.0) or 0.0) <= monotone_z_threshold
+        ]
+        betas = [float(row.get("kww_beta", 0.0) or 0.0) for row in compatible_rows]
+        beta_min = min(betas) if betas else 0.0
+        beta_max = max(betas) if betas else 0.0
+        beta_spread = beta_max - beta_min if betas else 0.0
+        max_z = max(
+            (float(row.get("max_monotonicity_violation_z", 0.0) or 0.0) for row in compatible_rows),
+            default=0.0,
+        )
+        all_edge = bool(crossed_rows) and all(
+            float(row.get("threshold_crossing_is_last_lag", 0.0) or 0.0) == 1.0
+            for row in crossed_rows
+        )
+        enough_crossed = len(crossed_rows) >= min_crossed_k_count
+        enough_compatible = len(compatible_rows) >= min_crossed_k_count
+        beta_consistent = bool(betas) and beta_spread <= max_beta_spread
+        candidate_ready = enough_crossed and enough_compatible and beta_consistent
+        claim_ready = candidate_ready and not all_edge
+
+        if claim_ready:
+            stage = "cached_multik_alpha_shape_supported"
+            blocker = "none"
+            next_action = "predict_heldout_macro_alpha_shape"
+        elif candidate_ready and all_edge:
+            stage = "cached_multik_alpha_shape_window_edge_blocked"
+            blocker = "post_alpha_window_depth"
+            next_action = "extend_cached_lag_window_beyond_alpha_crossing_for_multik_shape"
+        elif enough_crossed:
+            stage = "cached_multik_alpha_shape_inconsistent"
+            blocker = "beta_spread_or_monotonicity"
+            next_action = "increase_uncertainty_weighted_multik_sampling"
+        else:
+            stage = "cached_multik_alpha_shape_upstream_incomplete"
+            blocker = "crossed_k_count"
+            next_action = "measure_more_high_k_alpha_crossings"
+
+        out.append(
+            {
+                "gate_id": gate_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "tested_k_values": ";".join(
+                    f"{float(row.get('direct_alpha_wave_number', 0.0) or 0.0):.12g}"
+                    for row in sorted_group
+                ),
+                "tested_k_count": float(len(sorted_group)),
+                "crossed_k_count": float(len(crossed_rows)),
+                "monotone_compatible_k_count": float(len(compatible_rows)),
+                "min_crossed_k_count": float(min_crossed_k_count),
+                "kww_beta_min": float(beta_min),
+                "kww_beta_max": float(beta_max),
+                "kww_beta_spread": float(beta_spread),
+                "max_beta_spread": float(max_beta_spread),
+                "max_monotonicity_violation_z": float(max_z),
+                "monotone_z_threshold": float(monotone_z_threshold),
+                "all_crossings_at_window_edge": float(all_edge),
+                "multik_shape_candidate_ready": float(candidate_ready),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "multik_shape_gate_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_direct_alpha_transport_coupling_audit(
     *,
     audit_id: str,

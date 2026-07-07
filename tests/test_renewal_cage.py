@@ -147,6 +147,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_displacement_tail_bound,
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
@@ -712,6 +713,71 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["monotone_compatible_with_uncertainty"]), 1.0)
         self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "multi_k_alpha_shape")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_multik_shape_gate_requires_post_crossing_depth(self):
+        multik_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.15933802823269586,
+                "kww_log_shape_rmse": 0.5097575715864276,
+                "max_monotonicity_violation_z": 0.778224421773086,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 5.4,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.15242834237097458,
+                "kww_log_shape_rmse": 0.49648478785441796,
+                "max_monotonicity_violation_z": 0.7923188268620164,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 6.0,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.1463504696159314,
+                "kww_log_shape_rmse": 0.4848545883752606,
+                "max_monotonicity_violation_z": 0.8038877529881566,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+            },
+        ]
+
+        row = glassbench_direct_alpha_multik_shape_gate(
+            gate_id="glassbench_direct_alpha_multik_shape_gate",
+            multik_rows=multik_rows,
+            min_crossed_k_count=3,
+            max_beta_spread=0.03,
+            monotone_z_threshold=2.0,
+        )[0]
+
+        self.assertEqual(row["multik_shape_gate_stage"], "cached_multik_alpha_shape_window_edge_blocked")
+        self.assertEqual(float(row["multik_shape_candidate_ready"]), 1.0)
+        self.assertEqual(float(row["crossed_k_count"]), 3.0)
+        self.assertAlmostEqual(float(row["kww_beta_spread"]), 0.01298755861676447, delta=1e-12)
+        self.assertLess(float(row["max_monotonicity_violation_z"]), 1.0)
+        self.assertEqual(float(row["monotone_compatible_k_count"]), 3.0)
+        self.assertEqual(float(row["all_crossings_at_window_edge"]), 1.0)
+        self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "post_alpha_window_depth")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):

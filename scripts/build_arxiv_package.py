@@ -4041,6 +4041,78 @@ def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_direct_alpha_multik_shape_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha multi-k shape gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "High-k cached F_s curves test multi-k KWW consistency while window-edge crossings block a full real alpha-shape claim.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 58
+    colors_by_stage = {
+        "cached_multik_alpha_shape_supported": colors.HexColor("#2f855a"),
+        "cached_multik_alpha_shape_window_edge_blocked": colors.HexColor("#2563eb"),
+        "cached_multik_alpha_shape_inconsistent": colors.HexColor("#c05621"),
+        "cached_multik_alpha_shape_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "multi-k stage")
+    c.drawString(left + 390, top + 24, "high-k alpha-shape evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["multik_shape_gate_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; k={}; crossed={:.0f}/{:.0f}".format(
+                row["structure_id"],
+                row["tested_k_values"][:30],
+                float(row["crossed_k_count"]),
+                float(row["tested_k_count"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "beta spread={:.3g}; zmax={:.2f}; compatible k={:.0f}; edge crossings={}".format(
+                float(row["kww_beta_spread"]),
+                float(row["max_monotonicity_violation_z"]),
+                float(row["monotone_compatible_k_count"]),
+                int(float(row["all_crossings_at_window_edge"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The candidate is intentionally not promoted until post-alpha window depth exists beyond the crossing lag.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_transport_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7987,6 +8059,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_shape_selection_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf"
     )
+    sota_glassbench_direct_alpha_multik_shape_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf"
+    )
     sota_glassbench_direct_alpha_transport_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.pdf"
     )
@@ -8232,6 +8307,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_shape_selection_pdf(
         sota_glassbench_direct_alpha_shape_selection_pdf
+    )
+    write_sota_glassbench_direct_alpha_multik_shape_pdf(
+        sota_glassbench_direct_alpha_multik_shape_pdf
     )
     write_sota_glassbench_direct_alpha_transport_pdf(
         sota_glassbench_direct_alpha_transport_pdf
@@ -8527,6 +8605,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_shape_selection_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_multik_shape_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_transport_pdf,

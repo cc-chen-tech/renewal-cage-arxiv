@@ -336,9 +336,15 @@ curve strongly favors a stretched-alpha candidate (`beta=0.159`, KWW log-shape
 RMSE `0.510` versus exponential RMSE `7.77`). Frame-block standard errors from
 the cached particle tensor now provide machine-readable `sigma_F_s` values. The
 only upward step has `z=0.78`, so the sparse nonmonotonicity is statistically
-compatible with a monotone alpha decay under a two-sigma rule. The remaining
-blocker is therefore narrower: a real alpha-shape claim still requires an
-uncertainty-weighted multi-k curve rather than a single direct-alpha anchor.
+compatible with a monotone alpha decay under a two-sigma rule.
+The direct-alpha multi-k shape gate then recomputes the same cached tensor at
+three high wave numbers (`k=4.80`, `5.4`, and `6.0`). All three curves cross the
+alpha threshold with a consistent KWW shape (`beta` spread `0.013`) and
+uncertainty-compatible monotonicity (`z_max=0.804`). This is now a multi-k
+stretched-alpha candidate, but not a completed real alpha-shape claim: all
+three threshold crossings occur at the final cached lag `tc40`, so the remaining
+blocker is post-alpha window depth rather than mechanism selection or sparse
+nonmonotonicity.
 The direct-alpha transport proxy then matches that same `tc40` crossing to the
 reproduced GlassBench displacement observable: `MSD=0.9747508406`, giving
 `D_eff=1.6246e-7` and `D_eff tau_alpha=0.24369` in 2D. This is a useful
@@ -552,6 +558,7 @@ figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_curve.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_transport.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg
@@ -682,6 +689,7 @@ data/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
 data/renewal_cage_sota_glassbench_direct_alpha_curve.csv
 data/renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv
+data/renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv
 data/renewal_cage_sota_glassbench_direct_alpha_transport.csv
 data/renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv
 data/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv
@@ -833,6 +841,7 @@ paper/figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf
