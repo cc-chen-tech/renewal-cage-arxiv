@@ -5016,6 +5016,81 @@ def write_sota_glassbench_public_window_verdict_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_late_recovery_experiment_design_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late-recovery experiment design")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The public-window gap is converted into a minimal tc50 follow-up for Gaussian recovery and static-disorder rejection.",
+    )
+    left, top = 42, page_h - 94
+    row_h = 70
+    colors_by_stage = {
+        "minimal_tc50_followup_ready": colors.HexColor("#2b6cb0"),
+        "late_recovery_timecode_target_incomplete": colors.HexColor("#c05621"),
+        "finite_exchange_envelope_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 150, top + 18, "experiment stage")
+    c.drawString(left + 370, top + 18, "minimum acquisition and decision rules")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["experiment_design_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.3)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]}')
+        c.setFillColor(color)
+        c.rect(left + 150, y - 12, 200, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 158, y - 3, stage.replace("_", " ")[:34])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.9)
+        c.drawString(
+            left + 370,
+            y,
+            "required={}; current={}; planned/min={:.3g}; min lag={:.3g}; planned lag={:.3g}".format(
+                row["required_time_code"],
+                row["current_max_time_code"],
+                float(row["planned_lag_over_minimum_required"]),
+                float(row["minimum_required_lag_time"]),
+                float(row["planned_lag_time"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.3)
+        c.drawString(left + 370, y - 13, f'observables={row["required_observables"][:82]}')
+        c.drawString(
+            left + 370,
+            y - 26,
+            "finite-exchange rule: late NGP <= {:.3g}; static rejection: late NGP + 2sigma < {:.3g}".format(
+                float(row["max_finite_exchange_late_ngp"]),
+                float(row["static_gamma_late_ngp_plateau"]),
+            ),
+        )
+        c.drawString(
+            left + 370,
+            y - 39,
+            f'blocker={row["primary_blocker"][:42]}; next={row["next_required_action"][:56]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a dynamical-signature follow-up design; it does not license thermodynamic glass-transition claims.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7330,6 +7405,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_public_window_verdict_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_public_window_verdict.pdf"
     )
+    sota_glassbench_late_recovery_experiment_design_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -7551,6 +7629,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_public_window_verdict_pdf(
         sota_glassbench_public_window_verdict_pdf
+    )
+    write_sota_glassbench_late_recovery_experiment_design_pdf(
+        sota_glassbench_late_recovery_experiment_design_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7829,6 +7910,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_public_window_verdict_pdf,
             "figures/renewal_cage_sota_glassbench_public_window_verdict.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_experiment_design_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

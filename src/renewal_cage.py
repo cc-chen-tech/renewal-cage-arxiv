@@ -8371,6 +8371,98 @@ def glassbench_sota_public_window_verdict(
     return rows
 
 
+def glassbench_late_recovery_experiment_design(
+    *,
+    design_id: str,
+    late_recovery_protocol_rows: Sequence[dict[str, object]],
+    timecode_target_rows: Sequence[dict[str, object]],
+    public_window_verdict_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Design the minimal GlassBench follow-up that can close late recovery."""
+
+    if not design_id:
+        raise ValueError("design_id must be nonempty")
+    if not late_recovery_protocol_rows:
+        raise ValueError("late_recovery_protocol_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    target_by_key = {key_for(row): row for row in timecode_target_rows}
+    blockers = {
+        str(row.get("primary_blocker", "none"))
+        for row in public_window_verdict_rows
+        if str(row.get("public_window_verdict_stage", "")).endswith("unresolved")
+    }
+    public_blocker = "public_glassbench_timecode_ceiling" if "public_glassbench_timecode_ceiling" in blockers else (
+        sorted(blockers)[0] if blockers else "late_recovery_observation"
+    )
+
+    rows: list[dict[str, float | str]] = []
+    for protocol in sorted(late_recovery_protocol_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(protocol)
+        target = target_by_key.get((system_id, temperature, structure_id), {})
+        envelope_ready = float(protocol.get("envelope_ready", 0.0) or 0.0) == 1.0
+        target_ready = float(target.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        minimum_lag = float(protocol.get("required_followup_lag_time", 0.0) or 0.0)
+        planned_lag = float(target.get("target_lag_time", 0.0) or 0.0)
+        required_time_code = str(target.get("target_time_code", "none"))
+        max_finite_ngp = float(protocol.get("max_finite_exchange_late_ngp", 0.0) or 0.0)
+        static_plateau = float(protocol.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+        if static_plateau <= 0.0:
+            static_plateau = max_finite_ngp + float(
+                protocol.get("min_static_plateau_rejection_gap", 0.0) or 0.0
+            )
+
+        if not envelope_ready:
+            stage = "finite_exchange_envelope_upstream_incomplete"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_falsification_envelope"
+            claim_ready_after_measurement = False
+        elif not target_ready or required_time_code == "none":
+            stage = "late_recovery_timecode_target_incomplete"
+            blocker = "late_recovery_timecode_target"
+            next_action = "complete_late_recovery_timecode_target"
+            claim_ready_after_measurement = False
+        else:
+            stage = f"minimal_{required_time_code}_followup_ready"
+            blocker = public_blocker
+            next_action = f"measure_required_observables_at_{required_time_code}"
+            claim_ready_after_measurement = True
+
+        rows.append(
+            {
+                "design_id": design_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "current_max_time_code": str(target.get("current_max_time_code", "none")),
+                "required_time_code": required_time_code,
+                "minimum_required_lag_time": float(minimum_lag),
+                "planned_lag_time": float(planned_lag),
+                "planned_lag_over_minimum_required": float(planned_lag / minimum_lag)
+                if minimum_lag > 0.0
+                else 0.0,
+                "required_observables": "MSD;NGP;F_s(k,t);self_van_hove_tail;member_uncertainty",
+                "finite_exchange_support_rule": "late_ngp <= max_finite_exchange_late_ngp",
+                "static_disorder_rejection_rule": "late_ngp + 2sigma < static_gamma_late_ngp_plateau",
+                "max_finite_exchange_late_ngp": float(max_finite_ngp),
+                "static_gamma_late_ngp_plateau": float(static_plateau),
+                "late_recovery_claim_ready_after_measurement": float(claim_ready_after_measurement),
+                "real_pe_inversion_ready_after_measurement": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "experiment_design_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

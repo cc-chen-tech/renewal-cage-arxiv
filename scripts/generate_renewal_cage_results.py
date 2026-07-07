@@ -76,6 +76,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_public_timecode_ceiling,
     glassbench_censored_window_claim_audit,
     glassbench_sota_public_window_verdict,
+    glassbench_late_recovery_experiment_design,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4612,6 +4613,25 @@ def write_sota_glassbench_public_window_verdict_csv(
         verdict_id="glassbench_ka2d_sota_public_window_verdict",
         censored_window_rows=censored_window_rows,
         dynamic_signature_rows=dynamic_signature_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_experiment_design_csv(
+    path: Path,
+    *,
+    late_recovery_protocol_rows: list[dict[str, float | str]],
+    timecode_target_rows: list[dict[str, float | str]],
+    public_window_verdict_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the minimal follow-up design that can close late recovery."""
+
+    rows = glassbench_late_recovery_experiment_design(
+        design_id="glassbench_ka2d_late_recovery_experiment_design",
+        late_recovery_protocol_rows=late_recovery_protocol_rows,
+        timecode_target_rows=timecode_target_rows,
+        public_window_verdict_rows=public_window_verdict_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10108,6 +10128,58 @@ def write_sota_glassbench_public_window_verdict_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_late_recovery_experiment_design_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 320
+    left, top = 76, 126
+    row_h = 84
+    colors = {
+        "minimal_tc50_followup_ready": "#2b6cb0",
+        "late_recovery_timecode_target_incomplete": "#c05621",
+        "finite_exchange_envelope_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["experiment_design_stage"])
+        color = colors.get(stage, "#4a5568")
+        planned_ratio = float(row["planned_lag_over_minimum_required"])
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["system_id"]} T={row["temperature"]} structure {row["structure_id"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 205}" y="{y - 6}" width="285" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 214}" y="{y + 12}" font-family="Arial, sans-serif" font-size="9.5" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10.5">required={row["required_time_code"]}; current={row["current_max_time_code"]}; planned/min={planned_ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">min lag={float(row["minimum_required_lag_time"]):.3g}; planned lag={float(row["planned_lag_time"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">observables={row["required_observables"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 70}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">rules: late NGP <= {float(row["max_finite_exchange_late_ngp"]):.3g}; late NGP + 2sigma < {float(row["static_gamma_late_ngp_plateau"]):.3g}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late-recovery experiment design</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The public-window gap is converted into a minimal tc50 follow-up that can test Gaussian recovery and reject static disorder.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 205}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">experiment stage</text>
+  <text x="{left + 515}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">minimum acquisition and decision rules</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13117,6 +13189,18 @@ def main() -> None:
     write_sota_glassbench_public_window_verdict_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_public_window_verdict.svg",
         glassbench_public_window_verdict_rows,
+    )
+    glassbench_late_recovery_experiment_design_rows = (
+        write_sota_glassbench_late_recovery_experiment_design_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.csv",
+            late_recovery_protocol_rows=glassbench_late_recovery_protocol_rows,
+            timecode_target_rows=glassbench_late_recovery_timecode_target_rows,
+            public_window_verdict_rows=glassbench_public_window_verdict_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_experiment_design_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.svg",
+        glassbench_late_recovery_experiment_design_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",
