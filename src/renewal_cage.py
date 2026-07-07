@@ -6743,6 +6743,147 @@ def glassbench_direct_alpha_multik_heldout_prediction_gate(
     return out
 
 
+def glassbench_direct_alpha_post_window_prediction_targets(
+    *,
+    target_id: str,
+    heldout_prediction_rows: Sequence[dict[str, object]],
+    current_time_code: str,
+    current_lag_time: float,
+    target_time_codes: Sequence[str],
+    terminal_target_time_code: str,
+    terminal_target_lag_time: float,
+    abs_log_fs_tolerance: float,
+) -> list[dict[str, float | str]]:
+    """Preregister post-alpha F_s targets from held-out multi-k alpha prediction."""
+
+    if not target_id:
+        raise ValueError("target_id must be nonempty")
+    if not heldout_prediction_rows:
+        raise ValueError("heldout_prediction_rows must be nonempty")
+    if not current_time_code:
+        raise ValueError("current_time_code must be nonempty")
+    if current_lag_time <= 0.0:
+        raise ValueError("current_lag_time must be positive")
+    if not target_time_codes:
+        raise ValueError("target_time_codes must be nonempty")
+    if not terminal_target_time_code:
+        raise ValueError("terminal_target_time_code must be nonempty")
+    if terminal_target_lag_time <= current_lag_time:
+        raise ValueError("terminal_target_lag_time must exceed current_lag_time")
+    if abs_log_fs_tolerance < 0.0:
+        raise ValueError("abs_log_fs_tolerance must be nonnegative")
+
+    def timecode_number(code: str) -> int:
+        match = re.fullmatch(r"tc(\d+)", code)
+        if not match:
+            raise ValueError(f"invalid time code: {code}")
+        return int(match.group(1))
+
+    def split_floats(value: object) -> list[float]:
+        text = str(value or "")
+        if not text or text == "none":
+            return []
+        return [float(part) for part in text.split(";") if part and part != "none"]
+
+    current_number = timecode_number(current_time_code)
+    terminal_number = timecode_number(terminal_target_time_code)
+    if terminal_number <= current_number:
+        raise ValueError("terminal_target_time_code must be after current_time_code")
+
+    def target_lag(code: str) -> float:
+        number = timecode_number(code)
+        if number <= current_number:
+            raise ValueError("target_time_codes must be after current_time_code")
+        if number > terminal_number:
+            raise ValueError("target_time_codes must not exceed terminal_target_time_code")
+        fraction = (number - current_number) / (terminal_number - current_number)
+        log_lag = math.log(current_lag_time) + fraction * (
+            math.log(terminal_target_lag_time) - math.log(current_lag_time)
+        )
+        return float(math.exp(log_lag))
+
+    rows: list[dict[str, float | str]] = []
+    for heldout in sorted(
+        heldout_prediction_rows,
+        key=lambda row: (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(heldout.get("system_id", "unknown"))
+        temperature = str(heldout.get("temperature", "none"))
+        structure_id = str(heldout.get("structure_id", "none"))
+        candidate_ready = float(heldout.get("heldout_prediction_candidate_ready", 0.0) or 0.0) == 1.0
+        k_values = split_floats(heldout.get("heldout_k_values", "none"))
+        betas = split_floats(heldout.get("calibrated_betas", "none"))
+        paired = len(k_values) == len(betas) and len(k_values) > 0
+        prediction_ready = candidate_ready and paired
+
+        if not prediction_ready:
+            rows.append(
+                {
+                    "target_id": target_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "current_time_code": current_time_code,
+                    "current_lag_time": float(current_lag_time),
+                    "target_time_code": "none",
+                    "target_lag_time": 0.0,
+                    "direct_alpha_wave_number": 0.0,
+                    "calibrated_beta": 0.0,
+                    "predicted_fs": 0.0,
+                    "abs_log_fs_tolerance": float(abs_log_fs_tolerance),
+                    "acceptance_fs_low": 0.0,
+                    "acceptance_fs_high": 0.0,
+                    "observed_post_window_fs_ready": 0.0,
+                    "prediction_target_ready": 0.0,
+                    "real_alpha_shape_claim_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "heldout_prediction_candidate",
+                    "next_required_action": "complete_heldout_multi_k_alpha_prediction_before_targets",
+                    "post_window_target_stage": "post_alpha_prediction_target_upstream_incomplete",
+                }
+            )
+            continue
+
+        for code in target_time_codes:
+            lag = target_lag(str(code))
+            for wave_number, beta in zip(k_values, betas):
+                predicted_fs = math.exp(-((lag / current_lag_time) ** beta))
+                low = predicted_fs * math.exp(-abs_log_fs_tolerance)
+                high = min(1.0, predicted_fs * math.exp(abs_log_fs_tolerance))
+                rows.append(
+                    {
+                        "target_id": target_id,
+                        "system_id": system_id,
+                        "temperature": temperature,
+                        "structure_id": structure_id,
+                        "current_time_code": current_time_code,
+                        "current_lag_time": float(current_lag_time),
+                        "target_time_code": str(code),
+                        "target_lag_time": float(lag),
+                        "direct_alpha_wave_number": float(wave_number),
+                        "calibrated_beta": float(beta),
+                        "predicted_fs": float(predicted_fs),
+                        "abs_log_fs_tolerance": float(abs_log_fs_tolerance),
+                        "acceptance_fs_low": float(low),
+                        "acceptance_fs_high": float(high),
+                        "observed_post_window_fs_ready": 0.0,
+                        "prediction_target_ready": 1.0,
+                        "real_alpha_shape_claim_ready": 0.0,
+                        "real_pe_inversion_ready": 0.0,
+                        "thermodynamic_claim_allowed": 0.0,
+                        "primary_blocker": "post_alpha_window_observation",
+                        "next_required_action": f"measure_glassbench_{code}_fs_at_high_k_alpha_targets",
+                        "post_window_target_stage": "post_alpha_prediction_target_preregistered",
+                    }
+                )
+    return rows
+
+
 def glassbench_direct_alpha_transport_coupling_audit(
     *,
     audit_id: str,

@@ -60,6 +60,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_multik_heldout_prediction_gate,
+    glassbench_direct_alpha_post_window_prediction_targets,
     glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_pe_feasibility_bound,
@@ -4316,6 +4317,50 @@ def write_sota_glassbench_direct_alpha_multik_heldout_prediction_csv(
         max_heldout_beta_abs_error=0.02,
         max_heldout_shape_rmse=0.25,
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_post_window_prediction_targets_csv(
+    path: Path,
+    *,
+    heldout_prediction_rows: list[dict[str, float | str]],
+    timecode_target_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Preregister tc45/tc50 high-k F_s targets for the alpha-shape blocker."""
+
+    ready_target = next(
+        (
+            row for row in timecode_target_rows
+            if str(row.get("system_id", "")) == "KA2D"
+            and str(row.get("temperature", "")) == "0.23"
+            and str(row.get("structure_id", "")) == "151"
+            and float(row.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        ),
+        None,
+    )
+    if ready_target is None:
+        rows = glassbench_direct_alpha_post_window_prediction_targets(
+            target_id="glassbench_ka2d_direct_alpha_post_window_prediction_targets",
+            heldout_prediction_rows=heldout_prediction_rows,
+            current_time_code="tc40",
+            current_lag_time=1500000.0,
+            target_time_codes=["tc45", "tc50"],
+            terminal_target_time_code="tc50",
+            terminal_target_lag_time=166002226.8176154,
+            abs_log_fs_tolerance=0.35,
+        )
+    else:
+        rows = glassbench_direct_alpha_post_window_prediction_targets(
+            target_id="glassbench_ka2d_direct_alpha_post_window_prediction_targets",
+            heldout_prediction_rows=heldout_prediction_rows,
+            current_time_code=str(ready_target["current_max_time_code"]),
+            current_lag_time=float(ready_target["current_max_lag_time"]),
+            target_time_codes=["tc45", str(ready_target["target_time_code"])],
+            terminal_target_time_code=str(ready_target["target_time_code"]),
+            terminal_target_lag_time=float(ready_target["target_lag_time"]),
+            abs_log_fs_tolerance=0.35,
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -9681,6 +9726,54 @@ def write_sota_glassbench_direct_alpha_multik_heldout_prediction_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_post_window_prediction_targets_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 470
+    left, top = 75, 118
+    row_h = 48
+    colors = {
+        "post_alpha_prediction_target_preregistered": "#2563eb",
+        "post_alpha_prediction_target_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows[:7]):
+        y = top + idx * row_h
+        stage = str(row["post_window_target_stage"])
+        color = colors.get(stage, "#4a5568")
+        pred = float(row["predicted_fs"])
+        low = float(row["acceptance_fs_low"])
+        high = float(row["acceptance_fs_high"])
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 70}" y="{y - 5}" width="300" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 80}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 390}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">k={float(row["direct_alpha_wave_number"]):.3g}; beta={float(row["calibrated_beta"]):.3g}; Fs={pred:.3g}; band=[{low:.3g},{high:.3g}]</text>'
+        )
+        marks.append(
+            f'<text x="{left + 790}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#555">lag={float(row["target_lag_time"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench post-alpha prediction targets</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Held-out multi-k alpha prediction is converted into tc45/tc50 high-k F_s targets with preregistered acceptance bands.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time</text>
+  <text x="{left + 70}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target stage</text>
+  <text x="{left + 390}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">prediction</text>
+  <text x="{left + 790}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_transport_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -14116,6 +14209,17 @@ def main() -> None:
     write_sota_glassbench_late_recovery_timecode_target_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.svg",
         glassbench_late_recovery_timecode_target_rows,
+    )
+    glassbench_direct_alpha_post_window_prediction_target_rows = (
+        write_sota_glassbench_direct_alpha_post_window_prediction_targets_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.csv",
+            heldout_prediction_rows=glassbench_direct_alpha_multik_heldout_prediction_rows,
+            timecode_target_rows=glassbench_late_recovery_timecode_target_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_post_window_prediction_targets_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.svg",
+        glassbench_direct_alpha_post_window_prediction_target_rows,
     )
     glassbench_late_recovery_cache_request_contract_rows = (
         write_sota_glassbench_late_recovery_cache_request_contract_csv(

@@ -148,6 +148,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_event_clock_extraction_contract,
     glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_multik_heldout_prediction_gate,
+    glassbench_direct_alpha_post_window_prediction_targets,
     glassbench_direct_alpha_multik_shape_gate,
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_transport_coupling_audit,
@@ -855,6 +856,47 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "post_alpha_window_depth")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_post_window_prediction_targets_preregister_tc45_tc50(self):
+        heldout_rows = [
+            {
+                "prediction_id": "glassbench_direct_alpha_multik_heldout_prediction",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "heldout_k_values": "4.79844851031;5.4;6",
+                "calibrated_betas": "0.149389405993;0.152844248924;0.155883185302",
+                "heldout_prediction_candidate_ready": 1.0,
+                "real_alpha_shape_claim_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "heldout_prediction_stage": "cached_multik_heldout_prediction_window_edge_blocked",
+            }
+        ]
+        target_rows = glassbench_direct_alpha_post_window_prediction_targets(
+            target_id="glassbench_direct_alpha_post_window_prediction_targets",
+            heldout_prediction_rows=heldout_rows,
+            current_time_code="tc40",
+            current_lag_time=1500000.0,
+            target_time_codes=["tc45", "tc50"],
+            terminal_target_time_code="tc50",
+            terminal_target_lag_time=166002226.8176154,
+            abs_log_fs_tolerance=0.35,
+        )
+
+        self.assertEqual(len(target_rows), 6)
+        first = target_rows[0]
+        last = target_rows[-1]
+        self.assertEqual(first["target_time_code"], "tc45")
+        self.assertAlmostEqual(float(first["target_lag_time"]), 15779839.676828865, delta=1e-6)
+        self.assertAlmostEqual(float(first["predicted_fs"]), 0.24140638485539556, delta=1e-12)
+        self.assertAlmostEqual(float(first["acceptance_fs_low"]), 0.17011620418964926, delta=1e-12)
+        self.assertAlmostEqual(float(first["acceptance_fs_high"]), 0.3425719667715066, delta=1e-12)
+        self.assertEqual(last["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(last["predicted_fs"]), 0.12459213356529883, delta=1e-12)
+        self.assertEqual(float(first["prediction_target_ready"]), 1.0)
+        self.assertEqual(float(first["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(first["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(float(first["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):
         direct_rows = [
