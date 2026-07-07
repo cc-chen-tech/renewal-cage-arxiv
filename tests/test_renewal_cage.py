@@ -181,6 +181,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
+    glassbench_direct_four_point_claim_gate,
     glassbench_timecode_curve_bridge,
     sota_glassbench_ka2d_timecode_semantics_gate,
     sota_glassbench_observable_coverage_audit_gate,
@@ -449,6 +450,75 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["alpha_threshold_crossed"]), 0.0)
         self.assertGreaterEqual(float(row["supported_dynamical_signature_count"]), 4.0)
         self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_four_point_claim_gate_blocks_proxy_promotion(self):
+        signature_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "transient_chi4_peak_signature": 1.0,
+                "chi4_peak_value": 5.7,
+                "chi4_late_recovery_fraction": 0.44,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+        dynamic_alignment_rows = [
+            {
+                "signature": "chi4_dynamic_heterogeneity_proxy",
+                "real_glassbench_support": 1.0,
+                "alignment_stage": "real_proxy_supported_spatial_boundary",
+                "primary_blocker": "direct_four_point_function_and_dynamic_length",
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        ]
+        member_ensemble_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "frame_index": 1.0,
+                "member_count": 4.0,
+                "min_member_count": 4.0,
+                "ensemble_member_threshold_pass": 1.0,
+                "overlap_radius": 0.1,
+                "chi4_overlap": 161.9,
+                "sigma_chi4_overlap": 52.9,
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "frame_index": 2.0,
+                "member_count": 4.0,
+                "min_member_count": 4.0,
+                "ensemble_member_threshold_pass": 1.0,
+                "overlap_radius": 0.1,
+                "chi4_overlap": 150.9,
+                "sigma_chi4_overlap": 54.5,
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+        ]
+
+        rows = glassbench_direct_four_point_claim_gate(
+            gate_id="glassbench_direct_four_point_claim_gate",
+            signature_rows=signature_rows,
+            dynamic_alignment_rows=dynamic_alignment_rows,
+            member_ensemble_rows=member_ensemble_rows,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["four_point_claim_stage"], "overlap_chi4_proxy_supported_direct_four_point_blocked")
+        self.assertEqual(float(row["overlap_chi4_proxy_ready"]), 1.0)
+        self.assertEqual(float(row["direct_four_point_susceptibility_ready"]), 0.0)
+        self.assertEqual(float(row["dynamic_length_ready"]), 0.0)
+        self.assertEqual(float(row["direct_four_point_claim_ready"]), 0.0)
+        self.assertEqual(float(row["proxy_promotion_allowed"]), 0.0)
+        self.assertGreater(float(row["overlap_chi4_peak"]), 150.0)
+        self.assertEqual(row["primary_blocker"], "direct_four_point_function_and_dynamic_length")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_alpha_threshold_horizon_audit_flags_metadata_anchor_mismatch(self):

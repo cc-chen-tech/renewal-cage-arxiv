@@ -6125,6 +6125,77 @@ def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_direct_four_point_claim_gate_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct four-point claim gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Overlap-chi4 evidence remains a proxy until direct four-point susceptibility and dynamic length are both available.",
+    )
+    left, top = 48, page_h - 94
+    row_h = 58
+    colors_by_stage = {
+        "direct_four_point_dynamic_length_claim_ready": colors.HexColor("#2f855a"),
+        "overlap_chi4_proxy_supported_direct_four_point_blocked": colors.HexColor("#805ad5"),
+        "overlap_chi4_proxy_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 105, top + 18, "claim stage")
+    c.drawString(left + 430, top + 18, "promotion guard")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["four_point_claim_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 105, y - 12, 306, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 113, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 430,
+            y,
+            "proxy={}; direct4pt={}; length={}; promote={}; chi4={:.3g}; sigma={:.3g}".format(
+                int(float(row["overlap_chi4_proxy_ready"])),
+                int(float(row["direct_four_point_susceptibility_ready"])),
+                int(float(row["dynamic_length_ready"])),
+                int(float(row["proxy_promotion_allowed"])),
+                float(row["overlap_chi4_peak"]),
+                float(row["sigma_overlap_chi4_peak"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 430,
+            y - 14,
+            "members={:.0f}; physical time={}; blocker={}".format(
+                float(row["member_count"]),
+                int(float(row["physical_time_ready"])),
+                row["primary_blocker"].replace("_", " ")[:44],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The gate prevents overlap-density or chi4-proxy evidence from being promoted to a direct spatial four-point theory.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8422,6 +8493,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
+    sota_glassbench_direct_four_point_claim_gate_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf"
+    )
     sota_glassbench_microdynamic_closed_loop_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
     )
@@ -8682,6 +8756,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
+    )
+    write_sota_glassbench_direct_four_point_claim_gate_pdf(
+        sota_glassbench_direct_four_point_claim_gate_pdf
     )
     write_sota_glassbench_microdynamic_closed_loop_pdf(
         sota_glassbench_microdynamic_closed_loop_pdf
@@ -9021,6 +9098,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_dynamic_signature_alignment_pdf,
             "figures/renewal_cage_sota_dynamic_signature_alignment.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_four_point_claim_gate_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf",
         )
         archive.write(
             sota_glassbench_microdynamic_closed_loop_pdf,

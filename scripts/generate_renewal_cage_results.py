@@ -91,6 +91,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
+    glassbench_direct_four_point_claim_gate,
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
@@ -4971,6 +4972,25 @@ def write_sota_dynamic_signature_alignment_csv(
         claim_rows=claim_alignment_rows,
         literature_rows=literature_readiness_rows,
         glassbench_signature_rows=glassbench_signature_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_four_point_claim_gate_csv(
+    path: Path,
+    *,
+    signature_rows: list[dict[str, float | str]],
+    dynamic_alignment_rows: list[dict[str, float | str]],
+    member_ensemble_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Guard against promoting overlap-chi4 proxies to direct four-point claims."""
+
+    rows = glassbench_direct_four_point_claim_gate(
+        gate_id="glassbench_direct_four_point_claim_gate",
+        signature_rows=signature_rows,
+        dynamic_alignment_rows=dynamic_alignment_rows,
+        member_ensemble_rows=member_ensemble_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -12096,6 +12116,55 @@ def write_persistence_exchange_uncertainty_protocol_svg(path: Path, rows: list[d
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_four_point_claim_gate_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 76, 118
+    row_h = 78
+    colors = {
+        "direct_four_point_dynamic_length_claim_ready": "#2f855a",
+        "overlap_chi4_proxy_supported_direct_four_point_blocked": "#805ad5",
+        "overlap_chi4_proxy_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["four_point_claim_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 6}" width="370" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:55]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 520}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">proxy={int(float(row["overlap_chi4_proxy_ready"]))}; direct4pt={int(float(row["direct_four_point_susceptibility_ready"]))}; length={int(float(row["dynamic_length_ready"]))}; promote={int(float(row["proxy_promotion_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 520}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">chi4 peak={float(row["overlap_chi4_peak"]):.3g}; sigma={float(row["sigma_overlap_chi4_peak"]):.3g}; members={float(row["member_count"]):.0f}; physical time={int(float(row["physical_time_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 520}" y="{y + 57}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct four-point claim gate</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Overlap-chi4 evidence is kept as a proxy until direct four-point susceptibility and dynamic length are both available.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim stage</text>
+  <text x="{left + 520}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">promotion guard</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_microdynamic_closed_loop_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -14113,6 +14182,18 @@ def main() -> None:
     write_sota_dynamic_signature_alignment_svg(
         FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.svg",
         dynamic_signature_alignment_rows,
+    )
+    glassbench_direct_four_point_claim_gate_rows = (
+        write_sota_glassbench_direct_four_point_claim_gate_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv",
+            signature_rows=glassbench_timecode_signature_support_rows,
+            dynamic_alignment_rows=dynamic_signature_alignment_rows,
+            member_ensemble_rows=glassbench_trajectory_member_ensemble_observable_rows,
+        )
+    )
+    write_sota_glassbench_direct_four_point_claim_gate_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.svg",
+        glassbench_direct_four_point_claim_gate_rows,
     )
     cage_jump_proxy_canary_rows = write_sota_glassbench_cage_jump_proxy_canary_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv",

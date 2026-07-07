@@ -2304,6 +2304,28 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(thermo["thermodynamic_claim_allowed"]), 0.0)
         self.assertEqual(float(thermo["real_glassbench_support"]), 0.0)
 
+    def test_sota_glassbench_direct_four_point_claim_gate_blocks_proxy_promotion(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+        )
+        self.assertEqual(
+            ka2d_023["four_point_claim_stage"],
+            "overlap_chi4_proxy_supported_direct_four_point_blocked",
+        )
+        self.assertEqual(float(ka2d_023["overlap_chi4_proxy_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["direct_four_point_susceptibility_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["dynamic_length_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["direct_four_point_claim_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["proxy_promotion_allowed"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "direct_four_point_function_and_dynamic_length")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
         self.assertTrue(path.exists())
@@ -3050,6 +3072,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)
@@ -3267,6 +3290,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_microdynamic_minimality_audit.pdf",
             "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
             "figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",

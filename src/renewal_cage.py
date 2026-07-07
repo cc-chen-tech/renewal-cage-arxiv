@@ -11053,6 +11053,128 @@ def glassbench_timecode_signature_support_gate(
     return out
 
 
+def glassbench_direct_four_point_claim_gate(
+    *,
+    gate_id: str,
+    signature_rows: Sequence[dict[str, object]],
+    dynamic_alignment_rows: Sequence[dict[str, object]],
+    member_ensemble_rows: Sequence[dict[str, object]],
+    min_member_count: float = 4.0,
+) -> list[dict[str, float | str]]:
+    """Keep overlap-chi4 proxy evidence separate from direct four-point claims."""
+
+    if not gate_id:
+        raise ValueError("gate_id must be nonempty")
+    if not signature_rows:
+        raise ValueError("signature_rows must be nonempty")
+    if not dynamic_alignment_rows:
+        raise ValueError("dynamic_alignment_rows must be nonempty")
+    if not member_ensemble_rows:
+        raise ValueError("member_ensemble_rows must be nonempty")
+    if min_member_count <= 0.0:
+        raise ValueError("min_member_count must be positive")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str]:
+        return (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+
+    signature_by_key = {key_for(row): row for row in signature_rows}
+    groups: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in member_ensemble_rows:
+        groups.setdefault(key_for(row), []).append(row)
+    chi4_alignment = next(
+        (
+            row
+            for row in dynamic_alignment_rows
+            if str(row.get("signature", "")) == "chi4_dynamic_heterogeneity_proxy"
+        ),
+        {},
+    )
+    alignment_blocker = str(
+        chi4_alignment.get("primary_blocker", "direct_four_point_function_and_dynamic_length")
+    )
+    alignment_proxy_supported = (
+        float(chi4_alignment.get("real_glassbench_support", 0.0) or 0.0) == 1.0
+        and str(chi4_alignment.get("alignment_stage", "")) == "real_proxy_supported_spatial_boundary"
+    )
+
+    out: list[dict[str, float | str]] = []
+    for key, group in sorted(groups.items(), key=lambda item: (item[0][0], float(item[0][1]))):
+        system_id, temperature = key
+        signature = signature_by_key.get(key, {})
+        usable = [
+            row
+            for row in group
+            if float(row.get("frame_index", 0.0) or 0.0) > 0.0
+            and float(row.get("member_count", 0.0) or 0.0) >= min_member_count
+            and float(row.get("ensemble_member_threshold_pass", 0.0) or 0.0) == 1.0
+            and float(row.get("frame_index_uncertainty_ready", 0.0) or 0.0) == 1.0
+            and float(row.get("chi4_overlap", 0.0) or 0.0) > 0.0
+            and float(row.get("sigma_chi4_overlap", 0.0) or 0.0) > 0.0
+        ]
+        overlap_peak = max((float(row.get("chi4_overlap", 0.0) or 0.0) for row in usable), default=0.0)
+        overlap_sigma = max((float(row.get("sigma_chi4_overlap", 0.0) or 0.0) for row in usable), default=0.0)
+        overlap_radius = max((float(row.get("overlap_radius", 0.0) or 0.0) for row in usable), default=0.0)
+        member_count = max((float(row.get("member_count", 0.0) or 0.0) for row in group), default=0.0)
+        physical_time_ready = bool(usable) and all(
+            float(row.get("physical_time_ready", 0.0) or 0.0) == 1.0 for row in usable
+        )
+        signature_proxy_ready = (
+            float(signature.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+            and float(signature.get("transient_chi4_peak_signature", 0.0) or 0.0) == 1.0
+        )
+        overlap_proxy_ready = bool(usable) and (signature_proxy_ready or alignment_proxy_supported)
+        direct_four_point_ready = (
+            overlap_proxy_ready
+            and physical_time_ready
+            and float(signature.get("direct_four_point_susceptibility_ready", 0.0) or 0.0) == 1.0
+        )
+        dynamic_length_ready = float(signature.get("dynamic_length_ready", 0.0) or 0.0) == 1.0
+        direct_claim_ready = direct_four_point_ready and dynamic_length_ready
+        proxy_promotion_allowed = direct_claim_ready
+
+        if direct_claim_ready:
+            stage = "direct_four_point_dynamic_length_claim_ready"
+            blocker = "none"
+            next_action = "promote_direct_four_point_dynamic_length_claim"
+        elif overlap_proxy_ready:
+            stage = "overlap_chi4_proxy_supported_direct_four_point_blocked"
+            blocker = alignment_blocker
+            next_action = "compute_direct_four_point_function_and_dynamic_length"
+        else:
+            stage = "overlap_chi4_proxy_incomplete"
+            blocker = "overlap_chi4_proxy"
+            next_action = "complete_overlap_chi4_member_ensemble_and_timecode_signature"
+
+        out.append(
+            {
+                "gate_id": gate_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "member_count": float(member_count),
+                "min_member_count": float(min_member_count),
+                "usable_frame_count": float(len(usable)),
+                "overlap_radius": float(overlap_radius),
+                "overlap_chi4_peak": float(overlap_peak),
+                "sigma_overlap_chi4_peak": float(overlap_sigma),
+                "timecode_chi4_peak": float(signature.get("chi4_peak_value", 0.0) or 0.0),
+                "timecode_chi4_late_recovery_fraction": float(
+                    signature.get("chi4_late_recovery_fraction", 0.0) or 0.0
+                ),
+                "overlap_chi4_proxy_ready": float(overlap_proxy_ready),
+                "physical_time_ready": float(physical_time_ready),
+                "direct_four_point_susceptibility_ready": float(direct_four_point_ready),
+                "dynamic_length_ready": float(dynamic_length_ready),
+                "direct_four_point_claim_ready": float(direct_claim_ready),
+                "proxy_promotion_allowed": float(proxy_promotion_allowed),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "four_point_claim_stage": stage,
+            }
+        )
+    return out
+
+
 def dynamic_signature_alignment_ledger(
     *,
     alignment_id: str,

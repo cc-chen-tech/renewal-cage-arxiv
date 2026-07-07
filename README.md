@@ -417,6 +417,11 @@ supported, marks self-intermediate scattering as real-curve supported but still
 pre-alpha-threshold, marks `chi4` as a proxy spatial-heterogeneity alignment,
 keeps persistence/exchange decoupling blocked until real inversion, and leaves
 thermodynamic transition as a scope boundary.
+The direct four-point claim gate then prevents that `chi4` proxy from being
+over-promoted: overlap-`chi4` can support a qualitative dynamic-heterogeneity
+signature, but direct four-point susceptibility and dynamic-length claims remain
+blocked until physical time, uncertainty-weighted four-point data, and a
+measured dynamic length are present.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
@@ -612,6 +617,7 @@ figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.svg
 figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.svg
 figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
 figures/renewal_cage_sota_dynamic_signature_alignment.svg
+figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.svg
 figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
 figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg
 figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg
@@ -747,6 +753,7 @@ data/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.csv
 data/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv
 data/renewal_cage_sota_glassbench_timecode_signature_support.csv
 data/renewal_cage_sota_dynamic_signature_alignment.csv
+data/renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv
 data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
 data/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv
 data/renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv
@@ -903,6 +910,7 @@ paper/figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf
 paper/figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
 paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf
 paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf
