@@ -14717,6 +14717,159 @@ def simultaneous_dynamical_signature_closure_gate(
     return base
 
 
+def microdynamic_prediction_scorecard(
+    *,
+    scorecard_id: str,
+    event_prediction_rows: Sequence[dict[str, object]],
+    simultaneous_closure_rows: Sequence[dict[str, object]],
+    glassbench_closed_loop_rows: Sequence[dict[str, object]],
+    late_recovery_power_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Summarize microstatistics-to-macro prediction evidence without overclaiming."""
+
+    if not scorecard_id:
+        raise ValueError("scorecard_id must be nonempty")
+    if not event_prediction_rows:
+        raise ValueError("event_prediction_rows must be nonempty")
+    if not simultaneous_closure_rows:
+        raise ValueError("simultaneous_closure_rows must be nonempty")
+    if not glassbench_closed_loop_rows:
+        raise ValueError("glassbench_closed_loop_rows must be nonempty")
+
+    closure_by_id = {
+        str(row.get("protocol_id", "unknown")): row for row in simultaneous_closure_rows
+    }
+    passed_closure = next(
+        (
+            row
+            for row in simultaneous_closure_rows
+            if float(row.get("all_required_dynamical_predictions_pass", 0.0) or 0.0) == 1.0
+        ),
+        next(iter(closure_by_id.values())),
+    )
+
+    rows: list[dict[str, float | str]] = []
+    prediction_flags = [
+        "diffusion_prediction_pass",
+        "tau_alpha_prediction_pass",
+        "late_ngp_prediction_pass",
+        "chi4_peak_prediction_pass",
+    ]
+    for prediction in event_prediction_rows:
+        row_id = str(prediction.get("protocol_id", "unknown_event_prediction"))
+        ready = float(prediction.get("micro_to_macro_prediction_ready", 0.0) or 0.0) == 1.0
+        passed = float(prediction.get("micro_to_macro_predictions_pass", 0.0) or 0.0) == 1.0
+        failed_flags = [
+            flag for flag in prediction_flags if float(prediction.get(flag, 0.0) or 0.0) != 1.0
+        ]
+        if ready and passed:
+            stage = "microstats_to_macro_prediction_passed"
+            blocker = "none"
+            mechanism_rejection_ready = 0.0
+            allowed_claim = "synthetic_microdynamic_closure_canary"
+        elif ready:
+            stage = "heldout_macro_prediction_rejected"
+            blocker = failed_flags[0] if failed_flags else str(prediction.get("primary_blocker", "heldout_prediction"))
+            mechanism_rejection_ready = 1.0
+            allowed_claim = "synthetic_negative_control_rejected"
+        else:
+            stage = "microstats_to_macro_prediction_incomplete"
+            blocker = str(prediction.get("primary_blocker", "micro_to_macro_prediction_ready"))
+            mechanism_rejection_ready = 0.0
+            allowed_claim = "no_prediction_claim"
+
+        rows.append(
+            {
+                "scorecard_id": scorecard_id,
+                "scorecard_row_id": row_id,
+                "source_class": "synthetic_event_clock",
+                "allowed_claim_level": allowed_claim,
+                "micro_input_count": 4.0,
+                "calibration_observable_count": 0.0,
+                "heldout_macro_prediction_count": float(sum(1 for flag in prediction_flags if flag in prediction)),
+                "macro_fit_parameter_count": float(prediction.get("fit_parameters_from_macro_observables", 0.0) or 0.0),
+                "micro_to_macro_prediction_ready": float(ready),
+                "all_required_predictions_pass": float(passed),
+                "mechanism_rejection_ready": float(mechanism_rejection_ready),
+                "real_data_comparison_ready": 0.0,
+                "current_member_count": 0.0,
+                "required_member_count": 0.0,
+                "additional_member_count_needed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "scorecard_stage": stage,
+            }
+        )
+
+    rows.append(
+        {
+            "scorecard_id": scorecard_id,
+            "scorecard_row_id": "synthetic_minimal_dynamical_closure",
+            "source_class": "synthetic_minimal_inversion",
+            "allowed_claim_level": "diffusion_plus_anchor_alpha_closure_canary",
+            "micro_input_count": 0.0,
+            "calibration_observable_count": float(passed_closure.get("calibration_count", 2.0) or 2.0),
+            "heldout_macro_prediction_count": float(passed_closure.get("heldout_count", 0.0) or 0.0),
+            "macro_fit_parameter_count": 2.0,
+            "micro_to_macro_prediction_ready": float(passed_closure.get("simultaneous_closure_ready", 0.0) or 0.0),
+            "all_required_predictions_pass": float(
+                passed_closure.get("all_required_dynamical_predictions_pass", 0.0) or 0.0
+            ),
+            "mechanism_rejection_ready": 0.0,
+            "real_data_comparison_ready": 0.0,
+            "current_member_count": 0.0,
+            "required_member_count": 0.0,
+            "additional_member_count_needed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": str(passed_closure.get("primary_blocker", "none")),
+            "scorecard_stage": str(passed_closure.get("closure_stage", "simultaneous_closure_unscored")),
+        }
+    )
+
+    power_candidates = [
+        row
+        for row in late_recovery_power_rows
+        if str(row.get("decision_power_stage", "")) == "late_ngp_power_extension_required"
+    ]
+    power = power_candidates[0] if power_candidates else (late_recovery_power_rows[0] if late_recovery_power_rows else {})
+    for closed_loop in glassbench_closed_loop_rows:
+        system_id = str(closed_loop.get("system_id", "unknown")).lower()
+        temperature = str(closed_loop.get("temperature", "none"))
+        safe_temperature = temperature.replace(".", "_")
+        prediction_ready = float(closed_loop.get("micro_to_macro_prediction_ready", 0.0) or 0.0) == 1.0
+        if prediction_ready:
+            stage = "real_glassbench_microdynamic_prediction_ready"
+            claim = "real_microdynamic_prediction_test_ready"
+            blocker = "none"
+        else:
+            stage = "real_glassbench_prediction_blocked"
+            claim = "real_signature_support_not_microdynamic_prediction"
+            blocker = str(closed_loop.get("primary_blocker", "micro_to_macro_prediction_ready"))
+        rows.append(
+            {
+                "scorecard_id": scorecard_id,
+                "scorecard_row_id": f"glassbench_{system_id}_{safe_temperature}_current_closed_loop",
+                "source_class": "real_glassbench_public_data",
+                "allowed_claim_level": claim,
+                "micro_input_count": 0.0,
+                "calibration_observable_count": 0.0,
+                "heldout_macro_prediction_count": 0.0,
+                "macro_fit_parameter_count": 0.0,
+                "micro_to_macro_prediction_ready": float(prediction_ready),
+                "all_required_predictions_pass": 0.0,
+                "mechanism_rejection_ready": 0.0,
+                "real_data_comparison_ready": float(prediction_ready),
+                "current_member_count": float(power.get("current_member_count", 0.0) or 0.0),
+                "required_member_count": float(power.get("required_member_count", 0.0) or 0.0),
+                "additional_member_count_needed": float(power.get("additional_member_count_needed", 0.0) or 0.0),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "scorecard_stage": stage,
+            }
+        )
+    return rows
+
+
 def persistence_exchange_scan(
     *,
     ratios: list[float],

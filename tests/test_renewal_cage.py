@@ -107,6 +107,7 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_data_protocol,
     persistence_exchange_joint_diagnostic,
     simultaneous_dynamical_signature_closure_gate,
+    microdynamic_prediction_scorecard,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
@@ -7557,6 +7558,95 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertLess(float(row["chi4_peak_z"]), 1.0)
         self.assertEqual(row["primary_blocker"], "none")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_microdynamic_prediction_scorecard_separates_canary_rejection_and_glassbench_blocker(self):
+        rows = microdynamic_prediction_scorecard(
+            scorecard_id="microdynamic_prediction_scorecard",
+            event_prediction_rows=[
+                {
+                    "protocol_id": "synthetic_event_clock_macro_prediction",
+                    "micro_to_macro_prediction_ready": 1.0,
+                    "micro_to_macro_predictions_pass": 1.0,
+                    "calibrated_from_event_clock_only": 1.0,
+                    "fit_parameters_from_macro_observables": 0.0,
+                    "diffusion_prediction_pass": 1.0,
+                    "tau_alpha_prediction_pass": 1.0,
+                    "late_ngp_prediction_pass": 1.0,
+                    "chi4_peak_prediction_pass": 1.0,
+                    "prediction_stage": "event_clock_micro_to_macro_prediction_ready",
+                    "primary_blocker": "none",
+                },
+                {
+                    "protocol_id": "synthetic_event_clock_macro_late_ngp_mismatch",
+                    "micro_to_macro_prediction_ready": 1.0,
+                    "micro_to_macro_predictions_pass": 0.0,
+                    "calibrated_from_event_clock_only": 1.0,
+                    "fit_parameters_from_macro_observables": 0.0,
+                    "diffusion_prediction_pass": 1.0,
+                    "tau_alpha_prediction_pass": 1.0,
+                    "late_ngp_prediction_pass": 0.0,
+                    "chi4_peak_prediction_pass": 1.0,
+                    "prediction_stage": "event_clock_micro_to_macro_prediction_failed",
+                    "primary_blocker": "heldout_macro_signature_mismatch",
+                },
+            ],
+            simultaneous_closure_rows=[
+                {
+                    "protocol_id": "synthetic_minimal_dynamical_closure",
+                    "simultaneous_closure_ready": 1.0,
+                    "heldout_count": 4.0,
+                    "all_required_dynamical_predictions_pass": 1.0,
+                    "closure_stage": "simultaneous_dynamical_signature_closure_passed",
+                    "primary_blocker": "none",
+                }
+            ],
+            glassbench_closed_loop_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "frame_index_microstats_ready": 1.0,
+                    "macro_signature_ready": 1.0,
+                    "micro_to_macro_prediction_ready": 0.0,
+                    "closed_loop_stage": "real_microstats_macro_signatures_closed_loop_blocked",
+                    "primary_blocker": "cage_jump_event_segmentation",
+                }
+            ],
+            late_recovery_power_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "outcome_scenario": "wide_uncertainty_requires_more_data",
+                    "decision_power_stage": "late_ngp_power_extension_required",
+                    "current_member_count": 8.0,
+                    "required_member_count": 128.0,
+                    "additional_member_count_needed": 120.0,
+                }
+            ],
+        )
+
+        by_id = {row["scorecard_row_id"]: row for row in rows}
+        canary = by_id["synthetic_event_clock_macro_prediction"]
+        mismatch = by_id["synthetic_event_clock_macro_late_ngp_mismatch"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(canary["scorecard_stage"], "microstats_to_macro_prediction_passed")
+        self.assertEqual(canary["allowed_claim_level"], "synthetic_microdynamic_closure_canary")
+        self.assertEqual(float(canary["micro_input_count"]), 4.0)
+        self.assertEqual(float(canary["heldout_macro_prediction_count"]), 4.0)
+        self.assertEqual(float(canary["macro_fit_parameter_count"]), 0.0)
+        self.assertEqual(float(canary["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(mismatch["scorecard_stage"], "heldout_macro_prediction_rejected")
+        self.assertEqual(float(mismatch["mechanism_rejection_ready"]), 1.0)
+        self.assertEqual(mismatch["primary_blocker"], "late_ngp_prediction_pass")
+
+        self.assertEqual(glassbench["scorecard_stage"], "real_glassbench_prediction_blocked")
+        self.assertEqual(glassbench["allowed_claim_level"], "real_signature_support_not_microdynamic_prediction")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertEqual(float(glassbench["required_member_count"]), 128.0)
+        self.assertEqual(float(glassbench["additional_member_count_needed"]), 120.0)
+        self.assertEqual(glassbench["primary_blocker"], "cage_jump_event_segmentation")
 
     def test_trajectory_event_clock_threshold_robustness_detects_stable_window(self):
         positions = np.array(

@@ -271,6 +271,28 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(chi4_mismatch["closure_stage"], "dynamical_heldout_prediction_failed")
         self.assertEqual(chi4_mismatch["primary_blocker"], "chi4_peak_z_consistent")
 
+    def test_microdynamic_prediction_scorecard_keeps_core_claim_and_real_blocker_together(self):
+        path = ROOT / "data" / "renewal_cage_microdynamic_prediction_scorecard.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["scorecard_row_id"]: row for row in rows}
+        canary = by_id["synthetic_event_clock_macro_prediction"]
+        mismatch = by_id["synthetic_event_clock_macro_late_ngp_mismatch"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(canary["scorecard_stage"], "microstats_to_macro_prediction_passed")
+        self.assertEqual(float(canary["heldout_macro_prediction_count"]), 4.0)
+        self.assertEqual(float(canary["macro_fit_parameter_count"]), 0.0)
+        self.assertEqual(float(canary["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(mismatch["scorecard_stage"], "heldout_macro_prediction_rejected")
+        self.assertEqual(float(mismatch["mechanism_rejection_ready"]), 1.0)
+        self.assertEqual(glassbench["scorecard_stage"], "real_glassbench_prediction_blocked")
+        self.assertEqual(glassbench["allowed_claim_level"], "real_signature_support_not_microdynamic_prediction")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertGreater(float(glassbench["required_member_count"]), float(glassbench["current_member_count"]))
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -2860,6 +2882,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_translation_rotation_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_simultaneous_closure.pdf", names)
+            self.assertIn("figures/renewal_cage_microdynamic_prediction_scorecard.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -2995,6 +3018,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_signed_constraints.pdf",
             "figures/renewal_cage_sota_evidence_class.pdf",
             "figures/renewal_cage_simultaneous_closure.pdf",
+            "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",

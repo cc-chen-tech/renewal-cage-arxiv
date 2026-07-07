@@ -133,6 +133,7 @@ from renewal_cage import (  # noqa: E402
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     simultaneous_dynamical_signature_closure_gate,
+    microdynamic_prediction_scorecard,
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
@@ -6138,6 +6139,27 @@ def write_simultaneous_closure_csv(path: Path) -> list[dict[str, float | str]]:
             **closure_inputs,
         ),
     ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_microdynamic_prediction_scorecard_csv(
+    path: Path,
+    *,
+    event_prediction_rows: list[dict[str, float | str]],
+    simultaneous_closure_rows: list[dict[str, float | str]],
+    glassbench_closed_loop_rows: list[dict[str, float | str]],
+    late_recovery_power_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the compact microstatistics-to-macro prediction scorecard."""
+
+    rows = microdynamic_prediction_scorecard(
+        scorecard_id="microdynamic_prediction_scorecard",
+        event_prediction_rows=event_prediction_rows,
+        simultaneous_closure_rows=simultaneous_closure_rows,
+        glassbench_closed_loop_rows=glassbench_closed_loop_rows,
+        late_recovery_power_rows=late_recovery_power_rows,
+    )
     write_sweep_csv(path, rows)
     return rows
 
@@ -12393,6 +12415,61 @@ def write_simultaneous_closure_svg(path: Path, rows: list[dict[str, float | str]
     path.write_text(svg)
 
 
+def write_microdynamic_prediction_scorecard_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 390
+    left, top = 72, 112
+    row_h = 62
+    colors_by_stage = {
+        "microstats_to_macro_prediction_passed": "#2f855a",
+        "heldout_macro_prediction_rejected": "#c05621",
+        "real_glassbench_prediction_blocked": "#2b6cb0",
+        "real_glassbench_microdynamic_prediction_ready": "#276749",
+        "simultaneous_dynamical_signature_closure_passed": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["scorecard_stage"])
+        color = colors_by_stage.get(stage, "#718096")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["scorecard_row_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 315}" y="{y}" width="286" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 326}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 625}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">micro={float(row["micro_input_count"]):.0f}; held={float(row["heldout_macro_prediction_count"]):.0f}; fit={float(row["macro_fit_parameter_count"]):.0f}; real={int(float(row["real_data_comparison_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 880}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">members {float(row["current_member_count"]):.0f}->{float(row["required_member_count"]):.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 315}" y="{y + 43}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:50]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:42]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Microdynamic prediction scorecard</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Few microdynamic statistics must predict held-out macro signatures; current GlassBench support remains blocked from real micro-to-macro closure.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">row</text>
+  <text x="{left + 315}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 625}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">prediction accounting</text>
+  <text x="{left + 880}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member power</text>
+  {"".join(marks)}
+  <rect x="72" y="348" width="14" height="14" fill="#2f855a" /><text x="94" y="360" font-family="Arial, sans-serif" font-size="12">micro-to-macro canary passed</text>
+  <rect x="292" y="348" width="14" height="14" fill="#c05621" /><text x="314" y="360" font-family="Arial, sans-serif" font-size="12">held-out mismatch rejected</text>
+  <rect x="512" y="348" width="14" height="14" fill="#2b6cb0" /><text x="534" y="360" font-family="Arial, sans-serif" font-size="12">real GlassBench blocker retained</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -13885,6 +13962,17 @@ def main() -> None:
     write_simultaneous_closure_svg(
         FIGURE_DIR / "renewal_cage_simultaneous_closure.svg",
         simultaneous_closure_rows,
+    )
+    microdynamic_prediction_scorecard_rows = write_microdynamic_prediction_scorecard_csv(
+        DATA_DIR / "renewal_cage_microdynamic_prediction_scorecard.csv",
+        event_prediction_rows=trajectory_event_clock_macro_prediction_rows,
+        simultaneous_closure_rows=simultaneous_closure_rows,
+        glassbench_closed_loop_rows=microdynamic_closed_loop_rows,
+        late_recovery_power_rows=glassbench_late_recovery_decision_power_plan_rows,
+    )
+    write_microdynamic_prediction_scorecard_svg(
+        FIGURE_DIR / "renewal_cage_microdynamic_prediction_scorecard.svg",
+        microdynamic_prediction_scorecard_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

@@ -1750,6 +1750,69 @@ def write_simultaneous_closure_pdf(path: Path) -> None:
     c.save()
 
 
+def write_microdynamic_prediction_scorecard_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_microdynamic_prediction_scorecard.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Microdynamic prediction scorecard")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Few microdynamic statistics must predict held-out macro signatures; current GlassBench support remains prediction-gated.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "row")
+    c.drawString(left + 215, top, "stage")
+    c.drawString(left + 485, top, "accounting")
+    c.drawString(left + 645, top, "claim/blocker")
+    palette = {
+        "microstats_to_macro_prediction_passed": colors.HexColor("#2f855a"),
+        "heldout_macro_prediction_rejected": colors.HexColor("#c05621"),
+        "real_glassbench_prediction_blocked": colors.HexColor("#2b6cb0"),
+        "real_glassbench_microdynamic_prediction_ready": colors.HexColor("#276749"),
+        "simultaneous_dynamical_signature_closure_passed": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 6.6)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 42
+        stage = row["scorecard_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["scorecard_row_id"].replace("_", " ")[:35])
+        c.setFillColor(color)
+        c.rect(left + 215, y - 4, 240, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 220, y, stage.replace("_", " ")[:39])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 485,
+            y,
+            "micro={:.0f}; held={:.0f}; fit={:.0f}; real={:.0f}; members={:.0f}->{:.0f}".format(
+                float(row["micro_input_count"]),
+                float(row["heldout_macro_prediction_count"]),
+                float(row["macro_fit_parameter_count"]),
+                float(row["real_data_comparison_ready"]),
+                float(row["current_member_count"]),
+                float(row["required_member_count"]),
+            ),
+        )
+        c.drawString(left + 645, y, row["allowed_claim_level"].replace("_", " ")[:44])
+        c.drawString(left + 645, y - 10, f"blocker={row['primary_blocker'].replace('_', ' ')[:42]}")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The scorecard allows dynamical-signature closure claims only for held-out prediction rows; thermodynamic glass-transition claims remain out of scope.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7495,6 +7558,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_evidence_verdict_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_verdict.pdf"
     sota_evidence_class_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_class.pdf"
     simultaneous_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_simultaneous_closure.pdf"
+    microdynamic_prediction_scorecard_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_microdynamic_prediction_scorecard.pdf"
+    )
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -7750,6 +7816,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_evidence_verdict_pdf(sota_evidence_verdict_pdf)
     write_sota_evidence_class_pdf(sota_evidence_class_pdf)
     write_simultaneous_closure_pdf(simultaneous_closure_pdf)
+    write_microdynamic_prediction_scorecard_pdf(microdynamic_prediction_scorecard_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -7978,6 +8045,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(sota_evidence_verdict_pdf, "figures/renewal_cage_sota_evidence_verdict.pdf")
         archive.write(sota_evidence_class_pdf, "figures/renewal_cage_sota_evidence_class.pdf")
         archive.write(simultaneous_closure_pdf, "figures/renewal_cage_simultaneous_closure.pdf")
+        archive.write(
+            microdynamic_prediction_scorecard_pdf,
+            "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
+        )
         archive.write(
             real_benchmark_assimilation_gate_pdf,
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",

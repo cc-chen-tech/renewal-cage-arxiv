@@ -137,6 +137,10 @@ diffusion and one anchor `tau_alpha(k)` are calibration inputs, while multi-k
 alpha shape, late NGP recovery, Stokes-Einstein growth, and the `chi4` proxy
 must pass as held-out predictions; thermodynamic-transition claims remain
 disallowed for this gate.
+The microdynamic prediction scorecard makes the core claim more compact:
+particle event-clock statistics can pass or fail a no-macro-fit
+micro-to-macro prediction canary, while the current GlassBench rows remain real
+dynamical-signature support rather than completed microdynamic predictions.
 The inversion-identifiability audit then checks fit-rank margins, held-out
 predictions, closure dependence, and parameter degeneracy before any real-data
 fit is claimed.
@@ -486,6 +490,7 @@ figures/renewal_cage_sota_claim_alignment.svg
 figures/renewal_cage_sota_signed_constraints.svg
 figures/renewal_cage_sota_evidence_class.svg
 figures/renewal_cage_simultaneous_closure.svg
+figures/renewal_cage_microdynamic_prediction_scorecard.svg
 figures/renewal_cage_real_benchmark_assimilation_gate.svg
 figures/renewal_cage_cross_observable_prediction_ledger.svg
 figures/renewal_cage_inversion_identifiability_audit.svg
@@ -609,6 +614,7 @@ data/renewal_cage_sota_claim_alignment.csv
 data/renewal_cage_sota_signed_constraints.csv
 data/renewal_cage_sota_evidence_class.csv
 data/renewal_cage_simultaneous_closure.csv
+data/renewal_cage_microdynamic_prediction_scorecard.csv
 data/renewal_cage_real_benchmark_assimilation_gate.csv
 data/renewal_cage_cross_observable_prediction_ledger.csv
 data/renewal_cage_inversion_identifiability_audit.csv
@@ -755,6 +761,7 @@ paper/figures/renewal_cage_sota_claim_alignment.pdf
 paper/figures/renewal_cage_sota_signed_constraints.pdf
 paper/figures/renewal_cage_sota_evidence_class.pdf
 paper/figures/renewal_cage_simultaneous_closure.pdf
+paper/figures/renewal_cage_microdynamic_prediction_scorecard.pdf
 paper/figures/renewal_cage_real_benchmark_assimilation_gate.pdf
 paper/figures/renewal_cage_cross_observable_prediction_ledger.pdf
 paper/figures/renewal_cage_inversion_identifiability_audit.pdf
