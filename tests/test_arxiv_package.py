@@ -1355,6 +1355,22 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(tc05["observable_semantics_stage"], "official_displacement_observable_reproduced")
         self.assertEqual(float(tc05["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_cached_particle_observable_semantics_reproduces_official_ngp_formula(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        tc30 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151" and row["time_code"] == "tc30"
+        )
+        self.assertEqual(tc30["initial_reference_ngp_2d_formula"], "mean_replica_alpha2_2d")
+        self.assertGreater(float(tc30["pooled_initial_reference_ngp_2d_relative_error"]), 0.5)
+        self.assertLess(float(tc30["initial_reference_ngp_2d_relative_error"]), 1.0e-12)
+        self.assertEqual(float(tc30["official_ngp_2d_reproducible"]), 1.0)
+
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
         self.assertTrue(path.exists())

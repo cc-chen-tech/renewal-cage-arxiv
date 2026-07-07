@@ -1557,11 +1557,15 @@ itself create a physical-time event-clock trajectory. The cached-coordinate
 observable audit now uses the cached \texttt{initial\_positions} arrays to
 recompute minimal-image displacement observables. For all eight cold
 structure-151 lag targets, the recomputed MSD reproduces the official
-GlassBench MSD to numerical precision, while the raw coordinate MSD remains
-wrong by orders of magnitude. Thus the archive-to-observable semantic gap is
-closed for this fixed-lag ladder; the remaining promotion blockers are
-event segmentation, persistence/exchange clocks, and alpha-threshold coverage,
-not displacement-observable reproducibility.
+GlassBench MSD to numerical precision. The same audit also resolves the NGP
+averaging convention: the official two-dimensional NGP is the mean over
+isoconfigurational replicas of each replica's alpha-two value, not a pooled
+ratio over all replicas and particles. With that convention the cached
+displacements reproduce the official NGP as well, while the raw coordinate MSD
+and pooled NGP remain rejected proxies. Thus the archive-to-observable
+semantic gap is closed for MSD and NGP on this fixed-lag ladder; the remaining
+promotion blockers are event segmentation, persistence/exchange clocks, and
+alpha-threshold coverage, not displacement-observable reproducibility.
 
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out

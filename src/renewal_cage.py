@@ -6480,10 +6480,16 @@ def glassbench_cached_particle_observable_semantics_audit(
         replica_spread_msd = float(row.get("replica_spread_msd", 0.0) or 0.0)
         initial_reference_msd = float(row.get("initial_reference_msd", 0.0) or 0.0)
         initial_reference_ngp_2d = float(row.get("initial_reference_ngp_2d", 0.0) or 0.0)
+        pooled_initial_reference_ngp_2d = float(row.get("pooled_initial_reference_ngp_2d", 0.0) or 0.0)
         denominator = max(abs(official_msd), 1.0e-12)
         raw_rel_error = abs(raw_coordinate_msd - official_msd) / denominator
         spread_rel_error = abs(replica_spread_msd - official_msd) / denominator
         initial_reference_rel_error = abs(initial_reference_msd - official_msd) / denominator
+        ngp_denominator = max(abs(official_ngp_2d), 1.0e-12)
+        initial_reference_ngp_rel_error = abs(initial_reference_ngp_2d - official_ngp_2d) / ngp_denominator
+        pooled_initial_reference_ngp_rel_error = (
+            abs(pooled_initial_reference_ngp_2d - official_ngp_2d) / ngp_denominator
+        )
         cached_ready = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
         initial_ready = float(row.get("initial_reference_positions_ready", 0.0) or 0.0) == 1.0
         official_available = official_msd > 0.0
@@ -6530,6 +6536,19 @@ def glassbench_cached_particle_observable_semantics_audit(
                 "official_ngp_2d": float(official_ngp_2d),
                 "cached_ngp_2d_proxy": float(row.get("cached_ngp_2d_proxy", 0.0) or 0.0),
                 "initial_reference_ngp_2d": float(initial_reference_ngp_2d),
+                "initial_reference_ngp_2d_relative_error": float(initial_reference_ngp_rel_error),
+                "initial_reference_ngp_2d_formula": str(
+                    row.get("initial_reference_ngp_2d_formula", "unspecified")
+                ),
+                "pooled_initial_reference_ngp_2d": float(pooled_initial_reference_ngp_2d),
+                "pooled_initial_reference_ngp_2d_relative_error": float(
+                    pooled_initial_reference_ngp_rel_error
+                ),
+                "official_ngp_2d_reproducible": float(
+                    initial_ready
+                    and official_available
+                    and initial_reference_ngp_rel_error <= max_reproducible_relative_error
+                ),
                 "cached_coordinate_proxy_ready": float(cached_ready),
                 "initial_reference_positions_ready": float(initial_ready),
                 "official_displacement_observable_available": float(official_available),

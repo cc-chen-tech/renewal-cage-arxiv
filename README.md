@@ -276,8 +276,12 @@ The cached-particle observable-semantics audit now verifies the same boundary
 at the single-structure cache level: raw coordinate MSD is rejected as a proxy,
 while minimal-image displacement from cached `initial_positions` reproduces
 the official GlassBench MSD for the structure-151 cold lag ladder to numerical
-precision. This upgrades the remaining blocker from observable semantics to
-event segmentation, persistence/exchange clocks, and alpha-threshold coverage.
+precision. It also resolves the official NGP convention: GlassBench reports
+the mean over isoconfigurational replicas of each replica's two-dimensional
+alpha2, not the pooled ratio over all replicas and particles. With that
+convention, the cached displacements reproduce the official NGP as well. This
+upgrades the remaining blocker from observable semantics to event segmentation,
+persistence/exchange clocks, and alpha-threshold coverage.
 The time-code curve bridge now runs that `T=0.23` curve through the same
 trajectory pre-inversion schema used by the persistence/exchange protocol. It
 promotes the row from metadata-only evidence to a real physical-time

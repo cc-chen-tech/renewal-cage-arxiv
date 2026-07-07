@@ -897,7 +897,9 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         row = rows[0]
         self.assertLess(float(row["initial_reference_msd_relative_error"]), 0.05)
+        self.assertLess(float(row["initial_reference_ngp_2d_relative_error"]), 0.05)
         self.assertEqual(float(row["official_displacement_observable_reproducible"]), 1.0)
+        self.assertEqual(float(row["official_ngp_2d_reproducible"]), 1.0)
         self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "none")
         self.assertEqual(row["observable_semantics_stage"], "official_displacement_observable_reproduced")

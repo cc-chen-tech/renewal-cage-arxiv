@@ -4194,11 +4194,22 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
                 reference_r2 = np.sum(reference_displacements * reference_displacements, axis=-1)
                 initial_reference_msd = float(np.mean(reference_r2))
                 reference_r4 = float(np.mean(reference_r2 * reference_r2))
-                initial_reference_ngp_2d = (
+                pooled_initial_reference_ngp_2d = (
                     float(reference_r4 / (2.0 * initial_reference_msd * initial_reference_msd) - 1.0)
                     if initial_reference_msd > 0
                     else 0.0
                 )
+                replica_msd = np.mean(reference_r2, axis=1)
+                replica_r4 = np.mean(reference_r2 * reference_r2, axis=1)
+                replica_valid = replica_msd > 0.0
+                if np.any(replica_valid):
+                    initial_reference_ngp_2d = float(
+                        np.mean(replica_r4[replica_valid] / (2.0 * replica_msd[replica_valid] ** 2) - 1.0)
+                    )
+                else:
+                    initial_reference_ngp_2d = 0.0
+            else:
+                pooled_initial_reference_ngp_2d = 0.0
             cached_rows.append(
                 {
                     "system_id": row["system_id"],
@@ -4212,6 +4223,8 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
                     "cached_ngp_2d_proxy": cached_ngp_2d_proxy,
                     "initial_reference_msd": initial_reference_msd,
                     "initial_reference_ngp_2d": initial_reference_ngp_2d,
+                    "initial_reference_ngp_2d_formula": "mean_replica_alpha2_2d",
+                    "pooled_initial_reference_ngp_2d": pooled_initial_reference_ngp_2d,
                     "initial_reference_positions_ready": initial_reference_ready,
                     "particle_resolved_positions_cached": 1.0,
                 }
@@ -9571,12 +9584,12 @@ def write_sota_glassbench_cached_particle_observable_semantics_svg(
             f'<text x="{left + 153}" y="{y + 12}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:54]}</text>'
         )
         marks.append(
-            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">official MSD={float(row["official_msd"]):.4g}; raw rel err={float(row["raw_coordinate_msd_relative_error"]):.3g}; ref rel err={float(row["initial_reference_msd_relative_error"]):.3g}; init ref={int(float(row["initial_reference_positions_ready"]))}</text>'
+            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">MSD ref err={float(row["initial_reference_msd_relative_error"]):.2g}; NGP ref err={float(row["initial_reference_ngp_2d_relative_error"]):.2g}; pooled NGP err={float(row["pooled_initial_reference_ngp_2d_relative_error"]):.2g}; init ref={int(float(row["initial_reference_positions_ready"]))}</text>'
         )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />
   <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached-particle observable semantics</text>
-  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached initial references reproduce official displacement MSD while raw coordinates remain a rejected proxy.</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached initial references reproduce official MSD and mean-replica NGP; raw coordinates and pooled NGP remain rejected proxies.</text>
   <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
   <text x="{left + 145}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">observable semantics stage</text>
   <text x="{left + 500}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached-coordinate audit</text>
