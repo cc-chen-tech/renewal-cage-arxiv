@@ -153,6 +153,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_membership_probe_contract,
     glassbench_late_recovery_public_timecode_ceiling,
     glassbench_censored_window_claim_audit,
+    glassbench_sota_public_window_verdict,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1554,6 +1555,79 @@ class DelayedRenewalCageTests(unittest.TestCase):
             row["next_required_action"],
             "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
         )
+
+    def test_glassbench_sota_public_window_verdict_separates_supported_and_censored_claims(self):
+        censored_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "alpha_anchor_window_ready": 1.0,
+                "short_window_dynamic_claim_allowed": 1.0,
+                "alpha_relaxation_claim_allowed": 1.0,
+                "late_gaussian_recovery_claim_allowed": 0.0,
+                "static_vs_finite_exchange_rejection_ready": 0.0,
+                "public_window_fraction_of_target_lag": 0.009036023364,
+                "target_lag_over_public_max": 110.66815121174359,
+                "allowed_public_claim_level": "alpha_anchor_and_pre_late_dynamic_signatures",
+                "primary_blocker": "public_glassbench_timecode_ceiling",
+            }
+        ]
+        signature_rows = [
+            {
+                "signature": "self_intermediate_alpha",
+                "phenomenon": "self_intermediate_scattering_alpha_relaxation",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+            },
+            {
+                "signature": "late_gaussian_recovery",
+                "phenomenon": "long_time_gaussian_recovery",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+            },
+            {
+                "signature": "persistence_exchange_decoupling",
+                "phenomenon": "persistence_exchange_decoupling",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+            },
+            {
+                "signature": "thermodynamic_transition",
+                "phenomenon": "configurational_entropy_and_ideal_glass_scope",
+                "model_support": 0.0,
+                "literature_qualitative_support": 1.0,
+            },
+        ]
+
+        rows = glassbench_sota_public_window_verdict(
+            verdict_id="glassbench_sota_public_window_verdict",
+            censored_window_rows=censored_rows,
+            dynamic_signature_rows=signature_rows,
+        )
+
+        by_signature = {row["signature"]: row for row in rows}
+        alpha = by_signature["self_intermediate_alpha"]
+        self.assertEqual(alpha["public_window_verdict_stage"], "public_window_sota_consistent")
+        self.assertEqual(float(alpha["public_glassbench_claim_allowed"]), 1.0)
+        self.assertEqual(float(alpha["late_recovery_required"]), 0.0)
+        self.assertEqual(float(alpha["thermodynamic_claim_allowed"]), 0.0)
+
+        recovery = by_signature["late_gaussian_recovery"]
+        self.assertEqual(recovery["public_window_verdict_stage"], "public_window_censored_sota_unresolved")
+        self.assertEqual(float(recovery["public_glassbench_claim_allowed"]), 0.0)
+        self.assertEqual(float(recovery["late_recovery_required"]), 1.0)
+        self.assertEqual(recovery["primary_blocker"], "public_glassbench_timecode_ceiling")
+
+        pe = by_signature["persistence_exchange_decoupling"]
+        self.assertEqual(pe["public_window_verdict_stage"], "mechanism_selection_censored_unresolved")
+        self.assertEqual(float(pe["mechanism_rejection_ready"]), 0.0)
+        self.assertEqual(float(pe["public_glassbench_claim_allowed"]), 0.0)
+
+        thermo = by_signature["thermodynamic_transition"]
+        self.assertEqual(thermo["public_window_verdict_stage"], "scope_boundary_not_tested")
+        self.assertEqual(thermo["allowed_public_claim"], "not_a_thermodynamic_glass_transition_test")
+        self.assertEqual(float(thermo["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

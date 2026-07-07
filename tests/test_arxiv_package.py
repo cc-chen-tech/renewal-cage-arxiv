@@ -1643,6 +1643,37 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_023["primary_blocker"], "public_glassbench_timecode_ceiling")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_public_window_verdict_maps_sota_claims_to_censoring(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_public_window_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_signature = {row["signature"]: row for row in rows}
+        alpha = by_signature["self_intermediate_alpha"]
+        self.assertEqual(alpha["public_window_verdict_stage"], "public_window_sota_consistent")
+        self.assertEqual(float(alpha["public_glassbench_claim_allowed"]), 1.0)
+        self.assertEqual(float(alpha["late_recovery_required"]), 0.0)
+        self.assertEqual(float(alpha["thermodynamic_claim_allowed"]), 0.0)
+
+        recovery = by_signature["late_gaussian_recovery"]
+        self.assertEqual(recovery["public_window_verdict_stage"], "public_window_censored_sota_unresolved")
+        self.assertEqual(float(recovery["public_glassbench_claim_allowed"]), 0.0)
+        self.assertEqual(float(recovery["late_recovery_required"]), 1.0)
+        self.assertEqual(recovery["primary_blocker"], "public_glassbench_timecode_ceiling")
+
+        persistence_exchange = by_signature["persistence_exchange_decoupling"]
+        self.assertEqual(
+            persistence_exchange["public_window_verdict_stage"],
+            "mechanism_selection_censored_unresolved",
+        )
+        self.assertEqual(float(persistence_exchange["mechanism_rejection_ready"]), 0.0)
+
+        thermodynamic = by_signature["thermodynamic_transition"]
+        self.assertEqual(thermodynamic["public_window_verdict_stage"], "scope_boundary_not_tested")
+        self.assertEqual(thermodynamic["allowed_public_claim"], "not_a_thermodynamic_glass_transition_test")
+        self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2678,6 +2709,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_public_window_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2879,6 +2911,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf",
             "figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf",
+            "figures/renewal_cage_sota_glassbench_public_window_verdict.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

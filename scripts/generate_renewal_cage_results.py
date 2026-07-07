@@ -75,6 +75,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_membership_probe_contract,
     glassbench_late_recovery_public_timecode_ceiling,
     glassbench_censored_window_claim_audit,
+    glassbench_sota_public_window_verdict,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4594,6 +4595,23 @@ def write_sota_glassbench_censored_window_claim_audit_csv(
         audit_id="glassbench_ka2d_censored_window_claim_audit",
         public_ceiling_rows=public_ceiling_rows,
         finite_exchange_envelope_rows=finite_exchange_envelope_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_public_window_verdict_csv(
+    path: Path,
+    *,
+    censored_window_rows: list[dict[str, float | str]],
+    dynamic_signature_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the SOTA claim verdict allowed by the public GlassBench window."""
+
+    rows = glassbench_sota_public_window_verdict(
+        verdict_id="glassbench_ka2d_sota_public_window_verdict",
+        censored_window_rows=censored_window_rows,
+        dynamic_signature_rows=dynamic_signature_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10037,6 +10055,59 @@ def write_sota_glassbench_censored_window_claim_audit_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_public_window_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 530
+    left, top = 76, 126
+    row_h = 60
+    colors = {
+        "public_window_sota_consistent": "#2f855a",
+        "public_window_censored_sota_unresolved": "#b7791f",
+        "mechanism_selection_censored_unresolved": "#c05621",
+        "public_proxy_consistent_spatial_boundary": "#805ad5",
+        "scope_boundary_not_tested": "#4a5568",
+        "signature_not_mapped_to_public_window_gate": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["public_window_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        allowed = int(float(row["public_glassbench_claim_allowed"]))
+        late_required = int(float(row["late_recovery_required"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{str(row["signature"]).replace("_", " ")[:34]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 245}" y="{y - 6}" width="310" height="25" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 253}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9.2" fill="#fff">{stage.replace("_", " ")[:48]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">claim allowed={allowed}; late required={late_required}; model={float(row["model_support"]):.1g}; literature={float(row["literature_qualitative_support"]):.1g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">allowed={str(row["allowed_public_claim"]).replace("_", " ")[:72]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 47}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; public/target={float(row["public_window_fraction_of_target_lag"]):.4g}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench public-window SOTA verdict</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Each literature-level dynamic signature is mapped to what the currently public GlassBench window can and cannot test.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">signature</text>
+  <text x="{left + 245}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">public-window verdict</text>
+  <text x="{left + 580}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim boundary</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13027,6 +13098,25 @@ def main() -> None:
     write_sota_glassbench_censored_window_claim_audit_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.svg",
         glassbench_censored_window_claim_audit_rows,
+    )
+    glassbench_public_window_verdict_signature_rows = dynamic_signature_alignment_rows + [
+        {
+            "signature": "late_gaussian_recovery",
+            "phenomenon": "long_time_gaussian_recovery",
+            "model_support": 1.0,
+            "literature_qualitative_support": 1.0,
+        }
+    ]
+    glassbench_public_window_verdict_rows = (
+        write_sota_glassbench_public_window_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_public_window_verdict.csv",
+            censored_window_rows=glassbench_censored_window_claim_audit_rows,
+            dynamic_signature_rows=glassbench_public_window_verdict_signature_rows,
+        )
+    )
+    write_sota_glassbench_public_window_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_public_window_verdict.svg",
+        glassbench_public_window_verdict_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

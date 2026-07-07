@@ -8236,6 +8236,141 @@ def glassbench_censored_window_claim_audit(
     return rows
 
 
+def glassbench_sota_public_window_verdict(
+    *,
+    verdict_id: str,
+    censored_window_rows: Sequence[dict[str, object]],
+    dynamic_signature_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Map SOTA dynamic signatures onto the currently public GlassBench window."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not censored_window_rows:
+        raise ValueError("censored_window_rows must be nonempty")
+    if not dynamic_signature_rows:
+        raise ValueError("dynamic_signature_rows must be nonempty")
+
+    reference = max(
+        censored_window_rows,
+        key=lambda row: float(row.get("alpha_anchor_window_ready", 0.0) or 0.0),
+    )
+    alpha_ready = float(reference.get("alpha_anchor_window_ready", 0.0) or 0.0) == 1.0
+    short_window_ready = (
+        float(reference.get("short_window_dynamic_claim_allowed", 0.0) or 0.0) == 1.0
+    )
+    alpha_claim_ready = (
+        float(reference.get("alpha_relaxation_claim_allowed", 0.0) or 0.0) == 1.0
+    )
+    late_recovery_ready = (
+        float(reference.get("late_gaussian_recovery_claim_allowed", 0.0) or 0.0) == 1.0
+    )
+    mechanism_ready = (
+        float(reference.get("static_vs_finite_exchange_rejection_ready", 0.0) or 0.0) == 1.0
+    )
+    blocker = str(reference.get("primary_blocker", "public_glassbench_window"))
+    fraction = float(reference.get("public_window_fraction_of_target_lag", 0.0) or 0.0)
+    target_ratio = float(reference.get("target_lag_over_public_max", 0.0) or 0.0)
+    claim_level = str(reference.get("allowed_public_claim_level", "unknown"))
+
+    pre_late_signatures = {
+        "msd_growth_cage_escape",
+        "self_intermediate_alpha",
+        "transient_ngp_peak",
+    }
+    proxy_signatures = {"chi4_dynamic_heterogeneity_proxy"}
+    late_signatures = {"late_gaussian_recovery"}
+    mechanism_signatures = {"persistence_exchange_decoupling"}
+    thermodynamic_signatures = {"thermodynamic_transition"}
+
+    rows: list[dict[str, float | str]] = []
+    for signature_row in sorted(dynamic_signature_rows, key=lambda row: str(row.get("signature", ""))):
+        signature = str(signature_row.get("signature", "unknown"))
+        phenomenon = str(signature_row.get("phenomenon", signature))
+        model_support = float(signature_row.get("model_support", 0.0) or 0.0)
+        literature_support = float(signature_row.get("literature_qualitative_support", 0.0) or 0.0)
+
+        if signature in thermodynamic_signatures:
+            stage = "scope_boundary_not_tested"
+            allowed_claim = "not_a_thermodynamic_glass_transition_test"
+            public_allowed = False
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "thermodynamic_scope_boundary"
+        elif signature in mechanism_signatures:
+            stage = (
+                "mechanism_selection_public_window_ready"
+                if mechanism_ready
+                else "mechanism_selection_censored_unresolved"
+            )
+            allowed_claim = (
+                "mechanism_selection_ready"
+                if mechanism_ready
+                else "literature_consistent_but_real_mechanism_selection_censored"
+            )
+            public_allowed = mechanism_ready
+            late_required = True
+            mechanism_rejection_ready = mechanism_ready
+            primary_blocker = "none" if mechanism_ready else blocker
+        elif signature in late_signatures:
+            stage = (
+                "late_recovery_public_window_ready"
+                if late_recovery_ready
+                else "public_window_censored_sota_unresolved"
+            )
+            allowed_claim = (
+                "late_gaussian_recovery_test_ready"
+                if late_recovery_ready
+                else "sota_consistent_but_late_recovery_censored"
+            )
+            public_allowed = late_recovery_ready
+            late_required = True
+            mechanism_rejection_ready = mechanism_ready
+            primary_blocker = "none" if late_recovery_ready else blocker
+        elif signature in proxy_signatures:
+            stage = "public_proxy_consistent_spatial_boundary"
+            allowed_claim = "qualitative_dynamic_heterogeneity_proxy_only"
+            public_allowed = short_window_ready
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "direct_four_point_function_and_dynamic_length"
+        elif signature in pre_late_signatures:
+            stage = "public_window_sota_consistent" if alpha_ready or short_window_ready else "public_window_pre_alpha_only"
+            allowed_claim = claim_level if alpha_claim_ready or short_window_ready else "short_window_canary_only"
+            public_allowed = alpha_claim_ready or short_window_ready
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "none" if public_allowed else blocker
+        else:
+            stage = "signature_not_mapped_to_public_window_gate"
+            allowed_claim = "manual_review_required"
+            public_allowed = False
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "signature_mapping"
+
+        rows.append(
+            {
+                "verdict_id": verdict_id,
+                "signature": signature,
+                "phenomenon": phenomenon,
+                "model_support": float(model_support),
+                "literature_qualitative_support": float(literature_support),
+                "public_window_fraction_of_target_lag": float(fraction),
+                "target_lag_over_public_max": float(target_ratio),
+                "public_glassbench_claim_allowed": float(public_allowed),
+                "late_recovery_required": float(late_required),
+                "mechanism_rejection_ready": float(mechanism_rejection_ready),
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_public_claim": allowed_claim,
+                "primary_blocker": primary_blocker,
+                "public_window_verdict_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

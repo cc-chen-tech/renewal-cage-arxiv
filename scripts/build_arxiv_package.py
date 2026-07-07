@@ -4943,6 +4943,79 @@ def write_sota_glassbench_censored_window_claim_audit_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_public_window_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_public_window_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench public-window SOTA verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Each literature-level dynamic signature is mapped to what the currently public GlassBench window can and cannot test.",
+    )
+    left, top = 42, page_h - 92
+    row_h = 48
+    colors_by_stage = {
+        "public_window_sota_consistent": colors.HexColor("#2f855a"),
+        "public_window_censored_sota_unresolved": colors.HexColor("#b7791f"),
+        "mechanism_selection_censored_unresolved": colors.HexColor("#c05621"),
+        "public_proxy_consistent_spatial_boundary": colors.HexColor("#805ad5"),
+        "scope_boundary_not_tested": colors.HexColor("#4a5568"),
+        "signature_not_mapped_to_public_window_gate": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "signature")
+    c.drawString(left + 172, top + 18, "public-window verdict")
+    c.drawString(left + 410, top + 18, "claim boundary")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["public_window_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.3)
+        c.drawString(left, y, row["signature"].replace("_", " ")[:31])
+        c.setFillColor(color)
+        c.rect(left + 172, y - 12, 220, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.5)
+        c.drawString(left + 180, y - 3, stage.replace("_", " ")[:38])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.9)
+        c.drawString(
+            left + 410,
+            y,
+            "claim={:.0f}; late={:.0f}; mechanism={:.0f}; model={:.1g}; lit={:.1g}".format(
+                float(row["public_glassbench_claim_allowed"]),
+                float(row["late_recovery_required"]),
+                float(row["mechanism_rejection_ready"]),
+                float(row["model_support"]),
+                float(row["literature_qualitative_support"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.3)
+        c.drawString(left + 410, y - 13, f'allowed={row["allowed_public_claim"].replace("_", " ")[:65]}')
+        c.drawString(
+            left + 410,
+            y - 25,
+            "blocker={}; public/target={:.4g}".format(
+                row["primary_blocker"][:34],
+                float(row["public_window_fraction_of_target_lag"]),
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The verdict permits public-window dynamical consistency checks, not complete late-recovery, mechanism-selection, or thermodynamic claims.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7254,6 +7327,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_censored_window_claim_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.pdf"
     )
+    sota_glassbench_public_window_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_public_window_verdict.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -7472,6 +7548,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_censored_window_claim_audit_pdf(
         sota_glassbench_censored_window_claim_audit_pdf
+    )
+    write_sota_glassbench_public_window_verdict_pdf(
+        sota_glassbench_public_window_verdict_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7746,6 +7825,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_censored_window_claim_audit_pdf,
             "figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf",
+        )
+        archive.write(
+            sota_glassbench_public_window_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_public_window_verdict.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,
