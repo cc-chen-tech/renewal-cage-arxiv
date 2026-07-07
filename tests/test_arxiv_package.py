@@ -1331,7 +1331,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertTrue((ROOT / row["particle_cache_path"]).exists())
             self.assertEqual(row["positions_shape"], "20x1290x2")
 
-    def test_sota_glassbench_cached_particle_observable_semantics_blocks_missing_initial_reference(self):
+    def test_sota_glassbench_cached_particle_observable_semantics_reproduces_official_displacements(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
         self.assertTrue(path.exists())
         with path.open() as f:
@@ -1347,10 +1347,12 @@ class ArxivPackageTests(unittest.TestCase):
         tc05 = by_code["tc05"]
         self.assertGreater(float(tc05["raw_coordinate_msd_relative_error"]), 1.0e4)
         self.assertEqual(float(tc05["cached_coordinate_proxy_ready"]), 1.0)
-        self.assertEqual(float(tc05["initial_reference_positions_ready"]), 0.0)
-        self.assertEqual(float(tc05["official_displacement_observable_reproducible"]), 0.0)
+        self.assertEqual(float(tc05["initial_reference_positions_ready"]), 1.0)
+        self.assertLess(float(tc05["initial_reference_msd_relative_error"]), 1.0e-12)
+        self.assertEqual(float(tc05["official_displacement_observable_reproducible"]), 1.0)
         self.assertEqual(float(tc05["event_clock_trajectory_ready"]), 0.0)
-        self.assertEqual(tc05["primary_blocker"], "initial_positions_reference_missing")
+        self.assertEqual(tc05["primary_blocker"], "none")
+        self.assertEqual(tc05["observable_semantics_stage"], "official_displacement_observable_reproduced")
         self.assertEqual(float(tc05["thermodynamic_claim_allowed"]), 0.0)
 
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):

@@ -6478,9 +6478,12 @@ def glassbench_cached_particle_observable_semantics_audit(
         official_ngp_2d = float(official.get("ngp_2d", 0.0) or 0.0) if official else 0.0
         raw_coordinate_msd = float(row.get("raw_coordinate_msd", 0.0) or 0.0)
         replica_spread_msd = float(row.get("replica_spread_msd", 0.0) or 0.0)
+        initial_reference_msd = float(row.get("initial_reference_msd", 0.0) or 0.0)
+        initial_reference_ngp_2d = float(row.get("initial_reference_ngp_2d", 0.0) or 0.0)
         denominator = max(abs(official_msd), 1.0e-12)
         raw_rel_error = abs(raw_coordinate_msd - official_msd) / denominator
         spread_rel_error = abs(replica_spread_msd - official_msd) / denominator
+        initial_reference_rel_error = abs(initial_reference_msd - official_msd) / denominator
         cached_ready = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
         initial_ready = float(row.get("initial_reference_positions_ready", 0.0) or 0.0) == 1.0
         official_available = official_msd > 0.0
@@ -6488,7 +6491,7 @@ def glassbench_cached_particle_observable_semantics_audit(
             cached_ready
             and initial_ready
             and official_available
-            and min(raw_rel_error, spread_rel_error) <= max_reproducible_relative_error
+            and initial_reference_rel_error <= max_reproducible_relative_error
         )
 
         if reproducible:
@@ -6520,10 +6523,13 @@ def glassbench_cached_particle_observable_semantics_audit(
                 "official_msd": float(official_msd),
                 "raw_coordinate_msd": float(raw_coordinate_msd),
                 "replica_spread_msd": float(replica_spread_msd),
+                "initial_reference_msd": float(initial_reference_msd),
                 "raw_coordinate_msd_relative_error": float(raw_rel_error),
                 "replica_spread_msd_relative_error": float(spread_rel_error),
+                "initial_reference_msd_relative_error": float(initial_reference_rel_error),
                 "official_ngp_2d": float(official_ngp_2d),
                 "cached_ngp_2d_proxy": float(row.get("cached_ngp_2d_proxy", 0.0) or 0.0),
+                "initial_reference_ngp_2d": float(initial_reference_ngp_2d),
                 "cached_coordinate_proxy_ready": float(cached_ready),
                 "initial_reference_positions_ready": float(initial_ready),
                 "official_displacement_observable_available": float(official_available),

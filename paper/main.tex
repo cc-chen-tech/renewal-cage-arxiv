@@ -1554,10 +1554,14 @@ For the cold KA2D \(T=0.23\) structure-151 ladder, extended bounded-prefix
 extraction now caches all eight official lag targets. This closes the
 structure-matched particle-cache gap for that ladder, but it still does not by
 itself create a physical-time event-clock trajectory. The cached-coordinate
-observable audit makes the remaining semantic gap explicit: the cached NPZ
-files contain particle coordinates, whereas the official MSD, NGP, and
-self-intermediate scattering observables are displacement observables relative
-to an initial reference configuration.
+observable audit now uses the cached \texttt{initial\_positions} arrays to
+recompute minimal-image displacement observables. For all eight cold
+structure-151 lag targets, the recomputed MSD reproduces the official
+GlassBench MSD to numerical precision, while the raw coordinate MSD remains
+wrong by orders of magnitude. Thus the archive-to-observable semantic gap is
+closed for this fixed-lag ladder; the remaining promotion blockers are
+event segmentation, persistence/exchange clocks, and alpha-threshold coverage,
+not displacement-observable reproducibility.
 
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out

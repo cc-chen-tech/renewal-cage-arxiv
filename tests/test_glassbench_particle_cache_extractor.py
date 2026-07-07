@@ -1,4 +1,5 @@
 import hashlib
+import http.client
 import io
 import lzma
 import tarfile
@@ -17,15 +18,17 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from glassbench_particle_cache import (  # noqa: E402
     build_real_multilag_particle_caches,
     extract_first_npz_positions_cache_from_xz_bytes,
+    fetch_range_bytes,
 )
 
 
 class GlassBenchParticleCacheExtractorTests(unittest.TestCase):
     def _fixture_xz_bytes(self) -> tuple[bytes, str, str]:
         positions = np.arange(24, dtype=float).reshape(3, 4, 2)
+        initial_positions = positions[0] - 0.25
         box = np.array(10.0)
         npz_buffer = io.BytesIO()
-        np.savez_compressed(npz_buffer, positions=positions, box=box)
+        np.savez_compressed(npz_buffer, positions=positions, initial_positions=initial_positions, box=box)
         npz_bytes = npz_buffer.getvalue()
         member = "T0.99/test/example.npz"
 
@@ -80,7 +83,10 @@ class GlassBenchParticleCacheExtractorTests(unittest.TestCase):
 
             cached = np.load(target)
             np.testing.assert_allclose(cached["positions"], np.arange(24, dtype=float).reshape(3, 4, 2))
+            np.testing.assert_allclose(cached["initial_positions"], np.arange(8, dtype=float).reshape(4, 2) - 0.25)
             self.assertEqual(str(cached["source_path"]), "GlassBench/fixture.tar.xz")
+            self.assertEqual(manifest["initial_positions_shape"], "4x2")
+            self.assertEqual(float(manifest["initial_reference_positions_cached"]), 1.0)
 
     def test_extract_first_npz_positions_cache_from_zip_deflated_xz_payload(self):
         xz_bytes, member, expected_md5 = self._fixture_xz_bytes()
@@ -125,6 +131,44 @@ class GlassBenchParticleCacheExtractorTests(unittest.TestCase):
                     compressed_probe_range_end=20,
                 )
             self.assertFalse(target.exists())
+
+    def test_fetch_range_bytes_retries_incomplete_remote_reads(self):
+        import glassbench_particle_cache
+
+        class FakeResponse:
+            def __init__(self, payload: bytes | None, error: Exception | None = None):
+                self.payload = payload
+                self.error = error
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                if self.error is not None:
+                    raise self.error
+                return self.payload
+
+        calls = []
+
+        def fake_urlopen(request, timeout):
+            calls.append((request, timeout))
+            if len(calls) == 1:
+                raise http.client.IncompleteRead(b"abc", 3)
+            return FakeResponse(b"def")
+
+        original_urlopen = glassbench_particle_cache.urlopen
+        try:
+            glassbench_particle_cache.urlopen = fake_urlopen
+            self.assertEqual(fetch_range_bytes("https://example.invalid/data", 10, 15), b"abcdef")
+        finally:
+            glassbench_particle_cache.urlopen = original_urlopen
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][0].get_header("Range"), "bytes=10-15")
+        self.assertEqual(calls[1][0].get_header("Range"), "bytes=13-15")
 
     def test_build_real_multilag_particle_caches_records_extracted_and_prefix_missing_targets(self):
         xz_bytes, md5s = self._multi_member_fixture_xz_bytes()

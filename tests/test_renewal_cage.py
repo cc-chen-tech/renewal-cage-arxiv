@@ -863,6 +863,46 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["observable_semantics_stage"], "cached_coordinate_proxy_ready_initial_reference_blocked")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_glassbench_cached_particle_observable_semantics_audit_reproduces_displacement_with_initial_reference(self):
+        rows = glassbench_cached_particle_observable_semantics_audit(
+            audit_id="glassbench_cached_particle_observable_semantics",
+            cached_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "time_code": "tc05",
+                    "lag_time": 0.1,
+                    "target_member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                    "raw_coordinate_msd": 333.9,
+                    "replica_spread_msd": 0.00186,
+                    "initial_reference_msd": 0.00350,
+                    "initial_reference_ngp_2d": 0.00048,
+                    "initial_reference_positions_ready": 1.0,
+                    "particle_resolved_positions_cached": 1.0,
+                }
+            ],
+            official_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "time_code": "tc05",
+                    "member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                    "msd": 0.003511,
+                    "ngp_2d": 0.00047,
+                }
+            ],
+            max_reproducible_relative_error=0.05,
+        )
+
+        row = rows[0]
+        self.assertLess(float(row["initial_reference_msd_relative_error"]), 0.05)
+        self.assertEqual(float(row["official_displacement_observable_reproducible"]), 1.0)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(row["observable_semantics_stage"], "official_displacement_observable_reproduced")
+        self.assertEqual(row["next_required_action"], "run_structure_matched_displacement_inversion")
+
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
         claim_rows = [
             {

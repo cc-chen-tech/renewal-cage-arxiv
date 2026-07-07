@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import http.client
 import io
 import json
 import lzma
@@ -86,6 +87,16 @@ def extract_first_npz_positions_cache_from_xz_bytes(
         if "positions" not in source_npz:
             raise ValueError("positions array missing from NPZ member")
         positions = np.asarray(source_npz["positions"])
+        initial_positions = (
+            np.asarray(source_npz["initial_positions"])
+            if "initial_positions" in source_npz
+            else np.asarray([], dtype=float)
+        )
+        initial_positions_inherent = (
+            np.asarray(source_npz["initial_positions_inherent"])
+            if "initial_positions_inherent" in source_npz
+            else np.asarray([], dtype=float)
+        )
         box = np.asarray(source_npz["box"]) if "box" in source_npz else np.asarray(np.nan)
         types = np.asarray(source_npz["types"]) if "types" in source_npz else np.asarray([], dtype=int)
 
@@ -96,6 +107,8 @@ def extract_first_npz_positions_cache_from_xz_bytes(
     np.savez_compressed(
         target_path,
         positions=positions,
+        initial_positions=initial_positions,
+        initial_positions_inherent=initial_positions_inherent,
         box=box,
         types=types,
         system_id=np.asarray(system_id),
@@ -125,6 +138,12 @@ def extract_first_npz_positions_cache_from_xz_bytes(
         "particle_cache_bytes": float(target_path.stat().st_size),
         "positions_shape": _shape_text(tuple(int(value) for value in positions.shape)),
         "positions_dtype": str(positions.dtype),
+        "initial_positions_shape": (
+            _shape_text(tuple(int(value) for value in initial_positions.shape))
+            if initial_positions.size
+            else "none"
+        ),
+        "initial_reference_positions_cached": float(initial_positions.size > 0),
         "frame_count": float(frame_count),
         "particle_count": float(particle_count),
         "spatial_dimension": float(spatial_dimension),
@@ -143,7 +162,7 @@ def build_real_multilag_particle_caches(
     member_index_manifest_path: Path = DATA_DIR
     / "third_party"
     / "glassbench"
-    / "trajectory_npz_member_index_10118191.json",
+    / "trajectory_npz_member_index_extended_10118191.json",
     output_manifest_path: Path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv",
     output_root: Path = ROOT,
     cache_root: str = "data/third_party/glassbench/particle_cache",
@@ -215,6 +234,8 @@ def build_real_multilag_particle_caches(
                         "particle_cache_bytes": 0.0,
                         "positions_shape": "none",
                         "positions_dtype": "none",
+                        "initial_positions_shape": "none",
+                        "initial_reference_positions_cached": 0.0,
                         "frame_count": 0.0,
                         "particle_count": 0.0,
                         "spatial_dimension": 0.0,
@@ -248,6 +269,8 @@ def build_real_multilag_particle_caches(
                     "particle_cache_bytes": manifest["particle_cache_bytes"],
                     "positions_shape": manifest["positions_shape"],
                     "positions_dtype": manifest["positions_dtype"],
+                    "initial_positions_shape": manifest["initial_positions_shape"],
+                    "initial_reference_positions_cached": manifest["initial_reference_positions_cached"],
                     "frame_count": manifest["frame_count"],
                     "particle_count": manifest["particle_count"],
                     "spatial_dimension": manifest["spatial_dimension"],
@@ -261,16 +284,35 @@ def build_real_multilag_particle_caches(
     return rows
 
 
-def fetch_range_bytes(url: str, start: int, end: int) -> bytes:
+def fetch_range_bytes(url: str, start: int, end: int, *, max_attempts: int = 3) -> bytes:
     """Fetch inclusive HTTP byte range."""
 
-    request = Request(url, headers={"Range": f"bytes={start}-{end}"})
-    with urlopen(request, timeout=120) as response:
-        data = response.read()
     expected = end - start + 1
-    if len(data) != expected:
-        raise ValueError(f"range fetch returned {len(data)} bytes, expected {expected}")
-    return data
+    data = b""
+    last_error: Exception | None = None
+    for _attempt in range(max_attempts):
+        request_start = start + len(data)
+        request = Request(url, headers={"Range": f"bytes={request_start}-{end}"})
+        try:
+            with urlopen(request, timeout=120) as response:
+                chunk = response.read()
+        except http.client.IncompleteRead as exc:
+            chunk = exc.partial
+            last_error = exc
+        except ValueError as exc:
+            last_error = exc
+            continue
+
+        if not chunk:
+            continue
+        data += chunk
+        if len(data) > expected:
+            raise ValueError(f"range fetch returned {len(data)} bytes, expected {expected}")
+        if len(data) == expected:
+            return data
+    if last_error is not None:
+        raise ValueError(f"range fetch returned {len(data)} bytes, expected {expected}") from last_error
+    raise ValueError("max_attempts must be positive")
 
 
 def write_cache_manifest(rows: list[dict[str, float | str]], path: Path) -> None:

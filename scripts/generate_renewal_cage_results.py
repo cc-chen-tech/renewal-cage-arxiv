@@ -4157,7 +4157,7 @@ def write_sota_glassbench_multilag_particle_cache_targets_csv(
 def write_sota_glassbench_cached_particle_observable_semantics_csv(
     path: Path,
 ) -> list[dict[str, float | str]]:
-    """Audit which observables cached coordinates can reproduce without initial references."""
+    """Audit whether cached reference coordinates reproduce official displacement observables."""
 
     cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
     semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
@@ -4171,6 +4171,11 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
                 positions = np.asarray(npz["positions"], dtype=float)
                 box = float(np.asarray(npz["box"]))
                 initial_reference_ready = 1.0 if "initial_positions" in npz.files else 0.0
+                initial_positions = (
+                    np.asarray(npz["initial_positions"], dtype=float)
+                    if initial_reference_ready == 1.0
+                    else None
+                )
             raw_coordinate_msd = float(np.mean(np.sum(positions * positions, axis=-1)))
             replica_mean = np.mean(positions, axis=0)
             displacements = positions - replica_mean[None, :, :]
@@ -4180,6 +4185,20 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
             replica_spread_msd = float(np.mean(r2))
             r4 = float(np.mean(r2 * r2))
             cached_ngp_2d_proxy = float(r4 / (2.0 * replica_spread_msd * replica_spread_msd) - 1.0) if replica_spread_msd > 0 else 0.0
+            initial_reference_msd = 0.0
+            initial_reference_ngp_2d = 0.0
+            if initial_positions is not None and initial_positions.shape == positions.shape[1:]:
+                reference_displacements = positions - initial_positions[None, :, :]
+                if math.isfinite(box) and box > 0.0:
+                    reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
+                reference_r2 = np.sum(reference_displacements * reference_displacements, axis=-1)
+                initial_reference_msd = float(np.mean(reference_r2))
+                reference_r4 = float(np.mean(reference_r2 * reference_r2))
+                initial_reference_ngp_2d = (
+                    float(reference_r4 / (2.0 * initial_reference_msd * initial_reference_msd) - 1.0)
+                    if initial_reference_msd > 0
+                    else 0.0
+                )
             cached_rows.append(
                 {
                     "system_id": row["system_id"],
@@ -4191,6 +4210,8 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
                     "raw_coordinate_msd": raw_coordinate_msd,
                     "replica_spread_msd": replica_spread_msd,
                     "cached_ngp_2d_proxy": cached_ngp_2d_proxy,
+                    "initial_reference_msd": initial_reference_msd,
+                    "initial_reference_ngp_2d": initial_reference_ngp_2d,
                     "initial_reference_positions_ready": initial_reference_ready,
                     "particle_resolved_positions_cached": 1.0,
                 }
@@ -9550,12 +9571,12 @@ def write_sota_glassbench_cached_particle_observable_semantics_svg(
             f'<text x="{left + 153}" y="{y + 12}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:54]}</text>'
         )
         marks.append(
-            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">official MSD={float(row["official_msd"]):.4g}; raw rel err={float(row["raw_coordinate_msd_relative_error"]):.3g}; spread rel err={float(row["replica_spread_msd_relative_error"]):.3g}; init ref={int(float(row["initial_reference_positions_ready"]))}</text>'
+            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">official MSD={float(row["official_msd"]):.4g}; raw rel err={float(row["raw_coordinate_msd_relative_error"]):.3g}; ref rel err={float(row["initial_reference_msd_relative_error"]):.3g}; init ref={int(float(row["initial_reference_positions_ready"]))}</text>'
         )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />
   <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached-particle observable semantics</text>
-  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Particle caches are real coordinates, but official displacement observables still require initial reference positions.</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached initial references reproduce official displacement MSD while raw coordinates remain a rejected proxy.</text>
   <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
   <text x="{left + 145}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">observable semantics stage</text>
   <text x="{left + 500}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached-coordinate audit</text>

@@ -272,6 +272,12 @@ eight official time codes (`tc05` through `tc40`) with at least four complete
 members per time code, so it is a physical-time observable curve ready for the
 next persistence/exchange inversion gate; `T=0.30` still covers only `tc01` and
 therefore remains blocked by sparse time-code coverage.
+The cached-particle observable-semantics audit now verifies the same boundary
+at the single-structure cache level: raw coordinate MSD is rejected as a proxy,
+while minimal-image displacement from cached `initial_positions` reproduces
+the official GlassBench MSD for the structure-151 cold lag ladder to numerical
+precision. This upgrades the remaining blocker from observable semantics to
+event segmentation, persistence/exchange clocks, and alpha-threshold coverage.
 The time-code curve bridge now runs that `T=0.23` curve through the same
 trajectory pre-inversion schema used by the persistence/exchange protocol. It
 promotes the row from metadata-only evidence to a real physical-time
