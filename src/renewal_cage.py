@@ -14991,6 +14991,178 @@ def microdynamic_minimality_audit(
     return rows
 
 
+def sota_experimental_verdict_matrix(
+    *,
+    verdict_id: str,
+    dynamic_alignment_rows: Sequence[dict[str, object]],
+    microdynamic_scorecard_rows: Sequence[dict[str, object]],
+    minimality_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Collapse SOTA evidence, real-data blockers, and scope boundaries into verdict rows."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not dynamic_alignment_rows:
+        raise ValueError("dynamic_alignment_rows must be nonempty")
+    if not microdynamic_scorecard_rows:
+        raise ValueError("microdynamic_scorecard_rows must be nonempty")
+    if not minimality_rows:
+        raise ValueError("minimality_rows must be nonempty")
+
+    def number(row: dict[str, object], key: str) -> float:
+        return float(row.get(key, 0.0) or 0.0)
+
+    def max_flag(rows: Sequence[dict[str, object]], key: str) -> float:
+        return max((number(row, key) for row in rows), default=0.0)
+
+    def first_row(rows: Sequence[dict[str, object]], key: str, value: str) -> dict[str, object]:
+        for row in rows:
+            if str(row.get(key, "")) == value:
+                return row
+        return {}
+
+    dynamic_rows = [
+        row
+        for row in dynamic_alignment_rows
+        if str(row.get("signature", ""))
+        not in {"thermodynamic_transition", "persistence_exchange_decoupling"}
+    ]
+    persistence_exchange = first_row(
+        dynamic_alignment_rows,
+        "signature",
+        "persistence_exchange_decoupling",
+    )
+    thermodynamic = first_row(dynamic_alignment_rows, "signature", "thermodynamic_transition")
+    real_scorecards = [
+        row
+        for row in microdynamic_scorecard_rows
+        if str(row.get("source_class", "")) == "real_glassbench_public_data"
+    ]
+    real_scorecard = real_scorecards[0] if real_scorecards else {}
+    real_minimality = first_row(
+        minimality_rows,
+        "audit_row_id",
+        str(real_scorecard.get("scorecard_row_id", "")),
+    )
+
+    dynamic_supported = (
+        max_flag(dynamic_rows, "model_support") > 0.0
+        and max_flag(dynamic_rows, "literature_qualitative_support") > 0.0
+        and max_flag(dynamic_rows, "real_glassbench_support") > 0.0
+    )
+    micro_prediction_support = float(
+        any(number(row, "all_required_predictions_pass") == 1.0 for row in microdynamic_scorecard_rows)
+    )
+    mechanism_rejection_ready = float(
+        any(number(row, "mechanism_rejection_ready") == 1.0 for row in microdynamic_scorecard_rows)
+    )
+    minimality_ready = float(any(number(row, "microdynamic_basis_minimal") == 1.0 for row in minimality_rows))
+    mechanism_supported = (
+        number(persistence_exchange, "literature_qualitative_support") > 0.0
+        and micro_prediction_support == 1.0
+        and mechanism_rejection_ready == 1.0
+        and minimality_ready == 1.0
+    )
+    real_quantitative_ready = max_flag(dynamic_alignment_rows, "real_quantitative_inversion_ready")
+    real_comparison_ready = max_flag(real_scorecards, "real_data_comparison_ready")
+    real_closed_loop_ready = real_quantitative_ready == 1.0 and real_comparison_ready == 1.0
+
+    real_blocker = str(
+        real_scorecard.get(
+            "primary_blocker",
+            real_minimality.get("primary_blocker", "real_microdynamic_inputs"),
+        )
+    )
+    if real_blocker == "none" and not real_closed_loop_ready:
+        real_blocker = "real_microdynamic_inputs"
+
+    def row(
+        *,
+        verdict_row_id: str,
+        stage: str,
+        allowed_claim_level: str,
+        model_dynamic_support: float = 0.0,
+        literature_trend_support: float = 0.0,
+        real_glassbench_support: float = 0.0,
+        microdynamic_prediction_support: float = 0.0,
+        mechanism_rejection_ready: float = 0.0,
+        minimality_ready: float = 0.0,
+        real_quantitative_inversion_ready: float = 0.0,
+        thermodynamic_claim_allowed: float = 0.0,
+        primary_blocker: str = "none",
+    ) -> dict[str, float | str]:
+        return {
+            "verdict_id": verdict_id,
+            "verdict_row_id": verdict_row_id,
+            "model_dynamic_support": float(model_dynamic_support),
+            "literature_trend_support": float(literature_trend_support),
+            "real_glassbench_support": float(real_glassbench_support),
+            "microdynamic_prediction_support": float(microdynamic_prediction_support),
+            "mechanism_rejection_ready": float(mechanism_rejection_ready),
+            "minimality_ready": float(minimality_ready),
+            "real_quantitative_inversion_ready": float(real_quantitative_inversion_ready),
+            "thermodynamic_claim_allowed": float(thermodynamic_claim_allowed),
+            "allowed_claim_level": allowed_claim_level,
+            "primary_blocker": primary_blocker,
+            "sota_verdict_stage": stage,
+        }
+
+    return [
+        row(
+            verdict_row_id="sota_dynamic_signature_support",
+            stage="sota_dynamic_signatures_supported"
+            if dynamic_supported
+            else "sota_dynamic_signatures_partial",
+            allowed_claim_level="dynamical_signature_supported",
+            model_dynamic_support=max_flag(dynamic_rows, "model_support"),
+            literature_trend_support=max_flag(dynamic_rows, "literature_qualitative_support"),
+            real_glassbench_support=max_flag(dynamic_rows, "real_glassbench_support"),
+            thermodynamic_claim_allowed=max_flag(dynamic_rows, "thermodynamic_claim_allowed"),
+            primary_blocker="none" if dynamic_supported else "dynamic_signature_support",
+        ),
+        row(
+            verdict_row_id="sota_mechanism_selection",
+            stage="mechanism_selection_protocol_supported"
+            if mechanism_supported
+            else "mechanism_selection_protocol_incomplete",
+            allowed_claim_level="mechanism_selection_protocol_supported_not_real_glassbench_fit",
+            model_dynamic_support=number(persistence_exchange, "model_support"),
+            literature_trend_support=number(persistence_exchange, "literature_qualitative_support"),
+            microdynamic_prediction_support=micro_prediction_support,
+            mechanism_rejection_ready=mechanism_rejection_ready,
+            minimality_ready=minimality_ready,
+            thermodynamic_claim_allowed=number(persistence_exchange, "thermodynamic_claim_allowed"),
+            primary_blocker="none" if mechanism_supported else "mechanism_selection_inputs",
+        ),
+        row(
+            verdict_row_id="sota_real_glassbench_closed_loop",
+            stage="real_glassbench_closed_loop_ready"
+            if real_closed_loop_ready
+            else "real_glassbench_closed_loop_blocked",
+            allowed_claim_level="real_signature_support_preinversion"
+            if not real_closed_loop_ready
+            else "real_microdynamic_prediction_test_ready",
+            real_glassbench_support=max_flag(dynamic_rows, "real_glassbench_support"),
+            microdynamic_prediction_support=max_flag(real_scorecards, "all_required_predictions_pass"),
+            minimality_ready=number(real_minimality, "microdynamic_basis_minimal"),
+            real_quantitative_inversion_ready=real_quantitative_ready,
+            thermodynamic_claim_allowed=max_flag(real_scorecards, "thermodynamic_claim_allowed"),
+            primary_blocker="none" if real_closed_loop_ready else real_blocker,
+        ),
+        row(
+            verdict_row_id="sota_thermodynamic_boundary",
+            stage="thermodynamic_transition_out_of_scope",
+            allowed_claim_level="dynamical_theory_only",
+            model_dynamic_support=number(thermodynamic, "model_support"),
+            literature_trend_support=number(thermodynamic, "literature_qualitative_support"),
+            real_glassbench_support=number(thermodynamic, "real_glassbench_support"),
+            real_quantitative_inversion_ready=number(thermodynamic, "real_quantitative_inversion_ready"),
+            thermodynamic_claim_allowed=0.0,
+            primary_blocker=str(thermodynamic.get("primary_blocker", "thermodynamic_input_law")),
+        ),
+    ]
+
+
 def persistence_exchange_scan(
     *,
     ratios: list[float],

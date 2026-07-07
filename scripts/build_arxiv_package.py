@@ -1873,6 +1873,70 @@ def write_microdynamic_minimality_audit_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_experimental_verdict_matrix_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_experimental_verdict_matrix.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA experimental verdict matrix")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Literature trends, GlassBench support, microdynamic predictions, and scope boundaries are collapsed into manuscript-safe verdicts.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "verdict row")
+    c.drawString(left + 210, top, "stage")
+    c.drawString(left + 500, top, "evidence flags")
+    c.drawString(left + 640, top, "allowed claim / blocker")
+    palette = {
+        "sota_dynamic_signatures_supported": colors.HexColor("#2f855a"),
+        "sota_dynamic_signatures_partial": colors.HexColor("#d69e2e"),
+        "mechanism_selection_protocol_supported": colors.HexColor("#276749"),
+        "mechanism_selection_protocol_incomplete": colors.HexColor("#c05621"),
+        "real_glassbench_closed_loop_ready": colors.HexColor("#276749"),
+        "real_glassbench_closed_loop_blocked": colors.HexColor("#2b6cb0"),
+        "thermodynamic_transition_out_of_scope": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 6.7)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 42
+        stage = row["sota_verdict_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["verdict_row_id"].replace("_", " ")[:34])
+        c.setFillColor(color)
+        c.rect(left + 210, y - 4, 260, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 215, y, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 500,
+            y,
+            "lit={:.0f}; real={:.0f}; micro={:.0f}; reject={:.0f}; thermo={:.0f}".format(
+                float(row["literature_trend_support"]),
+                float(row["real_glassbench_support"]),
+                float(row["microdynamic_prediction_support"]),
+                float(row["mechanism_rejection_ready"]),
+                float(row["thermodynamic_claim_allowed"]),
+            ),
+        )
+        c.drawString(left + 640, y, row["allowed_claim_level"].replace("_", " ")[:43])
+        c.drawString(left + 640, y - 10, f"blocker={row['primary_blocker'].replace('_', ' ')[:40]}")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The verdict permits dynamical-signature and mechanism-diagnostic claims while blocking real closed-loop and thermodynamic-transition overclaims.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7624,6 +7688,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     microdynamic_minimality_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_microdynamic_minimality_audit.pdf"
     )
+    sota_experimental_verdict_matrix_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_experimental_verdict_matrix.pdf"
+    )
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -7881,6 +7948,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_simultaneous_closure_pdf(simultaneous_closure_pdf)
     write_microdynamic_prediction_scorecard_pdf(microdynamic_prediction_scorecard_pdf)
     write_microdynamic_minimality_audit_pdf(microdynamic_minimality_audit_pdf)
+    write_sota_experimental_verdict_matrix_pdf(sota_experimental_verdict_matrix_pdf)
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -8116,6 +8184,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             microdynamic_minimality_audit_pdf,
             "figures/renewal_cage_microdynamic_minimality_audit.pdf",
+        )
+        archive.write(
+            sota_experimental_verdict_matrix_pdf,
+            "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
         )
         archive.write(
             real_benchmark_assimilation_gate_pdf,

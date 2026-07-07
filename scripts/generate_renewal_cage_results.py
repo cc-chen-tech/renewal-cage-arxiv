@@ -135,6 +135,7 @@ from renewal_cage import (  # noqa: E402
     simultaneous_dynamical_signature_closure_gate,
     microdynamic_prediction_scorecard,
     microdynamic_minimality_audit,
+    sota_experimental_verdict_matrix,
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
@@ -6204,6 +6205,25 @@ def write_microdynamic_minimality_audit_csv(
             },
         ],
         scorecard_rows=scorecard_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_experimental_verdict_matrix_csv(
+    path: Path,
+    *,
+    dynamic_alignment_rows: list[dict[str, float | str]],
+    microdynamic_scorecard_rows: list[dict[str, float | str]],
+    minimality_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write final SOTA verdict rows without promoting blocked real-data claims."""
+
+    rows = sota_experimental_verdict_matrix(
+        verdict_id="sota_experimental_verdict_matrix",
+        dynamic_alignment_rows=dynamic_alignment_rows,
+        microdynamic_scorecard_rows=microdynamic_scorecard_rows,
+        minimality_rows=minimality_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -12567,6 +12587,64 @@ def write_microdynamic_minimality_audit_svg(
     path.write_text(svg)
 
 
+def write_sota_experimental_verdict_matrix_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 380
+    left, top = 72, 112
+    row_h = 58
+    colors_by_stage = {
+        "sota_dynamic_signatures_supported": "#2f855a",
+        "sota_dynamic_signatures_partial": "#d69e2e",
+        "mechanism_selection_protocol_supported": "#276749",
+        "mechanism_selection_protocol_incomplete": "#c05621",
+        "real_glassbench_closed_loop_ready": "#276749",
+        "real_glassbench_closed_loop_blocked": "#2b6cb0",
+        "thermodynamic_transition_out_of_scope": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["sota_verdict_stage"])
+        color = colors_by_stage.get(stage, "#718096")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["verdict_row_id"]).replace("_", " ")[:40]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 300}" y="{y}" width="292" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 310}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">lit={int(float(row["literature_trend_support"]))}; real={int(float(row["real_glassbench_support"]))}; micro={int(float(row["microdynamic_prediction_support"]))}; reject={int(float(row["mechanism_rejection_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 885}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">thermo claim={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 300}" y="{y + 43}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:58]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:35]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA experimental verdict matrix</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Literature trends, GlassBench support, microdynamic predictions, and scope boundaries are collapsed into manuscript-safe verdicts.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">verdict row</text>
+  <text x="{left + 300}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 620}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">evidence flags</text>
+  <text x="{left + 885}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">scope</text>
+  {"".join(marks)}
+  <rect x="72" y="336" width="14" height="14" fill="#2f855a" /><text x="94" y="348" font-family="Arial, sans-serif" font-size="12">dynamic signatures supported</text>
+  <rect x="314" y="336" width="14" height="14" fill="#276749" /><text x="336" y="348" font-family="Arial, sans-serif" font-size="12">mechanism protocol supported</text>
+  <rect x="572" y="336" width="14" height="14" fill="#2b6cb0" /><text x="594" y="348" font-family="Arial, sans-serif" font-size="12">real closed loop blocked</text>
+  <rect x="798" y="336" width="14" height="14" fill="#805ad5" /><text x="820" y="348" font-family="Arial, sans-serif" font-size="12">thermodynamic boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -14078,6 +14156,16 @@ def main() -> None:
     write_microdynamic_minimality_audit_svg(
         FIGURE_DIR / "renewal_cage_microdynamic_minimality_audit.svg",
         microdynamic_minimality_rows,
+    )
+    sota_experimental_verdict_rows = write_sota_experimental_verdict_matrix_csv(
+        DATA_DIR / "renewal_cage_sota_experimental_verdict_matrix.csv",
+        dynamic_alignment_rows=dynamic_signature_alignment_rows,
+        microdynamic_scorecard_rows=microdynamic_prediction_scorecard_rows,
+        minimality_rows=microdynamic_minimality_rows,
+    )
+    write_sota_experimental_verdict_matrix_svg(
+        FIGURE_DIR / "renewal_cage_sota_experimental_verdict_matrix.svg",
+        sota_experimental_verdict_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

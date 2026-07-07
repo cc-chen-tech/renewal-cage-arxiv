@@ -109,6 +109,7 @@ from renewal_cage import (  # noqa: E402
     simultaneous_dynamical_signature_closure_gate,
     microdynamic_prediction_scorecard,
     microdynamic_minimality_audit,
+    sota_experimental_verdict_matrix,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
@@ -7718,6 +7719,110 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
         self.assertEqual(float(glassbench["required_member_count"]), 128.0)
         self.assertEqual(float(glassbench["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_experimental_verdict_matrix_combines_literature_real_and_scope_boundaries(self):
+        rows = sota_experimental_verdict_matrix(
+            verdict_id="sota_experimental_verdict_matrix",
+            dynamic_alignment_rows=[
+                {
+                    "signature": "transient_ngp_peak",
+                    "model_support": 1.0,
+                    "literature_qualitative_support": 1.0,
+                    "real_glassbench_support": 1.0,
+                    "real_quantitative_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "none",
+                },
+                {
+                    "signature": "persistence_exchange_decoupling",
+                    "model_support": 1.0,
+                    "literature_qualitative_support": 1.0,
+                    "real_glassbench_support": 0.0,
+                    "real_quantitative_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "physical_time_semantics",
+                },
+                {
+                    "signature": "thermodynamic_transition",
+                    "model_support": 0.0,
+                    "literature_qualitative_support": 0.0,
+                    "real_glassbench_support": 0.0,
+                    "real_quantitative_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "thermodynamic_input_law",
+                },
+            ],
+            microdynamic_scorecard_rows=[
+                {
+                    "scorecard_row_id": "synthetic_event_clock_macro_prediction",
+                    "source_class": "synthetic_event_clock",
+                    "scorecard_stage": "microstats_to_macro_prediction_passed",
+                    "all_required_predictions_pass": 1.0,
+                    "mechanism_rejection_ready": 0.0,
+                    "real_data_comparison_ready": 0.0,
+                },
+                {
+                    "scorecard_row_id": "synthetic_event_clock_macro_late_ngp_mismatch",
+                    "source_class": "synthetic_event_clock",
+                    "scorecard_stage": "heldout_macro_prediction_rejected",
+                    "all_required_predictions_pass": 0.0,
+                    "mechanism_rejection_ready": 1.0,
+                    "real_data_comparison_ready": 0.0,
+                },
+                {
+                    "scorecard_row_id": "glassbench_ka2d_0_23_current_closed_loop",
+                    "source_class": "real_glassbench_public_data",
+                    "scorecard_stage": "real_glassbench_prediction_blocked",
+                    "all_required_predictions_pass": 0.0,
+                    "mechanism_rejection_ready": 0.0,
+                    "real_data_comparison_ready": 0.0,
+                    "primary_blocker": "physical_time_semantics",
+                },
+            ],
+            minimality_rows=[
+                {
+                    "audit_row_id": "full_event_clock_statistics",
+                    "minimality_stage": "necessary_microstatistics_sufficient",
+                    "microdynamic_basis_minimal": 1.0,
+                    "overclaim_risk": 0.0,
+                },
+                {
+                    "audit_row_id": "macro_fit_only_alpha_transport",
+                    "minimality_stage": "macro_fit_only_overclaim_risk",
+                    "microdynamic_basis_minimal": 0.0,
+                    "overclaim_risk": 1.0,
+                },
+                {
+                    "audit_row_id": "glassbench_ka2d_0_23_current_closed_loop",
+                    "minimality_stage": "real_data_microdynamic_inputs_missing",
+                    "microdynamic_basis_minimal": 0.0,
+                    "overclaim_risk": 0.0,
+                    "primary_blocker": "physical_time_semantics",
+                },
+            ],
+        )
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        dynamic = by_id["sota_dynamic_signature_support"]
+        mechanism = by_id["sota_mechanism_selection"]
+        glassbench = by_id["sota_real_glassbench_closed_loop"]
+        thermo = by_id["sota_thermodynamic_boundary"]
+
+        self.assertEqual(dynamic["sota_verdict_stage"], "sota_dynamic_signatures_supported")
+        self.assertEqual(float(dynamic["literature_trend_support"]), 1.0)
+        self.assertEqual(float(dynamic["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(dynamic["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(mechanism["sota_verdict_stage"], "mechanism_selection_protocol_supported")
+        self.assertEqual(float(mechanism["microdynamic_prediction_support"]), 1.0)
+        self.assertEqual(float(mechanism["mechanism_rejection_ready"]), 1.0)
+
+        self.assertEqual(glassbench["sota_verdict_stage"], "real_glassbench_closed_loop_blocked")
+        self.assertEqual(float(glassbench["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(glassbench["primary_blocker"], "physical_time_semantics")
+
+        self.assertEqual(thermo["sota_verdict_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(thermo["allowed_claim_level"], "dynamical_theory_only")
 
     def test_trajectory_event_clock_threshold_robustness_detects_stable_window(self):
         positions = np.array(

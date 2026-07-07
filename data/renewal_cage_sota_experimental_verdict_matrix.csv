@@ -1,0 +1,5 @@
+verdict_id,verdict_row_id,model_dynamic_support,literature_trend_support,real_glassbench_support,microdynamic_prediction_support,mechanism_rejection_ready,minimality_ready,real_quantitative_inversion_ready,thermodynamic_claim_allowed,allowed_claim_level,primary_blocker,sota_verdict_stage
+sota_experimental_verdict_matrix,sota_dynamic_signature_support,1.0,1.0,1.0,0.0,0.0,0.0,0.0,0.0,dynamical_signature_supported,none,sota_dynamic_signatures_supported
+sota_experimental_verdict_matrix,sota_mechanism_selection,1.0,1.0,0.0,1.0,1.0,1.0,0.0,0.0,mechanism_selection_protocol_supported_not_real_glassbench_fit,none,mechanism_selection_protocol_supported
+sota_experimental_verdict_matrix,sota_real_glassbench_closed_loop,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,real_signature_support_preinversion,physical_time_semantics,real_glassbench_closed_loop_blocked
+sota_experimental_verdict_matrix,sota_thermodynamic_boundary,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,dynamical_theory_only,thermodynamic_input_law,thermodynamic_transition_out_of_scope

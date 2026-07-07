@@ -315,6 +315,27 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
         self.assertEqual(float(glassbench["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_experimental_verdict_matrix_consolidates_final_comparison(self):
+        path = ROOT / "data" / "renewal_cage_sota_experimental_verdict_matrix.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        dynamic = by_id["sota_dynamic_signature_support"]
+        mechanism = by_id["sota_mechanism_selection"]
+        glassbench = by_id["sota_real_glassbench_closed_loop"]
+        thermodynamic = by_id["sota_thermodynamic_boundary"]
+        self.assertEqual(dynamic["sota_verdict_stage"], "sota_dynamic_signatures_supported")
+        self.assertEqual(float(dynamic["literature_trend_support"]), 1.0)
+        self.assertEqual(float(dynamic["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(mechanism["sota_verdict_stage"], "mechanism_selection_protocol_supported")
+        self.assertEqual(float(mechanism["mechanism_rejection_ready"]), 1.0)
+        self.assertEqual(glassbench["sota_verdict_stage"], "real_glassbench_closed_loop_blocked")
+        self.assertEqual(float(glassbench["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(thermodynamic["sota_verdict_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(thermodynamic["allowed_claim_level"], "dynamical_theory_only")
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -2906,6 +2927,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_simultaneous_closure.pdf", names)
             self.assertIn("figures/renewal_cage_microdynamic_prediction_scorecard.pdf", names)
             self.assertIn("figures/renewal_cage_microdynamic_minimality_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_experimental_verdict_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -3043,6 +3065,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_simultaneous_closure.pdf",
             "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
             "figures/renewal_cage_microdynamic_minimality_audit.pdf",
+            "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",
