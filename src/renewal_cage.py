@@ -7101,6 +7101,142 @@ def glassbench_interval_censored_first_crossing_clock(
     return rows
 
 
+def glassbench_interval_censored_persistence_fit(
+    *,
+    fit_id: str,
+    interval_clock_rows: Sequence[dict[str, object]],
+    direct_alpha_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Fit a one-parameter exponential persistence law with interval censoring."""
+
+    if not fit_id:
+        raise ValueError("fit_id must be nonempty")
+    if not interval_clock_rows:
+        raise ValueError("interval_clock_rows must be nonempty")
+    if not direct_alpha_rows:
+        raise ValueError("direct_alpha_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_intervals(text: str) -> list[tuple[float, float, float]]:
+        if not text or text == "none":
+            return []
+        parsed: list[tuple[float, float, float]] = []
+        for term in text.split(";"):
+            if not term:
+                continue
+            parts = term.split(":")
+            if len(parts) != 4:
+                raise ValueError("first-crossing interval terms must be code:lower:upper:fraction")
+            _, lower, upper, fraction = parts
+            parsed.append((float(lower), float(upper), float(fraction)))
+        return parsed
+
+    def interval_log_likelihood(rate: float, intervals: Sequence[tuple[float, float, float]], censored: float, latest: float) -> float:
+        if rate <= 0.0:
+            return -math.inf
+        total = 0.0
+        for lower, upper, weight in intervals:
+            if upper <= lower or weight <= 0.0:
+                continue
+            exponent_lower = -rate * lower
+            exponent_upper = -rate * upper
+            probability = math.exp(exponent_lower) * (-math.expm1(exponent_upper - exponent_lower))
+            if probability <= 0.0 or not math.isfinite(probability):
+                return -math.inf
+            total += weight * math.log(probability)
+        if censored > 0.0 and latest > 0.0:
+            total += censored * (-rate * latest)
+        return total
+
+    def fit_exponential_rate(intervals: Sequence[tuple[float, float, float]], censored: float, latest: float) -> tuple[float, float]:
+        low = math.log(1e-12)
+        high = math.log(1e-2)
+        for _ in range(240):
+            left = low + (high - low) / 3.0
+            right = high - (high - low) / 3.0
+            if interval_log_likelihood(math.exp(left), intervals, censored, latest) < interval_log_likelihood(
+                math.exp(right), intervals, censored, latest
+            ):
+                low = left
+            else:
+                high = right
+        rate = math.exp(0.5 * (low + high))
+        return rate, interval_log_likelihood(rate, intervals, censored, latest)
+
+    direct_by_key = {key_for(row): row for row in direct_alpha_rows}
+    rows: list[dict[str, float | str]] = []
+    for row in sorted(interval_clock_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(row)
+        ready = float(row.get("interval_clock_candidate_ready", 0.0) or 0.0) == 1.0
+        intervals = parse_intervals(str(row.get("first_crossing_intervals", "none")))
+        latest_lag = float(row.get("latest_lag_time", 0.0) or 0.0)
+        right_censored = float(row.get("right_censored_fraction", 0.0) or 0.0)
+        observed_crossed = float(
+            row.get(
+                "first_crossing_fraction_sum",
+                row.get("crossed_fraction", sum(fraction for _, _, fraction in intervals)),
+            )
+            or 0.0
+        )
+        direct = direct_by_key.get((system_id, temperature, structure_id), {})
+        tau_alpha_direct = float(direct.get("threshold_crossing_lag_time", 0.0) or 0.0)
+        alpha_crossed = float(direct.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+
+        if ready and intervals and latest_lag > 0.0:
+            rate, log_likelihood = fit_exponential_rate(intervals, right_censored, latest_lag)
+            mean_time = 1.0 / rate
+            predicted_cdf = 1.0 - math.exp(-rate * latest_lag)
+            stage = "interval_censored_exponential_persistence_fit_ready"
+            blocker = "exchange_clock_and_replica_identity"
+            next_action = "estimate_exchange_clock_or_joint_pe_model_under_interval_censoring"
+            fit_ready = True
+        else:
+            rate = 0.0
+            log_likelihood = 0.0
+            mean_time = 0.0
+            predicted_cdf = 0.0
+            stage = "interval_censored_persistence_fit_upstream_incomplete"
+            blocker = "interval_censored_clock"
+            next_action = "complete_interval_censored_first_crossing_clock"
+            fit_ready = False
+
+        rows.append(
+            {
+                "fit_id": fit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "interval_clock_candidate_ready": float(ready),
+                "persistence_fit_ready": float(fit_ready),
+                "exponential_rate_mle": float(rate),
+                "exponential_mean_persistence_time": float(mean_time),
+                "log_likelihood": float(log_likelihood),
+                "observed_crossed_fraction": float(observed_crossed),
+                "predicted_crossed_fraction_at_latest_lag": float(predicted_cdf),
+                "right_censored_fraction": float(right_censored),
+                "latest_lag_time": float(latest_lag),
+                "tau_alpha_direct": float(tau_alpha_direct),
+                "alpha_threshold_crossed": float(alpha_crossed),
+                "mean_persistence_over_tau_alpha_direct": float(mean_time / tau_alpha_direct)
+                if tau_alpha_direct > 0.0
+                else 0.0,
+                "exchange_clock_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "persistence_fit_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

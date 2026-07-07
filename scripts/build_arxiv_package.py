@@ -4284,6 +4284,75 @@ def write_sota_glassbench_interval_censored_first_crossing_clock_pdf(path: Path)
     c.save()
 
 
+def write_sota_glassbench_interval_censored_persistence_fit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench interval-censored persistence fit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A one-parameter censored exponential survival law estimates tau_p while leaving exchange-clock blockers explicit.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "interval_censored_exponential_persistence_fit_ready": colors.HexColor("#2f855a"),
+        "interval_censored_persistence_fit_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "fit stage")
+    c.drawString(left + 395, top + 24, "censored persistence-law estimate")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["persistence_fit_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; rate={:.3g}; mean tau_p={:.3g}; tau_p/tau_alpha={:.3g}".format(
+                row["structure_id"],
+                float(row["exponential_rate_mle"]),
+                float(row["exponential_mean_persistence_time"]),
+                float(row["mean_persistence_over_tau_alpha_direct"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "crossed observed={:.3g}; exponential predicted={:.3g}; latest lag={:.3g}".format(
+                float(row["observed_crossed_fraction"]),
+                float(row["predicted_crossed_fraction_at_latest_lag"]),
+                float(row["latest_lag_time"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The fitted persistence scale is a censored-clock estimate; exchange statistics and replica identity are still required for real PE inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6568,6 +6637,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_interval_censored_first_crossing_clock_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf"
     )
+    sota_glassbench_interval_censored_persistence_fit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6759,6 +6831,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_interval_censored_first_crossing_clock_pdf(
         sota_glassbench_interval_censored_first_crossing_clock_pdf
+    )
+    write_sota_glassbench_interval_censored_persistence_fit_pdf(
+        sota_glassbench_interval_censored_persistence_fit_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6997,6 +7072,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_interval_censored_first_crossing_clock_pdf,
             "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
+        )
+        archive.write(
+            sota_glassbench_interval_censored_persistence_fit_pdf,
+            "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

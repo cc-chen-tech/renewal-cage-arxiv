@@ -66,6 +66,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_multilag_particle_cache_targets,
     glassbench_sparse_lag_event_clock_audit,
     glassbench_interval_censored_first_crossing_clock,
+    glassbench_interval_censored_persistence_fit,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4425,6 +4426,23 @@ def write_sota_glassbench_interval_censored_first_crossing_clock_csv(
         audit_id="glassbench_ka2d_interval_censored_first_crossing_clock",
         sparse_lag_rows=sparse_lag_rows,
         crossing_rows=crossing_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_interval_censored_persistence_fit_csv(
+    path: Path,
+    *,
+    interval_clock_rows: list[dict[str, float | str]],
+    direct_alpha_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Fit a minimal censored exponential persistence law from sparse crossings."""
+
+    rows = glassbench_interval_censored_persistence_fit(
+        fit_id="glassbench_ka2d_interval_censored_persistence_fit",
+        interval_clock_rows=interval_clock_rows,
+        direct_alpha_rows=direct_alpha_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9351,6 +9369,62 @@ def write_sota_glassbench_interval_censored_first_crossing_clock_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_interval_censored_persistence_fit_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 395
+    left, top = 75, 125
+    row_h = 108
+    colors = {
+        "interval_censored_exponential_persistence_fit_ready": "#2f855a",
+        "interval_censored_persistence_fit_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["persistence_fit_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        rate = float(row["exponential_rate_mle"])
+        mean_time = float(row["exponential_mean_persistence_time"])
+        predicted = float(row["predicted_crossed_fraction_at_latest_lag"])
+        observed = float(row["observed_crossed_fraction"])
+        ratio = float(row["mean_persistence_over_tau_alpha_direct"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; rate={rate:.3g}; mean tau_p={mean_time:.3g}; tau_p/tau_alpha={ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">crossed fraction observed={observed:.3g}; exponential prediction={predicted:.3g}; latest lag={float(row["latest_lag_time"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">exchange clock={int(float(row["exchange_clock_ready"]))}; real PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:72]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench interval-censored persistence fit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A one-parameter censored exponential survival law gives a minimal persistence scale while exchange-clock and replica-identity blockers remain explicit.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">fit stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">censored persistence-law estimate</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -12246,6 +12320,17 @@ def main() -> None:
     write_sota_glassbench_interval_censored_first_crossing_clock_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg",
         glassbench_interval_censored_first_crossing_clock_rows,
+    )
+    glassbench_interval_censored_persistence_fit_rows = (
+        write_sota_glassbench_interval_censored_persistence_fit_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv",
+            interval_clock_rows=glassbench_interval_censored_first_crossing_clock_rows,
+            direct_alpha_rows=glassbench_direct_alpha_curve_rows,
+        )
+    )
+    write_sota_glassbench_interval_censored_persistence_fit_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.svg",
+        glassbench_interval_censored_persistence_fit_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

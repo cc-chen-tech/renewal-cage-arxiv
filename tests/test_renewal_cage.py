@@ -144,6 +144,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_sparse_lag_event_clock_audit,
     glassbench_interval_censored_first_crossing_clock,
+    glassbench_interval_censored_persistence_fit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -961,6 +962,46 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["latest_lag_time"]), 0.0)
         self.assertEqual(row["primary_blocker"], "sparse_lag_event_clock")
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+
+    def test_glassbench_interval_censored_persistence_fit_estimates_exponential_scale(self):
+        interval_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "interval_clock_candidate_ready": 1.0,
+                "first_crossing_intervals": "tc25:122.47:1288.4100000000001:3.8759689922480622e-05;tc30:1288.4100000000001:13554:0.001434108527131783;tc35:13554:142587:0.02135658914728682;tc40:142587:1500000:0.21724806201550387",
+                "right_censored_fraction": 0.759922480620155,
+                "latest_lag_time": 1500000.0,
+            }
+        ]
+        direct_alpha_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "threshold_crossing_lag_time": 1500000.0,
+                "alpha_threshold_crossed": 1.0,
+            }
+        ]
+
+        row = glassbench_interval_censored_persistence_fit(
+            fit_id="glassbench_interval_censored_persistence_fit",
+            interval_clock_rows=interval_rows,
+            direct_alpha_rows=direct_alpha_rows,
+        )[0]
+
+        self.assertEqual(row["persistence_fit_stage"], "interval_censored_exponential_persistence_fit_ready")
+        self.assertEqual(float(row["persistence_fit_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["exponential_rate_mle"]), 1.827224516438915e-07, delta=1e-15)
+        self.assertAlmostEqual(float(row["exponential_mean_persistence_time"]), 5472781.209990023, delta=1.0)
+        self.assertAlmostEqual(float(row["predicted_crossed_fraction_at_latest_lag"]), 0.2397315447385533, delta=1e-7)
+        self.assertAlmostEqual(float(row["observed_crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(row["mean_persistence_over_tau_alpha_direct"]), 3.6485208066600154, delta=1e-6)
+        self.assertEqual(float(row["exchange_clock_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "exchange_clock_and_replica_identity")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [
