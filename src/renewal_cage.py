@@ -8463,6 +8463,137 @@ def glassbench_late_recovery_experiment_design(
     return rows
 
 
+def glassbench_late_recovery_uncertainty_verdict(
+    *,
+    verdict_id: str,
+    late_recovery_protocol_rows: Sequence[dict[str, object]],
+    ingestion_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Score late-recovery observations with two-sigma mechanism decision rules."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not late_recovery_protocol_rows:
+        raise ValueError("late_recovery_protocol_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    ingestion_by_key: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in ingestion_rows:
+        ingestion_by_key.setdefault(key_for(row), []).append(row)
+
+    rows: list[dict[str, float | str]] = []
+    for protocol in sorted(late_recovery_protocol_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(protocol)
+        protocol_ready = float(protocol.get("envelope_ready", 0.0) or 0.0) == 1.0
+        minimum_lag = float(protocol.get("required_followup_lag_time", 0.0) or 0.0)
+        max_finite_ngp = float(protocol.get("max_finite_exchange_late_ngp", 0.0) or 0.0)
+        static_plateau = float(protocol.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+        if static_plateau <= 0.0:
+            static_plateau = max_finite_ngp + float(
+                protocol.get("min_static_plateau_rejection_gap", 0.0) or 0.0
+            )
+        group = ingestion_by_key.get((system_id, temperature, structure_id), [])
+        if not group:
+            group = [{}]
+
+        for index, ingestion in enumerate(group):
+            candidate_id = str(
+                ingestion.get("candidate_id", f"{system_id}:{temperature}:{structure_id}:{index}")
+            )
+            observation_ready = (
+                float(ingestion.get("late_recovery_observation_ready", 0.0) or 0.0) == 1.0
+            )
+            observed_lag = float(ingestion.get("observed_lag_time", 0.0) or 0.0)
+            observed_late_ngp = float(ingestion.get("observed_late_ngp", 0.0) or 0.0)
+            sigma_late_ngp = float(ingestion.get("sigma_late_ngp", 0.0) or 0.0)
+            observed_recovery = float(
+                ingestion.get("observed_tail_gaussian_recovery", 0.0) or 0.0
+            )
+            sigma_recovery = float(ingestion.get("sigma_tail_recovery", 0.0) or 0.0)
+            late_ngp_upper = observed_late_ngp + 2.0 * sigma_late_ngp
+            late_ngp_lower = observed_late_ngp - 2.0 * sigma_late_ngp
+            recovery_lower = observed_recovery - 2.0 * sigma_recovery
+            recovery_upper = observed_recovery + 2.0 * sigma_recovery
+            finite_margin = max_finite_ngp - late_ngp_upper
+            static_margin = static_plateau - late_ngp_upper
+            recovery_margin = recovery_lower - 0.5
+            finite_supported = bool(
+                protocol_ready
+                and observation_ready
+                and finite_margin >= 0.0
+                and recovery_margin >= 0.0
+            )
+            finite_rejected = bool(
+                protocol_ready
+                and observation_ready
+                and (late_ngp_lower > max_finite_ngp or recovery_upper < 0.5)
+            )
+            static_rejected = bool(protocol_ready and observation_ready and static_margin > 0.0)
+            decision_ready = bool((finite_supported and static_rejected) or finite_rejected)
+
+            if not protocol_ready:
+                stage = "late_recovery_verdict_protocol_incomplete"
+                blocker = "finite_exchange_envelope"
+                next_action = "complete_finite_exchange_falsification_envelope"
+            elif not observation_ready:
+                stage = "late_recovery_observation_not_ready"
+                blocker = str(ingestion.get("primary_blocker", "late_recovery_observation"))
+                next_action = "provide_uncertainty_weighted_late_recovery_observation"
+            elif finite_supported and static_rejected:
+                stage = "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected"
+                blocker = "exchange_clock"
+                next_action = "extract_exchange_clock_to_upgrade_to_persistence_exchange_inversion"
+            elif finite_rejected:
+                stage = "uncertainty_weighted_finite_exchange_rejected"
+                blocker = "late_gaussian_recovery"
+                next_action = "reject_or_reparameterize_finite_exchange_mechanism"
+            elif finite_supported:
+                stage = "finite_exchange_supported_static_disorder_not_rejected"
+                blocker = "static_disorder_uncertainty"
+                next_action = "extend_late_ngp_precision_or_static_null_plateau_estimate"
+            else:
+                stage = "late_recovery_uncertainty_indeterminate"
+                blocker = "tail_recovery_uncertainty" if recovery_margin < 0.0 else "late_ngp_uncertainty"
+                next_action = "reduce_late_recovery_uncertainty_or_add_later_lag_observation"
+
+            rows.append(
+                {
+                    "verdict_id": verdict_id,
+                    "candidate_id": candidate_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "minimum_required_lag_time": float(minimum_lag),
+                    "observed_lag_time": float(observed_lag),
+                    "observed_late_ngp": float(observed_late_ngp),
+                    "sigma_late_ngp": float(sigma_late_ngp),
+                    "late_ngp_upper_2sigma": float(late_ngp_upper),
+                    "tail_recovery_lower_2sigma": float(recovery_lower),
+                    "finite_exchange_support_margin": float(finite_margin),
+                    "static_disorder_rejection_margin": float(static_margin),
+                    "tail_recovery_support_margin": float(recovery_margin),
+                    "max_finite_exchange_late_ngp": float(max_finite_ngp),
+                    "static_gamma_late_ngp_plateau": float(static_plateau),
+                    "finite_exchange_uncertainty_supported": float(finite_supported),
+                    "finite_exchange_uncertainty_rejected": float(finite_rejected),
+                    "static_disorder_uncertainty_rejected": float(static_rejected),
+                    "uncertainty_decision_ready": float(decision_ready),
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": next_action,
+                    "uncertainty_verdict_stage": stage,
+                }
+            )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

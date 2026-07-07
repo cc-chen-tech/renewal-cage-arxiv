@@ -1700,6 +1700,27 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_023["primary_blocker"], "public_glassbench_timecode_ceiling")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_late_recovery_uncertainty_verdict_waits_for_tc50_measurement(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["uncertainty_verdict_stage"], "late_recovery_observation_not_ready")
+        self.assertEqual(ka2d_023["candidate_id"], "KA2D:0.23:151:0")
+        self.assertAlmostEqual(float(ka2d_023["minimum_required_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertEqual(float(ka2d_023["finite_exchange_uncertainty_supported"]), 0.0)
+        self.assertEqual(float(ka2d_023["static_disorder_uncertainty_rejected"]), 0.0)
+        self.assertEqual(float(ka2d_023["uncertainty_decision_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_observation")
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2737,6 +2758,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_public_window_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2940,6 +2962,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf",
             "figures/renewal_cage_sota_glassbench_public_window_verdict.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

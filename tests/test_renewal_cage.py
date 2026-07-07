@@ -155,6 +155,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_censored_window_claim_audit,
     glassbench_sota_public_window_verdict,
     glassbench_late_recovery_experiment_design,
+    glassbench_late_recovery_uncertainty_verdict,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1690,6 +1691,83 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["late_recovery_claim_ready_after_measurement"]), 1.0)
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
         self.assertEqual(row["primary_blocker"], "public_glassbench_timecode_ceiling")
+
+    def test_glassbench_late_recovery_uncertainty_verdict_requires_2sigma_decision_power(self):
+        protocol_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "required_followup_lag_time": 42972781.2315918,
+                "max_finite_exchange_late_ngp": 0.05,
+                "static_gamma_late_ngp_plateau": 0.1,
+                "min_static_plateau_rejection_gap": 0.05,
+                "late_recovery_stage": "late_recovery_acquisition_required",
+            }
+        ]
+        ingestion_rows = [
+            {
+                "candidate_id": "KA2D:0.23:151:0",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "required_followup_lag_time": 42972781.2315918,
+                "observed_lag_time": 50000000.0,
+                "observed_late_ngp": 0.012,
+                "sigma_late_ngp": 0.003,
+                "observed_tail_gaussian_recovery": 1.0,
+                "sigma_tail_recovery": 0.05,
+                "late_recovery_observation_ready": 1.0,
+                "late_recovery_ingestion_stage": "late_recovery_observation_ingestion_ready",
+            },
+            {
+                "candidate_id": "KA2D:0.23:151:1",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "required_followup_lag_time": 42972781.2315918,
+                "observed_lag_time": 50000000.0,
+                "observed_late_ngp": 0.045,
+                "sigma_late_ngp": 0.01,
+                "observed_tail_gaussian_recovery": 1.0,
+                "sigma_tail_recovery": 0.05,
+                "late_recovery_observation_ready": 1.0,
+                "late_recovery_ingestion_stage": "late_recovery_observation_ingestion_ready",
+            },
+        ]
+
+        rows = glassbench_late_recovery_uncertainty_verdict(
+            verdict_id="glassbench_late_recovery_uncertainty_verdict",
+            late_recovery_protocol_rows=protocol_rows,
+            ingestion_rows=ingestion_rows,
+        )
+
+        by_candidate = {row["candidate_id"]: row for row in rows}
+        supported = by_candidate["KA2D:0.23:151:0"]
+        wide = by_candidate["KA2D:0.23:151:1"]
+
+        self.assertEqual(
+            supported["uncertainty_verdict_stage"],
+            "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected",
+        )
+        self.assertAlmostEqual(float(supported["late_ngp_upper_2sigma"]), 0.018)
+        self.assertAlmostEqual(float(supported["tail_recovery_lower_2sigma"]), 0.9)
+        self.assertGreater(float(supported["finite_exchange_support_margin"]), 0.03)
+        self.assertGreater(float(supported["static_disorder_rejection_margin"]), 0.08)
+        self.assertEqual(float(supported["finite_exchange_uncertainty_supported"]), 1.0)
+        self.assertEqual(float(supported["static_disorder_uncertainty_rejected"]), 1.0)
+        self.assertEqual(float(supported["uncertainty_decision_ready"]), 1.0)
+        self.assertEqual(float(supported["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(supported["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(supported["primary_blocker"], "exchange_clock")
+
+        self.assertEqual(wide["uncertainty_verdict_stage"], "late_recovery_uncertainty_indeterminate")
+        self.assertGreater(float(wide["late_ngp_upper_2sigma"]), 0.05)
+        self.assertEqual(float(wide["finite_exchange_uncertainty_supported"]), 0.0)
+        self.assertEqual(float(wide["static_disorder_uncertainty_rejected"]), 1.0)
+        self.assertEqual(float(wide["uncertainty_decision_ready"]), 0.0)
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

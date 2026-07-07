@@ -77,6 +77,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_censored_window_claim_audit,
     glassbench_sota_public_window_verdict,
     glassbench_late_recovery_experiment_design,
+    glassbench_late_recovery_uncertainty_verdict,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4632,6 +4633,23 @@ def write_sota_glassbench_late_recovery_experiment_design_csv(
         late_recovery_protocol_rows=late_recovery_protocol_rows,
         timecode_target_rows=timecode_target_rows,
         public_window_verdict_rows=public_window_verdict_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_uncertainty_verdict_csv(
+    path: Path,
+    *,
+    late_recovery_protocol_rows: list[dict[str, float | str]],
+    ingestion_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the two-sigma late-recovery mechanism verdict state."""
+
+    rows = glassbench_late_recovery_uncertainty_verdict(
+        verdict_id="glassbench_ka2d_late_recovery_uncertainty_verdict",
+        late_recovery_protocol_rows=late_recovery_protocol_rows,
+        ingestion_rows=ingestion_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10180,6 +10198,63 @@ def write_sota_glassbench_late_recovery_experiment_design_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_late_recovery_uncertainty_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 400
+    left, top = 76, 126
+    row_h = 86
+    colors = {
+        "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected": "#2f855a",
+        "finite_exchange_supported_static_disorder_not_rejected": "#b7791f",
+        "uncertainty_weighted_finite_exchange_rejected": "#c53030",
+        "late_recovery_uncertainty_indeterminate": "#805ad5",
+        "late_recovery_observation_not_ready": "#2b6cb0",
+        "late_recovery_verdict_protocol_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["uncertainty_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        ready = int(float(row["uncertainty_decision_ready"]))
+        finite = int(float(row["finite_exchange_uncertainty_supported"]))
+        static = int(float(row["static_disorder_uncertainty_rejected"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["system_id"]} T={row["temperature"]} structure {row["structure_id"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 205}" y="{y - 6}" width="372" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 214}" y="{y + 12}" font-family="Arial, sans-serif" font-size="8.8" fill="#fff">{stage.replace("_", " ")[:62]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10.5">decision={ready}; finite support={finite}; static reject={static}; candidate={row["candidate_id"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">lag={float(row["observed_lag_time"]):.3g}/{float(row["minimum_required_lag_time"]):.3g}; late NGP upper 2sigma={float(row["late_ngp_upper_2sigma"]):.3g}; recovery lower 2sigma={float(row["tail_recovery_lower_2sigma"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">finite margin={float(row["finite_exchange_support_margin"]):.3g}; static margin={float(row["static_disorder_rejection_margin"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 70}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:74]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late-recovery uncertainty verdict</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Late-recovery measurements are promoted to mechanism verdicts only when two-sigma finite-exchange and static-disorder decision rules pass.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 205}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">uncertainty verdict</text>
+  <text x="{left + 600}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">two-sigma mechanism decision state</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13201,6 +13276,17 @@ def main() -> None:
     write_sota_glassbench_late_recovery_experiment_design_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.svg",
         glassbench_late_recovery_experiment_design_rows,
+    )
+    glassbench_late_recovery_uncertainty_verdict_rows = (
+        write_sota_glassbench_late_recovery_uncertainty_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.csv",
+            late_recovery_protocol_rows=glassbench_late_recovery_protocol_rows,
+            ingestion_rows=glassbench_late_recovery_ingestion_contract_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_uncertainty_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.svg",
+        glassbench_late_recovery_uncertainty_verdict_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

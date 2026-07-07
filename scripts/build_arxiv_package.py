@@ -5091,6 +5091,88 @@ def write_sota_glassbench_late_recovery_experiment_design_pdf(path: Path) -> Non
     c.save()
 
 
+def write_sota_glassbench_late_recovery_uncertainty_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late-recovery uncertainty verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Two-sigma late-recovery measurements gate finite-exchange support and static-disorder rejection without thermodynamic claims.",
+    )
+    left, top = 42, page_h - 94
+    row_h = 64
+    colors_by_stage = {
+        "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected": colors.HexColor("#2f855a"),
+        "finite_exchange_supported_static_disorder_not_rejected": colors.HexColor("#b7791f"),
+        "uncertainty_weighted_finite_exchange_rejected": colors.HexColor("#c53030"),
+        "late_recovery_uncertainty_indeterminate": colors.HexColor("#805ad5"),
+        "late_recovery_observation_not_ready": colors.HexColor("#2b6cb0"),
+        "late_recovery_verdict_protocol_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 150, top + 18, "uncertainty verdict")
+    c.drawString(left + 420, top + 18, "two-sigma decision")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["uncertainty_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.3)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]}')
+        c.setFillColor(color)
+        c.rect(left + 150, y - 12, 250, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.0)
+        c.drawString(left + 158, y - 3, stage.replace("_", " ")[:46])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 420,
+            y,
+            "candidate={}; decision={:.0f}; finite={:.0f}; static={:.0f}".format(
+                row["candidate_id"][:30],
+                float(row["uncertainty_decision_ready"]),
+                float(row["finite_exchange_uncertainty_supported"]),
+                float(row["static_disorder_uncertainty_rejected"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.2)
+        c.drawString(
+            left + 420,
+            y - 13,
+            "lag={:.3g}/{:.3g}; NGP upper={:.3g}; recovery lower={:.3g}".format(
+                float(row["observed_lag_time"]),
+                float(row["minimum_required_lag_time"]),
+                float(row["late_ngp_upper_2sigma"]),
+                float(row["tail_recovery_lower_2sigma"]),
+            ),
+        )
+        c.drawString(
+            left + 420,
+            y - 26,
+            "finite margin={:.3g}; static margin={:.3g}; blocker={}".format(
+                float(row["finite_exchange_support_margin"]),
+                float(row["static_disorder_rejection_margin"]),
+                row["primary_blocker"][:38],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Current public GlassBench rows remain observation-gated; the verdict becomes decisive only after uncertainty-weighted late data arrive.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7408,6 +7490,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_late_recovery_experiment_design_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf"
     )
+    sota_glassbench_late_recovery_uncertainty_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -7632,6 +7717,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_late_recovery_experiment_design_pdf(
         sota_glassbench_late_recovery_experiment_design_pdf
+    )
+    write_sota_glassbench_late_recovery_uncertainty_verdict_pdf(
+        sota_glassbench_late_recovery_uncertainty_verdict_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7914,6 +8002,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_late_recovery_experiment_design_pdf,
             "figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_uncertainty_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,
