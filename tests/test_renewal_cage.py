@@ -145,6 +145,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_sparse_lag_event_clock_audit,
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
+    glassbench_finite_exchange_falsification_envelope,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1001,6 +1002,40 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["exchange_clock_ready"]), 0.0)
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "exchange_clock_and_replica_identity")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_finite_exchange_envelope_turns_censored_fit_into_followup_horizon(self):
+        fit_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "persistence_fit_ready": 1.0,
+                "exponential_mean_persistence_time": 5472781.231591796,
+                "tau_alpha_direct": 1500000.0,
+                "latest_lag_time": 1500000.0,
+                "primary_blocker": "exchange_clock_and_replica_identity",
+            }
+        ]
+
+        row = glassbench_finite_exchange_falsification_envelope(
+            envelope_id="glassbench_finite_exchange_falsification_envelope",
+            persistence_fit_rows=fit_rows,
+            max_exchange_mean_over_tau_alpha=1.0,
+            min_exchange_events_for_gaussian_recovery=25.0,
+        )[0]
+
+        self.assertEqual(row["envelope_stage"], "finite_exchange_falsification_horizon_ready")
+        self.assertEqual(float(row["envelope_ready"]), 1.0)
+        self.assertAlmostEqual(row["conditional_exchange_mean_upper_bound"], 1500000.0)
+        self.assertAlmostEqual(row["conditional_persistence_exchange_ratio_lower_bound"], 3.6485208210611972)
+        self.assertAlmostEqual(row["gaussian_recovery_lag_upper_bound"], 42972781.2315918, delta=1e-3)
+        self.assertAlmostEqual(row["required_followup_lag_multiplier_over_current"], 28.6485208210612, delta=1e-12)
+        self.assertEqual(float(row["current_window_has_gaussian_recovery_power"]), 0.0)
+        self.assertEqual(float(row["late_ngp_followup_ready"]), 0.0)
+        self.assertEqual(float(row["exchange_clock_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "late_ngp_followup_and_exchange_clock")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

@@ -7237,6 +7237,103 @@ def glassbench_interval_censored_persistence_fit(
     return rows
 
 
+def glassbench_finite_exchange_falsification_envelope(
+    *,
+    envelope_id: str,
+    persistence_fit_rows: Sequence[dict[str, object]],
+    max_exchange_mean_over_tau_alpha: float = 1.0,
+    min_exchange_events_for_gaussian_recovery: float = 25.0,
+) -> list[dict[str, float | str]]:
+    """Turn a censored persistence fit into a conditional finite-exchange test horizon.
+
+    The envelope does not infer the exchange clock.  It asks what follows if the
+    post-persistence exchange time is no slower than the measured alpha time:
+    ``tau_x <= max_exchange_mean_over_tau_alpha * tau_alpha``.  Under that
+    condition the fitted persistence scale gives a conservative lower bound on
+    ``tau_p/tau_x`` and an upper-bound lag at which a late-NGP / Gaussian
+    recovery measurement should have enough post-escape exchange events to test
+    the finite-exchange mechanism.
+    """
+
+    if not envelope_id:
+        raise ValueError("envelope_id must be nonempty")
+    if not persistence_fit_rows:
+        raise ValueError("persistence_fit_rows must be nonempty")
+    if max_exchange_mean_over_tau_alpha <= 0.0:
+        raise ValueError("max_exchange_mean_over_tau_alpha must be positive")
+    if min_exchange_events_for_gaussian_recovery <= 0.0:
+        raise ValueError("min_exchange_events_for_gaussian_recovery must be positive")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    rows: list[dict[str, float | str]] = []
+    for row in sorted(persistence_fit_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(row)
+        fit_ready = float(row.get("persistence_fit_ready", 0.0) or 0.0) == 1.0
+        tau_p = float(row.get("exponential_mean_persistence_time", 0.0) or 0.0)
+        tau_alpha = float(row.get("tau_alpha_direct", 0.0) or 0.0)
+        latest_lag = float(row.get("latest_lag_time", 0.0) or 0.0)
+
+        if fit_ready and tau_p > 0.0 and tau_alpha > 0.0:
+            exchange_upper = max_exchange_mean_over_tau_alpha * tau_alpha
+            ratio_lower = tau_p / exchange_upper
+            recovery_lag = tau_p + min_exchange_events_for_gaussian_recovery * exchange_upper
+            followup_multiplier = recovery_lag / latest_lag if latest_lag > 0.0 else math.inf
+            current_window_has_power = latest_lag >= recovery_lag
+            stage = "finite_exchange_falsification_horizon_ready"
+            blocker = "none" if current_window_has_power else "late_ngp_followup_and_exchange_clock"
+            next_action = (
+                "measure_late_ngp_or_van_hove_at_recovery_horizon_and_extract_exchange_clock"
+                if not current_window_has_power
+                else "score_late_ngp_gaussian_recovery_against_finite_exchange_and_static_null"
+            )
+            envelope_ready = True
+        else:
+            exchange_upper = 0.0
+            ratio_lower = 0.0
+            recovery_lag = 0.0
+            followup_multiplier = 0.0
+            current_window_has_power = False
+            stage = "finite_exchange_envelope_upstream_incomplete"
+            blocker = "interval_censored_persistence_fit"
+            next_action = "complete_interval_censored_persistence_fit"
+            envelope_ready = False
+
+        rows.append(
+            {
+                "envelope_id": envelope_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "persistence_fit_ready": float(fit_ready),
+                "envelope_ready": float(envelope_ready),
+                "exponential_mean_persistence_time": float(tau_p),
+                "tau_alpha_direct": float(tau_alpha),
+                "latest_lag_time": float(latest_lag),
+                "max_exchange_mean_over_tau_alpha": float(max_exchange_mean_over_tau_alpha),
+                "min_exchange_events_for_gaussian_recovery": float(min_exchange_events_for_gaussian_recovery),
+                "conditional_exchange_mean_upper_bound": float(exchange_upper),
+                "conditional_persistence_exchange_ratio_lower_bound": float(ratio_lower),
+                "gaussian_recovery_lag_upper_bound": float(recovery_lag),
+                "required_followup_lag_multiplier_over_current": float(followup_multiplier),
+                "current_window_has_gaussian_recovery_power": float(current_window_has_power),
+                "late_ngp_followup_ready": float(current_window_has_power),
+                "exchange_clock_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "envelope_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

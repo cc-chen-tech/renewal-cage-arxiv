@@ -67,6 +67,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_sparse_lag_event_clock_audit,
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
+    glassbench_finite_exchange_falsification_envelope,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4443,6 +4444,23 @@ def write_sota_glassbench_interval_censored_persistence_fit_csv(
         fit_id="glassbench_ka2d_interval_censored_persistence_fit",
         interval_clock_rows=interval_clock_rows,
         direct_alpha_rows=direct_alpha_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_finite_exchange_envelope_csv(
+    path: Path,
+    *,
+    persistence_fit_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the conditional finite-exchange late-NGP falsification horizon."""
+
+    rows = glassbench_finite_exchange_falsification_envelope(
+        envelope_id="glassbench_ka2d_finite_exchange_falsification_envelope",
+        persistence_fit_rows=persistence_fit_rows,
+        max_exchange_mean_over_tau_alpha=1.0,
+        min_exchange_events_for_gaussian_recovery=25.0,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9425,6 +9443,61 @@ def write_sota_glassbench_interval_censored_persistence_fit_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_finite_exchange_envelope_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "finite_exchange_falsification_horizon_ready": "#2b6cb0",
+        "finite_exchange_envelope_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["envelope_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ratio = float(row["conditional_persistence_exchange_ratio_lower_bound"])
+        recovery_lag = float(row["gaussian_recovery_lag_upper_bound"])
+        multiplier = float(row["required_followup_lag_multiplier_over_current"])
+        current_power = int(float(row["current_window_has_gaussian_recovery_power"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; tau_p/tau_x >= {ratio:.3g}; recovery lag <= {recovery_lag:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">requires follow-up to {multiplier:.3g} current-lag units; current recovery power={current_power}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">exchange clock={int(float(row["exchange_clock_ready"]))}; real PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:78]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench finite-exchange falsification envelope</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The censored tau_p estimate implies a conditional tau_p/tau_x lower bound and a late-NGP horizon, without claiming a measured exchange clock.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">envelope stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">conditional finite-exchange consequence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -12331,6 +12404,16 @@ def main() -> None:
     write_sota_glassbench_interval_censored_persistence_fit_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.svg",
         glassbench_interval_censored_persistence_fit_rows,
+    )
+    glassbench_finite_exchange_envelope_rows = (
+        write_sota_glassbench_finite_exchange_envelope_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.csv",
+            persistence_fit_rows=glassbench_interval_censored_persistence_fit_rows,
+        )
+    )
+    write_sota_glassbench_finite_exchange_envelope_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.svg",
+        glassbench_finite_exchange_envelope_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

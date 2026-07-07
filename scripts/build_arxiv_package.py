@@ -4353,6 +4353,75 @@ def write_sota_glassbench_interval_censored_persistence_fit_pdf(path: Path) -> N
     c.save()
 
 
+def write_sota_glassbench_finite_exchange_envelope_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench finite-exchange falsification envelope")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The censored persistence fit gives a conditional tau_p/tau_x lower bound and a late-NGP follow-up horizon.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "finite_exchange_falsification_horizon_ready": colors.HexColor("#2b6cb0"),
+        "finite_exchange_envelope_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "envelope stage")
+    c.drawString(left + 395, top + 24, "conditional finite-exchange consequence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["envelope_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; tau_p/tau_x>={:.3g}; recovery lag<={:.3g}; follow-up multiplier={:.3g}".format(
+                row["structure_id"],
+                float(row["conditional_persistence_exchange_ratio_lower_bound"]),
+                float(row["gaussian_recovery_lag_upper_bound"]),
+                float(row["required_followup_lag_multiplier_over_current"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "tau_p={:.3g}; tau_alpha={:.3g}; current recovery power={:.0f}".format(
+                float(row["exponential_mean_persistence_time"]),
+                float(row["tau_alpha_direct"]),
+                float(row["current_window_has_gaussian_recovery_power"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a conditional acquisition target, not a measured exchange clock or thermodynamic glass-transition claim.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6640,6 +6709,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_interval_censored_persistence_fit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf"
     )
+    sota_glassbench_finite_exchange_envelope_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6834,6 +6906,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_interval_censored_persistence_fit_pdf(
         sota_glassbench_interval_censored_persistence_fit_pdf
+    )
+    write_sota_glassbench_finite_exchange_envelope_pdf(
+        sota_glassbench_finite_exchange_envelope_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7076,6 +7151,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_interval_censored_persistence_fit_pdf,
             "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
+        )
+        archive.write(
+            sota_glassbench_finite_exchange_envelope_pdf,
+            "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,
