@@ -56,6 +56,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_timecode_bridge,
     glassbench_cached_particle_observable_semantics_audit,
     glassbench_direct_alpha_curve_audit,
+    glassbench_direct_alpha_transport_coupling_audit,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_multilag_particle_cache_targets,
@@ -4127,6 +4128,24 @@ def write_sota_glassbench_direct_alpha_curve_csv(
         audit_id="glassbench_ka2d_direct_alpha_curve",
         root_rows=root_rows,
         curve_rows=curve_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_transport_csv(
+    path: Path,
+    *,
+    direct_alpha_rows: list[dict[str, float | str]],
+    observable_semantics_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Couple the direct-alpha crossing to matched cached transport observables."""
+
+    rows = glassbench_direct_alpha_transport_coupling_audit(
+        audit_id="glassbench_ka2d_direct_alpha_transport",
+        direct_alpha_rows=direct_alpha_rows,
+        observable_semantics_rows=observable_semantics_rows,
+        dimension=2,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8669,6 +8688,59 @@ def write_sota_glassbench_direct_alpha_curve_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_transport_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_direct_alpha_transport_proxy_ready_event_clock_blocked": "#7c2d12",
+        "direct_alpha_crossed_transport_observable_blocked": "#c05621",
+        "direct_alpha_crossing_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["transport_coupling_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        tau_alpha = float(row["tau_alpha_direct"])
+        matched_msd = float(row["matched_msd"])
+        product = float(row["apparent_stokes_einstein_product"])
+        diffusion = float(row["apparent_diffusion_coefficient"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; crossing={row["threshold_crossing_time_code"]}; tau_alpha={tau_alpha:.3g}; MSD={matched_msd:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">D_eff={diffusion:.3g}; D_eff tau_alpha={product:.3g}; NGP={float(row["matched_ngp_2d"]):.3g}; proxy={int(float(row["direct_alpha_transport_proxy_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha transport proxy</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The direct-alpha threshold crossing is matched to cached displacement transport, but persistence/exchange event-clock inversion remains blocked.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">transport coupling stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">matched alpha/transport proxy</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11495,6 +11567,15 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_curve_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.svg",
         glassbench_direct_alpha_curve_rows,
+    )
+    glassbench_direct_alpha_transport_rows = write_sota_glassbench_direct_alpha_transport_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv",
+        direct_alpha_rows=glassbench_direct_alpha_curve_rows,
+        observable_semantics_rows=glassbench_cached_particle_observable_semantics_rows,
+    )
+    write_sota_glassbench_direct_alpha_transport_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.svg",
+        glassbench_direct_alpha_transport_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

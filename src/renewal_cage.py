@@ -6250,6 +6250,106 @@ def glassbench_direct_alpha_curve_audit(
     return out
 
 
+def glassbench_direct_alpha_transport_coupling_audit(
+    *,
+    audit_id: str,
+    direct_alpha_rows: Sequence[dict[str, object]],
+    observable_semantics_rows: Sequence[dict[str, object]],
+    dimension: int = 2,
+) -> list[dict[str, float | str]]:
+    """Couple a cached direct-alpha crossing to the matched displacement observable."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not direct_alpha_rows:
+        raise ValueError("direct_alpha_rows must be nonempty")
+    if not observable_semantics_rows:
+        raise ValueError("observable_semantics_rows must be nonempty")
+    if dimension <= 0:
+        raise ValueError("dimension must be positive")
+
+    observable_by_key: dict[tuple[str, str, str, str], dict[str, object]] = {}
+    for row in observable_semantics_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+            str(row.get("time_code", "none")),
+        )
+        observable_by_key[key] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        direct_alpha_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        crossing_time_code = str(row.get("threshold_crossing_time_code", "none"))
+        tau_alpha = float(row.get("threshold_crossing_lag_time", 0.0) or 0.0)
+        alpha_crossed = float(row.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+        observable = observable_by_key.get((system_id, temperature, structure_id, crossing_time_code), {})
+        observable_reproduced = (
+            float(observable.get("official_displacement_observable_reproducible", 0.0) or 0.0) == 1.0
+        )
+        matched_msd = float(observable.get("official_msd", 0.0) or 0.0)
+        if matched_msd <= 0.0:
+            matched_msd = float(observable.get("initial_reference_msd", 0.0) or 0.0)
+        matched_lag = float(observable.get("lag_time", 0.0) or 0.0)
+        matched_ngp = float(observable.get("official_ngp_2d", 0.0) or 0.0)
+        proxy_ready = alpha_crossed and observable_reproduced and tau_alpha > 0.0 and matched_msd > 0.0
+
+        if proxy_ready:
+            apparent_diffusion = matched_msd / (2.0 * float(dimension) * tau_alpha)
+            apparent_product = apparent_diffusion * tau_alpha
+            stage = "cached_direct_alpha_transport_proxy_ready_event_clock_blocked"
+            blocker = "event_clock_trajectory"
+            next_action = "extract_particle_event_clock_for_persistence_exchange_inversion"
+        elif alpha_crossed:
+            apparent_diffusion = 0.0
+            apparent_product = 0.0
+            stage = "direct_alpha_crossed_transport_observable_blocked"
+            blocker = "matched_transport_observable"
+            next_action = "reproduce_structure_matched_displacement_observable"
+        else:
+            apparent_diffusion = 0.0
+            apparent_product = 0.0
+            stage = "direct_alpha_crossing_upstream_incomplete"
+            blocker = "direct_alpha_threshold_crossing"
+            next_action = "complete_direct_alpha_curve_threshold_crossing"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(tau_alpha),
+                "threshold_crossing_time_code": crossing_time_code,
+                "matched_lag_time": float(matched_lag),
+                "matched_msd": float(matched_msd),
+                "matched_ngp_2d": float(matched_ngp),
+                "dimension": float(dimension),
+                "apparent_diffusion_coefficient": float(apparent_diffusion),
+                "apparent_stokes_einstein_product": float(apparent_product),
+                "direct_alpha_transport_proxy_ready": float(proxy_ready),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "transport_coupling_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

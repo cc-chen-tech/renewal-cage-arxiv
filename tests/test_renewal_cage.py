@@ -137,6 +137,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_anchor_rescue_protocol,
     glassbench_alpha_anchor_cached_fs_audit,
     glassbench_direct_alpha_curve_audit,
+    glassbench_direct_alpha_transport_coupling_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -561,6 +562,57 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["threshold_crossing_time_code"], "tc40")
         self.assertEqual(float(row["alpha_threshold_crossed"]), 1.0)
         self.assertEqual(float(row["strictly_monotone_decay"]), 1.0)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_clock_trajectory")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):
+        direct_rows = [
+            {
+                "audit_id": "glassbench_ka2d_direct_alpha_curve",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.8,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_lag_time": 1500000.0,
+                "threshold_crossing_time_code": "tc40",
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "direct_alpha_curve_stage": "cached_direct_alpha_curve_ready_event_clock_blocked",
+            }
+        ]
+        observable_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "official_msd": 0.9747508405755333,
+                "initial_reference_msd": 0.9747508405755335,
+                "official_ngp_2d": 2.1239947887392923,
+                "official_displacement_observable_reproducible": 1.0,
+                "event_clock_trajectory_ready": 0.0,
+                "observable_semantics_stage": "official_displacement_observable_reproduced",
+            }
+        ]
+
+        row = glassbench_direct_alpha_transport_coupling_audit(
+            audit_id="glassbench_direct_alpha_transport",
+            direct_alpha_rows=direct_rows,
+            observable_semantics_rows=observable_rows,
+            dimension=2,
+        )[0]
+
+        self.assertEqual(row["transport_coupling_stage"], "cached_direct_alpha_transport_proxy_ready_event_clock_blocked")
+        self.assertEqual(float(row["direct_alpha_transport_proxy_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["tau_alpha_direct"]), 1500000.0)
+        self.assertAlmostEqual(float(row["matched_msd"]), 0.9747508405755333)
+        self.assertAlmostEqual(float(row["apparent_diffusion_coefficient"]), 1.6245847342925555e-7)
+        self.assertAlmostEqual(float(row["apparent_stokes_einstein_product"]), 0.24368771014388332)
+        self.assertAlmostEqual(float(row["matched_ngp_2d"]), 2.1239947887392923)
         self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "event_clock_trajectory")

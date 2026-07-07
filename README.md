@@ -320,6 +320,11 @@ targets at this `k_root`: `F_s` decreases from `0.980` at `tc05` to `e^-1` at
 alpha-threshold crossing. The audit still keeps `event_clock_trajectory_ready=0`
 and `real_pe_inversion_ready=0`, because the NPZ axis is an isoconfigurational
 replica axis rather than a physical event-clock trajectory.
+The direct-alpha transport proxy then matches that same `tc40` crossing to the
+reproduced GlassBench displacement observable: `MSD=0.9747508406`, giving
+`D_eff=1.6246e-7` and `D_eff tau_alpha=0.24369` in 2D. This is a useful
+alpha/transport anchor for the real-data loop, not a persistence/exchange
+ratio or a thermodynamic glass-transition claim.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve
@@ -488,6 +493,7 @@ figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_curve.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_transport.svg
 figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
 figures/renewal_cage_sota_dynamic_signature_alignment.svg
 figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
@@ -591,6 +597,7 @@ data/renewal_cage_sota_glassbench_alpha_threshold_horizon.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
 data/renewal_cage_sota_glassbench_direct_alpha_curve.csv
+data/renewal_cage_sota_glassbench_direct_alpha_transport.csv
 data/renewal_cage_sota_glassbench_timecode_signature_support.csv
 data/renewal_cage_sota_dynamic_signature_alignment.csv
 data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
@@ -715,6 +722,7 @@ paper/figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
 paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
 paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf

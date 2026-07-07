@@ -3780,6 +3780,77 @@ def write_sota_glassbench_direct_alpha_curve_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_direct_alpha_transport_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha transport proxy")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The direct-alpha crossing is matched to cached displacement transport while event-clock inversion remains blocked.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "cached_direct_alpha_transport_proxy_ready_event_clock_blocked": colors.HexColor("#7c2d12"),
+        "direct_alpha_crossed_transport_observable_blocked": colors.HexColor("#c05621"),
+        "direct_alpha_crossing_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "transport stage")
+    c.drawString(left + 390, top + 24, "matched alpha/transport proxy")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["transport_coupling_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; crossing={}; tau_alpha={:.3g}; MSD={:.3g}".format(
+                row["structure_id"],
+                row["threshold_crossing_time_code"],
+                float(row["tau_alpha_direct"]),
+                float(row["matched_msd"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "D_eff={:.3g}; D_eff tau_alpha={:.3g}; NGP={:.3g}; proxy={}".format(
+                float(row["apparent_diffusion_coefficient"]),
+                float(row["apparent_stokes_einstein_product"]),
+                float(row["matched_ngp_2d"]),
+                int(float(row["direct_alpha_transport_proxy_ready"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This transport-alpha product is a cached displacement proxy, not a persistence/exchange event-clock inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6043,6 +6114,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_curve_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.pdf"
     )
+    sota_glassbench_direct_alpha_transport_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6213,6 +6287,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_curve_pdf(
         sota_glassbench_direct_alpha_curve_pdf
+    )
+    write_sota_glassbench_direct_alpha_transport_pdf(
+        sota_glassbench_direct_alpha_transport_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6423,6 +6500,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_curve_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_transport_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,
