@@ -8117,6 +8117,125 @@ def glassbench_late_recovery_public_timecode_ceiling(
     return rows
 
 
+def glassbench_censored_window_claim_audit(
+    *,
+    audit_id: str,
+    public_ceiling_rows: Sequence[dict[str, object]],
+    finite_exchange_envelope_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Audit which GlassBench claims survive the public time-window censoring."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not public_ceiling_rows:
+        raise ValueError("public_ceiling_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    envelope_by_key = {key_for(row): row for row in finite_exchange_envelope_rows}
+    rows: list[dict[str, float | str]] = []
+    for ceiling in sorted(public_ceiling_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(ceiling)
+        envelope = envelope_by_key.get((system_id, temperature, structure_id), {})
+        public_max_lag = float(ceiling.get("public_max_lag_time", 0.0) or 0.0)
+        target_lag = float(ceiling.get("target_lag_time", 0.0) or 0.0)
+        target_ratio = float(ceiling.get("target_lag_over_public_max", 0.0) or 0.0)
+        tau_alpha = float(envelope.get("tau_alpha_direct", 0.0) or 0.0)
+        latest_lag = float(envelope.get("latest_lag_time", 0.0) or 0.0)
+        envelope_ready = float(envelope.get("envelope_ready", 0.0) or 0.0) == 1.0
+        target_ready = float(ceiling.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        ceiling_stage = str(ceiling.get("public_ceiling_stage", "unknown"))
+        alpha_anchor_ready = (
+            envelope_ready
+            and tau_alpha > 0.0
+            and max(public_max_lag, latest_lag) >= tau_alpha
+        )
+        late_recovery_window_ready = (
+            target_ready
+            and target_lag > 0.0
+            and public_max_lag >= target_lag
+        )
+
+        if not envelope_ready:
+            stage = "finite_exchange_envelope_upstream_incomplete"
+            allowed_claim = "short_window_canary_only"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_envelope_before_censored_window_audit"
+        elif late_recovery_window_ready:
+            stage = "late_recovery_public_window_ready"
+            allowed_claim = "late_recovery_falsification_ready"
+            blocker = "late_recovery_observable"
+            next_action = "run_late_recovery_falsification_protocol"
+        elif alpha_anchor_ready and ceiling_stage == "late_recovery_beyond_public_timecode_ceiling":
+            stage = "alpha_anchor_ready_late_recovery_censored"
+            allowed_claim = "alpha_anchor_and_pre_late_dynamic_signatures"
+            blocker = str(ceiling.get("primary_blocker", "public_glassbench_timecode_ceiling"))
+            next_action = str(
+                ceiling.get(
+                    "next_required_action",
+                    "obtain_new_glassbench_export_or_trajectory_beyond_public_ceiling",
+                )
+            )
+        elif alpha_anchor_ready:
+            stage = "alpha_anchor_ready_late_recovery_unresolved"
+            allowed_claim = "alpha_anchor_and_pre_late_dynamic_signatures"
+            blocker = str(ceiling.get("primary_blocker", "late_recovery_horizon"))
+            next_action = str(
+                ceiling.get(
+                    "next_required_action",
+                    "extend_public_window_or_ingest_late_recovery_observation",
+                )
+            )
+        else:
+            stage = "public_window_pre_alpha_only"
+            allowed_claim = "short_window_canary_only"
+            blocker = "alpha_anchor_window"
+            next_action = "extend_public_window_to_alpha_anchor"
+
+        short_window_allowed = envelope_ready or public_max_lag > 0.0
+        alpha_claim_allowed = alpha_anchor_ready
+        late_claim_allowed = late_recovery_window_ready
+        static_rejection_ready = late_recovery_window_ready
+
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "public_max_time_code": str(ceiling.get("public_max_time_code", "none")),
+                "target_time_code": str(ceiling.get("target_time_code", "none")),
+                "public_max_lag_time": float(public_max_lag),
+                "tau_alpha_direct": float(tau_alpha),
+                "target_lag_time": float(target_lag),
+                "public_window_fraction_of_target_lag": float(public_max_lag / target_lag)
+                if target_lag > 0.0
+                else 0.0,
+                "target_lag_over_public_max": float(target_ratio)
+                if target_ratio > 0.0
+                else (float(target_lag / public_max_lag) if public_max_lag > 0.0 else 0.0),
+                "alpha_anchor_window_ready": float(alpha_anchor_ready),
+                "late_recovery_window_ready": float(late_recovery_window_ready),
+                "short_window_dynamic_claim_allowed": float(short_window_allowed),
+                "alpha_relaxation_claim_allowed": float(alpha_claim_allowed),
+                "late_gaussian_recovery_claim_allowed": float(late_claim_allowed),
+                "static_vs_finite_exchange_rejection_ready": float(static_rejection_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_public_claim_level": allowed_claim,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "censored_window_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

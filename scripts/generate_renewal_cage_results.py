@@ -74,6 +74,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_cache_request_contract,
     glassbench_late_recovery_membership_probe_contract,
     glassbench_late_recovery_public_timecode_ceiling,
+    glassbench_censored_window_claim_audit,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4576,6 +4577,23 @@ def write_sota_glassbench_late_recovery_public_timecode_ceiling_csv(
         timecode_target_rows=timecode_target_rows,
         semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
         membership_probe_rows=membership_probe_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_censored_window_claim_audit_csv(
+    path: Path,
+    *,
+    public_ceiling_rows: list[dict[str, float | str]],
+    finite_exchange_envelope_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the public-window claim audit implied by the GlassBench ceiling."""
+
+    rows = glassbench_censored_window_claim_audit(
+        audit_id="glassbench_ka2d_censored_window_claim_audit",
+        public_ceiling_rows=public_ceiling_rows,
+        finite_exchange_envelope_rows=finite_exchange_envelope_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9962,6 +9980,63 @@ def write_sota_glassbench_late_recovery_public_timecode_ceiling_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_censored_window_claim_audit_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 410
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_public_window_ready": "#2f855a",
+        "alpha_anchor_ready_late_recovery_censored": "#b7791f",
+        "alpha_anchor_ready_late_recovery_unresolved": "#c05621",
+        "public_window_pre_alpha_only": "#805ad5",
+        "finite_exchange_envelope_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["censored_window_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        fraction = float(row["public_window_fraction_of_target_lag"])
+        late_allowed = int(float(row["late_gaussian_recovery_claim_allowed"]))
+        alpha_allowed = int(float(row["alpha_relaxation_claim_allowed"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="424" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">public max={row["public_max_time_code"]}; target={row["target_time_code"]}; alpha allowed={alpha_allowed}; late recovery allowed={late_allowed}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">public/target lag={fraction:.4g}; target/public={float(row["target_lag_over_public_max"]):.3g}; tau_alpha={float(row["tau_alpha_direct"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim level={str(row["allowed_public_claim_level"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:62]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench censored-window claim audit</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The public time window can support alpha-anchor diagnostics while late Gaussian recovery remains censored by the public time-code ceiling.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim audit stage</text>
+  <text x="{left + 580}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">allowed public claims</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -12941,6 +13016,17 @@ def main() -> None:
     write_sota_glassbench_late_recovery_public_timecode_ceiling_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.svg",
         glassbench_late_recovery_public_timecode_ceiling_rows,
+    )
+    glassbench_censored_window_claim_audit_rows = (
+        write_sota_glassbench_censored_window_claim_audit_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.csv",
+            public_ceiling_rows=glassbench_late_recovery_public_timecode_ceiling_rows,
+            finite_exchange_envelope_rows=glassbench_finite_exchange_envelope_rows,
+        )
+    )
+    write_sota_glassbench_censored_window_claim_audit_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.svg",
+        glassbench_censored_window_claim_audit_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

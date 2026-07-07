@@ -152,6 +152,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_cache_request_contract,
     glassbench_late_recovery_membership_probe_contract,
     glassbench_late_recovery_public_timecode_ceiling,
+    glassbench_censored_window_claim_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1500,6 +1501,59 @@ class DelayedRenewalCageTests(unittest.TestCase):
             "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
         )
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_censored_window_claim_audit_keeps_late_recovery_claim_blocked(self):
+        public_ceiling_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "timecode_target_ready": 1.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+                "public_max_time_code": "tc40",
+                "public_max_lag_time": 1500000.0,
+                "target_lag_over_public_max": 110.66815121174359,
+                "public_ceiling_stage": "late_recovery_beyond_public_timecode_ceiling",
+                "primary_blocker": "public_glassbench_timecode_ceiling",
+                "next_required_action": "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
+            }
+        ]
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "tau_alpha_direct": 1500000.0,
+                "latest_lag_time": 1500000.0,
+                "gaussian_recovery_lag_upper_bound": 166002226.81761542,
+            }
+        ]
+
+        rows = glassbench_censored_window_claim_audit(
+            audit_id="glassbench_censored_window_claim_audit",
+            public_ceiling_rows=public_ceiling_rows,
+            finite_exchange_envelope_rows=envelope_rows,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["censored_window_stage"], "alpha_anchor_ready_late_recovery_censored")
+        self.assertEqual(float(row["alpha_anchor_window_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["public_window_fraction_of_target_lag"]), 1500000.0 / 166002226.81761542)
+        self.assertGreater(float(row["target_lag_over_public_max"]), 100.0)
+        self.assertEqual(float(row["short_window_dynamic_claim_allowed"]), 1.0)
+        self.assertEqual(float(row["alpha_relaxation_claim_allowed"]), 1.0)
+        self.assertEqual(float(row["late_gaussian_recovery_claim_allowed"]), 0.0)
+        self.assertEqual(float(row["static_vs_finite_exchange_rejection_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["allowed_public_claim_level"], "alpha_anchor_and_pre_late_dynamic_signatures")
+        self.assertEqual(row["primary_blocker"], "public_glassbench_timecode_ceiling")
+        self.assertEqual(
+            row["next_required_action"],
+            "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
+        )
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

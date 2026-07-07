@@ -4861,6 +4861,88 @@ def write_sota_glassbench_late_recovery_public_timecode_ceiling_pdf(path: Path) 
     c.save()
 
 
+def write_sota_glassbench_censored_window_claim_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench censored-window claim audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The public window can support alpha-anchor diagnostics while late recovery and mechanism rejection remain censored.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 78
+    colors_by_stage = {
+        "late_recovery_public_window_ready": colors.HexColor("#2f855a"),
+        "alpha_anchor_ready_late_recovery_censored": colors.HexColor("#b7791f"),
+        "alpha_anchor_ready_late_recovery_unresolved": colors.HexColor("#c05621"),
+        "public_window_pre_alpha_only": colors.HexColor("#805ad5"),
+        "finite_exchange_envelope_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "claim audit stage")
+    c.drawString(left + 398, top + 24, "allowed public claims")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["censored_window_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 280, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:52])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 398,
+            y,
+            "public max={}; target={}; alpha={:.0f}; late={:.0f}; reject-static={:.0f}".format(
+                row["public_max_time_code"],
+                row["target_time_code"],
+                float(row["alpha_relaxation_claim_allowed"]),
+                float(row["late_gaussian_recovery_claim_allowed"]),
+                float(row["static_vs_finite_exchange_rejection_ready"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 398,
+            y - 14,
+            "public/target lag={:.4g}; target/public={:.3g}; tau_alpha={:.3g}".format(
+                float(row["public_window_fraction_of_target_lag"]),
+                float(row["target_lag_over_public_max"]),
+                float(row["tau_alpha_direct"]),
+            ),
+        )
+        c.drawString(
+            left + 398,
+            y - 27,
+            f'claim level={row["allowed_public_claim_level"].replace("_", " ")[:58]}',
+        )
+        c.drawString(
+            left + 398,
+            y - 40,
+            f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:48]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a claim-scope gate: it permits public-window alpha diagnostics but not late Gaussian recovery or thermodynamic claims.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7169,6 +7251,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_late_recovery_public_timecode_ceiling_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf"
     )
+    sota_glassbench_censored_window_claim_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -7384,6 +7469,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_late_recovery_public_timecode_ceiling_pdf(
         sota_glassbench_late_recovery_public_timecode_ceiling_pdf
+    )
+    write_sota_glassbench_censored_window_claim_audit_pdf(
+        sota_glassbench_censored_window_claim_audit_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7654,6 +7742,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_late_recovery_public_timecode_ceiling_pdf,
             "figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf",
+        )
+        archive.write(
+            sota_glassbench_censored_window_claim_audit_pdf,
+            "figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,
