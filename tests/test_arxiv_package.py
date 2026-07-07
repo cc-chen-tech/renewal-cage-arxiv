@@ -1521,6 +1521,28 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_030["late_recovery_ingestion_stage"], "late_recovery_envelope_upstream_incomplete")
         self.assertEqual(ka2d_030["primary_blocker"], "finite_exchange_envelope")
 
+    def test_sota_glassbench_late_recovery_timecode_target_names_next_cache(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_timecode_target.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["timecode_target_stage"], "late_recovery_timecode_target_ready")
+        self.assertEqual(float(ka2d_023["timecode_target_ready"]), 1.0)
+        self.assertEqual(ka2d_023["current_max_time_code"], "tc40")
+        self.assertEqual(ka2d_023["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(ka2d_023["current_max_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(ka2d_023["required_followup_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertGreater(float(ka2d_023["target_lag_over_required"]), 3.8)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_time_code_cache")
+        self.assertEqual(float(ka2d_023["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2551,6 +2573,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2747,6 +2770,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

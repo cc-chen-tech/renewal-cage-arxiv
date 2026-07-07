@@ -70,6 +70,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_finite_exchange_falsification_envelope,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
+    glassbench_late_recovery_timecode_target,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4497,6 +4498,23 @@ def write_sota_glassbench_late_recovery_ingestion_contract_csv(
         contract_id="glassbench_ka2d_late_recovery_ingestion_contract",
         envelope_rows=envelope_rows,
         candidate_rows=[],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_timecode_target_csv(
+    path: Path,
+    *,
+    envelope_rows: list[dict[str, float | str]],
+    interval_clock_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the next GlassBench time-code cache needed for late recovery."""
+
+    rows = glassbench_late_recovery_timecode_target(
+        target_id="glassbench_ka2d_late_recovery_timecode_target",
+        envelope_rows=envelope_rows,
+        interval_clock_rows=interval_clock_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9655,6 +9673,63 @@ def write_sota_glassbench_late_recovery_ingestion_contract_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_late_recovery_timecode_target_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_timecode_target_ready": "#2b6cb0",
+        "late_recovery_timecode_target_already_covered": "#2f855a",
+        "late_recovery_timecode_target_clock_incomplete": "#c05621",
+        "late_recovery_timecode_target_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["timecode_target_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        current_lag = float(row["current_max_lag_time"])
+        required_lag = float(row["required_followup_lag_time"])
+        target_lag = float(row["target_lag_time"])
+        target_ratio = float(row["target_lag_over_required"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; current={row["current_max_time_code"]} ({current_lag:.3g}); required lag={required_lag:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">target={row["target_time_code"]} ({target_lag:.3g}); target/required={target_ratio:.3g}; steps needed={int(float(row["timecode_steps_needed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">late observation ready={int(float(row["late_recovery_observation_ready"]))}; real PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:78]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late recovery time-code target</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The finite-exchange recovery horizon is converted into the first GlassBench time-code cache that can test late NGP or van-Hove recovery.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time-code stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">acquisition target</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -12591,6 +12666,17 @@ def main() -> None:
     write_sota_glassbench_late_recovery_ingestion_contract_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.svg",
         glassbench_late_recovery_ingestion_contract_rows,
+    )
+    glassbench_late_recovery_timecode_target_rows = (
+        write_sota_glassbench_late_recovery_timecode_target_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.csv",
+            envelope_rows=glassbench_finite_exchange_envelope_rows,
+            interval_clock_rows=glassbench_interval_censored_first_crossing_clock_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_timecode_target_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.svg",
+        glassbench_late_recovery_timecode_target_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

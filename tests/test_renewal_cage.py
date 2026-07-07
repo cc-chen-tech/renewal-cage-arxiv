@@ -148,6 +148,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_finite_exchange_falsification_envelope,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
+    glassbench_late_recovery_timecode_target,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1175,6 +1176,66 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(no_uncertainty["late_recovery_ingestion_stage"], "late_recovery_uncertainty_incomplete")
         self.assertEqual(no_uncertainty["missing_uncertainty_columns"], "sigma_late_ngp;sigma_tail_recovery")
         self.assertEqual(no_uncertainty["primary_blocker"], "sigma_late_ngp")
+
+    def test_glassbench_late_recovery_timecode_target_maps_required_lag_to_next_cache(self):
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "envelope_ready": 0.0,
+                "gaussian_recovery_lag_upper_bound": 0.0,
+            },
+        ]
+        interval_clock_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "interval_clock_candidate_ready": 1.0,
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.10000000000000001;1.1000000000000001;11.640000000000001;122.47;1288.4100000000001;13554;142587;1500000",
+            },
+        ]
+
+        rows = glassbench_late_recovery_timecode_target(
+            target_id="glassbench_late_recovery_timecode_target",
+            envelope_rows=envelope_rows,
+            interval_clock_rows=interval_clock_rows,
+        )
+
+        by_key = {(row["system_id"], row["temperature"], row["structure_id"]): row for row in rows}
+        ready = by_key[("KA2D", "0.23", "151")]
+        incomplete = by_key[("KA2D", "0.30", "3")]
+
+        self.assertEqual(ready["timecode_target_stage"], "late_recovery_timecode_target_ready")
+        self.assertEqual(float(ready["timecode_target_ready"]), 1.0)
+        self.assertEqual(ready["current_max_time_code"], "tc40")
+        self.assertAlmostEqual(float(ready["current_max_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(ready["required_followup_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertEqual(ready["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(ready["target_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertAlmostEqual(float(ready["current_lag_over_required"]), 0.034905816123841256, delta=1e-12)
+        self.assertGreater(float(ready["target_lag_over_required"]), 3.8)
+        self.assertAlmostEqual(float(ready["timecode_log_lag_step"]), 2.3532680473611762, delta=1e-12)
+        self.assertEqual(float(ready["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(float(ready["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ready["primary_blocker"], "late_recovery_time_code_cache")
+        self.assertEqual(
+            ready["next_required_action"],
+            "extract_or_cache_glassbench_time_code_tc50_late_recovery_observables",
+        )
+        self.assertEqual(float(ready["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(incomplete["timecode_target_stage"], "late_recovery_timecode_target_upstream_incomplete")
+        self.assertEqual(incomplete["primary_blocker"], "finite_exchange_envelope")
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

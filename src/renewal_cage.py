@@ -7577,6 +7577,130 @@ def glassbench_late_recovery_ingestion_contract(
     return rows
 
 
+def glassbench_late_recovery_timecode_target(
+    *,
+    target_id: str,
+    envelope_rows: Sequence[dict[str, object]],
+    interval_clock_rows: Sequence[dict[str, object]],
+    time_code_step: int | None = None,
+) -> list[dict[str, float | str]]:
+    """Map the required late-recovery lag horizon onto the next time-code cache."""
+
+    if not target_id:
+        raise ValueError("target_id must be nonempty")
+    if not envelope_rows:
+        raise ValueError("envelope_rows must be nonempty")
+    if time_code_step is not None and time_code_step <= 0:
+        raise ValueError("time_code_step must be positive")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_series(row: dict[str, object]) -> list[tuple[int, str, float]]:
+        codes = [value for value in str(row.get("time_codes", "")).split(";") if value]
+        lag_text = [value for value in str(row.get("lag_times", "")).split(";") if value]
+        pairs: list[tuple[int, str, float]] = []
+        for code, lag in zip(codes, lag_text):
+            match = re.fullmatch(r"tc(\d+)", code)
+            if match is None:
+                continue
+            lag_value = float(lag)
+            if lag_value > 0.0:
+                pairs.append((int(match.group(1)), code, lag_value))
+        return sorted(pairs)
+
+    clock_by_key = {key_for(row): row for row in interval_clock_rows}
+    rows: list[dict[str, float | str]] = []
+    for envelope in sorted(envelope_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(envelope)
+        envelope_ready = float(envelope.get("envelope_ready", 0.0) or 0.0) == 1.0
+        required_lag = float(envelope.get("gaussian_recovery_lag_upper_bound", 0.0) or 0.0)
+        clock = clock_by_key.get((system_id, temperature, structure_id), {})
+        clock_ready = float(clock.get("interval_clock_candidate_ready", 0.0) or 0.0) == 1.0
+        pairs = parse_series(clock)
+        current_code = pairs[-1][1] if pairs else "none"
+        current_code_number = pairs[-1][0] if pairs else 0
+        current_lag = pairs[-1][2] if pairs else 0.0
+        target_code = "none"
+        target_code_number = 0
+        target_lag = 0.0
+        log_step = 0.0
+        current_ratio = current_lag / required_lag if required_lag > 0.0 else 0.0
+        target_ratio = 0.0
+        steps_needed = 0
+        target_ready = False
+
+        if not envelope_ready:
+            stage = "late_recovery_timecode_target_upstream_incomplete"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_falsification_envelope"
+        elif not clock_ready or len(pairs) < 2 or required_lag <= 0.0:
+            stage = "late_recovery_timecode_target_clock_incomplete"
+            blocker = "interval_censored_first_crossing_clock"
+            next_action = "complete_interval_censored_first_crossing_clock"
+        else:
+            prev_code_number, _, prev_lag = pairs[-2]
+            observed_step = current_code_number - prev_code_number
+            step = int(time_code_step or observed_step)
+            log_step = math.log(current_lag / prev_lag) / observed_step * step
+            if current_lag >= required_lag:
+                target_code_number = current_code_number
+                target_code = current_code
+                target_lag = current_lag
+                stage = "late_recovery_timecode_target_already_covered"
+                blocker = "late_recovery_observation"
+                next_action = "measure_late_ngp_or_van_hove_at_current_max_time_code"
+            else:
+                steps_needed = max(
+                    1,
+                    math.ceil(math.log(required_lag / current_lag) / log_step),
+                )
+                target_code_number = current_code_number + step * steps_needed
+                target_code = f"tc{target_code_number:02d}"
+                target_lag = current_lag * math.exp(log_step * steps_needed)
+                stage = "late_recovery_timecode_target_ready"
+                blocker = "late_recovery_time_code_cache"
+                next_action = (
+                    f"extract_or_cache_glassbench_time_code_{target_code}_late_recovery_observables"
+                )
+            target_ratio = target_lag / required_lag if required_lag > 0.0 else 0.0
+            target_ready = target_lag >= required_lag and target_code != "none"
+
+        rows.append(
+            {
+                "target_id": target_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "envelope_ready": float(envelope_ready),
+                "interval_clock_candidate_ready": float(clock_ready),
+                "required_followup_lag_time": float(required_lag),
+                "current_max_time_code": current_code,
+                "current_max_time_code_number": float(current_code_number),
+                "current_max_lag_time": float(current_lag),
+                "current_lag_over_required": float(current_ratio),
+                "target_time_code": target_code,
+                "target_time_code_number": float(target_code_number),
+                "target_lag_time": float(target_lag),
+                "target_lag_over_required": float(target_ratio),
+                "timecode_log_lag_step": float(log_step),
+                "timecode_steps_needed": float(steps_needed),
+                "timecode_target_ready": float(target_ready),
+                "late_recovery_observation_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "timecode_target_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
