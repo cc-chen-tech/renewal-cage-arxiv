@@ -57,6 +57,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_observable_semantics_audit,
     glassbench_direct_alpha_curve_audit,
     glassbench_direct_alpha_displacement_tail_bound,
+    glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_event_clock_threshold_readiness_gate,
@@ -4237,6 +4238,114 @@ def write_sota_glassbench_direct_alpha_displacement_tail_bound_csv(
         pe_bound_rows=pe_bound_rows,
         displacement_rows=displacement_rows,
         min_tail_fraction=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_multilag_crossing_canary_csv(
+    path: Path,
+    *,
+    pe_bound_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute multi-lag displacement threshold crossings from cached replicates."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    manifest_by_key: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            manifest_by_key.setdefault(key, []).append(row)
+
+    crossing_rows: list[dict[str, float | str]] = []
+    for bound in pe_bound_rows:
+        if float(bound.get("pe_feasibility_bound_ready", 0.0) or 0.0) != 1.0:
+            continue
+        system_id = str(bound["system_id"])
+        temperature = str(bound["temperature"])
+        structure_id = str(bound["structure_id"])
+        q_bound = float(bound.get("jump_variance_upper_bound", 0.0) or 0.0)
+        if q_bound <= 0.0:
+            continue
+        rows = sorted(
+            manifest_by_key.get((system_id, temperature, structure_id), []),
+            key=lambda item: float(item.get("lag_time", 0.0) or 0.0),
+        )
+        if len(rows) < 2:
+            continue
+        q_by_lag: list[np.ndarray] = []
+        for row in rows:
+            with np.load(ROOT / row["particle_cache_path"]) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+            displacement = positions - initial_positions[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                displacement = displacement - box * np.round(displacement / box)
+            q_by_lag.append(np.sum(displacement * displacement, axis=2) / float(displacement.shape[-1]))
+        q = np.stack(q_by_lag, axis=0)
+        above = q > q_bound
+        ever = np.any(above, axis=0)
+        first_index = np.argmax(above, axis=0)
+        first_index[~ever] = -1
+        post_recross_count = 0
+        post_crossable_count = 0
+        for replica_index in range(above.shape[1]):
+            for particle_index in range(above.shape[2]):
+                idx = int(first_index[replica_index, particle_index])
+                if 0 <= idx < above.shape[0] - 1:
+                    post_crossable_count += 1
+                    if np.any(~above[idx + 1 :, replica_index, particle_index]):
+                        post_recross_count += 1
+        first_q = np.asarray(
+            [
+                q[int(first_index[replica_index, particle_index]), replica_index, particle_index]
+                for replica_index in range(q.shape[1])
+                for particle_index in range(q.shape[2])
+                if int(first_index[replica_index, particle_index]) >= 0
+            ],
+            dtype=float,
+        )
+        time_codes = [str(row["time_code"]) for row in rows]
+        lag_times = [float(row["lag_time"]) for row in rows]
+        first_fraction_terms = []
+        sample_count = float(q.shape[1] * q.shape[2])
+        for idx, time_code in enumerate(time_codes):
+            fraction = float(np.mean(first_index == idx))
+            if fraction > 0.0:
+                first_fraction_terms.append(f"{time_code}:{fraction:.17g}")
+        crossing_rows.append(
+            {
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                "time_codes": ";".join(time_codes),
+                "lag_times": ";".join(f"{value:.17g}" for value in lag_times),
+                "sample_count": sample_count,
+                "above_bound_fractions_by_lag": ";".join(
+                    f"{float(np.mean(above[idx])):.17g}" for idx in range(above.shape[0])
+                ),
+                "ever_crossed_fraction": float(np.mean(ever)),
+                "never_crossed_fraction": float(np.mean(~ever)),
+                "post_crossing_recross_fraction": float(post_recross_count / post_crossable_count)
+                if post_crossable_count > 0
+                else 0.0,
+                "first_crossing_fractions_by_time_code": ";".join(first_fraction_terms)
+                if first_fraction_terms
+                else "none",
+                "first_crossing_q_mean": float(np.mean(first_q)) if first_q.size else 0.0,
+                "first_crossing_q_median": float(np.median(first_q)) if first_q.size else 0.0,
+                "first_crossing_q_p90": float(np.percentile(first_q, 90.0)) if first_q.size else 0.0,
+            }
+        )
+    rows = glassbench_direct_alpha_multilag_crossing_canary(
+        audit_id="glassbench_ka2d_direct_alpha_multilag_crossing_canary",
+        pe_bound_rows=pe_bound_rows,
+        crossing_rows=crossing_rows,
+        min_crossing_fraction=0.05,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8939,6 +9048,59 @@ def write_sota_glassbench_direct_alpha_displacement_tail_bound_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "multilag_displacement_crossing_canary_ready_replica_axis_blocked": "#805ad5",
+        "multilag_displacement_crossing_canary_ready_event_clock_pending": "#2b6cb0",
+        "multilag_displacement_crossing_canary_incomplete": "#c05621",
+        "pe_feasibility_bound_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["crossing_canary_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ever = float(row["ever_crossed_fraction"])
+        recross = float(row["post_crossing_recross_fraction"])
+        q_ratio = float(row["first_crossing_q_mean_over_bound"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; lags={len(str(row["time_codes"]).split(";"))}; samples={float(row["sample_count"]):.0f}; ever crossed={ever:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">recross after first crossing={recross:.3g}; mean first-cross q/q_max={q_ratio:.3g}; axis0 replica={int(float(row["axis0_is_isoconfigurational_replica"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha multi-lag crossing canary</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached lag ladder gives a displacement-threshold segmentation target while keeping the isoconfigurational replica axis out of the event-clock claim.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">crossing canary stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">multi-lag threshold crossing status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11793,6 +11955,16 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_displacement_tail_bound_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg",
         glassbench_direct_alpha_displacement_tail_bound_rows,
+    )
+    glassbench_direct_alpha_multilag_crossing_canary_rows = (
+        write_sota_glassbench_direct_alpha_multilag_crossing_canary_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.csv",
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.svg",
+        glassbench_direct_alpha_multilag_crossing_canary_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

@@ -138,6 +138,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_anchor_cached_fs_audit,
     glassbench_direct_alpha_curve_audit,
     glassbench_direct_alpha_displacement_tail_bound,
+    glassbench_direct_alpha_multilag_crossing_canary,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_cage_jump_proxy_canary,
@@ -706,6 +707,55 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["event_segmentation_required"]), 1.0)
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "event_segmentation")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_multilag_crossing_canary_blocks_replica_axis_clock(self):
+        pe_bound_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "jump_variance_upper_bound": 0.4855550202214053,
+                "pe_feasibility_bound_ready": 1.0,
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+                "sample_count": 25800.0,
+                "above_bound_fractions_by_lag": "0;0;0;0;3.875968992248062e-05;0.001434108527131783;0.022325581395348838;0.2349612403100775",
+                "ever_crossed_fraction": 0.24007751937984495,
+                "never_crossed_fraction": 0.759922480620155,
+                "post_crossing_recross_fraction": 0.23599320882852293,
+                "first_crossing_fractions_by_time_code": "tc25:3.875968992248062e-05;tc30:0.001434108527131783;tc35:0.02135658914728682;tc40:0.21724806201550387",
+                "first_crossing_q_mean": 1.671772382881059,
+                "first_crossing_q_median": 1.1118363749999993,
+                "first_crossing_q_p90": 3.4652622499604004,
+            }
+        ]
+
+        row = glassbench_direct_alpha_multilag_crossing_canary(
+            audit_id="glassbench_direct_alpha_multilag_crossing_canary",
+            pe_bound_rows=pe_bound_rows,
+            crossing_rows=crossing_rows,
+            min_crossing_fraction=0.05,
+        )[0]
+
+        self.assertEqual(row["crossing_canary_stage"], "multilag_displacement_crossing_canary_ready_replica_axis_blocked")
+        self.assertEqual(float(row["crossing_canary_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["ever_crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(row["post_crossing_recross_fraction"]), 0.23599320882852293)
+        self.assertAlmostEqual(float(row["first_crossing_q_mean_over_bound"]), 3.4430132801814253)
+        self.assertEqual(float(row["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_event_clock_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

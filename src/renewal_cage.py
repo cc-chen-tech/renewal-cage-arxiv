@@ -6608,6 +6608,117 @@ def glassbench_direct_alpha_displacement_tail_bound(
     return out
 
 
+def glassbench_direct_alpha_multilag_crossing_canary(
+    *,
+    audit_id: str,
+    pe_bound_rows: Sequence[dict[str, object]],
+    crossing_rows: Sequence[dict[str, object]],
+    min_crossing_fraction: float = 0.05,
+) -> list[dict[str, float | str]]:
+    """Audit multi-lag displacement threshold crossings without promoting replica axes."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not pe_bound_rows:
+        raise ValueError("pe_bound_rows must be nonempty")
+    if not crossing_rows:
+        raise ValueError("crossing_rows must be nonempty")
+    if not 0.0 < min_crossing_fraction < 1.0:
+        raise ValueError("min_crossing_fraction must lie between zero and one")
+
+    crossing_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in crossing_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        crossing_by_key[key] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        pe_bound_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        pe_ready = float(row.get("pe_feasibility_bound_ready", 0.0) or 0.0) == 1.0
+        q_bound = float(row.get("jump_variance_upper_bound", 0.0) or 0.0)
+        crossing = crossing_by_key.get((system_id, temperature, structure_id), {})
+        axis0_semantics = str(crossing.get("axis0_semantics", "unknown"))
+        axis0_replica = axis0_semantics == "isoconfigurational_trajectory_replicates"
+        ever_crossed = float(crossing.get("ever_crossed_fraction", 0.0) or 0.0)
+        first_q_mean = float(crossing.get("first_crossing_q_mean", 0.0) or 0.0)
+        has_crossing_stats = q_bound > 0.0 and ever_crossed > 0.0 and first_q_mean > 0.0
+        target_ready = pe_ready and has_crossing_stats and ever_crossed >= min_crossing_fraction
+
+        if target_ready and axis0_replica:
+            stage = "multilag_displacement_crossing_canary_ready_replica_axis_blocked"
+            blocker = "frame_axis_is_isoconfigurational_replicates"
+            next_action = "extract_true_particle_time_trajectory_for_event_clock_segmentation"
+            canary_ready = True
+        elif target_ready:
+            stage = "multilag_displacement_crossing_canary_ready_event_clock_pending"
+            blocker = "event_clock_segmentation"
+            next_action = "run_threshold_sweep_event_clock_segmentation"
+            canary_ready = True
+        elif pe_ready:
+            stage = "multilag_displacement_crossing_canary_incomplete"
+            blocker = "multilag_crossing_statistics"
+            next_action = "compute_multilag_displacement_threshold_crossings"
+            canary_ready = False
+        else:
+            stage = "pe_feasibility_bound_upstream_incomplete"
+            blocker = "pe_feasibility_bound"
+            next_action = "complete_direct_alpha_pe_feasibility_bound"
+            canary_ready = False
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(row.get("tau_alpha_direct", 0.0) or 0.0),
+                "q_bound": float(q_bound),
+                "axis0_semantics": axis0_semantics,
+                "axis0_is_isoconfigurational_replica": float(axis0_replica),
+                "time_codes": str(crossing.get("time_codes", "none")),
+                "lag_times": str(crossing.get("lag_times", "none")),
+                "sample_count": float(crossing.get("sample_count", 0.0) or 0.0),
+                "above_bound_fractions_by_lag": str(crossing.get("above_bound_fractions_by_lag", "none")),
+                "first_crossing_fractions_by_time_code": str(
+                    crossing.get("first_crossing_fractions_by_time_code", "none")
+                ),
+                "ever_crossed_fraction": float(ever_crossed),
+                "never_crossed_fraction": float(crossing.get("never_crossed_fraction", 0.0) or 0.0),
+                "post_crossing_recross_fraction": float(
+                    crossing.get("post_crossing_recross_fraction", 0.0) or 0.0
+                ),
+                "first_crossing_q_mean": float(first_q_mean),
+                "first_crossing_q_mean_over_bound": float(first_q_mean / q_bound) if q_bound > 0.0 else 0.0,
+                "first_crossing_q_median": float(crossing.get("first_crossing_q_median", 0.0) or 0.0),
+                "first_crossing_q_p90": float(crossing.get("first_crossing_q_p90", 0.0) or 0.0),
+                "min_crossing_fraction": float(min_crossing_fraction),
+                "event_segmentation_target_ready": float(target_ready),
+                "crossing_canary_ready": float(canary_ready),
+                "persistence_exchange_event_clock_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "crossing_canary_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
