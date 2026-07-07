@@ -1750,6 +1750,260 @@ def write_simultaneous_closure_pdf(path: Path) -> None:
     c.save()
 
 
+def write_microdynamic_prediction_scorecard_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_microdynamic_prediction_scorecard.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Microdynamic prediction scorecard")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Few microdynamic statistics must predict held-out macro signatures; current GlassBench support remains prediction-gated.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "row")
+    c.drawString(left + 215, top, "stage")
+    c.drawString(left + 485, top, "accounting")
+    c.drawString(left + 645, top, "claim/blocker")
+    palette = {
+        "microstats_to_macro_prediction_passed": colors.HexColor("#2f855a"),
+        "heldout_macro_prediction_rejected": colors.HexColor("#c05621"),
+        "real_glassbench_prediction_blocked": colors.HexColor("#2b6cb0"),
+        "real_glassbench_microdynamic_prediction_ready": colors.HexColor("#276749"),
+        "simultaneous_dynamical_signature_closure_passed": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 6.6)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 42
+        stage = row["scorecard_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["scorecard_row_id"].replace("_", " ")[:35])
+        c.setFillColor(color)
+        c.rect(left + 215, y - 4, 240, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 220, y, stage.replace("_", " ")[:39])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 485,
+            y,
+            "micro={:.0f}; held={:.0f}; fit={:.0f}; real={:.0f}; members={:.0f}->{:.0f}".format(
+                float(row["micro_input_count"]),
+                float(row["heldout_macro_prediction_count"]),
+                float(row["macro_fit_parameter_count"]),
+                float(row["real_data_comparison_ready"]),
+                float(row["current_member_count"]),
+                float(row["required_member_count"]),
+            ),
+        )
+        c.drawString(left + 645, y, row["allowed_claim_level"].replace("_", " ")[:44])
+        c.drawString(left + 645, y - 10, f"blocker={row['primary_blocker'].replace('_', ' ')[:42]}")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The scorecard allows dynamical-signature closure claims only for held-out prediction rows; thermodynamic glass-transition claims remain out of scope.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_microdynamic_minimality_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_microdynamic_minimality_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Microdynamic minimality audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Prediction claims require persistence, exchange, jump variance, and cage scale; missing inputs remain underidentified or fit-only.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "row")
+    c.drawString(left + 220, top, "minimality stage")
+    c.drawString(left + 505, top, "inputs / held-out")
+    c.drawString(left + 660, top, "missing inputs")
+    palette = {
+        "necessary_microstatistics_sufficient": colors.HexColor("#2f855a"),
+        "required_microstatistics_missing": colors.HexColor("#c05621"),
+        "macro_fit_only_overclaim_risk": colors.HexColor("#b83280"),
+        "real_data_microdynamic_inputs_missing": colors.HexColor("#2b6cb0"),
+        "real_data_microdynamic_inputs_ready": colors.HexColor("#276749"),
+    }
+    c.setFont("Helvetica", 6.5)
+    for idx, row in enumerate(rows):
+        y = top - 20 - idx * 36
+        stage = row["minimality_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["audit_row_id"].replace("_", " ")[:35])
+        c.setFillColor(color)
+        c.rect(left + 220, y - 4, 250, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 225, y, stage.replace("_", " ")[:41])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 505,
+            y,
+            "missing={:.0f}; held={:.0f}; fit={:.0f}; risk={:.0f}".format(
+                float(row["missing_required_input_count"]),
+                float(row["heldout_macro_prediction_count"]),
+                float(row["macro_fit_parameter_count"]),
+                float(row["overclaim_risk"]),
+            ),
+        )
+        c.drawString(left + 660, y, row["missing_required_inputs"].replace("_", " ")[:58])
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This audit is a minimality and overclaim guard for dynamical predictions, not a thermodynamic glass-transition derivation.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_experimental_verdict_matrix_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_experimental_verdict_matrix.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA experimental verdict matrix")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Literature trends, GlassBench support, microdynamic predictions, and scope boundaries are collapsed into manuscript-safe verdicts.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "verdict row")
+    c.drawString(left + 210, top, "stage")
+    c.drawString(left + 500, top, "evidence flags")
+    c.drawString(left + 640, top, "allowed claim / blocker")
+    palette = {
+        "sota_dynamic_signatures_supported": colors.HexColor("#2f855a"),
+        "sota_dynamic_signatures_partial": colors.HexColor("#d69e2e"),
+        "mechanism_selection_protocol_supported": colors.HexColor("#276749"),
+        "mechanism_selection_protocol_incomplete": colors.HexColor("#c05621"),
+        "real_glassbench_closed_loop_ready": colors.HexColor("#276749"),
+        "real_glassbench_closed_loop_blocked": colors.HexColor("#2b6cb0"),
+        "thermodynamic_transition_out_of_scope": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica", 6.7)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 42
+        stage = row["sota_verdict_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["verdict_row_id"].replace("_", " ")[:34])
+        c.setFillColor(color)
+        c.rect(left + 210, y - 4, 260, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 215, y, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 500,
+            y,
+            "lit={:.0f}; real={:.0f}; micro={:.0f}; reject={:.0f}; thermo={:.0f}".format(
+                float(row["literature_trend_support"]),
+                float(row["real_glassbench_support"]),
+                float(row["microdynamic_prediction_support"]),
+                float(row["mechanism_rejection_ready"]),
+                float(row["thermodynamic_claim_allowed"]),
+            ),
+        )
+        c.drawString(left + 640, y, row["allowed_claim_level"].replace("_", " ")[:43])
+        c.drawString(left + 640, y - 10, f"blocker={row['primary_blocker'].replace('_', ' ')[:40]}")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The verdict permits dynamical-signature and mechanism-diagnostic claims while blocking real closed-loop and thermodynamic-transition overclaims.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_real_evidence_claim_synthesis_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real evidence claim synthesis")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real cached evidence, direct-alpha predictions, mechanism selection, and scope boundaries are reduced to manuscript-safe claim levels.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "claim row")
+    c.drawString(left + 210, top, "stage")
+    c.drawString(left + 520, top, "claim flags")
+    c.drawString(left + 660, top, "allowed claim / blocker")
+    palette = {
+        "real_dynamic_signatures_supported_preinversion": colors.HexColor("#2f855a"),
+        "real_dynamic_signatures_supported_and_inversion_ready": colors.HexColor("#276749"),
+        "real_dynamic_signatures_not_supported": colors.HexColor("#c05621"),
+        "multik_alpha_candidate_preregistered_post_window": colors.HexColor("#2b6cb0"),
+        "multik_alpha_shape_prediction_supported": colors.HexColor("#2f855a"),
+        "multik_alpha_prediction_rejected": colors.HexColor("#c05621"),
+        "conditional_transport_pe_bound_ready_event_clock_blocked": colors.HexColor("#805ad5"),
+        "mechanism_selection_preregistered_late_recovery_missing": colors.HexColor("#b7791f"),
+        "real_mechanism_selection_ready": colors.HexColor("#276749"),
+        "thermodynamic_transition_out_of_scope": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica", 6.5)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 42
+        stage = row["claim_synthesis_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["claim_row_id"].replace("_", " ")[:34])
+        c.setFillColor(color)
+        c.rect(left + 210, y - 4, 290, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 215, y, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 520,
+            y,
+            "cand={:.0f}; claim={:.0f}; real={:.0f}; PE={:.0f}; thermo={:.0f}".format(
+                float(row["candidate_ready"]),
+                float(row["claim_ready_now"]),
+                float(row["real_glassbench_support"]),
+                float(row["real_pe_inversion_ready"]),
+                float(row["thermodynamic_claim_allowed"]),
+            ),
+        )
+        c.drawString(left + 660, y, row["allowed_claim_level"].replace("_", " ")[:43])
+        c.drawString(left + 660, y - 10, f"blocker={row['primary_blocker'].replace('_', ' ')[:40]}")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This synthesis is a claim-level ledger: it supports dynamical signatures while keeping PE inversion and thermodynamics blocked.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -3269,7 +3523,7 @@ def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
         "Official trajectory README maps tc file codes to lag times and identifies positions[20] as isoconfigurational replicas.",
     )
     left, top = 48, page_h - 92
-    row_h = 56
+    row_h = 42
     colors_by_stage = {
         "physical_timecode_semantics_ready_sparse_coverage": colors.HexColor("#2b6cb0"),
         "physical_timecode_semantics_ready_member_uncertainty_short": colors.HexColor("#b7791f"),
@@ -3279,7 +3533,7 @@ def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
     c.drawString(left, top + 18, "target")
     c.drawString(left + 104, top + 18, "semantic stage")
     c.drawString(left + 370, top + 18, "corrected fixed-time observables")
-    for index, row in enumerate(rows[:4]):
+    for index, row in enumerate(rows):
         y = top - index * row_h
         stage = row["timecode_semantics_stage"]
         color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
@@ -3314,12 +3568,3177 @@ def write_sota_glassbench_ka2d_timecode_semantics_pdf(path: Path) -> None:
                 int(float(row["frame_axis_is_physical_time"])),
             ),
         )
-        c.drawString(left + 370, y - 27, f'blocker={row["primary_blocker"]}; next={row["next_required_action"]}')
+        c.drawString(left + 370, y - 27, f'blocker={row["primary_blocker"]}; next={row["next_required_action"][:54]}')
     c.setFont("Helvetica", 8)
     c.drawString(
         42,
         34,
         "This corrects the trajectory-axis semantics; full time-code coverage is still required before real inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_timecode_curve_bridge_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench time-code curve bridge")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Corrected KA2D physical-time rows are translated into the trajectory PE pre-inversion schema without promoting blockers.",
+    )
+    left, top = 48, page_h - 98
+    row_h = 54
+    colors_by_stage = {
+        "glassbench_timecode_curve_bridge_ready": colors.HexColor("#2f855a"),
+        "glassbench_timecode_curve_bridge_incomplete": colors.HexColor("#c05621"),
+        "glassbench_timecode_curve_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 22, "target")
+    c.drawString(left + 100, top + 22, "bridge stage")
+    c.drawString(left + 345, top + 22, "real-data inversion status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["bridge_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 228, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:39])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 345,
+            y,
+            "lags={}; tc curve={}; real curve={}; PE inversion={}; blocker={}".format(
+                int(float(row["lag_count"])),
+                int(float(row["timecode_curve_ready"])),
+                int(float(row["real_time_observable_curve_ready"])),
+                int(float(row["real_pe_inversion_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 345,
+            y - 14,
+            "latest t/tau_alpha={:.3g}; anchor Fs={:.3g}; D-window={}; thermodynamic claim={}".format(
+                float(row["latest_lag_time_over_tau_alpha"]),
+                float(row["latest_self_intermediate_scattering_anchor"]),
+                int(float(row["diffusion_asymptote_window_ready"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+            ),
+        )
+        c.drawString(left + 345, y - 27, f'next={row["next_required_action"][:70]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This promotes one real physical-time GlassBench curve to a quantitative pre-inversion blocker, not to a completed real-data fit.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_timecode_signature_support_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench time-code signature support")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real KA2D time-code curves are scored for dynamical signatures before persistence/exchange inversion is claimed.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "real_curve_dynamic_signature_support_and_inversion_ready": colors.HexColor("#2f855a"),
+        "real_curve_dynamic_signature_support_preinversion": colors.HexColor("#b7791f"),
+        "timecode_curve_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "signature stage")
+    c.drawString(left + 360, top + 24, "real-curve dynamical support")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["signature_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 244, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:43])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 360,
+            y,
+            "supported={}/4; real curve={}; PE inversion={}; blocker={}".format(
+                int(float(row["supported_dynamical_signature_count"])),
+                int(float(row["real_time_observable_curve_ready"])),
+                int(float(row["real_pe_inversion_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 360,
+            y - 14,
+            "MSD growth={:.3g}; Fs decay={:.3g}; alpha crossed={}".format(
+                float(row["msd_growth_factor"]),
+                float(row["self_intermediate_decay"]),
+                int(float(row["alpha_threshold_crossed"])),
+            ),
+        )
+        c.drawString(
+            left + 360,
+            y - 27,
+            "NGP peak t={:.4g}, recovery={:.2f}; chi4 peak t={:.4g}, recovery={:.2f}".format(
+                float(row["ngp_peak_time"]),
+                float(row["ngp_late_recovery_fraction"]),
+                float(row["chi4_peak_time"]),
+                float(row["chi4_late_recovery_fraction"]),
+            ),
+        )
+        c.drawString(left + 360, y - 40, f'next={row["next_required_action"][:66]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The score supports dynamical glass signatures only; thermodynamic glass-transition claims remain disallowed.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_alpha_threshold_horizon_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench alpha-threshold horizon audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Tau-alpha metadata and the observed k-grid are checked against the Fs=e^-1 anchor used by the persistence/exchange inversion.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "alpha_threshold_horizon_inversion_ready": colors.HexColor("#2f855a"),
+        "alpha_threshold_crossed_preinversion": colors.HexColor("#b7791f"),
+        "alpha_threshold_not_yet_reached": colors.HexColor("#c05621"),
+        "metadata_tau_alpha_anchor_fs_mismatch": colors.HexColor("#9f1239"),
+        "timecode_curve_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "audit stage")
+    c.drawString(left + 365, top + 24, "threshold and inversion status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["audit_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 250, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 365,
+            y,
+            "tau reached={}; alpha crossed={}; consistent={}; blocker={}".format(
+                int(float(row["metadata_tau_alpha_reached"])),
+                int(float(row["alpha_threshold_crossed"])),
+                int(float(row["metadata_tau_alpha_consistent_with_anchor_fs"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 365,
+            y - 14,
+            "latest t/tau_alpha(meta)={:.3g}; anchor Fs={:.3g}; extension={:.3g}x".format(
+                float(row["latest_lag_time_over_tau_alpha_metadata"]),
+                float(row["latest_self_intermediate_scattering_anchor"]),
+                float(row["estimated_lag_extension_factor"]),
+            ),
+        )
+        c.drawString(
+            left + 365,
+            y - 27,
+            "k*={:.3g}; k*/kmax={:.3g}; PE inversion={}; next={}".format(
+                float(row.get("estimated_threshold_wave_number_at_latest_lag", 0.0) or 0.0),
+                float(row.get("threshold_wave_number_over_max_observed", 0.0) or 0.0),
+                int(float(row["real_pe_inversion_ready"])),
+                row["next_required_action"][:58],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "A metadata/anchor-Fs mismatch blocks real-data inversion until the alpha wave number, definition, or horizon is resolved.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_alpha_anchor_rescue_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench alpha-anchor rescue protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A higher-k Fs measurement is separated from event-clock and held-out prediction gates.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "alpha_anchor_rescue_closed_loop_ready": colors.HexColor("#2f855a"),
+        "alpha_anchor_rescue_design_ready_real_event_clock_blocked": colors.HexColor("#9f1239"),
+        "alpha_anchor_already_consistent_real_event_clock_blocked": colors.HexColor("#b7791f"),
+        "alpha_anchor_rescue_upstream_incomplete": colors.HexColor("#2b6cb0"),
+        "alpha_anchor_rescue_design_blocked": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "rescue stage")
+    c.drawString(left + 390, top + 24, "post-rescue claim boundary")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["rescue_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "required k={:.3g}; k/kmax={:.3g}; anchor measurement={}; design={}; blocker={}".format(
+                float(row["required_anchor_wave_number"]),
+                float(row["required_anchor_wave_number_over_observed_max"]),
+                int(float(row["alpha_anchor_measurement_required"])),
+                int(float(row["alpha_anchor_rescue_design_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "post-rescue alpha consistent={}; event clock={}; closed loop={}".format(
+                int(float(row["post_rescue_alpha_definition_consistent"])),
+                int(float(row["post_rescue_event_clock_ready"])),
+                int(float(row["post_rescue_real_closed_loop_ready"])),
+            ),
+        )
+        c.drawString(
+            left + 390,
+            y - 27,
+            f'remaining={row["remaining_post_rescue_blockers"].replace("_", " ")[:74]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Resolving the alpha-anchor k-grid gap does not by itself establish a persistence/exchange event-clock inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_alpha_anchor_cached_fs_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cached alpha-anchor Fs audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Structure-matched cached displacements directly test the proposed higher-k alpha anchor.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "cached_anchor_measurement_closes_full_loop": colors.HexColor("#2f855a"),
+        "cached_anchor_measurement_closes_alpha_gap_event_clock_blocked": colors.HexColor("#b7791f"),
+        "cached_anchor_measurement_refines_required_k": colors.HexColor("#9f1239"),
+        "cached_anchor_measurement_missing": colors.HexColor("#c05621"),
+        "cached_anchor_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "cached stage")
+    c.drawString(left + 390, top + 24, "direct cached Fs measurement")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cached_anchor_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; lag={:.3g}; candidate k={:.3g}; cached Fs={:.3g}".format(
+                row["structure_id"],
+                float(row["lag_time"]),
+                float(row["candidate_anchor_wave_number"]),
+                float(row["cached_fs_at_candidate_anchor"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "log-grid k*={:.3g}; direct k_root={:.3g}; direct/candidate={:.3g}; crossed={}".format(
+                float(row["cached_structure_threshold_wave_number"]),
+                float(row["cached_direct_threshold_wave_number"]),
+                float(row["cached_direct_threshold_over_candidate"]),
+                int(float(row["candidate_anchor_threshold_crossed"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "A cached structure-specific refinement remains a dynamical alpha-anchor check, not an event-clock or thermodynamic claim.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_curve_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha cached curve")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The cached structure-matched ladder is evaluated at the direct k-root while event-clock claims remain blocked.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "cached_direct_alpha_curve_ready_event_clock_blocked": colors.HexColor("#9f1239"),
+        "cached_direct_alpha_curve_prethreshold": colors.HexColor("#c05621"),
+        "cached_direct_alpha_curve_missing": colors.HexColor("#4a5568"),
+        "cached_direct_alpha_root_upstream_incomplete": colors.HexColor("#2b6cb0"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "direct-alpha stage")
+    c.drawString(left + 390, top + 24, "cached alpha curve status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["direct_alpha_curve_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; k_root={:.3g}; lags={:.0f}; latest Fs={:.3g}".format(
+                row["structure_id"],
+                float(row["direct_alpha_wave_number"]),
+                float(row["lag_count"]),
+                float(row["latest_direct_alpha_fs"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "crossed={}; crossing={} at {:.3g}; monotone={}".format(
+                int(float(row["alpha_threshold_crossed"])),
+                row["threshold_crossing_time_code"],
+                float(row["threshold_crossing_lag_time"]),
+                int(float(row["strictly_monotone_decay"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "A cached alpha-threshold crossing is not a persistence/exchange event-clock inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha shape selection")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A threshold-anchored exponential alpha null is compared with KWW shape while overclaim blockers remain explicit.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "cached_alpha_shape_stretched_supported": colors.HexColor("#2f855a"),
+        "cached_alpha_shape_stretched_candidate_multik_blocked": colors.HexColor("#2563eb"),
+        "cached_alpha_shape_stretched_candidate_monotonicity_blocked": colors.HexColor("#7c3aed"),
+        "cached_alpha_shape_stretched_candidate_uncertainty_blocked": colors.HexColor("#805ad5"),
+        "cached_alpha_shape_exponential_not_rejected": colors.HexColor("#2b6cb0"),
+        "cached_alpha_shape_selection_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "shape-selection stage")
+    c.drawString(left + 390, top + 24, "alpha-shape evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["alpha_shape_selection_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; beta={:.3g}; delta AIC={:.3g}; points={:.0f}".format(
+                row["structure_id"],
+                float(row["kww_beta"]),
+                float(row["delta_aic_exponential_minus_kww"]),
+                float(row["shape_fit_points_used"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "RMSE exp={:.3g}; RMSE KWW={:.3g}; zmax={:.2f}; mono-compatible={}".format(
+                float(row["exponential_log_shape_rmse"]),
+                float(row["kww_log_shape_rmse"]),
+                float(row["max_monotonicity_violation_z"]),
+                int(float(row["monotone_compatible_with_uncertainty"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Frame-block sigma_Fs makes the sparse nonmonotonicity statistically compatible; multi-k alpha-shape validation remains required.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_multik_shape_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha multi-k shape gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "High-k cached F_s curves test multi-k KWW consistency while window-edge crossings block a full real alpha-shape claim.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 58
+    colors_by_stage = {
+        "cached_multik_alpha_shape_supported": colors.HexColor("#2f855a"),
+        "cached_multik_alpha_shape_window_edge_blocked": colors.HexColor("#2563eb"),
+        "cached_multik_alpha_shape_inconsistent": colors.HexColor("#c05621"),
+        "cached_multik_alpha_shape_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "multi-k stage")
+    c.drawString(left + 390, top + 24, "high-k alpha-shape evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["multik_shape_gate_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; k={}; crossed={:.0f}/{:.0f}".format(
+                row["structure_id"],
+                row["tested_k_values"][:30],
+                float(row["crossed_k_count"]),
+                float(row["tested_k_count"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "beta spread={:.3g}; zmax={:.2f}; compatible k={:.0f}; edge crossings={}".format(
+                float(row["kww_beta_spread"]),
+                float(row["max_monotonicity_violation_z"]),
+                float(row["monotone_compatible_k_count"]),
+                int(float(row["all_crossings_at_window_edge"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The candidate is intentionally not promoted until post-alpha window depth exists beyond the crossing lag.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_multik_heldout_prediction_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench held-out multi-k alpha prediction")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Each high-k alpha curve is held out and predicted from the other two before any real alpha-shape claim is promoted.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 58
+    colors_by_stage = {
+        "cached_multik_heldout_prediction_supported": colors.HexColor("#2f855a"),
+        "cached_multik_heldout_prediction_window_edge_blocked": colors.HexColor("#2563eb"),
+        "cached_multik_heldout_prediction_mismatch": colors.HexColor("#c05621"),
+        "cached_multik_heldout_prediction_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "held-out stage")
+    c.drawString(left + 390, top + 24, "prediction residuals")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["heldout_prediction_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; held-out k={}; held={:.0f}/{:.0f}".format(
+                row["structure_id"],
+                row["heldout_k_values"][:30],
+                float(row["heldout_count"]),
+                float(row["eligible_k_count"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "max beta error={:.3g}; max shape RMSE={:.3g}; edge crossings={}".format(
+                float(row["max_heldout_beta_abs_error"]),
+                float(row["max_heldout_shape_rmse"]),
+                int(float(row["all_crossings_at_window_edge"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Passing held-out residuals create a candidate, but tc40 edge crossings keep the real claim blocked.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_post_window_prediction_targets_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench post-alpha prediction targets")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Held-out multi-k alpha prediction is converted into tc45/tc50 high-k F_s targets with falsification bands.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 38
+    colors_by_stage = {
+        "post_alpha_prediction_target_preregistered": colors.HexColor("#2563eb"),
+        "post_alpha_prediction_target_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 22, "time")
+    c.drawString(left + 55, top + 22, "target stage")
+    c.drawString(left + 315, top + 22, "prediction")
+    c.drawString(left + 610, top + 22, "status")
+    for index, row in enumerate(rows[:10]):
+        y = top - index * row_h
+        stage = row["post_window_target_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawString(left, y, row["target_time_code"])
+        c.setFillColor(color)
+        c.rect(left + 55, y - 12, 242, 23, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 63, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 315,
+            y,
+            "k={:.3g}; beta={:.3g}; Fs={:.3g}; band=[{:.3g},{:.3g}]".format(
+                float(row["direct_alpha_wave_number"]),
+                float(row["calibrated_beta"]),
+                float(row["predicted_fs"]),
+                float(row["acceptance_fs_low"]),
+                float(row["acceptance_fs_high"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 610,
+            y,
+            f'lag={float(row["target_lag_time"]):.3g}; blocker={row["primary_blocker"][:34]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "These rows are prediction targets only; observed post-window F_s is still missing.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_post_window_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench post-alpha verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Preregistered high-k F_s targets become support/reject/indeterminate verdicts once post-window observations exist.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 38
+    colors_by_stage = {
+        "post_alpha_prediction_supported": colors.HexColor("#2f855a"),
+        "post_alpha_prediction_rejected": colors.HexColor("#c05621"),
+        "post_alpha_prediction_indeterminate": colors.HexColor("#b7791f"),
+        "post_alpha_observation_not_ready": colors.HexColor("#2563eb"),
+        "post_alpha_prediction_target_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 22, "time")
+    c.drawString(left + 55, top + 22, "verdict stage")
+    c.drawString(left + 320, top + 22, "residual")
+    c.drawString(left + 610, top + 22, "decision")
+    for index, row in enumerate(rows[:10]):
+        y = top - index * row_h
+        stage = row["post_window_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawString(left, y, row["target_time_code"])
+        c.setFillColor(color)
+        c.rect(left + 55, y - 12, 248, 23, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 63, y - 3, stage.replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 320,
+            y,
+            "k={}; pred={:.3g}; obs={:.3g}; residual={:.3g}".format(
+                row["direct_alpha_wave_number"],
+                float(row["predicted_fs"]),
+                float(row["observed_fs"]),
+                float(row["abs_log_fs_residual"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 610,
+            y,
+            "support={}; reject={}; blocker={}".format(
+                int(float(row["post_window_prediction_supported"])),
+                int(float(row["post_window_prediction_rejected"])),
+                row["primary_blocker"][:32],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Current rows are not-ready because post-window F_s observations are not yet available.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_transport_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha transport proxy")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The direct-alpha crossing is matched to cached displacement transport while event-clock inversion remains blocked.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "cached_direct_alpha_transport_proxy_ready_event_clock_blocked": colors.HexColor("#7c2d12"),
+        "direct_alpha_crossed_transport_observable_blocked": colors.HexColor("#c05621"),
+        "direct_alpha_crossing_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "transport stage")
+    c.drawString(left + 390, top + 24, "matched alpha/transport proxy")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["transport_coupling_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; crossing={}; tau_alpha={:.3g}; MSD={:.3g}".format(
+                row["structure_id"],
+                row["threshold_crossing_time_code"],
+                float(row["tau_alpha_direct"]),
+                float(row["matched_msd"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "D_eff={:.3g}; D_eff tau_alpha={:.3g}; NGP={:.3g}; proxy={}".format(
+                float(row["apparent_diffusion_coefficient"]),
+                float(row["apparent_stokes_einstein_product"]),
+                float(row["matched_ngp_2d"]),
+                int(float(row["direct_alpha_transport_proxy_ready"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This transport-alpha product is a cached displacement proxy, not a persistence/exchange event-clock inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_pe_bound_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha PE feasibility bound")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Direct-alpha transport constrains PE jump variance, but event-clock jump statistics remain missing.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "direct_alpha_transport_bounds_pe_but_event_clock_missing": colors.HexColor("#854d0e"),
+        "direct_alpha_transport_pe_bound_infeasible": colors.HexColor("#c05621"),
+        "direct_alpha_transport_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "PE feasibility stage")
+    c.drawString(left + 390, top + 24, "conditional identifiability bound")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["pe_feasibility_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; q_max={:.3g}; q_max/MSD={:.3g}; full-MSD feasible={}".format(
+                row["structure_id"],
+                float(row["jump_variance_upper_bound"]),
+                float(row["jump_variance_upper_over_msd"]),
+                int(float(row["full_msd_jump_variance_feasible"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "at q={:.2g} MSD: tau_x={:.3g}; tau_p={:.3g}; tau_p/tau_x={:.3g}".format(
+                float(row["reference_jump_variance_fraction"]),
+                float(row["reference_exchange_mean"]),
+                float(row["reference_persistence_mean"]),
+                float(row["reference_persistence_exchange_ratio"]),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "These are conditional PE bounds from alpha/transport; real inversion requires measured event-clock jump variance.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_displacement_tail_bound_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha displacement-tail bound")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Direct-lag displacement tails are compared with the PE single-event jump-variance bound.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "direct_displacement_tail_exceeds_pe_single_event_bound": colors.HexColor("#9f1239"),
+        "direct_displacement_tail_within_pe_single_event_bound": colors.HexColor("#2f855a"),
+        "direct_displacement_tail_stats_missing": colors.HexColor("#c05621"),
+        "pe_feasibility_bound_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "tail-bound stage")
+    c.drawString(left + 390, top + 24, "direct displacement tail vs PE bound")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["tail_bound_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; crossing={}; samples={:.0f}; q_all/q_max={:.3g}".format(
+                row["structure_id"],
+                row["time_code"],
+                float(row["sample_count"]),
+                float(row["q_all_over_bound"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "tail fraction above bound={:.3g}; tail mean/q_max={:.3g}; q90={:.3g}; q95={:.3g}".format(
+                float(row["fraction_q_gt_bound"]),
+                float(row["mean_q_above_over_bound"]),
+                float(row["q_p90"]),
+                float(row["q_p95"]),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:32]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "A broad direct-lag tail is a segmentation target, not yet a measured persistence/exchange event clock.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_multilag_crossing_canary_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha multi-lag crossing canary")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The cached lag ladder supplies a threshold-crossing target, not a persistence/exchange event clock.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "multilag_displacement_crossing_canary_ready_replica_axis_blocked": colors.HexColor("#805ad5"),
+        "multilag_displacement_crossing_canary_ready_event_clock_pending": colors.HexColor("#2b6cb0"),
+        "multilag_displacement_crossing_canary_incomplete": colors.HexColor("#c05621"),
+        "pe_feasibility_bound_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "crossing canary stage")
+    c.drawString(left + 390, top + 24, "multi-lag threshold crossing status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["crossing_canary_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; samples={:.0f}; ever crossed={:.3g}; never={:.3g}".format(
+                row["structure_id"],
+                float(row["sample_count"]),
+                float(row["ever_crossed_fraction"]),
+                float(row["never_crossed_fraction"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "recross={:.3g}; first-cross q/q_max={:.3g}; axis0 replica={}".format(
+                float(row["post_crossing_recross_fraction"]),
+                float(row["first_crossing_q_mean_over_bound"]),
+                int(float(row["axis0_is_isoconfigurational_replica"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Crossings along cached lag outputs define a segmentation target; true PE inversion still requires particle time trajectories.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct-alpha event-clock extraction contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "This gate separates a real segmentation target from a true persistence/exchange event-clock inversion.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "segmentation_target_ready_true_event_clock_missing": colors.HexColor("#9f1239"),
+        "true_event_clock_payload_ready_for_segmentation": colors.HexColor("#2f855a"),
+        "direct_tail_ready_crossing_target_missing": colors.HexColor("#c05621"),
+        "pe_bound_ready_tail_contract_missing": colors.HexColor("#c05621"),
+        "event_clock_contract_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "contract stage")
+    c.drawString(left + 395, top + 24, "required evidence before PE inversion")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["event_clock_contract_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; q_max={:.3g}; PE={}; tail={}; target={}; true-time={}".format(
+                row["structure_id"],
+                float(row["q_bound"]),
+                int(float(row["conditional_pe_inference_ready"])),
+                int(float(row["direct_displacement_tail_ready"])),
+                int(float(row["event_segmentation_target_ready"])),
+                int(float(row["axis0_is_physical_time"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "tail above={:.3g}; ever crossed={:.3g}; first-cross q/q_max={:.3g}".format(
+                float(row["fraction_q_gt_bound"]),
+                float(row["ever_crossed_fraction"]),
+                float(row["first_crossing_q_mean_over_bound"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'required={row["required_arrays"][:74]}')
+        c.drawString(left + 395, y - 40, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Direct-lag and lag-ladder evidence constrain the target, but cached replica axes are forbidden substitutes for true time trajectories.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_sparse_lag_event_clock_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench sparse-lag event-clock audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The lag ladder is promoted only to a coarse interval candidate; explicit replica identity remains a blocker.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 70
+    colors_by_stage = {
+        "sparse_lag_tensor_ready_replica_identity_unverified": colors.HexColor("#805ad5"),
+        "sparse_lag_event_clock_ready_for_interval_segmentation": colors.HexColor("#2f855a"),
+        "sparse_lag_tensor_identity_incomplete": colors.HexColor("#c05621"),
+        "sparse_lag_event_clock_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "sparse-lag stage")
+    c.drawString(left + 395, top + 24, "event-clock evidence and blocker")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["sparse_lag_event_clock_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; coverage={:.2f}; lags={:.0f}; shape={}".format(
+                row["structure_id"],
+                float(row["time_code_coverage_fraction"]),
+                float(row["lag_count"]),
+                row["positions_shape"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "same initial={}; tensor={}; candidate={}; replica IDs={}; resolution={}".format(
+                int(float(row["same_initial_structure_verified"])),
+                int(float(row["physical_lag_tensor_ready"])),
+                int(float(row["coarse_event_clock_candidate_ready"])),
+                int(float(row["replica_identity_alignment_ready"])),
+                row["event_clock_resolution"],
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This narrows the blocker from missing lag data to explicit replica-identity alignment and interval-censored segmentation.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_interval_censored_first_crossing_clock_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench interval-censored first-crossing clock")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Sparse-lag crossings are converted into lower/upper clock bounds, not a full persistence/exchange inversion.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "interval_censored_persistence_clock_candidate": colors.HexColor("#2b6cb0"),
+        "interval_clock_crossing_distribution_missing": colors.HexColor("#c05621"),
+        "interval_clock_sparse_lag_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "interval-clock stage")
+    c.drawString(left + 395, top + 24, "first-crossing clock bounds")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["interval_clock_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; crossed={:.3g}; right-censored={:.3g}; ready={}".format(
+                row["structure_id"],
+                float(row["crossed_fraction"]),
+                float(row["right_censored_fraction"]),
+                int(float(row["interval_clock_candidate_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "mean interval=[{:.3g}, {:.3g}], midpoint={:.3g}, width={:.3g}".format(
+                float(row["mean_first_crossing_lower_bound"]),
+                float(row["mean_first_crossing_upper_bound"]),
+                float(row["mean_first_crossing_midpoint"]),
+                float(row["mean_interval_width"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The result is a quantitative persistence-clock bound with right censoring and interval censoring explicitly retained.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_interval_censored_persistence_fit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench interval-censored persistence fit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "A one-parameter censored exponential survival law estimates tau_p while leaving exchange-clock blockers explicit.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "interval_censored_exponential_persistence_fit_ready": colors.HexColor("#2f855a"),
+        "interval_censored_persistence_fit_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "fit stage")
+    c.drawString(left + 395, top + 24, "censored persistence-law estimate")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["persistence_fit_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; rate={:.3g}; mean tau_p={:.3g}; tau_p/tau_alpha={:.3g}".format(
+                row["structure_id"],
+                float(row["exponential_rate_mle"]),
+                float(row["exponential_mean_persistence_time"]),
+                float(row["mean_persistence_over_tau_alpha_direct"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "crossed observed={:.3g}; exponential predicted={:.3g}; latest lag={:.3g}".format(
+                float(row["observed_crossed_fraction"]),
+                float(row["predicted_crossed_fraction_at_latest_lag"]),
+                float(row["latest_lag_time"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The fitted persistence scale is a censored-clock estimate; exchange statistics and replica identity are still required for real PE inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_waiting_law_selection_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench interval-censored waiting-law selection")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Exponential and Weibull persistence laws are compared with an AIC penalty before claiming stretched waiting times.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "exponential_waiting_law_not_rejected_sparse_cache": colors.HexColor("#2b6cb0"),
+        "weibull_waiting_law_preferred": colors.HexColor("#805ad5"),
+        "waiting_law_selection_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "selection stage")
+    c.drawString(left + 395, top + 24, "waiting-law comparison")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["waiting_law_selection_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; Weibull shape={:.3g}; extra parameter supported={:.0f}".format(
+                row["structure_id"],
+                float(row["weibull_shape_mle"]),
+                float(row["extra_waiting_law_parameter_supported"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "AIC exponential={:.3g}; AIC Weibull={:.3g}; delta exp-minus-Weibull={:.3g}".format(
+                float(row["exponential_aic"]),
+                float(row["weibull_aic"]),
+                float(row["delta_aic_exponential_minus_weibull"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The current cached GlassBench row constrains the waiting-time law but does not justify an extra stretched-law parameter.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_finite_exchange_envelope_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench finite-exchange falsification envelope")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The censored persistence fit gives a conditional tau_p/tau_x lower bound and a late-NGP follow-up horizon.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "finite_exchange_falsification_horizon_ready": colors.HexColor("#2b6cb0"),
+        "finite_exchange_envelope_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "envelope stage")
+    c.drawString(left + 395, top + 24, "conditional finite-exchange consequence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["envelope_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; tau_p/tau_x>={:.3g}; recovery lag<={:.3g}; follow-up multiplier={:.3g}".format(
+                row["structure_id"],
+                float(row["conditional_persistence_exchange_ratio_lower_bound"]),
+                float(row["gaussian_recovery_lag_upper_bound"]),
+                float(row["required_followup_lag_multiplier_over_current"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "tau_p={:.3g}; tau_alpha={:.3g}; current recovery power={:.0f}".format(
+                float(row["exponential_mean_persistence_time"]),
+                float(row["tau_alpha_direct"]),
+                float(row["current_window_has_gaussian_recovery_power"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a conditional acquisition target, not a measured exchange clock or thermodynamic glass-transition claim.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_real_cached_microdynamic_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real-cached microdynamic verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cached KA2D coordinates quantify censored persistence evidence and a conditional PE bound while full PE inversion remains blocked.",
+    )
+    left, top = 42, page_h - 90
+    row_h = 42
+    colors_by_stage = {
+        "real_cached_persistence_clock_quantified": colors.HexColor("#2f855a"),
+        "conditional_pe_decoupling_bound_ready": colors.HexColor("#276749"),
+        "late_recovery_protocol_preregistered": colors.HexColor("#2b6cb0"),
+        "real_pe_inversion_still_blocked": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top + 18, "verdict row")
+    c.drawString(left + 205, top + 18, "stage")
+    c.drawString(left + 500, top + 18, "readiness / scale")
+    c.drawString(left + 650, top + 18, "claim boundary")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cached_microdynamic_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.2)
+        c.drawString(left, y, row["verdict_row_id"].replace("_", " ")[:31])
+        c.setFillColor(color)
+        c.rect(left + 205, y - 12, 270, 22, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.7)
+        c.drawString(left + 213, y - 3, stage.replace("_", " ")[:45])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 500,
+            y,
+            "evidence={:.0f}; inv={:.0f}; taup/taua={:.2f}; PE>={:.2f}".format(
+                float(row["real_cached_evidence_ready"]),
+                float(row["real_pe_inversion_ready"]),
+                float(row["mean_persistence_over_tau_alpha"]),
+                float(row["conditional_pe_ratio_lower_bound"]),
+            ),
+        )
+        c.drawString(left + 650, y, row["allowed_claim_level"].replace("_", " ")[:40])
+        c.drawString(left + 650, y - 10, f'blocker={row["primary_blocker"].replace("_", " ")[:38]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The verdict upgrades real cached trajectory evidence while preserving exchange-clock, physical-time-axis, and thermodynamic scope blockers.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late recovery falsification protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Late-NGP or van-Hove recovery observations are classified as finite-exchange support, rejection, or acquisition-required.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "late_recovery_acquisition_required": colors.HexColor("#b7791f"),
+        "finite_exchange_late_recovery_supported": colors.HexColor("#2f855a"),
+        "finite_exchange_late_recovery_failed": colors.HexColor("#c53030"),
+        "late_recovery_protocol_upstream_incomplete": colors.HexColor("#4a5568"),
+        "late_recovery_lag_insufficient": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "protocol stage")
+    c.drawString(left + 395, top + 24, "mechanism falsification state")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["late_recovery_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; required lag={:.3g}; observed lag={:.3g}; mechanism ready={:.0f}".format(
+                row["structure_id"],
+                float(row["required_followup_lag_time"]),
+                float(row["observed_lag_time"]),
+                float(row["mechanism_selection_ready"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "finite supported={:.0f}; finite rejected={:.0f}; static rejected={:.0f}; late NGP={:.3g}".format(
+                float(row["finite_exchange_supported"]),
+                float(row["finite_exchange_rejected"]),
+                float(row["static_disorder_rejected"]),
+                float(row["observed_late_ngp"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Current GlassBench rows remain acquisition-required until a sufficiently late recovery observable is measured.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_ingestion_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late recovery ingestion contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Candidate late-recovery observations must be machine-readable, uncertainty-weighted, and beyond the required lag horizon.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "late_recovery_observation_ingestion_ready": colors.HexColor("#2f855a"),
+        "late_recovery_observation_missing": colors.HexColor("#b7791f"),
+        "late_recovery_horizon_incomplete": colors.HexColor("#805ad5"),
+        "late_recovery_uncertainty_incomplete": colors.HexColor("#c05621"),
+        "late_recovery_machine_readable_incomplete": colors.HexColor("#c53030"),
+        "late_recovery_columns_incomplete": colors.HexColor("#c53030"),
+        "late_recovery_time_units_incomplete": colors.HexColor("#c53030"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "ingestion stage")
+    c.drawString(left + 395, top + 24, "required observation schema")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["late_recovery_ingestion_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; required lag={:.3g}; observed lag={:.3g}; ingest ready={:.0f}".format(
+                row["structure_id"],
+                float(row["required_followup_lag_time"]),
+                float(row["observed_lag_time"]),
+                float(row["late_recovery_observation_ready"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "machine={:.0f}; shared time={:.0f}; horizon={:.0f}; uncertainty={:.0f}".format(
+                float(row["machine_readable_ready"]),
+                float(row["shared_time_units_ready"]),
+                float(row["horizon_satisfied"]),
+                float(row["uncertainty_ready"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The current GlassBench row lacks a late-recovery observation at the required horizon with uncertainty columns.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_timecode_target_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late recovery time-code target")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The finite-exchange recovery horizon is mapped onto the first GlassBench time-code cache that can test late recovery.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "late_recovery_timecode_target_ready": colors.HexColor("#2b6cb0"),
+        "late_recovery_timecode_target_already_covered": colors.HexColor("#2f855a"),
+        "late_recovery_timecode_target_clock_incomplete": colors.HexColor("#c05621"),
+        "late_recovery_timecode_target_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "time-code stage")
+    c.drawString(left + 395, top + 24, "acquisition target")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["timecode_target_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; current={} ({:.3g}); required lag={:.3g}; target={} ({:.3g})".format(
+                row["structure_id"],
+                row["current_max_time_code"],
+                float(row["current_max_lag_time"]),
+                float(row["required_followup_lag_time"]),
+                row["target_time_code"],
+                float(row["target_lag_time"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "target/required={:.3g}; steps needed={:.0f}; late observation ready={:.0f}; PE inversion={:.0f}".format(
+                float(row["target_lag_over_required"]),
+                float(row["timecode_steps_needed"]),
+                float(row["late_recovery_observation_ready"]),
+                float(row["real_pe_inversion_ready"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is an executable data-acquisition target, not a thermodynamic or completed persistence-exchange inversion claim.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_cache_request_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_cache_request_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late recovery cache request")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The tc50 target is converted into an inferred NPZ member path while preserving official metadata and cache gaps.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "late_recovery_particle_cache_ready": colors.HexColor("#2f855a"),
+        "late_recovery_particle_cache_required": colors.HexColor("#2b6cb0"),
+        "late_recovery_member_metadata_required": colors.HexColor("#b7791f"),
+        "late_recovery_member_path_inference_incomplete": colors.HexColor("#c05621"),
+        "late_recovery_timecode_target_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "cache contract stage")
+    c.drawString(left + 395, top + 24, "late-recovery member request")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cache_request_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.3)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; target={}; lag={:.3g}; metadata={:.0f}; cache={:.0f}; observable={:.0f}".format(
+                row["structure_id"],
+                row["target_time_code"],
+                float(row["target_lag_time"]),
+                float(row["official_target_member_metadata_ready"]),
+                float(row["particle_cache_ready"]),
+                float(row["late_recovery_observable_ready"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(left + 395, y - 14, f'member={row["inferred_target_member"][:70]}')
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The inferred tc50 path is a request contract: official member metadata and particle cache remain missing.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_membership_probe_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late recovery membership probe")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The extended tar-prefix member index is checked before claiming that the tc50 target can be cached.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "late_recovery_target_member_visible_in_probe": colors.HexColor("#2f855a"),
+        "late_recovery_target_absent_from_extended_prefix": colors.HexColor("#b7791f"),
+        "late_recovery_member_index_probe_missing": colors.HexColor("#c05621"),
+        "late_recovery_cache_request_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "membership stage")
+    c.drawString(left + 395, top + 24, "extended-prefix evidence")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["membership_probe_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.3)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; target={}; visible={:.0f}; same-structure={:.0f}; max visible={}".format(
+                row["structure_id"],
+                row["target_time_code"],
+                float(row["target_member_visible_in_probe"]),
+                float(row["same_structure_member_count_in_probe"]),
+                row["max_visible_time_code"],
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "compressed prefix={:.3g}; tar probe={:.3g}; codes={}".format(
+                float(row["compressed_probe_bytes"]),
+                float(row["tar_probe_bytes"]),
+                row["same_structure_visible_time_codes"][:44],
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "For KA2D T=0.23, the extended prefix verifies tc05-tc40 for structure 151 but does not expose tc50.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_public_timecode_ceiling_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench public time-code ceiling")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The tc50 late-recovery target is compared with published GlassBench time-code semantics before claiming reanalysis feasibility.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 78
+    colors_by_stage = {
+        "late_recovery_public_timecode_member_visible": colors.HexColor("#2f855a"),
+        "late_recovery_public_timecode_published_probe_needed": colors.HexColor("#2b6cb0"),
+        "late_recovery_beyond_public_timecode_ceiling": colors.HexColor("#b7791f"),
+        "late_recovery_timecode_not_in_public_semantics": colors.HexColor("#c05621"),
+        "public_timecode_semantics_missing": colors.HexColor("#9f1239"),
+        "late_recovery_timecode_target_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "public ceiling stage")
+    c.drawString(left + 405, top + 24, "published time-code support")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["public_ceiling_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 288, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:54])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 405,
+            y,
+            "structure={}; target={}; public max={}; structure max={}; published={:.0f}".format(
+                row["structure_id"],
+                row["target_time_code"],
+                row["public_max_time_code"],
+                row["structure_max_time_code"],
+                float(row["target_time_code_published"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 405,
+            y - 14,
+            "target lag={:.3g}; public max lag={:.3g}; target/public={:.3g}".format(
+                float(row["target_lag_time"]),
+                float(row["public_max_lag_time"]),
+                float(row["target_lag_over_public_max"]),
+            ),
+        )
+        c.drawString(left + 405, y - 27, f'public codes={row["public_time_codes"][:68]}')
+        c.drawString(
+            left + 405,
+            y - 40,
+            f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:48]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "For KA2D T=0.23, public GlassBench time-code semantics stop at tc40; the required late-recovery target is tc50.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_censored_window_claim_audit_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench censored-window claim audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The public window can support alpha-anchor diagnostics while late recovery and mechanism rejection remain censored.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 78
+    colors_by_stage = {
+        "late_recovery_public_window_ready": colors.HexColor("#2f855a"),
+        "alpha_anchor_ready_late_recovery_censored": colors.HexColor("#b7791f"),
+        "alpha_anchor_ready_late_recovery_unresolved": colors.HexColor("#c05621"),
+        "public_window_pre_alpha_only": colors.HexColor("#805ad5"),
+        "finite_exchange_envelope_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "claim audit stage")
+    c.drawString(left + 398, top + 24, "allowed public claims")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["censored_window_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 280, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:52])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 398,
+            y,
+            "public max={}; target={}; alpha={:.0f}; late={:.0f}; reject-static={:.0f}".format(
+                row["public_max_time_code"],
+                row["target_time_code"],
+                float(row["alpha_relaxation_claim_allowed"]),
+                float(row["late_gaussian_recovery_claim_allowed"]),
+                float(row["static_vs_finite_exchange_rejection_ready"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 398,
+            y - 14,
+            "public/target lag={:.4g}; target/public={:.3g}; tau_alpha={:.3g}".format(
+                float(row["public_window_fraction_of_target_lag"]),
+                float(row["target_lag_over_public_max"]),
+                float(row["tau_alpha_direct"]),
+            ),
+        )
+        c.drawString(
+            left + 398,
+            y - 27,
+            f'claim level={row["allowed_public_claim_level"].replace("_", " ")[:58]}',
+        )
+        c.drawString(
+            left + 398,
+            y - 40,
+            f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:48]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a claim-scope gate: it permits public-window alpha diagnostics but not late Gaussian recovery or thermodynamic claims.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_public_window_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_public_window_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench public-window SOTA verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Each literature-level dynamic signature is mapped to what the currently public GlassBench window can and cannot test.",
+    )
+    left, top = 42, page_h - 92
+    row_h = 48
+    colors_by_stage = {
+        "public_window_sota_consistent": colors.HexColor("#2f855a"),
+        "public_window_censored_sota_unresolved": colors.HexColor("#b7791f"),
+        "mechanism_selection_censored_unresolved": colors.HexColor("#c05621"),
+        "public_proxy_consistent_spatial_boundary": colors.HexColor("#805ad5"),
+        "scope_boundary_not_tested": colors.HexColor("#4a5568"),
+        "signature_not_mapped_to_public_window_gate": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "signature")
+    c.drawString(left + 172, top + 18, "public-window verdict")
+    c.drawString(left + 410, top + 18, "claim boundary")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["public_window_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.3)
+        c.drawString(left, y, row["signature"].replace("_", " ")[:31])
+        c.setFillColor(color)
+        c.rect(left + 172, y - 12, 220, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.5)
+        c.drawString(left + 180, y - 3, stage.replace("_", " ")[:38])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.9)
+        c.drawString(
+            left + 410,
+            y,
+            "claim={:.0f}; late={:.0f}; mechanism={:.0f}; model={:.1g}; lit={:.1g}".format(
+                float(row["public_glassbench_claim_allowed"]),
+                float(row["late_recovery_required"]),
+                float(row["mechanism_rejection_ready"]),
+                float(row["model_support"]),
+                float(row["literature_qualitative_support"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.3)
+        c.drawString(left + 410, y - 13, f'allowed={row["allowed_public_claim"].replace("_", " ")[:65]}')
+        c.drawString(
+            left + 410,
+            y - 25,
+            "blocker={}; public/target={:.4g}".format(
+                row["primary_blocker"][:34],
+                float(row["public_window_fraction_of_target_lag"]),
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The verdict permits public-window dynamical consistency checks, not complete late-recovery, mechanism-selection, or thermodynamic claims.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_experiment_design_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late-recovery experiment design")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The public-window gap is converted into a minimal tc50 follow-up for Gaussian recovery and static-disorder rejection.",
+    )
+    left, top = 42, page_h - 94
+    row_h = 70
+    colors_by_stage = {
+        "minimal_tc50_followup_ready": colors.HexColor("#2b6cb0"),
+        "late_recovery_timecode_target_incomplete": colors.HexColor("#c05621"),
+        "finite_exchange_envelope_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 150, top + 18, "experiment stage")
+    c.drawString(left + 370, top + 18, "minimum acquisition and decision rules")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["experiment_design_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.3)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]}')
+        c.setFillColor(color)
+        c.rect(left + 150, y - 12, 200, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 158, y - 3, stage.replace("_", " ")[:34])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.9)
+        c.drawString(
+            left + 370,
+            y,
+            "required={}; current={}; planned/min={:.3g}; min lag={:.3g}; planned lag={:.3g}".format(
+                row["required_time_code"],
+                row["current_max_time_code"],
+                float(row["planned_lag_over_minimum_required"]),
+                float(row["minimum_required_lag_time"]),
+                float(row["planned_lag_time"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.3)
+        c.drawString(left + 370, y - 13, f'observables={row["required_observables"][:82]}')
+        c.drawString(
+            left + 370,
+            y - 26,
+            "finite-exchange rule: late NGP <= {:.3g}; static rejection: late NGP + 2sigma < {:.3g}".format(
+                float(row["max_finite_exchange_late_ngp"]),
+                float(row["static_gamma_late_ngp_plateau"]),
+            ),
+        )
+        c.drawString(
+            left + 370,
+            y - 39,
+            f'blocker={row["primary_blocker"][:42]}; next={row["next_required_action"][:56]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a dynamical-signature follow-up design; it does not license thermodynamic glass-transition claims.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_uncertainty_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late-recovery uncertainty verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Two-sigma late-recovery measurements gate finite-exchange support and static-disorder rejection without thermodynamic claims.",
+    )
+    left, top = 42, page_h - 94
+    row_h = 64
+    colors_by_stage = {
+        "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected": colors.HexColor("#2f855a"),
+        "finite_exchange_supported_static_disorder_not_rejected": colors.HexColor("#b7791f"),
+        "uncertainty_weighted_finite_exchange_rejected": colors.HexColor("#c53030"),
+        "late_recovery_uncertainty_indeterminate": colors.HexColor("#805ad5"),
+        "late_recovery_observation_not_ready": colors.HexColor("#2b6cb0"),
+        "late_recovery_verdict_protocol_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 150, top + 18, "uncertainty verdict")
+    c.drawString(left + 420, top + 18, "two-sigma decision")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["uncertainty_verdict_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.3)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]}')
+        c.setFillColor(color)
+        c.rect(left + 150, y - 12, 250, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.0)
+        c.drawString(left + 158, y - 3, stage.replace("_", " ")[:46])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.7)
+        c.drawString(
+            left + 420,
+            y,
+            "candidate={}; decision={:.0f}; finite={:.0f}; static={:.0f}".format(
+                row["candidate_id"][:30],
+                float(row["uncertainty_decision_ready"]),
+                float(row["finite_exchange_uncertainty_supported"]),
+                float(row["static_disorder_uncertainty_rejected"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.2)
+        c.drawString(
+            left + 420,
+            y - 13,
+            "lag={:.3g}/{:.3g}; NGP upper={:.3g}; recovery lower={:.3g}".format(
+                float(row["observed_lag_time"]),
+                float(row["minimum_required_lag_time"]),
+                float(row["late_ngp_upper_2sigma"]),
+                float(row["tail_recovery_lower_2sigma"]),
+            ),
+        )
+        c.drawString(
+            left + 420,
+            y - 26,
+            "finite margin={:.3g}; static margin={:.3g}; blocker={}".format(
+                float(row["finite_exchange_support_margin"]),
+                float(row["static_disorder_rejection_margin"]),
+                row["primary_blocker"][:38],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Current public GlassBench rows remain observation-gated; the verdict becomes decisive only after uncertainty-weighted late data arrive.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_outcome_matrix_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench tc50 late-recovery outcome matrix")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Possible tc50 observations are pre-registered as support, rejection, or indeterminate outcomes before late data are available.",
+    )
+    left, top = 42, page_h - 92
+    row_h = 44
+    colors_by_claim = {
+        "finite_exchange_supported_static_disorder_rejected": colors.HexColor("#2f855a"),
+        "finite_exchange_rejected_or_model_reparameterization_required": colors.HexColor("#c53030"),
+        "no_mechanism_selection_claim": colors.HexColor("#805ad5"),
+        "no_late_recovery_claim": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target/scenario")
+    c.drawString(left + 185, top + 18, "claim if observed")
+    c.drawString(left + 450, top + 18, "two-sigma verdict inputs")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        claim = row["claim_if_observed"]
+        color = colors_by_claim.get(claim, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 6.8)
+        c.drawString(
+            left,
+            y,
+            f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]} {row["target_time_code"]}',
+        )
+        c.setFont("Helvetica", 6.1)
+        c.drawString(left, y - 12, row["outcome_scenario"].replace("_", " ")[:35])
+        c.setFillColor(color)
+        c.rect(left + 185, y - 12, 245, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 5.9)
+        c.drawString(left + 193, y - 3, claim.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.4)
+        c.drawString(
+            left + 450,
+            y,
+            "decision={:.0f}; NGP={:.3g}+/-{:.2g}; recovery={:.1g}; finite margin={:.3g}; static margin={:.3g}".format(
+                float(row["uncertainty_decision_ready"]),
+                float(row["synthetic_observed_late_ngp"]),
+                float(row["synthetic_sigma_late_ngp"]),
+                float(row["synthetic_tail_recovery"]),
+                float(row["finite_exchange_support_margin"]),
+                float(row["static_disorder_rejection_margin"]),
+            ),
+        )
+        c.setFont("Helvetica", 5.9)
+        c.drawString(
+            left + 450,
+            y - 12,
+            f'verdict={row["predicted_uncertainty_verdict_stage"].replace("_", " ")[:72]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The matrix prevents after-the-fact mechanism selection; thermodynamic glass-transition claims remain out of scope.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_late_recovery_decision_power_plan_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench tc50 late-recovery decision power plan")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The preregistered tc50 outcome matrix is converted into member-count requirements for two-sigma mechanism decisions.",
+    )
+    left, top = 42, page_h - 92
+    row_h = 46
+    colors_by_stage = {
+        "decision_power_sufficient": colors.HexColor("#2f855a"),
+        "late_ngp_power_extension_required": colors.HexColor("#c05621"),
+        "mean_value_requires_model_rejection_not_more_precision": colors.HexColor("#c53030"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target/scenario")
+    c.drawString(left + 190, top + 18, "decision-power stage")
+    c.drawString(left + 430, top + 18, "member and uncertainty requirement")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["decision_power_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 6.8)
+        c.drawString(
+            left,
+            y,
+            f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]} {row["target_time_code"]}',
+        )
+        c.setFont("Helvetica", 6.1)
+        c.drawString(left, y - 12, row["outcome_scenario"].replace("_", " ")[:38])
+        c.setFillColor(color)
+        c.rect(left + 190, y - 12, 220, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 5.9)
+        c.drawString(left + 198, y - 3, stage.replace("_", " ")[:39])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.4)
+        c.drawString(
+            left + 430,
+            y,
+            "members {:.0f}->{:.0f} (+{:.0f}); multiplier={:.2g}; sigma {:.2g}->{:.2g}".format(
+                float(row["current_member_count"]),
+                float(row["required_member_count"]),
+                float(row["additional_member_count_needed"]),
+                float(row["member_multiplier_needed"]),
+                float(row["current_sigma_late_ngp"]),
+                float(row["required_sigma_late_ngp_for_decision"]),
+            ),
+        )
+        c.setFont("Helvetica", 5.9)
+        c.drawString(
+            left + 430,
+            y - 12,
+            f'blocker={row["primary_blocker"]}; next={row["next_required_action"].replace("_", " ")[:55]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Wide-error late data remain non-decisive until member or uncertainty requirements are met; thermodynamic claims remain out of scope.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "SOTA dynamic-signature alignment")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Model diagnostics, literature claims, and current GlassBench evidence are aligned without promoting thermodynamic or fit claims.",
+    )
+    left, top = 48, page_h - 92
+    row_h = 45
+    colors_by_stage = {
+        "real_curve_supported": colors.HexColor("#2f855a"),
+        "real_curve_supported_pre_alpha_threshold": colors.HexColor("#b7791f"),
+        "real_proxy_supported_spatial_boundary": colors.HexColor("#805ad5"),
+        "model_literature_supported_real_inversion_blocked": colors.HexColor("#c05621"),
+        "scope_boundary_not_explained": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "signature")
+    c.drawString(left + 170, top + 18, "alignment stage")
+    c.drawString(left + 420, top + 18, "support and blocker")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["alignment_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#2b6cb0"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.8)
+        c.drawString(left, y, row["signature"].replace("_", " ")[:30])
+        c.setFillColor(color)
+        c.rect(left + 170, y - 12, 232, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 178, y - 3, stage.replace("_", " ")[:40])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 420,
+            y,
+            "model={:.1g}; literature={}; real={}; inversion={}; thermo={}".format(
+                float(row["model_support"]),
+                int(float(row["literature_qualitative_support"])),
+                int(float(row["real_glassbench_support"])),
+                int(float(row["real_quantitative_inversion_ready"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.7)
+        c.drawString(left + 420, y - 14, f'phenomenon={row["phenomenon"].replace("_", " ")[:64]}')
+        c.drawString(left + 420, y - 27, f'blocker={row["primary_blocker"].replace("_", " ")[:64]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Rows with real support are dynamical signatures only; persistence/exchange inversion and thermodynamic claims remain separately gated.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_direct_four_point_claim_gate_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench direct four-point claim gate")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Overlap-chi4 evidence remains a proxy until direct four-point susceptibility and dynamic length are both available.",
+    )
+    left, top = 48, page_h - 94
+    row_h = 58
+    colors_by_stage = {
+        "direct_four_point_dynamic_length_claim_ready": colors.HexColor("#2f855a"),
+        "overlap_chi4_proxy_supported_direct_four_point_blocked": colors.HexColor("#805ad5"),
+        "overlap_chi4_proxy_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 105, top + 18, "claim stage")
+    c.drawString(left + 430, top + 18, "promotion guard")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["four_point_claim_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 105, y - 12, 306, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 113, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 430,
+            y,
+            "proxy={}; direct4pt={}; length={}; promote={}; chi4={:.3g}; sigma={:.3g}".format(
+                int(float(row["overlap_chi4_proxy_ready"])),
+                int(float(row["direct_four_point_susceptibility_ready"])),
+                int(float(row["dynamic_length_ready"])),
+                int(float(row["proxy_promotion_allowed"])),
+                float(row["overlap_chi4_peak"]),
+                float(row["sigma_overlap_chi4_peak"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 430,
+            y - 14,
+            "members={:.0f}; physical time={}; blocker={}".format(
+                float(row["member_count"]),
+                int(float(row["physical_time_ready"])),
+                row["primary_blocker"].replace("_", " ")[:44],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The gate prevents overlap-density or chi4-proxy evidence from being promoted to a direct spatial four-point theory.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_real_data_closure_priority_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real-data closure priority ledger")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Minimum real payloads are ranked by which dynamical diagnostic claims they unlock; thermodynamic claims stay disallowed.",
+    )
+    left, top = 46, page_h - 94
+    row_h = 56
+    colors_by_stage = {
+        "minimum_real_inversion_closure_priority": colors.HexColor("#9f1239"),
+        "heldout_alpha_prediction_priority": colors.HexColor("#2b6cb0"),
+        "mechanism_selection_priority": colors.HexColor("#805ad5"),
+        "spatial_four_point_boundary_priority": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 20, "rank")
+    c.drawString(left + 44, top + 20, "closure payload")
+    c.drawString(left + 320, top + 20, "claim unlocked and required data")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["priority_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(left, y, f'#{int(float(row["priority_rank"]))}')
+        c.setFillColor(color)
+        c.rect(left + 44, y - 12, 260, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 52, y - 3, row["closure_id"].replace("_", " ")[:42])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(
+            left + 320,
+            y,
+            "stage={}; blockers={:.0f}; inversion={}; micro-macro={}; alpha={}; mechanism={}; spatial={}; thermo={}".format(
+                stage.replace("_", " ")[:42],
+                float(row["blocked_gate_count"]),
+                int(float(row["unlocks_quantitative_inversion"])),
+                int(float(row["unlocks_micro_to_macro_prediction"])),
+                int(float(row["unlocks_heldout_alpha_prediction"])),
+                int(float(row["unlocks_mechanism_selection"])),
+                int(float(row["unlocks_direct_spatial_claim"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 320,
+            y - 14,
+            f'payload={row["minimum_required_payload"].replace("_", " ")[:86]}',
+        )
+        c.drawString(
+            left + 320,
+            y - 27,
+            f'post-unlock={row["post_unlock_claim_level"].replace("_", " ")[:80]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is a real-data closure ledger, not a claim that the present cache already contains a complete microdynamic inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench microdynamic closed-loop audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real frame-index microstatistics, real macro dynamical signatures, and missing cage-jump clock inputs are separated.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "real_microdynamic_closed_loop_ready": colors.HexColor("#2f855a"),
+        "real_microstats_macro_signatures_closed_loop_blocked": colors.HexColor("#9f1239"),
+        "real_microstats_macro_signature_incomplete": colors.HexColor("#c05621"),
+        "macro_timecode_upstream_incomplete": colors.HexColor("#2b6cb0"),
+        "trajectory_microstatistics_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "closed-loop stage")
+    c.drawString(left + 370, top + 24, "micro-to-macro evidence status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["closed_loop_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 252, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 370,
+            y,
+            "frame microstats={}; macro signatures={}; prediction={}; blocker={}".format(
+                int(float(row["frame_index_microstats_ready"])),
+                int(float(row["macro_signature_ready"])),
+                int(float(row["micro_to_macro_prediction_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            "cage proxy={:.3g}; short NGP peak={:.3g}; short Fs decay={:.3g}; signatures={:.0f}".format(
+                float(row["cage_length_proxy"]),
+                float(row["short_frame_ngp_peak"]),
+                float(row["short_frame_fs_decay"]),
+                float(row["macro_signature_count"]),
+            ),
+        )
+        c.drawString(left + 370, y - 27, f'missing={row["missing_closed_loop_inputs"][:82]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This convergence audit blocks held-out micro-to-macro prediction claims until cage jumps and clocks are extracted.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_cage_jump_proxy_canary_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cage-jump proxy canary")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Aggregate frame-index MSD, NGP, and Fs decay mark jump-like candidates; particle-resolved event clocks remain blocked.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "aggregate_cage_jump_proxy_ready_particle_events_blocked": colors.HexColor("#9f1239"),
+        "aggregate_cage_jump_proxy_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "canary stage")
+    c.drawString(left + 370, top + 24, "aggregate proxy status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["canary_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 252, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 370,
+            y,
+            "proxy={}; particle events={}; physical clock={}; blocker={}".format(
+                int(float(row["aggregate_jump_proxy_ready"])),
+                int(float(row["particle_resolved_jump_events_ready"])),
+                int(float(row["physical_time_jump_clock_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            "peak frame={:.0f}; proxy jump length={:.3g}; score={:.3g}; short Fs decay={:.3g}".format(
+                float(row["peak_proxy_event_frame"]),
+                float(row["proxy_jump_length"]),
+                float(row["proxy_event_score"]),
+                float(row["max_short_frame_fs_decay"]),
+            ),
+        )
+        c.drawString(left + 370, y - 27, f'missing={row["missing_event_clock_inputs"][:82]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This canary is an aggregate trajectory proxy only; it does not replace particle-resolved cage-jump segmentation.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_event_clock_threshold_readiness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench event-clock threshold readiness")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real threshold-robustness claims require cached particle trajectories, physical time, and held-out macro observables.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "real_event_clock_threshold_robustness_ready": colors.HexColor("#2f855a"),
+        "real_event_clock_threshold_robustness_blocked": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "readiness stage")
+    c.drawString(left + 390, top + 24, "real-input gate")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["readiness_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 270, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "schema={}; curve={}; members={}; particle cache={}; threshold sweep={}; blocker={}".format(
+                int(float(row["positions_schema_ready"])),
+                int(float(row["first_npz_observable_curve_ready"])),
+                int(float(row["member_ensemble_observable_ready"])),
+                int(float(row["particle_resolved_positions_cached"])),
+                int(float(row["threshold_sweep_event_clock_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 390, y - 14, f'missing={row["missing_real_threshold_inputs"][:92]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The gate is intentionally conservative: schema visibility is not treated as a real particle-event threshold sweep.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_first_npz_particle_cache_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench first-NPZ particle cache contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The contract pins byte ranges, NPZ identity, coordinate shape, and the local cache target needed before real event-clock sweeps.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 64
+    colors_by_stage = {
+        "first_npz_particle_cache_ready_for_threshold_sweep": colors.HexColor("#2f855a"),
+        "first_npz_particle_cache_contract_ready_cache_missing": colors.HexColor("#b7791f"),
+        "first_npz_particle_cache_contract_ready_time_blocked": colors.HexColor("#805ad5"),
+        "first_npz_particle_cache_contract_incomplete": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "contract stage")
+    c.drawString(left + 395, top + 24, "coordinate-cache payload")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["cache_contract_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 395,
+            y,
+            "shape={}; npz={} B; md5={}; cache={}; blocker={}".format(
+                row["positions_shape"],
+                int(float(row["npz_member_bytes"])),
+                row["npz_member_md5"][:10],
+                int(float(row["particle_resolved_positions_cached"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "range={}-{}; target={}".format(
+                int(float(row["compressed_probe_range_start"])),
+                int(float(row["compressed_probe_range_end"])),
+                row["particle_cache_target"][:72],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This is an extraction contract, not a cached coordinate array or a completed real threshold sweep.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_cached_particle_timecode_bridge_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cached-particle time-code bridge")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cached first-NPZ coordinates have official lag times, but axis 0 is isoconfigurational replicas rather than physical time.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 64
+    colors_by_stage = {
+        "cached_particle_event_clock_ready": colors.HexColor("#2f855a"),
+        "cached_particle_lag_time_ready_event_clock_blocked": colors.HexColor("#b7791f"),
+        "cached_particle_lag_time_ready_frame_axis_unknown": colors.HexColor("#805ad5"),
+        "cached_particle_timecode_semantics_incomplete": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "bridge stage")
+    c.drawString(left + 395, top + 24, "lag-time and axis semantics")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["timecode_bridge_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 395,
+            y,
+            "code={}; lag={:.3g}; cache={}; lag ready={}; frame-axis time={}; event clock={}".format(
+                row["time_code"],
+                float(row["lag_time"]),
+                int(float(row["particle_resolved_positions_cached"])),
+                int(float(row["physical_lag_time_ready"])),
+                int(float(row["frame_axis_is_physical_time"])),
+                int(float(row["event_clock_trajectory_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            f'axis0={row["axis0_semantics"][:46]}; blocker={row["primary_blocker"]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The bridge upgrades lag-time semantics but explicitly blocks event-clock claims from fixed-lag replica axes.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_multilag_particle_cache_targets_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench multi-lag particle-cache targets")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Official structure-matched time-code ladders specify which NPZ members must be cached before particle event-clock tests.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 66
+    colors_by_stage = {
+        "multi_lag_particle_event_clock_ready": colors.HexColor("#2f855a"),
+        "multi_lag_particle_cache_ready_event_clock_axis_blocked": colors.HexColor("#805ad5"),
+        "official_multi_lag_ladder_ready_cache_missing": colors.HexColor("#b7791f"),
+        "official_multi_lag_ladder_incomplete": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "cache-target stage")
+    c.drawString(left + 395, top + 24, "structure-matched lag ladder")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["target_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; codes={}; members={}; cached={}; official={}; event clock={}".format(
+                row["selected_structure_id"],
+                row["selected_time_codes"][:42],
+                int(float(row["target_member_count"])),
+                int(float(row["cached_target_member_count"])),
+                int(float(row["official_multi_lag_ladder_ready"])),
+                int(float(row["event_clock_trajectory_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            f'lag span={float(row["lag_span"]):.3g}; blocker={row["primary_blocker"]}; next={row["next_required_action"][:44]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This target list is a data-acquisition contract, not a completed real trajectory inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
+def write_sota_glassbench_cached_particle_observable_semantics_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cached-particle observable semantics")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cached particle coordinates are real data, but official displacement observables still require initial reference positions.",
+    )
+    left, top = 48, page_h - 86
+    row_h = 31
+    colors_by_stage = {
+        "official_displacement_observable_reproduced": colors.HexColor("#2f855a"),
+        "cached_coordinate_proxy_ready_initial_reference_blocked": colors.HexColor("#b7791f"),
+        "cached_coordinate_proxy_ready_observable_mismatch": colors.HexColor("#805ad5"),
+        "cached_coordinate_proxy_incomplete": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 115, top + 18, "semantics stage")
+    c.drawString(left + 405, top + 18, "audit values")
+    for index, row in enumerate(rows[:9]):
+        y = top - index * row_h
+        stage = row["observable_semantics_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.2)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} {row["time_code"]}')
+        c.setFillColor(color)
+        c.rect(left + 115, y - 10, 274, 20, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.5)
+        c.drawString(left + 121, y - 1, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 405,
+            y,
+            "official MSD={:.4g}; raw rel err={:.3g}; spread rel err={:.3g}; init ref={}; event clock={}".format(
+                float(row["official_msd"]),
+                float(row["raw_coordinate_msd_relative_error"]),
+                float(row["replica_spread_msd_relative_error"]),
+                int(float(row["initial_reference_positions_ready"])),
+                int(float(row["event_clock_trajectory_ready"])),
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The audit prevents coordinate-cache readiness from being promoted to displacement-observable or event-clock readiness.",
     )
     c.showPage()
     c.save()
@@ -4535,6 +7954,169 @@ def write_trajectory_observable_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_cage_jump_events_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_cage_jump_events.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    row = rows[0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Particle-resolved cage-jump event clock")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Synthetic trajectory canary: threshold jumps define persistence and exchange intervals before real-benchmark inversion.",
+    )
+    left, top = 80, page_h - 105
+    labels = [
+        ("jump events", float(row["total_jump_event_count"]), colors.HexColor("#2b6cb0")),
+        ("particles with jumps", float(row["particles_with_jump_count"]), colors.HexColor("#2f855a")),
+        ("exchange intervals", float(row["exchange_interval_count"]), colors.HexColor("#805ad5")),
+        ("mean persistence", float(row["persistence_mean"]), colors.HexColor("#c05621")),
+        ("mean exchange", float(row["exchange_mean"]), colors.HexColor("#718096")),
+    ]
+    max_value = max(value for _, value, _ in labels)
+    c.setFont("Helvetica", 8)
+    for idx, (label, value, color) in enumerate(labels):
+        y0 = top - idx * 42
+        bar_w = 470 * value / max(max_value, 1e-12)
+        c.setFillColor(colors.black)
+        c.drawString(left, y0 + 7, label)
+        c.setFillColor(color)
+        c.rect(left + 135, y0, bar_w, 18, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.drawString(left + 145 + bar_w, y0 + 5, f"{value:.3g}")
+    c.setFont("Helvetica", 7.5)
+    c.drawString(
+        left,
+        94,
+        f"stage={row['event_protocol_stage']}; blocker={row['primary_blocker']}; thermodynamic_claim_allowed={int(float(row['thermodynamic_claim_allowed']))}",
+    )
+    c.drawString(left, 78, f"scope={row['scope_note']}")
+    c.showPage()
+    c.save()
+
+
+def write_trajectory_event_clock_macro_predictions_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Event-clock micro-to-macro prediction")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Particle jump clocks predict D, multi-k alpha, late NGP, and chi4 without fitting macro observables.",
+    )
+    left, top = 70, page_h - 105
+    metrics = [
+        ("D", "diffusion_z", colors.HexColor("#2b6cb0")),
+        ("tau alpha", "max_tau_alpha_z", colors.HexColor("#2f855a")),
+        ("late NGP", "late_ngp_z", colors.HexColor("#c05621")),
+        ("chi4", "chi4_peak_z", colors.HexColor("#805ad5")),
+    ]
+    max_z = max(max(float(row[key]) for _, key, _ in metrics) for row in rows)
+    max_z = max(max_z, 2.0)
+    c.setFont("Helvetica", 7.5)
+    threshold_y = top - 65 * 2.0 / max_z
+    c.setStrokeColor(colors.HexColor("#718096"))
+    c.setDash(3, 3)
+    c.line(left, threshold_y, left + 580, threshold_y)
+    c.setDash()
+    c.setFillColor(colors.HexColor("#718096"))
+    c.drawString(left + 590, threshold_y - 3, "z=2")
+    for row_idx, row in enumerate(rows):
+        y0 = top - row_idx * 135
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y0 + 12, row["protocol_id"])
+        c.setFont("Helvetica", 7.5)
+        for metric_idx, (label, key, color) in enumerate(metrics):
+            value = float(row[key])
+            x0 = left + metric_idx * 132
+            bar_h = 65 * min(value / max_z, 1.0)
+            c.setFillColor(color)
+            c.rect(x0, y0 - 68, 34, bar_h, stroke=0, fill=1)
+            c.setFillColor(colors.black)
+            c.drawString(x0, y0 - 82, label)
+            c.drawString(x0, y0 - 70 + bar_h, f"{value:.2g}")
+        c.setFillColor(colors.black)
+        c.drawString(left, y0 - 106, f"stage={row['prediction_stage']}; blocker={row['primary_blocker']}")
+    c.showPage()
+    c.save()
+
+
+def write_trajectory_event_clock_threshold_robustness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Event-clock threshold robustness")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Micro-to-macro predictions must pass across a stable cage-jump threshold window and fail outside it.",
+    )
+    left, bottom = 78, 108
+    plot_w, plot_h = 640, 290
+    thresholds = np.array([float(row["jump_displacement_threshold"]) for row in rows])
+    z_values = []
+    for row in rows:
+        if float(row["event_clock_ready"]) == 1.0:
+            z_values.append(
+                max(
+                    float(row["diffusion_z"]),
+                    float(row["max_tau_alpha_z"]),
+                    float(row["late_ngp_z"]),
+                    float(row["chi4_peak_z"]),
+                )
+            )
+        else:
+            z_values.append(2.5)
+    z = np.array(z_values)
+    zmax = max(3.0, float(np.max(z)))
+
+    def sx(value: float) -> float:
+        return left + (value - float(np.min(thresholds))) * plot_w / max(float(np.max(thresholds) - np.min(thresholds)), 1e-12)
+
+    def sy(value: float) -> float:
+        return bottom + plot_h - value * plot_h / zmax
+
+    c.setStrokeColor(colors.black)
+    c.line(left, bottom, left + plot_w, bottom)
+    c.line(left, bottom, left, bottom + plot_h)
+    c.setStrokeColor(colors.HexColor("#718096"))
+    c.setDash(3, 3)
+    c.line(left, sy(2.0), left + plot_w, sy(2.0))
+    c.setDash()
+    c.setFont("Helvetica", 7)
+    c.setFillColor(colors.HexColor("#718096"))
+    c.drawString(left + plot_w - 26, sy(2.0) + 4, "z=2")
+    for row, value in zip(rows, z):
+        passed = float(row["threshold_prediction_pass"]) == 1.0
+        ready = float(row["event_clock_ready"]) == 1.0
+        color = colors.HexColor("#2f855a" if passed else ("#c05621" if ready else "#718096"))
+        x0 = sx(float(row["jump_displacement_threshold"]))
+        y0 = sy(float(value))
+        c.setFillColor(color)
+        c.circle(x0, y0, 4, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.drawString(x0 - 8, bottom - 18, f"{float(row['jump_displacement_threshold']):.2g}")
+    c.setFillColor(colors.black)
+    c.drawString(left, 70, f"stable threshold window count={int(max(float(row['stable_threshold_window_count']) for row in rows))}")
+    c.drawString(left, 56, "thermodynamic_claim_allowed=0; real_benchmark_closed_loop_ready=0")
+    c.showPage()
+    c.save()
+
+
 def write_trajectory_uncertainty_protocol_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -4799,6 +8381,18 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_evidence_verdict_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_verdict.pdf"
     sota_evidence_class_pdf = PAPER_FIGURE_DIR / "renewal_cage_sota_evidence_class.pdf"
     simultaneous_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_simultaneous_closure.pdf"
+    microdynamic_prediction_scorecard_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_microdynamic_prediction_scorecard.pdf"
+    )
+    microdynamic_minimality_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_microdynamic_minimality_audit.pdf"
+    )
+    sota_experimental_verdict_matrix_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_experimental_verdict_matrix.pdf"
+    )
+    sota_glassbench_real_evidence_claim_synthesis_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf"
+    )
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -4869,6 +8463,138 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_ka2d_timecode_semantics_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf"
     )
+    sota_glassbench_timecode_curve_bridge_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.pdf"
+    )
+    sota_glassbench_timecode_signature_support_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.pdf"
+    )
+    sota_glassbench_alpha_threshold_horizon_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf"
+    )
+    sota_glassbench_alpha_anchor_rescue_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf"
+    )
+    sota_glassbench_alpha_anchor_cached_fs_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf"
+    )
+    sota_glassbench_direct_alpha_curve_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.pdf"
+    )
+    sota_glassbench_direct_alpha_shape_selection_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf"
+    )
+    sota_glassbench_direct_alpha_multik_shape_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf"
+    )
+    sota_glassbench_direct_alpha_multik_heldout_prediction_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf"
+    )
+    sota_glassbench_direct_alpha_post_window_prediction_targets_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf"
+    )
+    sota_glassbench_direct_alpha_post_window_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf"
+    )
+    sota_glassbench_direct_alpha_transport_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.pdf"
+    )
+    sota_glassbench_direct_alpha_pe_bound_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf"
+    )
+    sota_glassbench_direct_alpha_displacement_tail_bound_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf"
+    )
+    sota_glassbench_direct_alpha_multilag_crossing_canary_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf"
+    )
+    sota_glassbench_direct_alpha_event_clock_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
+    )
+    sota_glassbench_sparse_lag_event_clock_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf"
+    )
+    sota_glassbench_interval_censored_first_crossing_clock_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf"
+    )
+    sota_glassbench_interval_censored_persistence_fit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf"
+    )
+    sota_glassbench_waiting_law_selection_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.pdf"
+    )
+    sota_glassbench_finite_exchange_envelope_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.pdf"
+    )
+    sota_glassbench_real_cached_microdynamic_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf"
+    )
+    sota_glassbench_late_recovery_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.pdf"
+    )
+    sota_glassbench_late_recovery_ingestion_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf"
+    )
+    sota_glassbench_late_recovery_timecode_target_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf"
+    )
+    sota_glassbench_late_recovery_cache_request_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_cache_request_contract.pdf"
+    )
+    sota_glassbench_late_recovery_membership_probe_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf"
+    )
+    sota_glassbench_late_recovery_public_timecode_ceiling_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf"
+    )
+    sota_glassbench_censored_window_claim_audit_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.pdf"
+    )
+    sota_glassbench_public_window_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_public_window_verdict.pdf"
+    )
+    sota_glassbench_late_recovery_experiment_design_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf"
+    )
+    sota_glassbench_late_recovery_uncertainty_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf"
+    )
+    sota_glassbench_late_recovery_outcome_matrix_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf"
+    )
+    sota_glassbench_late_recovery_decision_power_plan_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf"
+    )
+    sota_dynamic_signature_alignment_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
+    )
+    sota_glassbench_direct_four_point_claim_gate_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf"
+    )
+    sota_glassbench_real_data_closure_priority_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.pdf"
+    )
+    sota_glassbench_microdynamic_closed_loop_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
+    )
+    sota_glassbench_cage_jump_proxy_canary_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf"
+    )
+    sota_glassbench_event_clock_threshold_readiness_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf"
+    )
+    sota_glassbench_cached_particle_timecode_bridge_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf"
+    )
+    sota_glassbench_multilag_particle_cache_targets_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf"
+    )
+    sota_glassbench_cached_particle_observable_semantics_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf"
+    )
+    sota_glassbench_first_npz_particle_cache_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -4907,6 +8633,13 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         PAPER_FIGURE_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
     )
     trajectory_observable_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.pdf"
+    trajectory_cage_jump_events_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_cage_jump_events.pdf"
+    trajectory_event_clock_macro_predictions_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
+    )
+    trajectory_event_clock_threshold_robustness_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.pdf"
+    )
     trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
     trajectory_member_ensemble_uncertainty_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.pdf"
@@ -4942,6 +8675,12 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_evidence_verdict_pdf(sota_evidence_verdict_pdf)
     write_sota_evidence_class_pdf(sota_evidence_class_pdf)
     write_simultaneous_closure_pdf(simultaneous_closure_pdf)
+    write_microdynamic_prediction_scorecard_pdf(microdynamic_prediction_scorecard_pdf)
+    write_microdynamic_minimality_audit_pdf(microdynamic_minimality_audit_pdf)
+    write_sota_experimental_verdict_matrix_pdf(sota_experimental_verdict_matrix_pdf)
+    write_sota_glassbench_real_evidence_claim_synthesis_pdf(
+        sota_glassbench_real_evidence_claim_synthesis_pdf
+    )
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -4991,6 +8730,138 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_glassbench_ka2d_timecode_semantics_pdf(
         sota_glassbench_ka2d_timecode_semantics_pdf
     )
+    write_sota_glassbench_timecode_curve_bridge_pdf(
+        sota_glassbench_timecode_curve_bridge_pdf
+    )
+    write_sota_glassbench_timecode_signature_support_pdf(
+        sota_glassbench_timecode_signature_support_pdf
+    )
+    write_sota_glassbench_alpha_threshold_horizon_pdf(
+        sota_glassbench_alpha_threshold_horizon_pdf
+    )
+    write_sota_glassbench_alpha_anchor_rescue_protocol_pdf(
+        sota_glassbench_alpha_anchor_rescue_protocol_pdf
+    )
+    write_sota_glassbench_alpha_anchor_cached_fs_pdf(
+        sota_glassbench_alpha_anchor_cached_fs_pdf
+    )
+    write_sota_glassbench_direct_alpha_curve_pdf(
+        sota_glassbench_direct_alpha_curve_pdf
+    )
+    write_sota_glassbench_direct_alpha_shape_selection_pdf(
+        sota_glassbench_direct_alpha_shape_selection_pdf
+    )
+    write_sota_glassbench_direct_alpha_multik_shape_pdf(
+        sota_glassbench_direct_alpha_multik_shape_pdf
+    )
+    write_sota_glassbench_direct_alpha_multik_heldout_prediction_pdf(
+        sota_glassbench_direct_alpha_multik_heldout_prediction_pdf
+    )
+    write_sota_glassbench_direct_alpha_post_window_prediction_targets_pdf(
+        sota_glassbench_direct_alpha_post_window_prediction_targets_pdf
+    )
+    write_sota_glassbench_direct_alpha_post_window_verdict_pdf(
+        sota_glassbench_direct_alpha_post_window_verdict_pdf
+    )
+    write_sota_glassbench_direct_alpha_transport_pdf(
+        sota_glassbench_direct_alpha_transport_pdf
+    )
+    write_sota_glassbench_direct_alpha_pe_bound_pdf(
+        sota_glassbench_direct_alpha_pe_bound_pdf
+    )
+    write_sota_glassbench_direct_alpha_displacement_tail_bound_pdf(
+        sota_glassbench_direct_alpha_displacement_tail_bound_pdf
+    )
+    write_sota_glassbench_direct_alpha_multilag_crossing_canary_pdf(
+        sota_glassbench_direct_alpha_multilag_crossing_canary_pdf
+    )
+    write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
+        sota_glassbench_direct_alpha_event_clock_contract_pdf
+    )
+    write_sota_glassbench_sparse_lag_event_clock_pdf(
+        sota_glassbench_sparse_lag_event_clock_pdf
+    )
+    write_sota_glassbench_interval_censored_first_crossing_clock_pdf(
+        sota_glassbench_interval_censored_first_crossing_clock_pdf
+    )
+    write_sota_glassbench_interval_censored_persistence_fit_pdf(
+        sota_glassbench_interval_censored_persistence_fit_pdf
+    )
+    write_sota_glassbench_waiting_law_selection_pdf(
+        sota_glassbench_waiting_law_selection_pdf
+    )
+    write_sota_glassbench_finite_exchange_envelope_pdf(
+        sota_glassbench_finite_exchange_envelope_pdf
+    )
+    write_sota_glassbench_real_cached_microdynamic_verdict_pdf(
+        sota_glassbench_real_cached_microdynamic_verdict_pdf
+    )
+    write_sota_glassbench_late_recovery_protocol_pdf(
+        sota_glassbench_late_recovery_protocol_pdf
+    )
+    write_sota_glassbench_late_recovery_ingestion_contract_pdf(
+        sota_glassbench_late_recovery_ingestion_contract_pdf
+    )
+    write_sota_glassbench_late_recovery_timecode_target_pdf(
+        sota_glassbench_late_recovery_timecode_target_pdf
+    )
+    write_sota_glassbench_late_recovery_cache_request_contract_pdf(
+        sota_glassbench_late_recovery_cache_request_contract_pdf
+    )
+    write_sota_glassbench_late_recovery_membership_probe_contract_pdf(
+        sota_glassbench_late_recovery_membership_probe_contract_pdf
+    )
+    write_sota_glassbench_late_recovery_public_timecode_ceiling_pdf(
+        sota_glassbench_late_recovery_public_timecode_ceiling_pdf
+    )
+    write_sota_glassbench_censored_window_claim_audit_pdf(
+        sota_glassbench_censored_window_claim_audit_pdf
+    )
+    write_sota_glassbench_public_window_verdict_pdf(
+        sota_glassbench_public_window_verdict_pdf
+    )
+    write_sota_glassbench_late_recovery_experiment_design_pdf(
+        sota_glassbench_late_recovery_experiment_design_pdf
+    )
+    write_sota_glassbench_late_recovery_uncertainty_verdict_pdf(
+        sota_glassbench_late_recovery_uncertainty_verdict_pdf
+    )
+    write_sota_glassbench_late_recovery_outcome_matrix_pdf(
+        sota_glassbench_late_recovery_outcome_matrix_pdf
+    )
+    write_sota_glassbench_late_recovery_decision_power_plan_pdf(
+        sota_glassbench_late_recovery_decision_power_plan_pdf
+    )
+    write_sota_dynamic_signature_alignment_pdf(
+        sota_dynamic_signature_alignment_pdf
+    )
+    write_sota_glassbench_direct_four_point_claim_gate_pdf(
+        sota_glassbench_direct_four_point_claim_gate_pdf
+    )
+    write_sota_glassbench_real_data_closure_priority_pdf(
+        sota_glassbench_real_data_closure_priority_pdf
+    )
+    write_sota_glassbench_microdynamic_closed_loop_pdf(
+        sota_glassbench_microdynamic_closed_loop_pdf
+    )
+    write_sota_glassbench_cage_jump_proxy_canary_pdf(
+        sota_glassbench_cage_jump_proxy_canary_pdf
+    )
+    write_sota_glassbench_event_clock_threshold_readiness_pdf(
+        sota_glassbench_event_clock_threshold_readiness_pdf
+    )
+    write_sota_glassbench_cached_particle_timecode_bridge_pdf(
+        sota_glassbench_cached_particle_timecode_bridge_pdf
+    )
+    write_sota_glassbench_multilag_particle_cache_targets_pdf(
+        sota_glassbench_multilag_particle_cache_targets_pdf
+    )
+    write_sota_glassbench_cached_particle_observable_semantics_pdf(
+        sota_glassbench_cached_particle_observable_semantics_pdf
+    )
+    write_sota_glassbench_first_npz_particle_cache_contract_pdf(
+        sota_glassbench_first_npz_particle_cache_contract_pdf
+    )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
     )
@@ -5018,6 +8889,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_raw_curve_diagnostic_readiness_pdf(raw_curve_diagnostic_readiness_pdf)
     write_raw_curve_persistence_exchange_protocol_pdf(raw_curve_persistence_exchange_protocol_pdf)
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
+    write_trajectory_cage_jump_events_pdf(trajectory_cage_jump_events_pdf)
+    write_trajectory_event_clock_macro_predictions_pdf(trajectory_event_clock_macro_predictions_pdf)
+    write_trajectory_event_clock_threshold_robustness_pdf(trajectory_event_clock_threshold_robustness_pdf)
     write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
     write_trajectory_member_ensemble_uncertainty_pdf(trajectory_member_ensemble_uncertainty_pdf)
     write_trajectory_inversion_readiness_pdf(trajectory_inversion_readiness_pdf)
@@ -5062,6 +8936,22 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(sota_evidence_verdict_pdf, "figures/renewal_cage_sota_evidence_verdict.pdf")
         archive.write(sota_evidence_class_pdf, "figures/renewal_cage_sota_evidence_class.pdf")
         archive.write(simultaneous_closure_pdf, "figures/renewal_cage_simultaneous_closure.pdf")
+        archive.write(
+            microdynamic_prediction_scorecard_pdf,
+            "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
+        )
+        archive.write(
+            microdynamic_minimality_audit_pdf,
+            "figures/renewal_cage_microdynamic_minimality_audit.pdf",
+        )
+        archive.write(
+            sota_experimental_verdict_matrix_pdf,
+            "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_evidence_claim_synthesis_pdf,
+            "figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf",
+        )
         archive.write(
             real_benchmark_assimilation_gate_pdf,
             "figures/renewal_cage_real_benchmark_assimilation_gate.pdf",
@@ -5151,6 +9041,182 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf",
         )
         archive.write(
+            sota_glassbench_timecode_curve_bridge_pdf,
+            "figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf",
+        )
+        archive.write(
+            sota_glassbench_timecode_signature_support_pdf,
+            "figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf",
+        )
+        archive.write(
+            sota_glassbench_alpha_threshold_horizon_pdf,
+            "figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf",
+        )
+        archive.write(
+            sota_glassbench_alpha_anchor_rescue_protocol_pdf,
+            "figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf",
+        )
+        archive.write(
+            sota_glassbench_alpha_anchor_cached_fs_pdf,
+            "figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_curve_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_shape_selection_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_multik_shape_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_multik_heldout_prediction_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_post_window_prediction_targets_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_post_window_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_transport_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_pe_bound_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_displacement_tail_bound_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_multilag_crossing_canary_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_alpha_event_clock_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf",
+        )
+        archive.write(
+            sota_glassbench_sparse_lag_event_clock_pdf,
+            "figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf",
+        )
+        archive.write(
+            sota_glassbench_interval_censored_first_crossing_clock_pdf,
+            "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
+        )
+        archive.write(
+            sota_glassbench_interval_censored_persistence_fit_pdf,
+            "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
+        )
+        archive.write(
+            sota_glassbench_waiting_law_selection_pdf,
+            "figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf",
+        )
+        archive.write(
+            sota_glassbench_finite_exchange_envelope_pdf,
+            "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_cached_microdynamic_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_protocol_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_ingestion_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_timecode_target_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_cache_request_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_cache_request_contract.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_membership_probe_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_public_timecode_ceiling_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf",
+        )
+        archive.write(
+            sota_glassbench_censored_window_claim_audit_pdf,
+            "figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf",
+        )
+        archive.write(
+            sota_glassbench_public_window_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_public_window_verdict.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_experiment_design_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_uncertainty_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_outcome_matrix_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_decision_power_plan_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf",
+        )
+        archive.write(
+            sota_dynamic_signature_alignment_pdf,
+            "figures/renewal_cage_sota_dynamic_signature_alignment.pdf",
+        )
+        archive.write(
+            sota_glassbench_direct_four_point_claim_gate_pdf,
+            "figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_data_closure_priority_pdf,
+            "figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf",
+        )
+        archive.write(
+            sota_glassbench_microdynamic_closed_loop_pdf,
+            "figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf",
+        )
+        archive.write(
+            sota_glassbench_cage_jump_proxy_canary_pdf,
+            "figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf",
+        )
+        archive.write(
+            sota_glassbench_event_clock_threshold_readiness_pdf,
+            "figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf",
+        )
+        archive.write(
+            sota_glassbench_cached_particle_timecode_bridge_pdf,
+            "figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf",
+        )
+        archive.write(
+            sota_glassbench_multilag_particle_cache_targets_pdf,
+            "figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf",
+        )
+        archive.write(
+            sota_glassbench_cached_particle_observable_semantics_pdf,
+            "figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf",
+        )
+        archive.write(
+            sota_glassbench_first_npz_particle_cache_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf",
+        )
+        archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,
             "figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf",
         )
@@ -5205,6 +9271,15 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
         )
         archive.write(trajectory_observable_protocol_pdf, "figures/renewal_cage_trajectory_observable_protocol.pdf")
+        archive.write(trajectory_cage_jump_events_pdf, "figures/renewal_cage_trajectory_cage_jump_events.pdf")
+        archive.write(
+            trajectory_event_clock_macro_predictions_pdf,
+            "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
+        )
+        archive.write(
+            trajectory_event_clock_threshold_robustness_pdf,
+            "figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf",
+        )
         archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
         archive.write(
             trajectory_member_ensemble_uncertainty_pdf,

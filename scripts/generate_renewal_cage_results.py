@@ -41,6 +41,7 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     cross_observable_prediction_ledger,
+    dynamic_signature_alignment_ledger,
     dynamic_heterogeneity_benchmark_consistency,
     fragility_benchmark_consistency,
     frontier_benchmark_horizon,
@@ -51,6 +52,50 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_count_moments,
     gamma_exchange_diagnostic_map,
     gamma_exchange_temperature_scan,
+    glassbench_alpha_anchor_cached_fs_audit,
+    glassbench_alpha_anchor_rescue_protocol,
+    glassbench_alpha_threshold_horizon_audit,
+    glassbench_cage_jump_proxy_canary,
+    glassbench_cached_particle_timecode_bridge,
+    glassbench_cached_particle_observable_semantics_audit,
+    glassbench_direct_alpha_curve_audit,
+    glassbench_direct_alpha_displacement_tail_bound,
+    glassbench_direct_alpha_event_clock_extraction_contract,
+    glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_multik_heldout_prediction_gate,
+    glassbench_direct_alpha_post_window_prediction_targets,
+    glassbench_direct_alpha_post_window_verdict,
+    glassbench_direct_alpha_multik_shape_gate,
+    glassbench_direct_alpha_shape_selection,
+    glassbench_direct_alpha_pe_feasibility_bound,
+    glassbench_direct_alpha_transport_coupling_audit,
+    glassbench_event_clock_threshold_readiness_gate,
+    glassbench_first_npz_particle_cache_contract_gate,
+    glassbench_multilag_particle_cache_targets,
+    glassbench_sparse_lag_event_clock_audit,
+    glassbench_interval_censored_first_crossing_clock,
+    glassbench_interval_censored_persistence_fit,
+    glassbench_interval_censored_waiting_law_selection,
+    glassbench_finite_exchange_falsification_envelope,
+    glassbench_real_evidence_claim_synthesis,
+    glassbench_real_cached_microdynamic_verdict,
+    glassbench_late_recovery_falsification_protocol,
+    glassbench_late_recovery_ingestion_contract,
+    glassbench_late_recovery_timecode_target,
+    glassbench_late_recovery_cache_request_contract,
+    glassbench_late_recovery_membership_probe_contract,
+    glassbench_late_recovery_public_timecode_ceiling,
+    glassbench_censored_window_claim_audit,
+    glassbench_sota_public_window_verdict,
+    glassbench_late_recovery_experiment_design,
+    glassbench_late_recovery_uncertainty_verdict,
+    glassbench_late_recovery_outcome_matrix,
+    glassbench_late_recovery_decision_power_plan,
+    glassbench_microdynamic_closed_loop_audit,
+    glassbench_timecode_curve_bridge,
+    glassbench_timecode_signature_support_gate,
+    glassbench_direct_four_point_claim_gate,
+    glassbench_real_data_closure_priority_ledger,
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
@@ -105,6 +150,9 @@ from renewal_cage import (  # noqa: E402
     renewal_scattering_susceptibility,
     self_intermediate_scattering,
     simultaneous_dynamical_signature_closure_gate,
+    microdynamic_prediction_scorecard,
+    microdynamic_minimality_audit,
+    sota_experimental_verdict_matrix,
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     sota_claim_alignment,
@@ -158,6 +206,9 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_gamma_exchange,
     temperature_scan,
     trajectory_adapter_contract,
+    trajectory_cage_jump_event_protocol,
+    trajectory_event_clock_macro_prediction_protocol,
+    trajectory_event_clock_threshold_robustness_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_observable_curve_bridge,
@@ -4006,6 +4057,1390 @@ def write_sota_glassbench_ka2d_timecode_semantics_csv(path: Path) -> list[dict[s
     return rows
 
 
+def write_sota_glassbench_timecode_curve_bridge_csv(
+    path: Path,
+    timecode_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Bridge corrected GlassBench time-code rows into PE pre-inversion inputs."""
+
+    rows = glassbench_timecode_curve_bridge(
+        benchmark_id="glassbench_ka2d_timecode_curve_bridge",
+        rows=timecode_rows,
+        required_wave_numbers=[0.7, 1.1, 1.6],
+        anchor_wave_number=1.1,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_timecode_signature_support_csv(
+    path: Path,
+    timecode_rows: list[dict[str, float | str]],
+    bridge_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Score real GlassBench time-code curves against dynamical glass signatures."""
+
+    rows = glassbench_timecode_signature_support_gate(
+        support_id="glassbench_ka2d_timecode_signature_support",
+        timecode_rows=timecode_rows,
+        bridge_rows=bridge_rows,
+        anchor_wave_number=1.1,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_alpha_threshold_horizon_csv(
+    path: Path,
+    timecode_rows: list[dict[str, float | str]],
+    bridge_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit GlassBench tau-alpha metadata against the anchor Fs threshold."""
+
+    rows = glassbench_alpha_threshold_horizon_audit(
+        audit_id="glassbench_ka2d_alpha_threshold_horizon",
+        timecode_rows=timecode_rows,
+        bridge_rows=bridge_rows,
+        anchor_wave_number=1.1,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_alpha_anchor_rescue_protocol_csv(
+    path: Path,
+    *,
+    alpha_horizon_rows: list[dict[str, float | str]],
+    event_clock_rows: list[dict[str, float | str]],
+    closed_loop_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Convert the GlassBench alpha-anchor k-grid blocker into a rescue protocol."""
+
+    rows = glassbench_alpha_anchor_rescue_protocol(
+        protocol_id="glassbench_ka2d_alpha_anchor_rescue",
+        alpha_horizon_rows=alpha_horizon_rows,
+        event_clock_rows=event_clock_rows,
+        closed_loop_rows=closed_loop_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_alpha_anchor_cached_fs_csv(
+    path: Path,
+    *,
+    rescue_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Measure the rescue anchor Fs directly from cached GlassBench displacements."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    semantics_manifest = json.loads(semantics_path.read_text(encoding="utf-8"))
+    wave_numbers = [float(value) for value in semantics_manifest.get("wave_numbers", [])]
+    rescue_by_key = {
+        (str(row["system_id"]), str(row["temperature"])): row
+        for row in rescue_rows
+    }
+    cached_anchor_rows: list[dict[str, float | str]] = []
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"])
+            rescue = rescue_by_key.get(key)
+            if rescue is None or float(rescue.get("alpha_anchor_rescue_design_ready", 0.0) or 0.0) != 1.0:
+                continue
+            candidate_k = float(rescue.get("required_anchor_wave_number", 0.0) or 0.0)
+            if candidate_k <= 0.0:
+                continue
+            cache_path = ROOT / row["particle_cache_path"]
+            with np.load(cache_path) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+            reference_displacements = positions - initial_positions[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
+            dx = reference_displacements[:, :, 0]
+            dy = reference_displacements[:, :, 1]
+            def fs_at_wave_number(wave_number: float) -> float:
+                return float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy))))
+
+            cached_fs_at_candidate = float(
+                fs_at_wave_number(candidate_k)
+            )
+            fs_by_k = [
+                fs_at_wave_number(wave_number)
+                for wave_number in wave_numbers
+            ]
+            threshold = math.exp(-1.0)
+            direct_threshold_k = 0.0
+            direct_fs_at_threshold = 0.0
+            direct_root_bracketed = 0.0
+            if candidate_k > 0.0 and cached_fs_at_candidate > threshold:
+                low = candidate_k
+                high = max(candidate_k * 1.25, candidate_k + 0.25)
+                high_fs = fs_at_wave_number(high)
+                while high_fs > threshold and high < 50.0:
+                    low = high
+                    high *= 1.25
+                    high_fs = fs_at_wave_number(high)
+                if high_fs <= threshold:
+                    for _ in range(80):
+                        mid = 0.5 * (low + high)
+                        mid_fs = fs_at_wave_number(mid)
+                        if mid_fs > threshold:
+                            low = mid
+                        else:
+                            high = mid
+                    direct_threshold_k = float(high)
+                    direct_fs_at_threshold = fs_at_wave_number(direct_threshold_k)
+                    direct_root_bracketed = 1.0
+            elif candidate_k > 0.0 and cached_fs_at_candidate <= threshold:
+                direct_threshold_k = candidate_k
+                direct_fs_at_threshold = cached_fs_at_candidate
+                direct_root_bracketed = 1.0
+            cached_anchor_rows.append(
+                {
+                    "system_id": row["system_id"],
+                    "temperature": row["temperature"],
+                    "structure_id": row["structure_id"],
+                    "time_code": row["time_code"],
+                    "lag_time": float(row["lag_time"]),
+                    "candidate_anchor_wave_number": float(candidate_k),
+                    "cached_fs_at_candidate_anchor": cached_fs_at_candidate,
+                    "latest_wave_numbers": ";".join(f"{value:.17g}" for value in wave_numbers),
+                    "latest_cached_fs_by_k": ";".join(f"{value:.17g}" for value in fs_by_k),
+                    "direct_threshold_wave_number": float(direct_threshold_k),
+                    "direct_fs_at_threshold_wave_number": float(direct_fs_at_threshold),
+                    "direct_root_bracketed": float(direct_root_bracketed),
+                }
+            )
+    rows = glassbench_alpha_anchor_cached_fs_audit(
+        audit_id="glassbench_ka2d_alpha_anchor_cached_fs",
+        rescue_rows=rescue_rows,
+        cached_anchor_rows=cached_anchor_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_curve_csv(
+    path: Path,
+    *,
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute the cached structure-matched alpha curve at the direct k-root."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    root_by_key = {
+        (str(row["system_id"]), str(row["temperature"]), str(row["structure_id"])): row
+        for row in root_rows
+        if float(row.get("cached_direct_root_bracketed", 0.0) or 0.0) == 1.0
+    }
+    curve_rows: list[dict[str, float | str]] = []
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            root = root_by_key.get(key)
+            if root is None:
+                continue
+            direct_k = float(root.get("cached_direct_threshold_wave_number", 0.0) or 0.0)
+            if direct_k <= 0.0:
+                continue
+            cache_path = ROOT / row["particle_cache_path"]
+            with np.load(cache_path) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+            reference_displacements = positions - initial_positions[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
+            dx = reference_displacements[:, :, 0]
+            dy = reference_displacements[:, :, 1]
+            frame_direct_alpha = 0.5 * (
+                np.mean(np.cos(direct_k * dx), axis=1)
+                + np.mean(np.cos(direct_k * dy), axis=1)
+            )
+            direct_alpha_fs = float(
+                0.5 * (np.mean(np.cos(direct_k * dx)) + np.mean(np.cos(direct_k * dy)))
+            )
+            sigma_direct_alpha_fs = float(
+                np.std(frame_direct_alpha, ddof=1) / math.sqrt(frame_direct_alpha.size)
+                if frame_direct_alpha.size > 1
+                else 0.0
+            )
+            curve_rows.append(
+                {
+                    "system_id": row["system_id"],
+                    "temperature": row["temperature"],
+                    "structure_id": row["structure_id"],
+                    "time_code": row["time_code"],
+                    "lag_time": float(row["lag_time"]),
+                    "direct_alpha_wave_number": float(direct_k),
+                    "direct_alpha_fs": float(direct_alpha_fs),
+                    "sigma_direct_alpha_fs": sigma_direct_alpha_fs,
+                    "direct_alpha_uncertainty_method": "frame_block_standard_error",
+                }
+            )
+    rows = glassbench_direct_alpha_curve_audit(
+        audit_id="glassbench_ka2d_direct_alpha_curve",
+        root_rows=root_rows,
+        curve_rows=curve_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_shape_selection_csv(
+    path: Path,
+    *,
+    direct_alpha_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Select alpha-shape evidence from the cached direct-alpha curve."""
+
+    rows = glassbench_direct_alpha_shape_selection(
+        selection_id="glassbench_ka2d_direct_alpha_shape_selection",
+        direct_alpha_rows=direct_alpha_rows,
+        min_aic_improvement_for_kww=2.0,
+        min_points_for_shape_fit=6,
+        min_decay=0.35,
+        max_decay=0.99,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def compute_sota_glassbench_direct_alpha_multik_rows(
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute per-k cached high-k alpha curves from particle tensors."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    root_by_key = {
+        (str(row["system_id"]), str(row["temperature"]), str(row["structure_id"])): row
+        for row in root_rows
+        if float(row.get("cached_direct_root_bracketed", 0.0) or 0.0) == 1.0
+    }
+    manifest_by_key: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            if key in root_by_key:
+                manifest_by_key.setdefault(key, []).append(row)
+
+    threshold = math.exp(-1.0)
+    multik_rows: list[dict[str, float | str]] = []
+    for key, manifest_rows in sorted(manifest_by_key.items()):
+        root = root_by_key[key]
+        k_values = [float(root["cached_direct_threshold_wave_number"]), 5.4, 6.0]
+        sorted_manifest = sorted(manifest_rows, key=lambda row: float(row["lag_time"]))
+        lag_times = np.array([float(row["lag_time"]) for row in sorted_manifest], dtype=float)
+        time_codes = [row["time_code"] for row in sorted_manifest]
+        for wave_number in k_values:
+            fs_values: list[float] = []
+            sigma_values: list[float] = []
+            for row in sorted_manifest:
+                with np.load(ROOT / row["particle_cache_path"]) as npz:
+                    positions = np.asarray(npz["positions"], dtype=float)
+                    initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                    box = float(np.asarray(npz["box"]))
+                displacement = positions - initial_positions[None, :, :]
+                if math.isfinite(box) and box > 0.0:
+                    displacement = displacement - box * np.round(displacement / box)
+                dx = displacement[:, :, 0]
+                dy = displacement[:, :, 1]
+                frame_fs = 0.5 * (
+                    np.mean(np.cos(wave_number * dx), axis=1)
+                    + np.mean(np.cos(wave_number * dy), axis=1)
+                )
+                fs_values.append(float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy)))))
+                sigma_values.append(
+                    float(np.std(frame_fs, ddof=1) / math.sqrt(frame_fs.size))
+                    if frame_fs.size > 1
+                    else 0.0
+                )
+            decay = np.array(fs_values, dtype=float)
+            sigma = np.array(sigma_values, dtype=float)
+            crossing_index = next((idx for idx, value in enumerate(fs_values) if value <= threshold + 1e-12), None)
+            crossed = crossing_index is not None
+            fit = kww_alpha_fit(lag_times, decay, min_decay=0.30, max_decay=0.99) if crossed else {
+                "kww_beta": 0.0,
+                "rms_log_residual": 0.0,
+            }
+            if decay.size >= 2 and np.all(sigma > 0.0):
+                upward = decay[1:] - decay[:-1]
+                combined_sigma = np.sqrt(sigma[1:] ** 2 + sigma[:-1] ** 2)
+                upward_z = np.divide(upward, combined_sigma, out=np.zeros_like(upward), where=combined_sigma > 0.0)
+                max_z = float(np.max(np.maximum(upward_z, 0.0)))
+            else:
+                max_z = 0.0
+            multik_rows.append(
+                {
+                    "system_id": key[0],
+                    "temperature": key[1],
+                    "structure_id": key[2],
+                    "direct_alpha_wave_number": float(wave_number),
+                    "lag_count": float(len(lag_times)),
+                    "time_codes": ";".join(time_codes),
+                    "lag_times": ";".join(f"{value:.17g}" for value in lag_times),
+                    "direct_alpha_fs_curve": ";".join(f"{value:.17g}" for value in fs_values),
+                    "sigma_direct_alpha_fs_curve": ";".join(f"{value:.12g}" for value in sigma_values),
+                    "alpha_threshold_crossed": float(crossed),
+                    "threshold_crossing_time_code": time_codes[crossing_index] if crossed else "none",
+                    "threshold_crossing_lag_time": float(lag_times[crossing_index]) if crossed else 0.0,
+                    "threshold_crossing_is_last_lag": float(crossed and crossing_index == len(time_codes) - 1),
+                    "kww_beta": float(fit["kww_beta"]),
+                    "kww_log_shape_rmse": float(fit["rms_log_residual"]),
+                    "max_monotonicity_violation_z": float(max_z),
+                    "monotone_compatible_with_uncertainty": float(max_z <= 2.0),
+                    "uncertainty_columns_ready": float(np.all(sigma > 0.0)),
+                }
+            )
+    return multik_rows
+
+
+def write_sota_glassbench_direct_alpha_multik_shape_csv(
+    path: Path,
+    *,
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute a high-k cached multi-k alpha-shape gate from particle tensors."""
+
+    multik_rows = compute_sota_glassbench_direct_alpha_multik_rows(root_rows)
+    rows = glassbench_direct_alpha_multik_shape_gate(
+        gate_id="glassbench_ka2d_direct_alpha_multik_shape_gate",
+        multik_rows=multik_rows,
+        min_crossed_k_count=3,
+        max_beta_spread=0.03,
+        monotone_z_threshold=2.0,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_multik_heldout_prediction_csv(
+    path: Path,
+    *,
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Run leave-one-k-out high-k alpha-shape prediction from cached curves."""
+
+    multik_rows = compute_sota_glassbench_direct_alpha_multik_rows(root_rows)
+    rows = glassbench_direct_alpha_multik_heldout_prediction_gate(
+        prediction_id="glassbench_ka2d_direct_alpha_multik_heldout_prediction",
+        multik_rows=multik_rows,
+        min_calibration_k_count=2,
+        max_heldout_beta_abs_error=0.02,
+        max_heldout_shape_rmse=0.25,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_post_window_prediction_targets_csv(
+    path: Path,
+    *,
+    heldout_prediction_rows: list[dict[str, float | str]],
+    timecode_target_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Preregister tc45/tc50 high-k F_s targets for the alpha-shape blocker."""
+
+    ready_target = next(
+        (
+            row for row in timecode_target_rows
+            if str(row.get("system_id", "")) == "KA2D"
+            and str(row.get("temperature", "")) == "0.23"
+            and str(row.get("structure_id", "")) == "151"
+            and float(row.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        ),
+        None,
+    )
+    if ready_target is None:
+        rows = glassbench_direct_alpha_post_window_prediction_targets(
+            target_id="glassbench_ka2d_direct_alpha_post_window_prediction_targets",
+            heldout_prediction_rows=heldout_prediction_rows,
+            current_time_code="tc40",
+            current_lag_time=1500000.0,
+            target_time_codes=["tc45", "tc50"],
+            terminal_target_time_code="tc50",
+            terminal_target_lag_time=166002226.8176154,
+            abs_log_fs_tolerance=0.35,
+        )
+    else:
+        rows = glassbench_direct_alpha_post_window_prediction_targets(
+            target_id="glassbench_ka2d_direct_alpha_post_window_prediction_targets",
+            heldout_prediction_rows=heldout_prediction_rows,
+            current_time_code=str(ready_target["current_max_time_code"]),
+            current_lag_time=float(ready_target["current_max_lag_time"]),
+            target_time_codes=["tc45", str(ready_target["target_time_code"])],
+            terminal_target_time_code=str(ready_target["target_time_code"]),
+            terminal_target_lag_time=float(ready_target["target_lag_time"]),
+            abs_log_fs_tolerance=0.35,
+        )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_post_window_verdict_csv(
+    path: Path,
+    *,
+    target_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Score post-alpha F_s targets when future GlassBench observations exist."""
+
+    rows = glassbench_direct_alpha_post_window_verdict(
+        verdict_id="glassbench_ka2d_direct_alpha_post_window_verdict",
+        target_rows=target_rows,
+        observed_rows=[],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_transport_csv(
+    path: Path,
+    *,
+    direct_alpha_rows: list[dict[str, float | str]],
+    observable_semantics_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Couple the direct-alpha crossing to matched cached transport observables."""
+
+    rows = glassbench_direct_alpha_transport_coupling_audit(
+        audit_id="glassbench_ka2d_direct_alpha_transport",
+        direct_alpha_rows=direct_alpha_rows,
+        observable_semantics_rows=observable_semantics_rows,
+        dimension=2,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_pe_bound_csv(
+    path: Path,
+    *,
+    transport_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute conditional PE identifiability bounds from direct-alpha transport."""
+
+    rows = glassbench_direct_alpha_pe_feasibility_bound(
+        audit_id="glassbench_ka2d_direct_alpha_pe_bound",
+        transport_rows=transport_rows,
+        reference_jump_variance_fraction=0.2,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_displacement_tail_bound_csv(
+    path: Path,
+    *,
+    pe_bound_rows: list[dict[str, float | str]],
+    transport_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute direct-lag displacement-tail statistics against the PE q-bound."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    cache_by_key: dict[tuple[str, str, str, str], dict[str, str]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"], row["time_code"])
+            cache_by_key[key] = row
+
+    q_bound_by_key = {
+        (str(row["system_id"]), str(row["temperature"]), str(row["structure_id"])): float(
+            row.get("jump_variance_upper_bound", 0.0) or 0.0
+        )
+        for row in pe_bound_rows
+    }
+    displacement_rows: list[dict[str, float | str]] = []
+    for row in transport_rows:
+        if float(row.get("direct_alpha_transport_proxy_ready", 0.0) or 0.0) != 1.0:
+            continue
+        system_id = str(row["system_id"])
+        temperature = str(row["temperature"])
+        structure_id = str(row["structure_id"])
+        time_code = str(row["threshold_crossing_time_code"])
+        q_bound = q_bound_by_key.get((system_id, temperature, structure_id), 0.0)
+        cache = cache_by_key.get((system_id, temperature, structure_id, time_code))
+        if cache is None or q_bound <= 0.0:
+            continue
+        cache_path = ROOT / cache["particle_cache_path"]
+        with np.load(cache_path) as npz:
+            positions = np.asarray(npz["positions"], dtype=float)
+            initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+            box = float(np.asarray(npz["box"]))
+        displacement = positions - initial_positions[None, :, :]
+        if math.isfinite(box) and box > 0.0:
+            displacement = displacement - box * np.round(displacement / box)
+        dimension = displacement.shape[-1]
+        q_values = np.sum(displacement * displacement, axis=2).reshape(-1) / float(dimension)
+        above = q_values > q_bound
+        displacement_rows.append(
+            {
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": time_code,
+                "sample_count": float(q_values.size),
+                "q_all": float(np.mean(q_values)),
+                "q_bound": float(q_bound),
+                "fraction_q_le_bound": float(np.mean(q_values <= q_bound)),
+                "fraction_q_gt_bound": float(np.mean(above)),
+                "mean_q_above_bound": float(np.mean(q_values[above])) if np.any(above) else 0.0,
+                "q_median": float(np.percentile(q_values, 50.0)),
+                "q_p90": float(np.percentile(q_values, 90.0)),
+                "q_p95": float(np.percentile(q_values, 95.0)),
+            }
+        )
+    rows = glassbench_direct_alpha_displacement_tail_bound(
+        audit_id="glassbench_ka2d_direct_alpha_displacement_tail_bound",
+        pe_bound_rows=pe_bound_rows,
+        displacement_rows=displacement_rows,
+        min_tail_fraction=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_multilag_crossing_canary_csv(
+    path: Path,
+    *,
+    pe_bound_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute multi-lag displacement threshold crossings from cached replicates."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    manifest_by_key: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            manifest_by_key.setdefault(key, []).append(row)
+
+    crossing_rows: list[dict[str, float | str]] = []
+    for bound in pe_bound_rows:
+        if float(bound.get("pe_feasibility_bound_ready", 0.0) or 0.0) != 1.0:
+            continue
+        system_id = str(bound["system_id"])
+        temperature = str(bound["temperature"])
+        structure_id = str(bound["structure_id"])
+        q_bound = float(bound.get("jump_variance_upper_bound", 0.0) or 0.0)
+        if q_bound <= 0.0:
+            continue
+        rows = sorted(
+            manifest_by_key.get((system_id, temperature, structure_id), []),
+            key=lambda item: float(item.get("lag_time", 0.0) or 0.0),
+        )
+        if len(rows) < 2:
+            continue
+        q_by_lag: list[np.ndarray] = []
+        for row in rows:
+            with np.load(ROOT / row["particle_cache_path"]) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+            displacement = positions - initial_positions[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                displacement = displacement - box * np.round(displacement / box)
+            q_by_lag.append(np.sum(displacement * displacement, axis=2) / float(displacement.shape[-1]))
+        q = np.stack(q_by_lag, axis=0)
+        above = q > q_bound
+        ever = np.any(above, axis=0)
+        first_index = np.argmax(above, axis=0)
+        first_index[~ever] = -1
+        post_recross_count = 0
+        post_crossable_count = 0
+        for replica_index in range(above.shape[1]):
+            for particle_index in range(above.shape[2]):
+                idx = int(first_index[replica_index, particle_index])
+                if 0 <= idx < above.shape[0] - 1:
+                    post_crossable_count += 1
+                    if np.any(~above[idx + 1 :, replica_index, particle_index]):
+                        post_recross_count += 1
+        first_q = np.asarray(
+            [
+                q[int(first_index[replica_index, particle_index]), replica_index, particle_index]
+                for replica_index in range(q.shape[1])
+                for particle_index in range(q.shape[2])
+                if int(first_index[replica_index, particle_index]) >= 0
+            ],
+            dtype=float,
+        )
+        time_codes = [str(row["time_code"]) for row in rows]
+        lag_times = [float(row["lag_time"]) for row in rows]
+        first_fraction_terms = []
+        sample_count = float(q.shape[1] * q.shape[2])
+        for idx, time_code in enumerate(time_codes):
+            fraction = float(np.mean(first_index == idx))
+            if fraction > 0.0:
+                first_fraction_terms.append(f"{time_code}:{fraction:.17g}")
+        crossing_rows.append(
+            {
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                "time_codes": ";".join(time_codes),
+                "lag_times": ";".join(f"{value:.17g}" for value in lag_times),
+                "sample_count": sample_count,
+                "above_bound_fractions_by_lag": ";".join(
+                    f"{float(np.mean(above[idx])):.17g}" for idx in range(above.shape[0])
+                ),
+                "ever_crossed_fraction": float(np.mean(ever)),
+                "never_crossed_fraction": float(np.mean(~ever)),
+                "post_crossing_recross_fraction": float(post_recross_count / post_crossable_count)
+                if post_crossable_count > 0
+                else 0.0,
+                "first_crossing_fractions_by_time_code": ";".join(first_fraction_terms)
+                if first_fraction_terms
+                else "none",
+                "first_crossing_q_mean": float(np.mean(first_q)) if first_q.size else 0.0,
+                "first_crossing_q_median": float(np.median(first_q)) if first_q.size else 0.0,
+                "first_crossing_q_p90": float(np.percentile(first_q, 90.0)) if first_q.size else 0.0,
+            }
+        )
+    rows = glassbench_direct_alpha_multilag_crossing_canary(
+        audit_id="glassbench_ka2d_direct_alpha_multilag_crossing_canary",
+        pe_bound_rows=pe_bound_rows,
+        crossing_rows=crossing_rows,
+        min_crossing_fraction=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_event_clock_contract_csv(
+    path: Path,
+    *,
+    pe_bound_rows: list[dict[str, float | str]],
+    tail_rows: list[dict[str, float | str]],
+    crossing_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the true-time trajectory contract for PE event-clock extraction."""
+
+    rows = glassbench_direct_alpha_event_clock_extraction_contract(
+        audit_id="glassbench_ka2d_direct_alpha_event_clock_contract",
+        pe_bound_rows=pe_bound_rows,
+        tail_rows=tail_rows,
+        crossing_rows=crossing_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_sparse_lag_event_clock_csv(
+    path: Path,
+    *,
+    contract_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit whether multi-lag caches form a sparse physical-lag event-clock candidate."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    cache_rows: list[dict[str, float | str]] = []
+    reference_initial_by_key: dict[tuple[str, str, str], np.ndarray] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            cache_row: dict[str, float | str] = dict(row)
+            mismatch = 0.0
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0:
+                cache_path = ROOT / row["particle_cache_path"]
+                with np.load(cache_path) as npz:
+                    initial = np.asarray(npz["initial_positions"], dtype=float)
+                key = (row["system_id"], row["temperature"], row["structure_id"])
+                if key not in reference_initial_by_key:
+                    reference_initial_by_key[key] = initial
+                else:
+                    reference = reference_initial_by_key[key]
+                    if reference.shape == initial.shape:
+                        mismatch = float(np.max(np.abs(initial - reference)))
+                    else:
+                        mismatch = float("inf")
+            cache_row["max_initial_position_mismatch"] = mismatch
+            cache_rows.append(cache_row)
+    rows = glassbench_sparse_lag_event_clock_audit(
+        audit_id="glassbench_ka2d_sparse_lag_event_clock",
+        cache_rows=cache_rows,
+        contract_rows=contract_rows,
+        required_time_codes=("tc05", "tc10", "tc15", "tc20", "tc25", "tc30", "tc35", "tc40"),
+        max_initial_mismatch_tolerance=1e-10,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_interval_censored_first_crossing_clock_csv(
+    path: Path,
+    *,
+    sparse_lag_rows: list[dict[str, float | str]],
+    crossing_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Estimate interval-censored first-crossing clock bounds from sparse lag crossings."""
+
+    rows = glassbench_interval_censored_first_crossing_clock(
+        audit_id="glassbench_ka2d_interval_censored_first_crossing_clock",
+        sparse_lag_rows=sparse_lag_rows,
+        crossing_rows=crossing_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_interval_censored_persistence_fit_csv(
+    path: Path,
+    *,
+    interval_clock_rows: list[dict[str, float | str]],
+    direct_alpha_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Fit a minimal censored exponential persistence law from sparse crossings."""
+
+    rows = glassbench_interval_censored_persistence_fit(
+        fit_id="glassbench_ka2d_interval_censored_persistence_fit",
+        interval_clock_rows=interval_clock_rows,
+        direct_alpha_rows=direct_alpha_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_waiting_law_selection_csv(
+    path: Path,
+    *,
+    interval_clock_rows: list[dict[str, float | str]],
+    persistence_fit_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compare one-parameter exponential and two-parameter Weibull persistence laws."""
+
+    rows = glassbench_interval_censored_waiting_law_selection(
+        selection_id="glassbench_ka2d_interval_censored_waiting_law_selection",
+        interval_clock_rows=interval_clock_rows,
+        persistence_fit_rows=persistence_fit_rows,
+        min_delta_aic_for_extra_parameter=2.0,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_finite_exchange_envelope_csv(
+    path: Path,
+    *,
+    persistence_fit_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the conditional finite-exchange late-NGP falsification horizon."""
+
+    rows = glassbench_finite_exchange_falsification_envelope(
+        envelope_id="glassbench_ka2d_finite_exchange_falsification_envelope",
+        persistence_fit_rows=persistence_fit_rows,
+        max_exchange_mean_over_tau_alpha=1.0,
+        min_exchange_events_for_gaussian_recovery=25.0,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_cached_microdynamic_verdict_csv(
+    path: Path,
+    *,
+    persistence_fit_rows: list[dict[str, float | str]],
+    finite_exchange_envelope_rows: list[dict[str, float | str]],
+    event_clock_contract_rows: list[dict[str, float | str]],
+    late_recovery_outcome_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the real cached GlassBench microdynamic evidence verdict."""
+
+    rows = glassbench_real_cached_microdynamic_verdict(
+        verdict_id="glassbench_real_cached_microdynamic_verdict",
+        persistence_fit_rows=persistence_fit_rows,
+        finite_exchange_envelope_rows=finite_exchange_envelope_rows,
+        event_clock_contract_rows=event_clock_contract_rows,
+        late_recovery_outcome_rows=late_recovery_outcome_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_protocol_csv(
+    path: Path,
+    *,
+    envelope_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the late-NGP / van-Hove recovery falsification protocol state."""
+
+    rows = glassbench_late_recovery_falsification_protocol(
+        protocol_id="glassbench_ka2d_late_recovery_falsification_protocol",
+        envelope_rows=envelope_rows,
+        late_observable_rows=[],
+        max_finite_exchange_late_ngp=0.05,
+        min_static_plateau_rejection_gap=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_ingestion_contract_csv(
+    path: Path,
+    *,
+    envelope_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the machine-readable late-recovery observation ingestion contract."""
+
+    rows = glassbench_late_recovery_ingestion_contract(
+        contract_id="glassbench_ka2d_late_recovery_ingestion_contract",
+        envelope_rows=envelope_rows,
+        candidate_rows=[],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_timecode_target_csv(
+    path: Path,
+    *,
+    envelope_rows: list[dict[str, float | str]],
+    interval_clock_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the next GlassBench time-code cache needed for late recovery."""
+
+    rows = glassbench_late_recovery_timecode_target(
+        target_id="glassbench_ka2d_late_recovery_timecode_target",
+        envelope_rows=envelope_rows,
+        interval_clock_rows=interval_clock_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_cache_request_contract_csv(
+    path: Path,
+    *,
+    timecode_target_rows: list[dict[str, float | str]],
+    multilag_target_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write a cache request contract for the late-recovery time-code target."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    cache_rows: list[dict[str, float | str]] = []
+    with cache_manifest_path.open() as f:
+        cache_rows.extend(csv.DictReader(f))
+    rows = glassbench_late_recovery_cache_request_contract(
+        contract_id="glassbench_ka2d_late_recovery_cache_request_contract",
+        timecode_target_rows=timecode_target_rows,
+        multilag_target_rows=multilag_target_rows,
+        cache_rows=cache_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_membership_probe_contract_csv(
+    path: Path,
+    *,
+    cache_request_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write an extended-prefix membership probe for the late-recovery target."""
+
+    member_index_path = DATA_DIR / "third_party" / "glassbench" / "trajectory_npz_member_index_extended_10118191.json"
+    rows = glassbench_late_recovery_membership_probe_contract(
+        probe_id="glassbench_ka2d_late_recovery_membership_probe_contract",
+        cache_request_rows=cache_request_rows,
+        member_index_manifest=json.loads(member_index_path.read_text(encoding="utf-8")),
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_public_timecode_ceiling_csv(
+    path: Path,
+    *,
+    timecode_target_rows: list[dict[str, float | str]],
+    membership_probe_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the public GlassBench time-code ceiling for the late-recovery target."""
+
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    rows = glassbench_late_recovery_public_timecode_ceiling(
+        ceiling_id="glassbench_ka2d_late_recovery_public_timecode_ceiling",
+        timecode_target_rows=timecode_target_rows,
+        semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
+        membership_probe_rows=membership_probe_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_censored_window_claim_audit_csv(
+    path: Path,
+    *,
+    public_ceiling_rows: list[dict[str, float | str]],
+    finite_exchange_envelope_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the public-window claim audit implied by the GlassBench ceiling."""
+
+    rows = glassbench_censored_window_claim_audit(
+        audit_id="glassbench_ka2d_censored_window_claim_audit",
+        public_ceiling_rows=public_ceiling_rows,
+        finite_exchange_envelope_rows=finite_exchange_envelope_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_public_window_verdict_csv(
+    path: Path,
+    *,
+    censored_window_rows: list[dict[str, float | str]],
+    dynamic_signature_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the SOTA claim verdict allowed by the public GlassBench window."""
+
+    rows = glassbench_sota_public_window_verdict(
+        verdict_id="glassbench_ka2d_sota_public_window_verdict",
+        censored_window_rows=censored_window_rows,
+        dynamic_signature_rows=dynamic_signature_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_experiment_design_csv(
+    path: Path,
+    *,
+    late_recovery_protocol_rows: list[dict[str, float | str]],
+    timecode_target_rows: list[dict[str, float | str]],
+    public_window_verdict_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the minimal follow-up design that can close late recovery."""
+
+    rows = glassbench_late_recovery_experiment_design(
+        design_id="glassbench_ka2d_late_recovery_experiment_design",
+        late_recovery_protocol_rows=late_recovery_protocol_rows,
+        timecode_target_rows=timecode_target_rows,
+        public_window_verdict_rows=public_window_verdict_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_uncertainty_verdict_csv(
+    path: Path,
+    *,
+    late_recovery_protocol_rows: list[dict[str, float | str]],
+    ingestion_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the two-sigma late-recovery mechanism verdict state."""
+
+    rows = glassbench_late_recovery_uncertainty_verdict(
+        verdict_id="glassbench_ka2d_late_recovery_uncertainty_verdict",
+        late_recovery_protocol_rows=late_recovery_protocol_rows,
+        ingestion_rows=ingestion_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_outcome_matrix_csv(
+    path: Path,
+    *,
+    experiment_design_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write pre-registered tc50 outcome paths before observing late data."""
+
+    rows = glassbench_late_recovery_outcome_matrix(
+        matrix_id="glassbench_ka2d_late_recovery_outcome_matrix",
+        experiment_design_rows=experiment_design_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_decision_power_plan_csv(
+    path: Path,
+    *,
+    outcome_matrix_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the member-count power plan for tc50 late-recovery decisions."""
+
+    rows = glassbench_late_recovery_decision_power_plan(
+        plan_id="glassbench_ka2d_late_recovery_decision_power_plan",
+        outcome_matrix_rows=outcome_matrix_rows,
+        current_member_count=8,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_dynamic_signature_alignment_csv(
+    path: Path,
+    *,
+    claim_alignment_rows: list[dict[str, float | str]],
+    literature_readiness_rows: list[dict[str, float | str]],
+    glassbench_signature_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Align model support, SOTA literature, and real GlassBench signature evidence."""
+
+    rows = dynamic_signature_alignment_ledger(
+        alignment_id="sota_dynamic_signature_alignment",
+        claim_rows=claim_alignment_rows,
+        literature_rows=literature_readiness_rows,
+        glassbench_signature_rows=glassbench_signature_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_four_point_claim_gate_csv(
+    path: Path,
+    *,
+    signature_rows: list[dict[str, float | str]],
+    dynamic_alignment_rows: list[dict[str, float | str]],
+    member_ensemble_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Guard against promoting overlap-chi4 proxies to direct four-point claims."""
+
+    rows = glassbench_direct_four_point_claim_gate(
+        gate_id="glassbench_direct_four_point_claim_gate",
+        signature_rows=signature_rows,
+        dynamic_alignment_rows=dynamic_alignment_rows,
+        member_ensemble_rows=member_ensemble_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_data_closure_priority_csv(
+    path: Path,
+    *,
+    evidence_rows: list[dict[str, float | str]],
+    closed_loop_rows: list[dict[str, float | str]],
+    unlock_rows: list[dict[str, float | str]],
+    post_window_rows: list[dict[str, float | str]],
+    late_recovery_rows: list[dict[str, float | str]],
+    four_point_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Rank the minimum real-data payloads needed to close GlassBench claims."""
+
+    rows = glassbench_real_data_closure_priority_ledger(
+        ledger_id="glassbench_real_data_closure_priority",
+        evidence_rows=evidence_rows,
+        closed_loop_rows=closed_loop_rows,
+        unlock_rows=unlock_rows,
+        post_window_rows=post_window_rows,
+        late_recovery_rows=late_recovery_rows,
+        four_point_rows=four_point_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_microdynamic_closed_loop_csv(
+    path: Path,
+    *,
+    trajectory_rows: list[dict[str, float | str]],
+    signature_rows: list[dict[str, float | str]],
+    alpha_horizon_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit the real trajectory-microstatistics to macro-signature closed loop."""
+
+    rows = glassbench_microdynamic_closed_loop_audit(
+        audit_id="glassbench_ka2d_microdynamic_closed_loop",
+        trajectory_rows=trajectory_rows,
+        signature_rows=signature_rows,
+        alpha_horizon_rows=alpha_horizon_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_cage_jump_proxy_canary_csv(
+    path: Path,
+    trajectory_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Extract aggregate cage-jump proxy candidates from real frame-index rows."""
+
+    rows = glassbench_cage_jump_proxy_canary(
+        canary_id="glassbench_ka2d_cage_jump_proxy_canary",
+        trajectory_rows=trajectory_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_event_clock_threshold_readiness_csv(
+    path: Path,
+    *,
+    particle_cache_contract_rows: list[dict[str, float | str]] | None = None,
+) -> list[dict[str, float | str]]:
+    """Gate real GlassBench threshold robustness against cached particle inputs."""
+
+    schema_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_npz_schema_probe_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+    curve_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_first_npz_observable_curve_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+    member_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_member_ensemble_observable_curve_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    curve_keys = {
+        (str(entry["system_id"]), str(entry["temperature"]))
+        for entry in curve_manifest["entries"]
+    }
+    member_keys = {
+        (str(entry["system_id"]), str(entry["temperature"]))
+        for entry in member_manifest["entries"]
+    }
+    cache_by_key = {
+        (str(row["system_id"]), str(row["temperature"])): row
+        for row in (particle_cache_contract_rows or [])
+    }
+    rows: list[dict[str, float | str]] = []
+    for entry in schema_manifest["entries"]:
+        system_id = str(entry["system_id"])
+        temperature = str(entry["temperature"])
+        arrays = entry.get("arrays", [])
+        has_positions = any(array.get("name") == "positions.npy" for array in arrays)
+        key = (system_id, temperature)
+        cache_row = cache_by_key.get(key, {})
+        rows.extend(
+            glassbench_event_clock_threshold_readiness_gate(
+                benchmark_id=f"glassbench_{system_id.lower()}_t{temperature.replace('.', '_')}_threshold_readiness",
+                system_id=system_id,
+                temperature=temperature,
+                positions_schema_ready=has_positions,
+                first_npz_observable_curve_ready=key in curve_keys,
+                member_ensemble_observable_ready=key in member_keys,
+                particle_resolved_positions_cached=float(
+                    cache_row.get("particle_resolved_positions_cached", 0.0) or 0.0
+                )
+                == 1.0,
+                physical_time_semantics_ready=False,
+                event_clock_threshold_protocol_available=True,
+                macro_heldout_observables_ready=False,
+            )
+        )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_first_npz_particle_cache_contract_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """Pin byte ranges and cache targets for first-NPZ coordinate persistence."""
+
+    schema_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_npz_schema_probe_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+    curve_manifest = json.loads(
+        (
+            DATA_DIR
+            / "third_party"
+            / "glassbench"
+            / "trajectory_first_npz_observable_curve_10118191.json"
+        ).read_text(encoding="utf-8")
+    )
+    rows = glassbench_first_npz_particle_cache_contract_gate(
+        contract_id="glassbench_first_npz_particle_cache_contract",
+        schema_entries=schema_manifest["entries"],
+        curve_entries=curve_manifest["entries"],
+        cache_root="data/third_party/glassbench/particle_cache",
+        cached_particle_cache_targets=[
+            str(path.relative_to(ROOT))
+            for path in (DATA_DIR / "third_party" / "glassbench" / "particle_cache").glob("*.npz")
+        ],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_cached_particle_timecode_bridge_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """Attach official time-code lag semantics to cached first-NPZ coordinates."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    with cache_manifest_path.open() as f:
+        cache_rows = list(csv.DictReader(f))
+    rows = glassbench_cached_particle_timecode_bridge(
+        bridge_id="glassbench_cached_particle_timecode_bridge",
+        cache_rows=cache_rows,
+        semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_multilag_particle_cache_targets_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """List structure-matched multi-lag NPZ members needed for particle caches."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv"
+    multilag_cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    with cache_manifest_path.open() as f:
+        cache_rows = list(csv.DictReader(f))
+    if multilag_cache_manifest_path.exists():
+        with multilag_cache_manifest_path.open() as f:
+            cache_rows.extend(csv.DictReader(f))
+    rows = glassbench_multilag_particle_cache_targets(
+        target_id="glassbench_multilag_particle_cache_targets",
+        semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
+        cache_rows=cache_rows,
+        minimum_time_codes=3,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_cached_particle_observable_semantics_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """Audit whether cached reference coordinates reproduce official displacement observables."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    semantics_manifest = json.loads(semantics_path.read_text(encoding="utf-8"))
+    wave_numbers = [float(value) for value in semantics_manifest.get("wave_numbers", [])]
+    cached_rows: list[dict[str, float | str]] = []
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            cache_path = ROOT / row["particle_cache_path"]
+            with np.load(cache_path) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+                initial_reference_ready = 1.0 if "initial_positions" in npz.files else 0.0
+                initial_positions = (
+                    np.asarray(npz["initial_positions"], dtype=float)
+                    if initial_reference_ready == 1.0
+                    else None
+                )
+            raw_coordinate_msd = float(np.mean(np.sum(positions * positions, axis=-1)))
+            replica_mean = np.mean(positions, axis=0)
+            displacements = positions - replica_mean[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                displacements = displacements - box * np.round(displacements / box)
+            r2 = np.sum(displacements * displacements, axis=-1)
+            replica_spread_msd = float(np.mean(r2))
+            r4 = float(np.mean(r2 * r2))
+            cached_ngp_2d_proxy = float(r4 / (2.0 * replica_spread_msd * replica_spread_msd) - 1.0) if replica_spread_msd > 0 else 0.0
+            initial_reference_msd = 0.0
+            initial_reference_ngp_2d = 0.0
+            initial_reference_fs_by_k: list[float] = []
+            single_axis_x_fs_by_k: list[float] = []
+            if initial_positions is not None and initial_positions.shape == positions.shape[1:]:
+                reference_displacements = positions - initial_positions[None, :, :]
+                if math.isfinite(box) and box > 0.0:
+                    reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
+                reference_r2 = np.sum(reference_displacements * reference_displacements, axis=-1)
+                initial_reference_msd = float(np.mean(reference_r2))
+                reference_r4 = float(np.mean(reference_r2 * reference_r2))
+                pooled_initial_reference_ngp_2d = (
+                    float(reference_r4 / (2.0 * initial_reference_msd * initial_reference_msd) - 1.0)
+                    if initial_reference_msd > 0
+                    else 0.0
+                )
+                replica_msd = np.mean(reference_r2, axis=1)
+                replica_r4 = np.mean(reference_r2 * reference_r2, axis=1)
+                replica_valid = replica_msd > 0.0
+                if np.any(replica_valid):
+                    initial_reference_ngp_2d = float(
+                        np.mean(replica_r4[replica_valid] / (2.0 * replica_msd[replica_valid] ** 2) - 1.0)
+                    )
+                else:
+                    initial_reference_ngp_2d = 0.0
+                dx = reference_displacements[:, :, 0]
+                dy = reference_displacements[:, :, 1]
+                for wave_number in wave_numbers:
+                    single_axis_x_fs_by_k.append(float(np.mean(np.cos(wave_number * dx))))
+                    initial_reference_fs_by_k.append(
+                        float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy))))
+                    )
+            else:
+                pooled_initial_reference_ngp_2d = 0.0
+            cached_rows.append(
+                {
+                    "system_id": row["system_id"],
+                    "temperature": row["temperature"],
+                    "structure_id": row["structure_id"],
+                    "time_code": row["time_code"],
+                    "lag_time": float(row["lag_time"]),
+                    "target_member": row["target_member"],
+                    "raw_coordinate_msd": raw_coordinate_msd,
+                    "replica_spread_msd": replica_spread_msd,
+                    "cached_ngp_2d_proxy": cached_ngp_2d_proxy,
+                    "initial_reference_msd": initial_reference_msd,
+                    "initial_reference_ngp_2d": initial_reference_ngp_2d,
+                    "initial_reference_ngp_2d_formula": "mean_replica_alpha2_2d",
+                    "pooled_initial_reference_ngp_2d": pooled_initial_reference_ngp_2d,
+                    "initial_reference_fs_by_k": initial_reference_fs_by_k,
+                    "initial_reference_fs_formula": "axis_average_cos_xy",
+                    "single_axis_x_fs_by_k": single_axis_x_fs_by_k,
+                    "initial_reference_positions_ready": initial_reference_ready,
+                    "particle_resolved_positions_cached": 1.0,
+                }
+            )
+
+    official_rows: list[dict[str, float | str]] = []
+    for entry in semantics_manifest.get("entries", []):
+        if not isinstance(entry, dict):
+            continue
+        for member in entry.get("members", []):
+            if not isinstance(member, dict):
+                continue
+            official_rows.append(
+                {
+                    "system_id": str(entry.get("system_id", "unknown")),
+                    "temperature": str(entry.get("temperature", "none")),
+                    "time_code": str(member.get("time_code", "none")),
+                    "member": str(member.get("member", "none")),
+                    "msd": float(member.get("msd", 0.0) or 0.0),
+                    "ngp_2d": float(member.get("ngp_2d", 0.0) or 0.0),
+                    "self_intermediate_scattering_by_k": [
+                        float(value) for value in member.get("self_intermediate_scattering_by_k", [])
+                    ],
+                }
+            )
+    rows = glassbench_cached_particle_observable_semantics_audit(
+        audit_id="glassbench_cached_particle_observable_semantics",
+        cached_observable_rows=cached_rows,
+        official_observable_rows=official_rows,
+        max_reproducible_relative_error=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_sota_remote_result_curve_cache_csv(path: Path) -> list[dict[str, float | str]]:
     """Verify small numeric GlassBench result curves fetched by remote byte ranges."""
 
@@ -4638,6 +6073,148 @@ def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float
     return rows
 
 
+def write_trajectory_cage_jump_events_csv(path: Path) -> list[dict[str, float | str]]:
+    """Extract a particle-resolved cage-jump event clock from local trajectories."""
+
+    positions = np.array(
+        [
+            [[0.0], [0.0], [0.0]],
+            [[0.1], [0.0], [0.0]],
+            [[1.4], [0.0], [0.0]],
+            [[1.5], [1.2], [0.0]],
+            [[2.8], [1.3], [1.1]],
+        ],
+        dtype=float,
+    )
+    times = np.arange(5.0)
+    row = trajectory_cage_jump_event_protocol(
+        protocol_id="synthetic_particle_cage_jump_events",
+        positions=positions,
+        times=times,
+        jump_displacement_threshold=1.0,
+        min_particles_with_jumps=2,
+        min_exchange_interval_count=1,
+    )
+    row.update(
+        {
+            "benchmark_id": "synthetic_particle_cage_jump_events",
+            "target_protocol": "trajectory_to_persistence_exchange_event_clock",
+            "machine_readable_trajectory": 1.0,
+            "real_benchmark_closed_loop_ready": 0.0,
+            "scope_note": "synthetic_api_canary_not_glassbench_claim",
+        }
+    )
+    rows = [row]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_trajectory_event_clock_macro_predictions_csv(
+    path: Path,
+    event_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Score direct macro predictions from particle-resolved event clocks."""
+
+    event_row = event_rows[0]
+    params = PersistenceExchangeParams(
+        cage_variance=0.5,
+        cage_tau=0.2,
+        jump_variance=float(event_row["mean_squared_jump_length"]) / float(event_row["dimension"]),
+        persistence_mean=float(event_row["persistence_mean"]),
+        exchange_mean=float(event_row["exchange_mean"]),
+    )
+    wave_numbers = [0.8, 1.1]
+    late_time = 12.0
+    time_grid = np.geomspace(0.05, 30.0, 800)
+    observed_tau_alpha_by_k = {
+        wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+        for wave_number in wave_numbers
+    }
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    observed_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(0.8, time_grid, params))
+    )
+    common_kwargs = {
+        "event_row": event_row,
+        "anchor_wave_number": 0.8,
+        "wave_numbers": wave_numbers,
+        "observed_diffusion_coefficient": persistence_exchange_diffusion_coefficient(params),
+        "diffusion_relative_error": 0.05,
+        "observed_tau_alpha_by_k": observed_tau_alpha_by_k,
+        "tau_alpha_relative_error_by_k": {0.8: 0.05, 1.1: 0.05},
+        "late_time": late_time,
+        "late_ngp_relative_error": 0.10,
+        "observed_chi4_peak": observed_chi4_peak,
+        "chi4_peak_relative_error": 0.10,
+        "time_grid": time_grid,
+        "cage_variance": 0.5,
+        "cage_tau": 0.2,
+    }
+    ready = trajectory_event_clock_macro_prediction_protocol(
+        protocol_id="synthetic_event_clock_macro_prediction",
+        observed_late_ngp=observed_late_ngp,
+        **common_kwargs,
+    )
+    mismatch = trajectory_event_clock_macro_prediction_protocol(
+        protocol_id="synthetic_event_clock_macro_late_ngp_mismatch",
+        observed_late_ngp=3.0 * observed_late_ngp,
+        **common_kwargs,
+    )
+    for row in [ready, mismatch]:
+        row.update(
+            {
+                "benchmark_id": "synthetic_particle_cage_jump_events",
+                "target_protocol": "event_clock_to_macro_signature_prediction",
+                "real_benchmark_closed_loop_ready": 0.0,
+                "scope_note": "synthetic_direct_prediction_canary_not_glassbench_claim",
+            }
+        )
+    rows = [ready, mismatch]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_trajectory_event_clock_threshold_robustness_csv(path: Path) -> list[dict[str, float | str]]:
+    """Audit cage-jump threshold robustness for event-clock macro prediction."""
+
+    positions = np.array(
+        [
+            [[0.0], [0.0], [0.0]],
+            [[0.1], [0.0], [0.0]],
+            [[1.4], [0.0], [0.0]],
+            [[1.5], [1.2], [0.0]],
+            [[2.8], [1.3], [1.1]],
+        ],
+        dtype=float,
+    )
+    rows = trajectory_event_clock_threshold_robustness_protocol(
+        protocol_id="synthetic_event_clock_threshold_robustness",
+        positions=positions,
+        times=np.arange(5.0),
+        thresholds=[0.05, 0.9, 1.0, 1.35],
+        reference_threshold=1.0,
+        anchor_wave_number=0.8,
+        wave_numbers=[0.8, 1.1],
+        late_time=12.0,
+        time_grid=np.geomspace(0.05, 30.0, 800),
+        min_particles_with_jumps=2,
+        min_exchange_interval_count=1,
+        cage_variance=0.5,
+        cage_tau=0.2,
+    )
+    for row in rows:
+        row.update(
+            {
+                "benchmark_id": "synthetic_particle_cage_jump_events",
+                "target_protocol": "event_clock_threshold_robustness",
+                "real_benchmark_closed_loop_ready": 0.0,
+                "scope_note": "synthetic_threshold_robustness_canary_not_glassbench_claim",
+            }
+        )
+    write_sweep_csv(path, rows)
+    return rows
+
+
 def write_trajectory_adapter_demo_csv(path: Path) -> list[dict[str, float | str]]:
     """Extract trajectory observables through the local particle-table adapter."""
 
@@ -4993,6 +6570,119 @@ def write_simultaneous_closure_csv(path: Path) -> list[dict[str, float | str]]:
             **closure_inputs,
         ),
     ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_microdynamic_prediction_scorecard_csv(
+    path: Path,
+    *,
+    event_prediction_rows: list[dict[str, float | str]],
+    simultaneous_closure_rows: list[dict[str, float | str]],
+    glassbench_closed_loop_rows: list[dict[str, float | str]],
+    late_recovery_power_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the compact microstatistics-to-macro prediction scorecard."""
+
+    rows = microdynamic_prediction_scorecard(
+        scorecard_id="microdynamic_prediction_scorecard",
+        event_prediction_rows=event_prediction_rows,
+        simultaneous_closure_rows=simultaneous_closure_rows,
+        glassbench_closed_loop_rows=glassbench_closed_loop_rows,
+        late_recovery_power_rows=late_recovery_power_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_microdynamic_minimality_audit_csv(
+    path: Path,
+    *,
+    scorecard_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write a minimality audit for the microdynamic prediction basis."""
+
+    rows = microdynamic_minimality_audit(
+        audit_id="microdynamic_minimality_audit",
+        required_micro_inputs=[
+            "persistence_mean",
+            "exchange_mean",
+            "jump_variance",
+            "cage_variance",
+        ],
+        variant_rows=[
+            {
+                "variant_id": "full_event_clock_statistics",
+                "available_micro_inputs": "persistence_mean;exchange_mean;jump_variance;cage_variance",
+                "macro_fit_parameter_count": 0.0,
+                "heldout_macro_prediction_count": 4.0,
+                "all_required_predictions_pass": 1.0,
+            },
+            {
+                "variant_id": "missing_exchange_clock",
+                "available_micro_inputs": "persistence_mean;jump_variance;cage_variance",
+                "macro_fit_parameter_count": 0.0,
+                "heldout_macro_prediction_count": 0.0,
+                "all_required_predictions_pass": 0.0,
+            },
+            {
+                "variant_id": "macro_fit_only_alpha_transport",
+                "available_micro_inputs": "none",
+                "macro_fit_parameter_count": 2.0,
+                "heldout_macro_prediction_count": 0.0,
+                "all_required_predictions_pass": 0.0,
+            },
+        ],
+        scorecard_rows=scorecard_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_experimental_verdict_matrix_csv(
+    path: Path,
+    *,
+    dynamic_alignment_rows: list[dict[str, float | str]],
+    microdynamic_scorecard_rows: list[dict[str, float | str]],
+    minimality_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write final SOTA verdict rows without promoting blocked real-data claims."""
+
+    rows = sota_experimental_verdict_matrix(
+        verdict_id="sota_experimental_verdict_matrix",
+        dynamic_alignment_rows=dynamic_alignment_rows,
+        microdynamic_scorecard_rows=microdynamic_scorecard_rows,
+        minimality_rows=minimality_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_evidence_claim_synthesis_csv(
+    path: Path,
+    *,
+    dynamic_alignment_rows: list[dict[str, float | str]],
+    multik_shape_rows: list[dict[str, float | str]],
+    heldout_prediction_rows: list[dict[str, float | str]],
+    post_window_verdict_rows: list[dict[str, float | str]],
+    transport_rows: list[dict[str, float | str]],
+    pe_bound_rows: list[dict[str, float | str]],
+    microdynamic_verdict_rows: list[dict[str, float | str]],
+    experimental_verdict_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the manuscript-safe synthesis of real GlassBench evidence."""
+
+    rows = glassbench_real_evidence_claim_synthesis(
+        synthesis_id="glassbench_real_evidence_claim_synthesis",
+        dynamic_alignment_rows=dynamic_alignment_rows,
+        multik_shape_rows=multik_shape_rows,
+        heldout_prediction_rows=heldout_prediction_rows,
+        post_window_verdict_rows=post_window_verdict_rows,
+        transport_rows=transport_rows,
+        pe_bound_rows=pe_bound_rows,
+        microdynamic_verdict_rows=microdynamic_verdict_rows,
+        experimental_verdict_rows=experimental_verdict_rows,
+    )
     write_sweep_csv(path, rows)
     return rows
 
@@ -7694,10 +9384,10 @@ def write_sota_glassbench_ka2d_timecode_semantics_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    width, height = 1160, 470
+    width, height = 1160, 790
     left, top = 75, 118
-    row_h = 70
-    display_rows = rows[:4]
+    row_h = 66
+    display_rows = rows
     colors = {
         "physical_timecode_semantics_ready_sparse_coverage": "#2b6cb0",
         "physical_timecode_semantics_ready_member_uncertainty_short": "#b7791f",
@@ -7742,7 +9432,1942 @@ def write_sota_glassbench_ka2d_timecode_semantics_svg(
   <text x="{left + 150}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">semantic stage</text>
   <text x="{left + 530}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">corrected fixed-time observables</text>
   {"".join(marks)}
-  <rect x="75" y="420" width="14" height="14" fill="#2b6cb0" /><text x="96" y="432" font-family="Arial, sans-serif" font-size="12">physical lag time is known for observed tc codes, but full time-code coverage is still missing</text>
+  <rect x="75" y="742" width="14" height="14" fill="#2f855a" /><text x="96" y="754" font-family="Arial, sans-serif" font-size="12">full observed time-code curve ready for T=0.23</text>
+  <rect x="430" y="742" width="14" height="14" fill="#2b6cb0" /><text x="451" y="754" font-family="Arial, sans-serif" font-size="12">physical lag time known, but time-code coverage remains sparse</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_timecode_curve_bridge_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 75, 118
+    row_h = 78
+    colors = {
+        "glassbench_timecode_curve_bridge_ready": "#2f855a",
+        "glassbench_timecode_curve_bridge_incomplete": "#c05621",
+        "glassbench_timecode_curve_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["bridge_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        lag_count = int(float(row["lag_count"]))
+        curve = int(float(row["timecode_curve_ready"]))
+        real_curve = int(float(row["real_time_observable_curve_ready"]))
+        pe_ready = int(float(row["real_pe_inversion_ready"]))
+        latest_tau = float(row["latest_lag_time_over_tau_alpha"])
+        fs_anchor = float(row["latest_self_intermediate_scattering_anchor"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 5}" width="345" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 15}" font-family="Arial, sans-serif" font-size="11">lags={lag_count}; tc curve={curve}; real curve={real_curve}; PE inversion={pe_ready}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">latest t/tau_alpha={latest_tau:.3g}; anchor Fs={fs_anchor:.3g}; D-window={int(float(row["diffusion_asymptote_window_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench time-code curve bridge</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Corrected KA2D physical-time rows are translated into the same trajectory PE pre-inversion schema, with blockers preserved.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">bridge stage</text>
+  <text x="{left + 500}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">real-data inversion status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_timecode_signature_support_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "real_curve_dynamic_signature_support_and_inversion_ready": "#2f855a",
+        "real_curve_dynamic_signature_support_preinversion": "#b7791f",
+        "timecode_curve_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["signature_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        supported = int(float(row["supported_dynamical_signature_count"]))
+        msd_growth = float(row["msd_growth_factor"])
+        fs_decay = float(row["self_intermediate_decay"])
+        ngp_recovery = float(row["ngp_late_recovery_fraction"])
+        chi4_recovery = float(row["chi4_late_recovery_fraction"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="360" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">supported={supported}/4; real curve={int(float(row["real_time_observable_curve_ready"]))}; PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">MSD growth={msd_growth:.3g}; Fs decay={fs_decay:.3g}; alpha crossed={int(float(row["alpha_threshold_crossed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">NGP peak t={float(row["ngp_peak_time"]):.4g}, recovery={ngp_recovery:.2f}; chi4 peak t={float(row["chi4_peak_time"]):.4g}, recovery={chi4_recovery:.2f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 75}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench time-code signature support</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Real KA2D time-code curves are scored for dynamical signatures before any persistence/exchange inversion is claimed.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">signature stage</text>
+  <text x="{left + 515}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">real-curve dynamical support</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_alpha_threshold_horizon_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "alpha_threshold_horizon_inversion_ready": "#2f855a",
+        "alpha_threshold_crossed_preinversion": "#b7791f",
+        "alpha_threshold_not_yet_reached": "#c05621",
+        "metadata_tau_alpha_anchor_fs_mismatch": "#9f1239",
+        "timecode_curve_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["audit_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        latest_tau = float(row["latest_lag_time_over_tau_alpha_metadata"])
+        fs_anchor = float(row["latest_self_intermediate_scattering_anchor"])
+        extension = float(row["estimated_lag_extension_factor"])
+        k_threshold = float(row["estimated_threshold_wave_number_at_latest_lag"])
+        k_ratio = float(row["threshold_wave_number_over_max_observed"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="375" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">metadata tau reached={int(float(row["metadata_tau_alpha_reached"]))}; alpha crossed={int(float(row["alpha_threshold_crossed"]))}; consistent={int(float(row["metadata_tau_alpha_consistent_with_anchor_fs"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">latest t/tau_alpha(meta)={latest_tau:.3g}; anchor Fs={fs_anchor:.3g}; extrapolated extension={extension:.3g}x</text>'
+        )
+        marks.append(
+            f'<text x="{left + 530}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">k* latest={k_threshold:.3g}; k*/kmax={k_ratio:.3g}; PE inversion={int(float(row["real_pe_inversion_ready"]))}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench alpha-threshold horizon audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The audit checks whether tau-alpha metadata and the observed k-grid cover the Fs=e^-1 anchor needed for PE inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">audit stage</text>
+  <text x="{left + 530}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">threshold and inversion status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_alpha_anchor_rescue_protocol_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "alpha_anchor_rescue_closed_loop_ready": "#2f855a",
+        "alpha_anchor_rescue_design_ready_real_event_clock_blocked": "#9f1239",
+        "alpha_anchor_already_consistent_real_event_clock_blocked": "#b7791f",
+        "alpha_anchor_rescue_upstream_incomplete": "#2b6cb0",
+        "alpha_anchor_rescue_design_blocked": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["rescue_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        required_k = float(row["required_anchor_wave_number"])
+        k_ratio = float(row["required_anchor_wave_number_over_observed_max"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">required k={required_k:.3g}; k/kmax={k_ratio:.3g}; anchor measurement={int(float(row["alpha_anchor_measurement_required"]))}; design={int(float(row["alpha_anchor_rescue_design_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">post-rescue alpha consistent={int(float(row["post_rescue_alpha_definition_consistent"]))}; closed-loop ready={int(float(row["post_rescue_real_closed_loop_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">remaining={str(row["remaining_post_rescue_blockers"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench alpha-anchor rescue protocol</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A proposed higher-k Fs measurement can resolve the alpha-anchor blocker, but event-clock and held-out prediction gates remain separate.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">rescue stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">post-rescue claim boundary</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_alpha_anchor_cached_fs_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_anchor_measurement_closes_full_loop": "#2f855a",
+        "cached_anchor_measurement_closes_alpha_gap_event_clock_blocked": "#b7791f",
+        "cached_anchor_measurement_refines_required_k": "#9f1239",
+        "cached_anchor_measurement_missing": "#c05621",
+        "cached_anchor_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["cached_anchor_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        candidate_k = float(row["candidate_anchor_wave_number"])
+        cached_fs = float(row["cached_fs_at_candidate_anchor"])
+        cached_k = float(row["cached_structure_threshold_wave_number"])
+        direct_k = float(row["cached_direct_threshold_wave_number"])
+        ratio = float(row["cached_structure_threshold_over_candidate"])
+        direct_ratio = float(row["cached_direct_threshold_over_candidate"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; lag={float(row["lag_time"]):.3g}; candidate k={candidate_k:.3g}; cached Fs={cached_fs:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">log-grid k*={cached_k:.3g}; direct k_root={direct_k:.3g}; direct/candidate={direct_ratio:.3g}; crossed={int(float(row["candidate_anchor_threshold_crossed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached alpha-anchor Fs audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached structure-matched displacements test whether the proposed higher-k alpha anchor actually reaches Fs=e^-1.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached-anchor stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">direct cached Fs measurement</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_curve_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_direct_alpha_curve_ready_event_clock_blocked": "#9f1239",
+        "cached_direct_alpha_curve_prethreshold": "#c05621",
+        "cached_direct_alpha_curve_missing": "#4a5568",
+        "cached_direct_alpha_root_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["direct_alpha_curve_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        k_root = float(row["direct_alpha_wave_number"])
+        latest_fs = float(row["latest_direct_alpha_fs"])
+        crossing_lag = float(row["threshold_crossing_lag_time"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; k_root={k_root:.3g}; lags={float(row["lag_count"]):.0f}; latest Fs={latest_fs:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">crossed={int(float(row["alpha_threshold_crossed"]))}; crossing={row["threshold_crossing_time_code"]} at {crossing_lag:.3g}; monotone={int(float(row["strictly_monotone_decay"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha cached curve</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached structure-matched displacement ladder is evaluated at the direct k-root, separating alpha crossing from event-clock inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">direct-alpha stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached alpha curve status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_shape_selection_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_alpha_shape_stretched_supported": "#2f855a",
+        "cached_alpha_shape_stretched_candidate_multik_blocked": "#2563eb",
+        "cached_alpha_shape_stretched_candidate_monotonicity_blocked": "#7c3aed",
+        "cached_alpha_shape_stretched_candidate_uncertainty_blocked": "#805ad5",
+        "cached_alpha_shape_exponential_not_rejected": "#2b6cb0",
+        "cached_alpha_shape_selection_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["alpha_shape_selection_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        beta = float(row["kww_beta"])
+        delta = float(row["delta_aic_exponential_minus_kww"])
+        exp_rmse = float(row["exponential_log_shape_rmse"])
+        kww_rmse = float(row["kww_log_shape_rmse"])
+        zmax = float(row["max_monotonicity_violation_z"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; beta={beta:.3g}; delta AIC={delta:.3g}; points={float(row["shape_fit_points_used"]):.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">RMSE exp={exp_rmse:.3g}; RMSE KWW={kww_rmse:.3g}; zmax={zmax:.2f}; mono-compatible={int(float(row["monotone_compatible_with_uncertainty"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha shape selection</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached direct-alpha curve compares a threshold-anchored exponential null with a KWW fit and tests whether sparse nonmonotonicity is significant relative to sigma_Fs.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">shape-selection stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">alpha-shape evidence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_multik_shape_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 75, 120
+    row_h = 82
+    colors = {
+        "cached_multik_alpha_shape_supported": "#2f855a",
+        "cached_multik_alpha_shape_window_edge_blocked": "#2563eb",
+        "cached_multik_alpha_shape_inconsistent": "#c05621",
+        "cached_multik_alpha_shape_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["multik_shape_gate_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        beta_spread = float(row["kww_beta_spread"])
+        max_z = float(row["max_monotonicity_violation_z"])
+        crossed = float(row["crossed_k_count"])
+        tested = float(row["tested_k_count"])
+        edge = int(float(row["all_crossings_at_window_edge"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; k={row["tested_k_values"]}; crossed={crossed:.0f}/{tested:.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">beta spread={beta_spread:.3g}; zmax={max_z:.2f}; compatible k={float(row["monotone_compatible_k_count"]):.0f}; edge crossings={edge}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha multi-k shape gate</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Three high-k cached F_s curves are tested for consistent KWW shape, while window-edge alpha crossings block the real alpha-shape claim.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">multi-k gate stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">high-k alpha-shape evidence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_multik_heldout_prediction_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 75, 120
+    row_h = 82
+    colors = {
+        "cached_multik_heldout_prediction_supported": "#2f855a",
+        "cached_multik_heldout_prediction_window_edge_blocked": "#2563eb",
+        "cached_multik_heldout_prediction_mismatch": "#c05621",
+        "cached_multik_heldout_prediction_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["heldout_prediction_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        beta_error = float(row["max_heldout_beta_abs_error"])
+        shape_rmse = float(row["max_heldout_shape_rmse"])
+        heldout = float(row["heldout_count"])
+        eligible = float(row["eligible_k_count"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; held-out k={row["heldout_k_values"]}; held={heldout:.0f}/{eligible:.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">max beta error={beta_error:.3g}; max shape RMSE={shape_rmse:.3g}; edge crossings={int(float(row["all_crossings_at_window_edge"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench held-out multi-k alpha prediction</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Each high-k curve is held out, the other two calibrate beta, and the held-out normalized alpha shape is predicted before any real claim is promoted.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">held-out stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">prediction residuals</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_post_window_prediction_targets_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 470
+    left, top = 75, 118
+    row_h = 48
+    colors = {
+        "post_alpha_prediction_target_preregistered": "#2563eb",
+        "post_alpha_prediction_target_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows[:7]):
+        y = top + idx * row_h
+        stage = str(row["post_window_target_stage"])
+        color = colors.get(stage, "#4a5568")
+        pred = float(row["predicted_fs"])
+        low = float(row["acceptance_fs_low"])
+        high = float(row["acceptance_fs_high"])
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 70}" y="{y - 5}" width="300" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 80}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 390}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">k={float(row["direct_alpha_wave_number"]):.3g}; beta={float(row["calibrated_beta"]):.3g}; Fs={pred:.3g}; band=[{low:.3g},{high:.3g}]</text>'
+        )
+        marks.append(
+            f'<text x="{left + 790}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#555">lag={float(row["target_lag_time"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench post-alpha prediction targets</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Held-out multi-k alpha prediction is converted into tc45/tc50 high-k F_s targets with preregistered acceptance bands.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time</text>
+  <text x="{left + 70}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target stage</text>
+  <text x="{left + 390}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">prediction</text>
+  <text x="{left + 790}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_post_window_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 470
+    left, top = 75, 118
+    row_h = 48
+    colors = {
+        "post_alpha_prediction_supported": "#2f855a",
+        "post_alpha_prediction_rejected": "#c05621",
+        "post_alpha_prediction_indeterminate": "#b7791f",
+        "post_alpha_observation_not_ready": "#2563eb",
+        "post_alpha_prediction_target_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows[:7]):
+        y = top + idx * row_h
+        stage = str(row["post_window_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 70}" y="{y - 5}" width="305" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 80}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 395}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">k={row["direct_alpha_wave_number"]}; pred={float(row["predicted_fs"]):.3g}; obs={float(row["observed_fs"]):.3g}; residual={float(row["abs_log_fs_residual"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 790}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#555">support={int(float(row["post_window_prediction_supported"]))}; reject={int(float(row["post_window_prediction_rejected"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench post-alpha verdict</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The preregistered high-k F_s targets are converted into support/reject/indeterminate verdicts when post-window observations exist.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time</text>
+  <text x="{left + 70}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">verdict stage</text>
+  <text x="{left + 395}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">residual</text>
+  <text x="{left + 790}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">decision</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_transport_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_direct_alpha_transport_proxy_ready_event_clock_blocked": "#7c2d12",
+        "direct_alpha_crossed_transport_observable_blocked": "#c05621",
+        "direct_alpha_crossing_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["transport_coupling_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        tau_alpha = float(row["tau_alpha_direct"])
+        matched_msd = float(row["matched_msd"])
+        product = float(row["apparent_stokes_einstein_product"])
+        diffusion = float(row["apparent_diffusion_coefficient"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; crossing={row["threshold_crossing_time_code"]}; tau_alpha={tau_alpha:.3g}; MSD={matched_msd:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">D_eff={diffusion:.3g}; D_eff tau_alpha={product:.3g}; NGP={float(row["matched_ngp_2d"]):.3g}; proxy={int(float(row["direct_alpha_transport_proxy_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha transport proxy</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The direct-alpha threshold crossing is matched to cached displacement transport, but persistence/exchange event-clock inversion remains blocked.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">transport coupling stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">matched alpha/transport proxy</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_pe_bound_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "direct_alpha_transport_bounds_pe_but_event_clock_missing": "#854d0e",
+        "direct_alpha_transport_pe_bound_infeasible": "#c05621",
+        "direct_alpha_transport_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["pe_feasibility_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        q_upper = float(row["jump_variance_upper_bound"])
+        q_over_msd = float(row["jump_variance_upper_over_msd"])
+        ratio = float(row["reference_persistence_exchange_ratio"])
+        exchange = float(row["reference_exchange_mean"])
+        persistence = float(row["reference_persistence_mean"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; q_max={q_upper:.3g}; q_max/MSD={q_over_msd:.3g}; full-MSD feasible={int(float(row["full_msd_jump_variance_feasible"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">at q={float(row["reference_jump_variance_fraction"]):.2g} MSD: tau_x={exchange:.3g}; tau_p={persistence:.3g}; tau_p/tau_x={ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha PE feasibility bound</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Direct-alpha transport constrains the per-event jump variance needed for persistence/exchange inversion; the event-clock jump variance is still missing.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">PE feasibility stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">conditional identifiability bound</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_displacement_tail_bound_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "direct_displacement_tail_exceeds_pe_single_event_bound": "#9f1239",
+        "direct_displacement_tail_within_pe_single_event_bound": "#2f855a",
+        "direct_displacement_tail_stats_missing": "#c05621",
+        "pe_feasibility_bound_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["tail_bound_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        q_ratio = float(row["q_all_over_bound"])
+        tail_fraction = float(row["fraction_q_gt_bound"])
+        tail_ratio = float(row["mean_q_above_over_bound"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; crossing={row["time_code"]}; samples={float(row["sample_count"]):.0f}; q_all/q_max={q_ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">tail fraction above bound={tail_fraction:.3g}; tail mean/q_max={tail_ratio:.3g}; q90={float(row["q_p90"]):.3g}; q95={float(row["q_p95"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha displacement-tail bound</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The direct-lag displacement tail is compared with the PE single-event jump-variance bound, identifying the required event segmentation step.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">tail-bound stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">direct displacement tail vs PE bound</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "multilag_displacement_crossing_canary_ready_replica_axis_blocked": "#805ad5",
+        "multilag_displacement_crossing_canary_ready_event_clock_pending": "#2b6cb0",
+        "multilag_displacement_crossing_canary_incomplete": "#c05621",
+        "pe_feasibility_bound_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["crossing_canary_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ever = float(row["ever_crossed_fraction"])
+        recross = float(row["post_crossing_recross_fraction"])
+        q_ratio = float(row["first_crossing_q_mean_over_bound"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; lags={len(str(row["time_codes"]).split(";"))}; samples={float(row["sample_count"]):.0f}; ever crossed={ever:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">recross after first crossing={recross:.3g}; mean first-cross q/q_max={q_ratio:.3g}; axis0 replica={int(float(row["axis0_is_isoconfigurational_replica"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha multi-lag crossing canary</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached lag ladder gives a displacement-threshold segmentation target while keeping the isoconfigurational replica axis out of the event-clock claim.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">crossing canary stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">multi-lag threshold crossing status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 380
+    left, top = 75, 125
+    row_h = 105
+    colors = {
+        "segmentation_target_ready_true_event_clock_missing": "#9f1239",
+        "true_event_clock_payload_ready_for_segmentation": "#2f855a",
+        "direct_tail_ready_crossing_target_missing": "#c05621",
+        "pe_bound_ready_tail_contract_missing": "#c05621",
+        "event_clock_contract_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["event_clock_contract_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        checks = (
+            f'PE={int(float(row["conditional_pe_inference_ready"]))}; '
+            f'tail={int(float(row["direct_displacement_tail_ready"]))}; '
+            f'target={int(float(row["event_segmentation_target_ready"]))}; '
+            f'true-time={int(float(row["axis0_is_physical_time"]))}'
+        )
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="445" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; q_max={float(row["q_bound"]):.3g}; {checks}; requires true trajectory={int(float(row["requires_true_time_trajectory"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">ever crossed={float(row["ever_crossed_fraction"]):.3g}; tail above bound={float(row["fraction_q_gt_bound"]):.3g}; first-cross q/q_max={float(row["first_crossing_q_mean_over_bound"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">required={str(row["required_arrays"]).replace(";", "; ")[:82]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 78}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:52]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha event-clock extraction contract</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A contract-level gate separates a real segmentation target from a true persistence/exchange event-clock inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">contract stage</text>
+  <text x="{left + 600}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">required evidence before PE inversion</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_sparse_lag_event_clock_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 390
+    left, top = 75, 125
+    row_h = 105
+    colors = {
+        "sparse_lag_tensor_ready_replica_identity_unverified": "#805ad5",
+        "sparse_lag_event_clock_ready_for_interval_segmentation": "#2f855a",
+        "sparse_lag_tensor_identity_incomplete": "#c05621",
+        "sparse_lag_event_clock_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["sparse_lag_event_clock_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; coverage={float(row["time_code_coverage_fraction"]):.2f}; lags={float(row["lag_count"]):.0f}; shape={row["positions_shape"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">same initial={int(float(row["same_initial_structure_verified"]))}; tensor={int(float(row["physical_lag_tensor_ready"]))}; coarse candidate={int(float(row["coarse_event_clock_candidate_ready"]))}; replica IDs={int(float(row["replica_identity_alignment_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">resolution={row["event_clock_resolution"]}; max initial mismatch={float(row["max_initial_position_mismatch"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 78}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:52]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench sparse-lag event-clock audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Multi-lag particle caches can define a coarse interval candidate only after lag coverage, shared initial structure, and replica identity are separated.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">sparse-lag stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">event-clock evidence and remaining blocker</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_interval_censored_first_crossing_clock_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 395
+    left, top = 75, 125
+    row_h = 108
+    colors = {
+        "interval_censored_persistence_clock_candidate": "#2b6cb0",
+        "interval_clock_crossing_distribution_missing": "#c05621",
+        "interval_clock_sparse_lag_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["interval_clock_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        crossed = float(row["crossed_fraction"])
+        censored = float(row["right_censored_fraction"])
+        lower = float(row["mean_first_crossing_lower_bound"])
+        upper = float(row["mean_first_crossing_upper_bound"])
+        midpoint = float(row["mean_first_crossing_midpoint"])
+        width_value = float(row["mean_interval_width"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; crossed={crossed:.3g}; right-censored={censored:.3g}; ready={int(float(row["interval_clock_candidate_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">mean first crossing interval: [{lower:.3g}, {upper:.3g}], midpoint={midpoint:.3g}, width={width_value:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">interval bins={str(row["first_crossing_intervals"])[:90]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:50]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench interval-censored first-crossing clock</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Sparse-lag threshold crossings are converted into lower/upper persistence-clock bounds without claiming a full PE inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">interval-clock stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">first-crossing bounds</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_interval_censored_persistence_fit_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 395
+    left, top = 75, 125
+    row_h = 108
+    colors = {
+        "interval_censored_exponential_persistence_fit_ready": "#2f855a",
+        "interval_censored_persistence_fit_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["persistence_fit_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        rate = float(row["exponential_rate_mle"])
+        mean_time = float(row["exponential_mean_persistence_time"])
+        predicted = float(row["predicted_crossed_fraction_at_latest_lag"])
+        observed = float(row["observed_crossed_fraction"])
+        ratio = float(row["mean_persistence_over_tau_alpha_direct"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; rate={rate:.3g}; mean tau_p={mean_time:.3g}; tau_p/tau_alpha={ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">crossed fraction observed={observed:.3g}; exponential prediction={predicted:.3g}; latest lag={float(row["latest_lag_time"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">exchange clock={int(float(row["exchange_clock_ready"]))}; real PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:72]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench interval-censored persistence fit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A one-parameter censored exponential survival law gives a minimal persistence scale while exchange-clock and replica-identity blockers remain explicit.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">fit stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">censored persistence-law estimate</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_waiting_law_selection_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 395
+    left, top = 75, 125
+    row_h = 108
+    colors = {
+        "exponential_waiting_law_not_rejected_sparse_cache": "#2b6cb0",
+        "weibull_waiting_law_preferred": "#805ad5",
+        "waiting_law_selection_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["waiting_law_selection_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        exp_aic = float(row["exponential_aic"])
+        weibull_aic = float(row["weibull_aic"])
+        delta = float(row["delta_aic_exponential_minus_weibull"])
+        shape = float(row["weibull_shape_mle"])
+        supported = int(float(row["extra_waiting_law_parameter_supported"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; Weibull shape={shape:.3g}; extra parameter supported={supported}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">AIC exponential={exp_aic:.3g}; AIC Weibull={weibull_aic:.3g}; delta AIC exp-minus-Weibull={delta:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">crossed={float(row["observed_crossed_fraction"]):.3g}; latest lag={float(row["latest_lag_time"]):.3g}; inversion={int(float(row["real_pe_inversion_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:60]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench interval-censored waiting-law selection</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Sparse real crossings compare exponential and Weibull persistence laws; the extra stretched-law parameter is accepted only if it beats the AIC penalty.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">selection stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">waiting-law evidence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_real_cached_microdynamic_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1240, 390
+    left, top = 70, 112
+    row_h = 58
+    colors = {
+        "real_cached_persistence_clock_quantified": "#2f855a",
+        "real_cached_persistence_clock_incomplete": "#9f1239",
+        "conditional_pe_decoupling_bound_ready": "#276749",
+        "conditional_pe_decoupling_bound_incomplete": "#9f1239",
+        "late_recovery_protocol_preregistered": "#2b6cb0",
+        "late_recovery_protocol_incomplete": "#9f1239",
+        "real_pe_inversion_ready": "#2f855a",
+        "real_pe_inversion_still_blocked": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["cached_microdynamic_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["verdict_row_id"]).replace("_", " ")[:38]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 280}" y="{y}" width="335" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 290}" y="{y + 16}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:54]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 640}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">evidence={int(float(row["real_cached_evidence_ready"]))}; persistence={int(float(row["interval_persistence_fit_ready"]))}; envelope={int(float(row["finite_exchange_envelope_ready"]))}; inversion={int(float(row["real_pe_inversion_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 915}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">taup/taua={float(row["mean_persistence_over_tau_alpha"]):.2f}; PE bound={float(row["conditional_pe_ratio_lower_bound"]):.2f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 280}" y="{y + 42}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:58]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:46]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-cached microdynamic verdict</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached KA2D coordinates quantify interval-censored persistence evidence and a conditional finite-exchange bound, while full PE inversion remains blocked.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">verdict row</text>
+  <text x="{left + 280}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 640}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness flags</text>
+  <text x="{left + 915}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">microdynamic scales</text>
+  {"".join(marks)}
+  <rect x="70" y="346" width="14" height="14" fill="#2f855a" /><text x="92" y="358" font-family="Arial, sans-serif" font-size="12">real cached persistence quantified</text>
+  <rect x="330" y="346" width="14" height="14" fill="#2b6cb0" /><text x="352" y="358" font-family="Arial, sans-serif" font-size="12">late-recovery protocol registered</text>
+  <rect x="610" y="346" width="14" height="14" fill="#805ad5" /><text x="632" y="358" font-family="Arial, sans-serif" font-size="12">full PE inversion blocked</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_finite_exchange_envelope_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "finite_exchange_falsification_horizon_ready": "#2b6cb0",
+        "finite_exchange_envelope_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["envelope_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        ratio = float(row["conditional_persistence_exchange_ratio_lower_bound"])
+        recovery_lag = float(row["gaussian_recovery_lag_upper_bound"])
+        multiplier = float(row["required_followup_lag_multiplier_over_current"])
+        current_power = int(float(row["current_window_has_gaussian_recovery_power"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; tau_p/tau_x >= {ratio:.3g}; recovery lag <= {recovery_lag:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">requires follow-up to {multiplier:.3g} current-lag units; current recovery power={current_power}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">exchange clock={int(float(row["exchange_clock_ready"]))}; real PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:78]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench finite-exchange falsification envelope</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The censored tau_p estimate implies a conditional tau_p/tau_x lower bound and a late-NGP horizon, without claiming a measured exchange clock.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">envelope stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">conditional finite-exchange consequence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_protocol_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_acquisition_required": "#b7791f",
+        "finite_exchange_late_recovery_supported": "#2f855a",
+        "finite_exchange_late_recovery_failed": "#c53030",
+        "late_recovery_protocol_upstream_incomplete": "#4a5568",
+        "late_recovery_lag_insufficient": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["late_recovery_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        required_lag = float(row["required_followup_lag_time"])
+        observed_lag = float(row["observed_lag_time"])
+        ready = int(float(row["mechanism_selection_ready"]))
+        finite_supported = int(float(row["finite_exchange_supported"]))
+        finite_rejected = int(float(row["finite_exchange_rejected"]))
+        static_rejected = int(float(row["static_disorder_rejected"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; required lag={required_lag:.3g}; observed lag={observed_lag:.3g}; mechanism ready={ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">finite supported={finite_supported}; finite rejected={finite_rejected}; static disorder rejected={static_rejected}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">late NGP={float(row["observed_late_ngp"]):.3g}; max finite-exchange late NGP={float(row["max_finite_exchange_late_ngp"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:78]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late recovery falsification protocol</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The protocol states exactly what late-NGP or van-Hove recovery observation is still needed to support or reject finite exchange against static disorder.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">protocol stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">mechanism falsification state</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_ingestion_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_observation_ingestion_ready": "#2f855a",
+        "late_recovery_observation_missing": "#b7791f",
+        "late_recovery_horizon_incomplete": "#805ad5",
+        "late_recovery_uncertainty_incomplete": "#c05621",
+        "late_recovery_machine_readable_incomplete": "#c53030",
+        "late_recovery_columns_incomplete": "#c53030",
+        "late_recovery_time_units_incomplete": "#c53030",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["late_recovery_ingestion_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        required_lag = float(row["required_followup_lag_time"])
+        observed_lag = float(row["observed_lag_time"])
+        ready = int(float(row["late_recovery_observation_ready"]))
+        uncertainty_ready = int(float(row["uncertainty_ready"]))
+        horizon = int(float(row["horizon_satisfied"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; required lag={required_lag:.3g}; observed lag={observed_lag:.3g}; ingest ready={ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">machine readable={int(float(row["machine_readable_ready"]))}; shared time={int(float(row["shared_time_units_ready"]))}; horizon={horizon}; uncertainty={uncertainty_ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing columns={str(row["missing_columns"]).replace("_", " ")}; missing sigma={str(row["missing_uncertainty_columns"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late recovery ingestion contract</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A late-NGP or van-Hove observation must be machine-readable, uncertainty-weighted, in shared lag units, and beyond the finite-exchange horizon.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">ingestion stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">required observation schema</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_timecode_target_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_timecode_target_ready": "#2b6cb0",
+        "late_recovery_timecode_target_already_covered": "#2f855a",
+        "late_recovery_timecode_target_clock_incomplete": "#c05621",
+        "late_recovery_timecode_target_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["timecode_target_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        current_lag = float(row["current_max_lag_time"])
+        required_lag = float(row["required_followup_lag_time"])
+        target_lag = float(row["target_lag_time"])
+        target_ratio = float(row["target_lag_over_required"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; current={row["current_max_time_code"]} ({current_lag:.3g}); required lag={required_lag:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">target={row["target_time_code"]} ({target_lag:.3g}); target/required={target_ratio:.3g}; steps needed={int(float(row["timecode_steps_needed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">late observation ready={int(float(row["late_recovery_observation_ready"]))}; real PE inversion={int(float(row["real_pe_inversion_ready"]))}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:78]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late recovery time-code target</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The finite-exchange recovery horizon is converted into the first GlassBench time-code cache that can test late NGP or van-Hove recovery.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time-code stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">acquisition target</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_cache_request_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_particle_cache_ready": "#2f855a",
+        "late_recovery_particle_cache_required": "#2b6cb0",
+        "late_recovery_member_metadata_required": "#b7791f",
+        "late_recovery_member_path_inference_incomplete": "#c05621",
+        "late_recovery_timecode_target_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["cache_request_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        target_lag = float(row["target_lag_time"])
+        metadata_ready = int(float(row["official_target_member_metadata_ready"]))
+        cache_ready = int(float(row["particle_cache_ready"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; target={row["target_time_code"]}; lag={target_lag:.3g}; metadata={metadata_ready}; cache={cache_ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">member={str(row["inferred_target_member"])[:82]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">cache={str(row["expected_particle_cache_path"])[:88]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:60]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late recovery cache request</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The tc50 late-recovery target is converted into an inferred member path while preserving the official metadata and cache gaps.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cache contract stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">late-recovery member request</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_membership_probe_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_target_member_visible_in_probe": "#2f855a",
+        "late_recovery_target_absent_from_extended_prefix": "#b7791f",
+        "late_recovery_member_index_probe_missing": "#c05621",
+        "late_recovery_cache_request_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["membership_probe_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        visible = int(float(row["target_member_visible_in_probe"]))
+        count = int(float(row["same_structure_member_count_in_probe"]))
+        compressed = float(row["compressed_probe_bytes"])
+        tar_bytes = float(row["tar_probe_bytes"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; target={row["target_time_code"]}; visible={visible}; same-structure count={count}; max visible={row["max_visible_time_code"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">compressed prefix={compressed:.3g} bytes; tar probe={tar_bytes:.3g} bytes; codes={str(row["same_structure_visible_time_codes"])[:70]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">member={str(row["inferred_target_member"])[:82]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:60]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late recovery membership probe</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The extended tar-prefix member index shows which structure-matched time codes are visible before claiming a tc50 particle cache.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">membership stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">extended-prefix evidence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_public_timecode_ceiling_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_public_timecode_member_visible": "#2f855a",
+        "late_recovery_public_timecode_published_probe_needed": "#2b6cb0",
+        "late_recovery_beyond_public_timecode_ceiling": "#b7791f",
+        "late_recovery_timecode_not_in_public_semantics": "#c05621",
+        "public_timecode_semantics_missing": "#9f1239",
+        "late_recovery_timecode_target_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["public_ceiling_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        published = int(float(row["target_time_code_published"]))
+        ratio = float(row["target_lag_over_public_max"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; target={row["target_time_code"]}; public max={row["public_max_time_code"]}; structure max={row["structure_max_time_code"]}; published={published}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">target lag={float(row["target_lag_time"]):.3g}; public max lag={float(row["public_max_lag_time"]):.3g}; target/public={ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">public codes={str(row["public_time_codes"])[:84]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:60]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench public time-code ceiling</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The required late-recovery target is compared with the published GlassBench time-code semantics before claiming reanalysis feasibility.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">public ceiling stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">published time-code support</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_censored_window_claim_audit_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 410
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_public_window_ready": "#2f855a",
+        "alpha_anchor_ready_late_recovery_censored": "#b7791f",
+        "alpha_anchor_ready_late_recovery_unresolved": "#c05621",
+        "public_window_pre_alpha_only": "#805ad5",
+        "finite_exchange_envelope_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["censored_window_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        fraction = float(row["public_window_fraction_of_target_lag"])
+        late_allowed = int(float(row["late_gaussian_recovery_claim_allowed"]))
+        alpha_allowed = int(float(row["alpha_relaxation_claim_allowed"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="424" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">public max={row["public_max_time_code"]}; target={row["target_time_code"]}; alpha allowed={alpha_allowed}; late recovery allowed={late_allowed}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">public/target lag={fraction:.4g}; target/public={float(row["target_lag_over_public_max"]):.3g}; tau_alpha={float(row["tau_alpha_direct"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim level={str(row["allowed_public_claim_level"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:62]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench censored-window claim audit</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The public time window can support alpha-anchor diagnostics while late Gaussian recovery remains censored by the public time-code ceiling.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim audit stage</text>
+  <text x="{left + 580}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">allowed public claims</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_public_window_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 530
+    left, top = 76, 126
+    row_h = 60
+    colors = {
+        "public_window_sota_consistent": "#2f855a",
+        "public_window_censored_sota_unresolved": "#b7791f",
+        "mechanism_selection_censored_unresolved": "#c05621",
+        "public_proxy_consistent_spatial_boundary": "#805ad5",
+        "scope_boundary_not_tested": "#4a5568",
+        "signature_not_mapped_to_public_window_gate": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["public_window_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        allowed = int(float(row["public_glassbench_claim_allowed"]))
+        late_required = int(float(row["late_recovery_required"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{str(row["signature"]).replace("_", " ")[:34]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 245}" y="{y - 6}" width="310" height="25" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 253}" y="{y + 11}" font-family="Arial, sans-serif" font-size="9.2" fill="#fff">{stage.replace("_", " ")[:48]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">claim allowed={allowed}; late required={late_required}; model={float(row["model_support"]):.1g}; literature={float(row["literature_qualitative_support"]):.1g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">allowed={str(row["allowed_public_claim"]).replace("_", " ")[:72]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 580}" y="{y + 47}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; public/target={float(row["public_window_fraction_of_target_lag"]):.4g}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench public-window SOTA verdict</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Each literature-level dynamic signature is mapped to what the currently public GlassBench window can and cannot test.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">signature</text>
+  <text x="{left + 245}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">public-window verdict</text>
+  <text x="{left + 580}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim boundary</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_experiment_design_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 320
+    left, top = 76, 126
+    row_h = 84
+    colors = {
+        "minimal_tc50_followup_ready": "#2b6cb0",
+        "late_recovery_timecode_target_incomplete": "#c05621",
+        "finite_exchange_envelope_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["experiment_design_stage"])
+        color = colors.get(stage, "#4a5568")
+        planned_ratio = float(row["planned_lag_over_minimum_required"])
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["system_id"]} T={row["temperature"]} structure {row["structure_id"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 205}" y="{y - 6}" width="285" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 214}" y="{y + 12}" font-family="Arial, sans-serif" font-size="9.5" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10.5">required={row["required_time_code"]}; current={row["current_max_time_code"]}; planned/min={planned_ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">min lag={float(row["minimum_required_lag_time"]):.3g}; planned lag={float(row["planned_lag_time"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">observables={row["required_observables"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 515}" y="{y + 70}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">rules: late NGP <= {float(row["max_finite_exchange_late_ngp"]):.3g}; late NGP + 2sigma < {float(row["static_gamma_late_ngp_plateau"]):.3g}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late-recovery experiment design</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The public-window gap is converted into a minimal tc50 follow-up that can test Gaussian recovery and reject static disorder.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 205}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">experiment stage</text>
+  <text x="{left + 515}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">minimum acquisition and decision rules</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_uncertainty_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 400
+    left, top = 76, 126
+    row_h = 86
+    colors = {
+        "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected": "#2f855a",
+        "finite_exchange_supported_static_disorder_not_rejected": "#b7791f",
+        "uncertainty_weighted_finite_exchange_rejected": "#c53030",
+        "late_recovery_uncertainty_indeterminate": "#805ad5",
+        "late_recovery_observation_not_ready": "#2b6cb0",
+        "late_recovery_verdict_protocol_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["uncertainty_verdict_stage"])
+        color = colors.get(stage, "#4a5568")
+        ready = int(float(row["uncertainty_decision_ready"]))
+        finite = int(float(row["finite_exchange_uncertainty_supported"]))
+        static = int(float(row["static_disorder_uncertainty_rejected"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{row["system_id"]} T={row["temperature"]} structure {row["structure_id"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 205}" y="{y - 6}" width="372" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 214}" y="{y + 12}" font-family="Arial, sans-serif" font-size="8.8" fill="#fff">{stage.replace("_", " ")[:62]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10.5">decision={ready}; finite support={finite}; static reject={static}; candidate={row["candidate_id"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">lag={float(row["observed_lag_time"]):.3g}/{float(row["minimum_required_lag_time"]):.3g}; late NGP upper 2sigma={float(row["late_ngp_upper_2sigma"]):.3g}; recovery lower 2sigma={float(row["tail_recovery_lower_2sigma"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">finite margin={float(row["finite_exchange_support_margin"]):.3g}; static margin={float(row["static_disorder_rejection_margin"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 600}" y="{y + 70}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">next={str(row["next_required_action"]).replace("_", " ")[:74]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late-recovery uncertainty verdict</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Late-recovery measurements are promoted to mechanism verdicts only when two-sigma finite-exchange and static-disorder decision rules pass.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 205}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">uncertainty verdict</text>
+  <text x="{left + 600}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">two-sigma mechanism decision state</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_outcome_matrix_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 720
+    left, top = 76, 126
+    row_h = 66
+    colors = {
+        "finite_exchange_supported_static_disorder_rejected": "#2f855a",
+        "finite_exchange_rejected_or_model_reparameterization_required": "#c53030",
+        "no_mechanism_selection_claim": "#805ad5",
+        "no_late_recovery_claim": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        claim = str(row["claim_if_observed"])
+        color = colors.get(claim, "#4a5568")
+        ready = int(float(row["uncertainty_decision_ready"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10.5" font-weight="700">{row["system_id"]} T={row["temperature"]} s={row["structure_id"]} {row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left}" y="{y + 33}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">{str(row["outcome_scenario"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 250}" y="{y - 7}" width="320" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 259}" y="{y + 11}" font-family="Arial, sans-serif" font-size="8.5" fill="#fff">{claim.replace("_", " ")[:56]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10">decision={ready}; NGP={float(row["synthetic_observed_late_ngp"]):.3g} +/- {float(row["synthetic_sigma_late_ngp"]):.2g}; recovery={float(row["synthetic_tail_recovery"]):.1g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">verdict={str(row["predicted_uncertainty_verdict_stage"]).replace("_", " ")[:76]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">finite margin={float(row["finite_exchange_support_margin"]):.3g}; static margin={float(row["static_disorder_rejection_margin"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench tc50 late-recovery outcome matrix</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Possible tc50 observations are pre-registered as support, rejection, or indeterminate outcomes before late data are available.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target and scenario</text>
+  <text x="{left + 250}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim if observed</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">two-sigma verdict inputs</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_late_recovery_decision_power_plan_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 720
+    left, top = 76, 126
+    row_h = 66
+    colors = {
+        "decision_power_sufficient": "#2f855a",
+        "late_ngp_power_extension_required": "#c05621",
+        "mean_value_requires_model_rejection_not_more_precision": "#c53030",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["decision_power_stage"])
+        color = colors.get(stage, "#4a5568")
+        required = int(float(row["required_member_count"]))
+        current = int(float(row["current_member_count"]))
+        additional = int(float(row["additional_member_count_needed"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10.5" font-weight="700">{row["system_id"]} T={row["temperature"]} s={row["structure_id"]} {row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left}" y="{y + 33}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">{str(row["outcome_scenario"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 250}" y="{y - 7}" width="300" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 259}" y="{y + 11}" font-family="Arial, sans-serif" font-size="8.8" fill="#fff">{stage.replace("_", " ")[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10">members current/required/additional = {current}/{required}/{additional}; multiplier={float(row["member_multiplier_needed"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">sigma late NGP current/required = {float(row["current_sigma_late_ngp"]):.3g}/{float(row["required_sigma_late_ngp_for_decision"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:60]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench tc50 late-recovery decision power plan</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The outcome matrix is converted into required member counts, so indeterminate tc50 data cannot be over-promoted to mechanism selection.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target and scenario</text>
+  <text x="{left + 250}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">decision-power stage</text>
+  <text x="{left + 575}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member and uncertainty requirement</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_dynamic_signature_alignment_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 610
+    left, top = 75, 118
+    row_h = 70
+    colors = {
+        "real_curve_supported": "#2f855a",
+        "real_curve_supported_pre_alpha_threshold": "#b7791f",
+        "real_proxy_supported_spatial_boundary": "#805ad5",
+        "model_literature_supported_real_inversion_blocked": "#c05621",
+        "scope_boundary_not_explained": "#4a5568",
+        "model_supported_literature_or_real_data_pending": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["alignment_stage"])
+        color = colors.get(stage, "#4a5568")
+        signature = str(row["signature"]).replace("_", " ")
+        model = int(float(row["model_support"]) > 0.0)
+        literature = int(float(row["literature_qualitative_support"]))
+        real = int(float(row["real_glassbench_support"]))
+        inversion = int(float(row["real_quantitative_inversion_ready"]))
+        thermo = int(float(row["thermodynamic_claim_allowed"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{signature[:34]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 255}" y="{y - 6}" width="340" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 265}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:49]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">model={model}; literature={literature}; real curve={real}; real inversion={inversion}; thermo={thermo}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">phenomenon={str(row["phenomenon"]).replace("_", " ")[:66]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 55}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA dynamic-signature alignment</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Model diagnostics, literature-level SOTA claims, and current real GlassBench evidence are aligned without promoting thermodynamic or fit claims.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">signature</text>
+  <text x="{left + 255}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">alignment stage</text>
+  <text x="{left + 620}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">support and blocker</text>
+  {"".join(marks)}
 </svg>
 """
     path.write_text(svg)
@@ -8711,6 +12336,452 @@ def write_persistence_exchange_uncertainty_protocol_svg(path: Path, rows: list[d
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_four_point_claim_gate_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 330
+    left, top = 76, 118
+    row_h = 78
+    colors = {
+        "direct_four_point_dynamic_length_claim_ready": "#2f855a",
+        "overlap_chi4_proxy_supported_direct_four_point_blocked": "#805ad5",
+        "overlap_chi4_proxy_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["four_point_claim_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 120}" y="{y - 6}" width="370" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 130}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:55]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 520}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">proxy={int(float(row["overlap_chi4_proxy_ready"]))}; direct4pt={int(float(row["direct_four_point_susceptibility_ready"]))}; length={int(float(row["dynamic_length_ready"]))}; promote={int(float(row["proxy_promotion_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 520}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">chi4 peak={float(row["overlap_chi4_peak"]):.3g}; sigma={float(row["sigma_overlap_chi4_peak"]):.3g}; members={float(row["member_count"]):.0f}; physical time={int(float(row["physical_time_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 520}" y="{y + 57}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct four-point claim gate</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Overlap-chi4 evidence is kept as a proxy until direct four-point susceptibility and dynamic length are both available.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 120}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim stage</text>
+  <text x="{left + 520}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">promotion guard</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_real_data_closure_priority_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 500
+    left, top = 70, 118
+    row_h = 82
+    colors = {
+        "minimum_real_inversion_closure_priority": "#9f1239",
+        "heldout_alpha_prediction_priority": "#2b6cb0",
+        "mechanism_selection_priority": "#805ad5",
+        "spatial_four_point_boundary_priority": "#2f855a",
+    }
+    marks = []
+    for row in rows:
+        rank = int(float(row["priority_rank"]))
+        y = top + (rank - 1) * row_h
+        stage = str(row["priority_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="18" font-weight="700">#{rank}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 52}" y="{y - 8}" width="360" height="29" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 62}" y="{y + 11}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{str(row["closure_id"]).replace("_", " ")[:52]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 438}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">stage={stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 438}" y="{y + 34}" font-family="Arial, sans-serif" font-size="10" fill="#555">unlocks: inversion={int(float(row["unlocks_quantitative_inversion"]))}; micro-macro={int(float(row["unlocks_micro_to_macro_prediction"]))}; alpha={int(float(row["unlocks_heldout_alpha_prediction"]))}; mechanism={int(float(row["unlocks_mechanism_selection"]))}; spatial={int(float(row["unlocks_direct_spatial_claim"]))}; thermo={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 438}" y="{y + 55}" font-family="Arial, sans-serif" font-size="10" fill="#555">payload={str(row["minimum_required_payload"]).replace("_", " ")[:96]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-data closure priority ledger</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The ledger ranks the smallest real payloads that would turn current dynamical-signature evidence into quantitative, falsifiable tests without thermodynamic overclaim.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">rank</text>
+  <text x="{left + 52}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">closure payload</text>
+  <text x="{left + 438}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim unlocked and required data</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_microdynamic_closed_loop_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "real_microdynamic_closed_loop_ready": "#2f855a",
+        "real_microstats_macro_signatures_closed_loop_blocked": "#9f1239",
+        "real_microstats_macro_signature_incomplete": "#c05621",
+        "macro_timecode_upstream_incomplete": "#2b6cb0",
+        "trajectory_microstatistics_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["closed_loop_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        cage = float(row["cage_length_proxy"])
+        ngp_peak = float(row["short_frame_ngp_peak"])
+        fs_decay = float(row["short_frame_fs_decay"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="390" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">frame microstats={int(float(row["frame_index_microstats_ready"]))}; macro signatures={int(float(row["macro_signature_ready"]))}; prediction={int(float(row["micro_to_macro_prediction_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">cage length proxy={cage:.3g}; short-frame NGP peak={ngp_peak:.3g}; short-frame Fs decay={fs_decay:.3g}; signatures={float(row["macro_signature_count"]):.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing={str(row["missing_closed_loop_inputs"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench microdynamic closed-loop audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The audit separates real frame-index microstatistics, real macro dynamical signatures, and the missing cage-jump clock required for held-out prediction.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">closed-loop stage</text>
+  <text x="{left + 545}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">micro-to-macro evidence status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_cage_jump_proxy_canary_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "aggregate_cage_jump_proxy_ready_particle_events_blocked": "#9f1239",
+        "aggregate_cage_jump_proxy_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["canary_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        jump = float(row["proxy_jump_length"])
+        score = float(row["proxy_event_score"])
+        fs_decay = float(row["max_short_frame_fs_decay"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="390" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">proxy={int(float(row["aggregate_jump_proxy_ready"]))}; particle events={int(float(row["particle_resolved_jump_events_ready"]))}; physical clock={int(float(row["physical_time_jump_clock_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">peak frame={float(row["peak_proxy_event_frame"]):.0f}; proxy jump length={jump:.3g}; score={score:.3g}; short Fs decay={fs_decay:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing={str(row["missing_event_clock_inputs"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cage-jump proxy canary</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Aggregate frame-index MSD, NGP, and Fs decay mark jump-like candidate frames, while particle-resolved event clocks remain blocked.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">canary stage</text>
+  <text x="{left + 545}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">aggregate proxy status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_event_clock_threshold_readiness_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "real_event_clock_threshold_robustness_ready": "#2f855a",
+        "real_event_clock_threshold_robustness_blocked": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["readiness_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="410" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">schema={int(float(row["positions_schema_ready"]))}; first-NPZ curve={int(float(row["first_npz_observable_curve_ready"]))}; members={int(float(row["member_ensemble_observable_ready"]))}; particle cache={int(float(row["particle_resolved_positions_cached"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">threshold sweep={int(float(row["threshold_sweep_event_clock_ready"]))}; held-out macro={int(float(row["macro_heldout_observables_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing={str(row["missing_real_threshold_inputs"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench event-clock threshold readiness</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Real threshold-robustness claims are blocked until particle-resolved coordinate cache, physical time, and held-out macro observables are available.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">readiness stage</text>
+  <text x="{left + 565}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">real-input gate</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_first_npz_particle_cache_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "first_npz_particle_cache_ready_for_threshold_sweep": "#2f855a",
+        "first_npz_particle_cache_contract_ready_cache_missing": "#b7791f",
+        "first_npz_particle_cache_contract_ready_time_blocked": "#805ad5",
+        "first_npz_particle_cache_contract_incomplete": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["cache_contract_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        md5 = str(row["npz_member_md5"])[:10]
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="410" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">shape={row["positions_shape"]}; npz={int(float(row["npz_member_bytes"]))} B; md5={md5}; cache={int(float(row["particle_resolved_positions_cached"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">range={int(float(row["compressed_probe_range_start"]))}-{int(float(row["compressed_probe_range_end"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">target={str(row["particle_cache_target"])[:92]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench first-NPZ particle cache contract</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The contract pins byte ranges, NPZ identity, coordinate shape, and the local cache target required before real event-clock threshold sweeps.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">contract stage</text>
+  <text x="{left + 565}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">coordinate-cache payload</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_cached_particle_timecode_bridge_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_particle_event_clock_ready": "#2f855a",
+        "cached_particle_lag_time_ready_event_clock_blocked": "#b7791f",
+        "cached_particle_lag_time_ready_frame_axis_unknown": "#805ad5",
+        "cached_particle_timecode_semantics_incomplete": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["timecode_bridge_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">time code={row["time_code"]}; lag={float(row["lag_time"]):.3g}; cache={int(float(row["particle_resolved_positions_cached"]))}; lag ready={int(float(row["physical_lag_time_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">axis0={str(row["axis0_semantics"]).replace("_", " ")}; frame-axis time={int(float(row["frame_axis_is_physical_time"]))}; event clock={int(float(row["event_clock_trajectory_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={row["primary_blocker"]}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached-particle time-code bridge</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached first-NPZ coordinates have official lag times, but their axis 0 is isoconfigurational replicas rather than a physical-time trajectory.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time-code bridge stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">lag-time and axis semantics</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_multilag_particle_cache_targets_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1260, 360
+    left, top = 70, 122
+    row_h = 90
+    colors = {
+        "multi_lag_particle_event_clock_ready": "#2f855a",
+        "multi_lag_particle_cache_ready_event_clock_axis_blocked": "#805ad5",
+        "official_multi_lag_ladder_ready_cache_missing": "#b7791f",
+        "official_multi_lag_ladder_incomplete": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["target_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="410" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["selected_structure_id"]}; codes={row["selected_time_codes"]}; members={int(float(row["target_member_count"]))}; cached={int(float(row["cached_target_member_count"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">lag span={float(row["lag_span"]):.3g}; official ladder={int(float(row["official_multi_lag_ladder_ready"]))}; particle ladder cache={int(float(row["particle_lag_ladder_cache_ready"]))}; event clock={int(float(row["event_clock_trajectory_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={row["primary_blocker"]}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench multi-lag particle-cache targets</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Official structure-matched time-code ladders identify exactly which NPZ members must be cached before a particle-level event-clock test.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cache-target stage</text>
+  <text x="{left + 565}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">structure-matched lag ladder</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_cached_particle_observable_semantics_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1260, 430
+    left, top = 70, 120
+    row_h = 32
+    colors = {
+        "official_displacement_observable_reproduced": "#2f855a",
+        "cached_coordinate_proxy_ready_initial_reference_blocked": "#b7791f",
+        "cached_coordinate_proxy_ready_observable_mismatch": "#805ad5",
+        "cached_coordinate_proxy_incomplete": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows[:9]):
+        y = top + idx * row_h
+        stage = str(row["observable_semantics_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10">{row["system_id"]} T={row["temperature"]} {row["time_code"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 145}" y="{y - 3}" width="330" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 153}" y="{y + 12}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:54]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">MSD err={float(row["initial_reference_msd_relative_error"]):.2g}; NGP err={float(row["initial_reference_ngp_2d_relative_error"]):.2g}; Fs err={float(row["initial_reference_fs_max_abs_error"]):.2g}; x-Fs err={float(row["single_axis_x_fs_max_abs_error"]):.2g}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached-particle observable semantics</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached initial references reproduce official MSD, mean-replica NGP, and axis-averaged multi-k Fs; proxy conventions are rejected.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 145}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">observable semantics stage</text>
+  <text x="{left + 500}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached-coordinate audit</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 660
@@ -9010,6 +13081,158 @@ def write_trajectory_observable_protocol_svg(
     path.write_text(svg)
 
 
+def write_trajectory_cage_jump_events_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    row = rows[0]
+    width, height = 980, 430
+    left, top = 90, 92
+    labels = [
+        ("jump events", float(row["total_jump_event_count"]), "#2b6cb0"),
+        ("particles", float(row["particles_with_jump_count"]), "#2f855a"),
+        ("exchange intervals", float(row["exchange_interval_count"]), "#805ad5"),
+        ("tau_p mean", float(row["persistence_mean"]), "#c05621"),
+        ("tau_x mean", float(row["exchange_mean"]), "#718096"),
+    ]
+    max_value = max(value for _, value, _ in labels)
+    marks = []
+    for idx, (label, value, color) in enumerate(labels):
+        y0 = top + idx * 52
+        bar_w = 560 * value / max(max_value, 1e-12)
+        marks.append(
+            f'<text x="{left}" y="{y0 + 18}" font-family="Arial, sans-serif" font-size="13">{label}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 165}" y="{y0}" width="{bar_w:.1f}" height="24" fill="{color}" opacity="0.88" />'
+        )
+        marks.append(
+            f'<text x="{left + 178 + bar_w:.1f}" y="{y0 + 17}" font-family="Arial, sans-serif" font-size="12" fill="#222">{value:.3g}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Particle-resolved cage-jump event clock</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Synthetic local trajectory canary: threshold jumps define first-persistence and exchange intervals before real-benchmark inversion.</text>
+  {"".join(marks)}
+  <text x="90" y="365" font-family="Arial, sans-serif" font-size="11">stage: {row["event_protocol_stage"]}; blocker: {row["primary_blocker"]}; thermodynamic claim allowed: {int(float(row["thermodynamic_claim_allowed"]))}</text>
+  <text x="90" y="383" font-family="Arial, sans-serif" font-size="11">scope: {row["scope_note"]}</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_trajectory_event_clock_macro_predictions_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1060, 480
+    left, top = 85, 102
+    metrics = [
+        ("D", "diffusion_z", "#2b6cb0"),
+        ("tau_alpha", "max_tau_alpha_z", "#2f855a"),
+        ("late NGP", "late_ngp_z", "#c05621"),
+        ("chi4 peak", "chi4_peak_z", "#805ad5"),
+    ]
+    max_z = max(max(float(row[key]) for _, key, _ in metrics) for row in rows)
+    max_z = max(max_z, 2.0)
+    marks = []
+    for row_idx, row in enumerate(rows):
+        y0 = top + row_idx * 145
+        marks.append(
+            f'<text x="{left}" y="{y0 - 20}" font-family="Arial, sans-serif" font-size="13" font-weight="700">{row["protocol_id"]}</text>'
+        )
+        for metric_idx, (label, key, color) in enumerate(metrics):
+            value = float(row[key])
+            x0 = left + metric_idx * 225
+            bar_h = 72 * min(value / max_z, 1.0)
+            y_bar = y0 + 78 - bar_h
+            marks.append(
+                f'<rect x="{x0}" y="{y_bar:.1f}" width="58" height="{bar_h:.1f}" fill="{color}" opacity="0.88" />'
+            )
+            marks.append(
+                f'<text x="{x0}" y="{y0 + 98}" font-family="Arial, sans-serif" font-size="12">{label}</text>'
+            )
+            marks.append(
+                f'<text x="{x0}" y="{y_bar - 6:.1f}" font-family="Arial, sans-serif" font-size="11">{value:.2g}</text>'
+            )
+        marks.append(
+            f'<text x="{left}" y="{y0 + 124}" font-family="Arial, sans-serif" font-size="11">stage: {row["prediction_stage"]}; blocker: {row["primary_blocker"]}</text>'
+        )
+    threshold_y = top + 78 - 72 * 2.0 / max_z
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="85" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Event-clock micro-to-macro prediction</text>
+  <text x="85" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Particle jump clocks predict D, multi-k alpha, late NGP, and chi4 without fitting macro observables.</text>
+  <line x1="{left}" y1="{threshold_y:.1f}" x2="{left + 840}" y2="{threshold_y:.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{left + 850}" y="{threshold_y + 4:.1f}" font-family="Arial, sans-serif" font-size="11" fill="#718096">z=2</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_trajectory_event_clock_threshold_robustness_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1040, 450
+    left, top, right, bottom = 90, 86, 940, 330
+    thresholds = np.array([float(row["jump_displacement_threshold"]) for row in rows])
+    z_values = []
+    for row in rows:
+        if float(row["event_clock_ready"]) == 1.0:
+            z_values.append(
+                max(
+                    float(row["diffusion_z"]),
+                    float(row["max_tau_alpha_z"]),
+                    float(row["late_ngp_z"]),
+                    float(row["chi4_peak_z"]),
+                )
+            )
+        else:
+            z_values.append(2.5)
+    z = np.array(z_values)
+    zmax = max(3.0, float(np.max(z)))
+
+    def x(values: np.ndarray) -> np.ndarray:
+        return left + (values - np.min(thresholds)) * (right - left) / max(float(np.max(thresholds) - np.min(thresholds)), 1e-12)
+
+    def y(values: np.ndarray) -> np.ndarray:
+        return bottom - values * (bottom - top) / zmax
+
+    marks = []
+    for row, xx, yy, value in zip(rows, x(thresholds), y(z), z):
+        passed = float(row["threshold_prediction_pass"]) == 1.0
+        ready = float(row["event_clock_ready"]) == 1.0
+        color = "#2f855a" if passed else ("#c05621" if ready else "#718096")
+        marks.append(f'<circle cx="{xx:.1f}" cy="{yy:.1f}" r="6" fill="{color}" />')
+        marks.append(
+            f'<text x="{xx - 16:.1f}" y="{bottom + 24}" font-family="Arial, sans-serif" font-size="11">{float(row["jump_displacement_threshold"]):.2g}</text>'
+        )
+        marks.append(
+            f'<text x="{xx - 35:.1f}" y="{yy - 12:.1f}" font-family="Arial, sans-serif" font-size="10" fill="{color}">{row["primary_blocker"]}</text>'
+        )
+    threshold_y = y(np.array([2.0]))[0]
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Event-clock threshold robustness</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The same micro-to-macro prediction must pass across a stable cage-jump threshold window and fail outside it.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <line x1="{left}" y1="{threshold_y:.1f}" x2="{right}" y2="{threshold_y:.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{right - 48}" y="{threshold_y - 6:.1f}" font-family="Arial, sans-serif" font-size="11" fill="#718096">z=2</text>
+  {"".join(marks)}
+  <text x="{(left + right) / 2 - 80}" y="{bottom + 50}" font-family="Arial, sans-serif" font-size="13">jump displacement threshold</text>
+  <text x="38" y="255" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 38 255)">max signature z score</text>
+  <text x="90" y="405" font-family="Arial, sans-serif" font-size="11">stable threshold window count = {int(max(float(row["stable_threshold_window_count"]) for row in rows))}; thermodynamic claim allowed = 0</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_trajectory_uncertainty_protocol_svg(
     path: Path,
     rows: list[dict[str, float | str]],
@@ -9262,6 +13485,232 @@ def write_simultaneous_closure_svg(path: Path, rows: list[dict[str, float | str]
   {"".join(marks)}
   <rect x="72" y="252" width="14" height="14" fill="#2f855a" /><text x="94" y="264" font-family="Arial, sans-serif" font-size="12">simultaneous closure passed</text>
   <rect x="302" y="252" width="14" height="14" fill="#c05621" /><text x="324" y="264" font-family="Arial, sans-serif" font-size="12">held-out mismatch rejected</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_microdynamic_prediction_scorecard_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 390
+    left, top = 72, 112
+    row_h = 62
+    colors_by_stage = {
+        "microstats_to_macro_prediction_passed": "#2f855a",
+        "heldout_macro_prediction_rejected": "#c05621",
+        "real_glassbench_prediction_blocked": "#2b6cb0",
+        "real_glassbench_microdynamic_prediction_ready": "#276749",
+        "simultaneous_dynamical_signature_closure_passed": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["scorecard_stage"])
+        color = colors_by_stage.get(stage, "#718096")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["scorecard_row_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 315}" y="{y}" width="286" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 326}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 625}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">micro={float(row["micro_input_count"]):.0f}; held={float(row["heldout_macro_prediction_count"]):.0f}; fit={float(row["macro_fit_parameter_count"]):.0f}; real={int(float(row["real_data_comparison_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 880}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">members {float(row["current_member_count"]):.0f}->{float(row["required_member_count"]):.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 315}" y="{y + 43}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:50]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:42]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Microdynamic prediction scorecard</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Few microdynamic statistics must predict held-out macro signatures; current GlassBench support remains blocked from real micro-to-macro closure.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">row</text>
+  <text x="{left + 315}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 625}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">prediction accounting</text>
+  <text x="{left + 880}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member power</text>
+  {"".join(marks)}
+  <rect x="72" y="348" width="14" height="14" fill="#2f855a" /><text x="94" y="360" font-family="Arial, sans-serif" font-size="12">micro-to-macro canary passed</text>
+  <rect x="292" y="348" width="14" height="14" fill="#c05621" /><text x="314" y="360" font-family="Arial, sans-serif" font-size="12">held-out mismatch rejected</text>
+  <rect x="512" y="348" width="14" height="14" fill="#2b6cb0" /><text x="534" y="360" font-family="Arial, sans-serif" font-size="12">real GlassBench blocker retained</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_microdynamic_minimality_audit_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 420
+    left, top = 72, 112
+    row_h = 52
+    colors_by_stage = {
+        "necessary_microstatistics_sufficient": "#2f855a",
+        "required_microstatistics_missing": "#c05621",
+        "macro_fit_only_overclaim_risk": "#b83280",
+        "real_data_microdynamic_inputs_missing": "#2b6cb0",
+        "real_data_microdynamic_inputs_ready": "#276749",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["minimality_stage"])
+        color = colors_by_stage.get(stage, "#718096")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["audit_row_id"]).replace("_", " ")[:42]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 315}" y="{y}" width="286" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 326}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 625}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">missing={float(row["missing_required_input_count"]):.0f}; held={float(row["heldout_macro_prediction_count"]):.0f}; fit={float(row["macro_fit_parameter_count"]):.0f}; risk={int(float(row["overclaim_risk"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 315}" y="{y + 39}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing inputs: {str(row["missing_required_inputs"]).replace("_", " ")[:60]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:34]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Microdynamic minimality audit</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The prediction claim requires persistence, exchange, jump variance, and cage scale; missing inputs become underidentified fits or overclaim risks.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">row</text>
+  <text x="{left + 315}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">minimality stage</text>
+  <text x="{left + 625}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim accounting</text>
+  {"".join(marks)}
+  <rect x="72" y="380" width="14" height="14" fill="#2f855a" /><text x="94" y="392" font-family="Arial, sans-serif" font-size="12">required microstatistics sufficient</text>
+  <rect x="330" y="380" width="14" height="14" fill="#c05621" /><text x="352" y="392" font-family="Arial, sans-serif" font-size="12">required input missing</text>
+  <rect x="545" y="380" width="14" height="14" fill="#b83280" /><text x="567" y="392" font-family="Arial, sans-serif" font-size="12">fit-only overclaim risk</text>
+  <rect x="760" y="380" width="14" height="14" fill="#2b6cb0" /><text x="782" y="392" font-family="Arial, sans-serif" font-size="12">real data still blocked</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_experimental_verdict_matrix_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 380
+    left, top = 72, 112
+    row_h = 58
+    colors_by_stage = {
+        "sota_dynamic_signatures_supported": "#2f855a",
+        "sota_dynamic_signatures_partial": "#d69e2e",
+        "mechanism_selection_protocol_supported": "#276749",
+        "mechanism_selection_protocol_incomplete": "#c05621",
+        "real_glassbench_closed_loop_ready": "#276749",
+        "real_glassbench_closed_loop_blocked": "#2b6cb0",
+        "thermodynamic_transition_out_of_scope": "#805ad5",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["sota_verdict_stage"])
+        color = colors_by_stage.get(stage, "#718096")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">{str(row["verdict_row_id"]).replace("_", " ")[:40]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 300}" y="{y}" width="292" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 310}" y="{y + 16}" font-family="Arial, sans-serif" font-size="11" fill="#fff">{stage.replace("_", " ")[:43]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 620}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">lit={int(float(row["literature_trend_support"]))}; real={int(float(row["real_glassbench_support"]))}; micro={int(float(row["microdynamic_prediction_support"]))}; reject={int(float(row["mechanism_rejection_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 885}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12">thermo claim={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 300}" y="{y + 43}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:58]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:35]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">SOTA experimental verdict matrix</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Literature trends, GlassBench support, microdynamic predictions, and scope boundaries are collapsed into manuscript-safe verdicts.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">verdict row</text>
+  <text x="{left + 300}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">stage</text>
+  <text x="{left + 620}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">evidence flags</text>
+  <text x="{left + 885}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">scope</text>
+  {"".join(marks)}
+  <rect x="72" y="336" width="14" height="14" fill="#2f855a" /><text x="94" y="348" font-family="Arial, sans-serif" font-size="12">dynamic signatures supported</text>
+  <rect x="314" y="336" width="14" height="14" fill="#276749" /><text x="336" y="348" font-family="Arial, sans-serif" font-size="12">mechanism protocol supported</text>
+  <rect x="572" y="336" width="14" height="14" fill="#2b6cb0" /><text x="594" y="348" font-family="Arial, sans-serif" font-size="12">real closed loop blocked</text>
+  <rect x="798" y="336" width="14" height="14" fill="#805ad5" /><text x="820" y="348" font-family="Arial, sans-serif" font-size="12">thermodynamic boundary</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_sota_glassbench_real_evidence_claim_synthesis_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 420
+    left, top = 72, 112
+    row_h = 60
+    colors_by_stage = {
+        "real_dynamic_signatures_supported_preinversion": "#2f855a",
+        "real_dynamic_signatures_supported_and_inversion_ready": "#276749",
+        "real_dynamic_signatures_not_supported": "#c05621",
+        "multik_alpha_candidate_preregistered_post_window": "#2b6cb0",
+        "multik_alpha_shape_prediction_supported": "#2f855a",
+        "multik_alpha_prediction_rejected": "#c05621",
+        "multik_alpha_claim_incomplete": "#4a5568",
+        "conditional_transport_pe_bound_ready_event_clock_blocked": "#805ad5",
+        "real_alpha_transport_pe_inversion_ready": "#276749",
+        "alpha_transport_pe_bound_incomplete": "#4a5568",
+        "mechanism_selection_preregistered_late_recovery_missing": "#b7791f",
+        "real_mechanism_selection_ready": "#276749",
+        "mechanism_selection_protocol_incomplete": "#4a5568",
+        "thermodynamic_transition_out_of_scope": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["claim_synthesis_stage"])
+        color = colors_by_stage.get(stage, "#718096")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{str(row["claim_row_id"]).replace("_", " ")[:38]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 290}" y="{y}" width="330" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 300}" y="{y + 16}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 645}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">cand={int(float(row["candidate_ready"]))}; claim={int(float(row["claim_ready_now"]))}; real={int(float(row["real_glassbench_support"]))}; thermo={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 900}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">PE={int(float(row["real_pe_inversion_ready"]))}; sig={float(row["supported_real_signature_count"]):.0f}; ratio={float(row["pe_ratio_or_bound"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 290}" y="{y + 43}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:62]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:34]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real evidence claim synthesis</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Real cached evidence, direct-alpha predictions, mechanism selection, and scope boundaries are reduced to manuscript-safe claim levels.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim row</text>
+  <text x="{left + 290}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">synthesis stage</text>
+  <text x="{left + 645}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim flags</text>
+  <text x="{left + 900}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">quantitative anchors</text>
+  {"".join(marks)}
 </svg>
 """
     path.write_text(svg)
@@ -9798,6 +14247,32 @@ def main() -> None:
         FIGURE_DIR / "renewal_cage_sota_glassbench_ka2d_timecode_semantics.svg",
         glassbench_ka2d_timecode_semantics_rows,
     )
+    glassbench_timecode_curve_bridge_rows = write_sota_glassbench_timecode_curve_bridge_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.csv",
+        glassbench_ka2d_timecode_semantics_rows,
+    )
+    write_sota_glassbench_timecode_curve_bridge_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_curve_bridge.svg",
+        glassbench_timecode_curve_bridge_rows,
+    )
+    glassbench_alpha_threshold_horizon_rows = write_sota_glassbench_alpha_threshold_horizon_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.csv",
+        glassbench_ka2d_timecode_semantics_rows,
+        glassbench_timecode_curve_bridge_rows,
+    )
+    write_sota_glassbench_alpha_threshold_horizon_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_threshold_horizon.svg",
+        glassbench_alpha_threshold_horizon_rows,
+    )
+    glassbench_timecode_signature_support_rows = write_sota_glassbench_timecode_signature_support_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.csv",
+        glassbench_ka2d_timecode_semantics_rows,
+        glassbench_timecode_curve_bridge_rows,
+    )
+    write_sota_glassbench_timecode_signature_support_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_timecode_signature_support.svg",
+        glassbench_timecode_signature_support_rows,
+    )
     glassbench_trajectory_npz_ensemble_horizon_rows = write_sota_glassbench_trajectory_npz_ensemble_horizon_csv(
         DATA_DIR / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv",
         tar_probe_rows=glassbench_trajectory_inner_tar_header_probe_rows,
@@ -9967,6 +14442,419 @@ def main() -> None:
     write_literature_inversion_readiness_svg(
         FIGURE_DIR / "renewal_cage_literature_inversion_readiness.svg",
         literature_readiness_rows,
+    )
+    dynamic_signature_alignment_rows = write_sota_dynamic_signature_alignment_csv(
+        DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv",
+        claim_alignment_rows=sota_claim_alignment_rows,
+        literature_readiness_rows=literature_readiness_rows,
+        glassbench_signature_rows=glassbench_timecode_signature_support_rows,
+    )
+    write_sota_dynamic_signature_alignment_svg(
+        FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.svg",
+        dynamic_signature_alignment_rows,
+    )
+    glassbench_direct_four_point_claim_gate_rows = (
+        write_sota_glassbench_direct_four_point_claim_gate_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv",
+            signature_rows=glassbench_timecode_signature_support_rows,
+            dynamic_alignment_rows=dynamic_signature_alignment_rows,
+            member_ensemble_rows=glassbench_trajectory_member_ensemble_observable_rows,
+        )
+    )
+    write_sota_glassbench_direct_four_point_claim_gate_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.svg",
+        glassbench_direct_four_point_claim_gate_rows,
+    )
+    cage_jump_proxy_canary_rows = write_sota_glassbench_cage_jump_proxy_canary_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv",
+        glassbench_trajectory_member_ensemble_observable_rows,
+    )
+    write_sota_glassbench_cage_jump_proxy_canary_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg",
+        cage_jump_proxy_canary_rows,
+    )
+    glassbench_first_npz_particle_cache_contract_rows = (
+        write_sota_glassbench_first_npz_particle_cache_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.csv"
+        )
+    )
+    write_sota_glassbench_first_npz_particle_cache_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.svg",
+        glassbench_first_npz_particle_cache_contract_rows,
+    )
+    glassbench_cached_particle_timecode_bridge_rows = (
+        write_sota_glassbench_cached_particle_timecode_bridge_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv"
+        )
+    )
+    write_sota_glassbench_cached_particle_timecode_bridge_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg",
+        glassbench_cached_particle_timecode_bridge_rows,
+    )
+    glassbench_multilag_particle_cache_targets_rows = (
+        write_sota_glassbench_multilag_particle_cache_targets_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv"
+        )
+    )
+    write_sota_glassbench_multilag_particle_cache_targets_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg",
+        glassbench_multilag_particle_cache_targets_rows,
+    )
+    glassbench_cached_particle_observable_semantics_rows = (
+        write_sota_glassbench_cached_particle_observable_semantics_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
+        )
+    )
+    write_sota_glassbench_cached_particle_observable_semantics_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.svg",
+        glassbench_cached_particle_observable_semantics_rows,
+    )
+    glassbench_event_clock_threshold_readiness_rows = (
+        write_sota_glassbench_event_clock_threshold_readiness_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.csv",
+            particle_cache_contract_rows=glassbench_first_npz_particle_cache_contract_rows,
+        )
+    )
+    write_sota_glassbench_event_clock_threshold_readiness_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.svg",
+        glassbench_event_clock_threshold_readiness_rows,
+    )
+    microdynamic_closed_loop_rows = write_sota_glassbench_microdynamic_closed_loop_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv",
+        trajectory_rows=glassbench_trajectory_member_ensemble_observable_rows,
+        signature_rows=glassbench_timecode_signature_support_rows,
+        alpha_horizon_rows=glassbench_alpha_threshold_horizon_rows,
+    )
+    write_sota_glassbench_microdynamic_closed_loop_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.svg",
+        microdynamic_closed_loop_rows,
+    )
+    glassbench_alpha_anchor_rescue_protocol_rows = (
+        write_sota_glassbench_alpha_anchor_rescue_protocol_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv",
+            alpha_horizon_rows=glassbench_alpha_threshold_horizon_rows,
+            event_clock_rows=glassbench_event_clock_threshold_readiness_rows,
+            closed_loop_rows=microdynamic_closed_loop_rows,
+        )
+    )
+    write_sota_glassbench_alpha_anchor_rescue_protocol_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg",
+        glassbench_alpha_anchor_rescue_protocol_rows,
+    )
+    glassbench_alpha_anchor_cached_fs_rows = write_sota_glassbench_alpha_anchor_cached_fs_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv",
+        rescue_rows=glassbench_alpha_anchor_rescue_protocol_rows,
+    )
+    write_sota_glassbench_alpha_anchor_cached_fs_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg",
+        glassbench_alpha_anchor_cached_fs_rows,
+    )
+    glassbench_direct_alpha_curve_rows = write_sota_glassbench_direct_alpha_curve_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.csv",
+        root_rows=glassbench_alpha_anchor_cached_fs_rows,
+    )
+    write_sota_glassbench_direct_alpha_curve_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.svg",
+        glassbench_direct_alpha_curve_rows,
+    )
+    glassbench_direct_alpha_shape_selection_rows = (
+        write_sota_glassbench_direct_alpha_shape_selection_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv",
+            direct_alpha_rows=glassbench_direct_alpha_curve_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_shape_selection_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg",
+        glassbench_direct_alpha_shape_selection_rows,
+    )
+    glassbench_direct_alpha_multik_shape_rows = (
+        write_sota_glassbench_direct_alpha_multik_shape_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv",
+            root_rows=glassbench_alpha_anchor_cached_fs_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_multik_shape_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.svg",
+        glassbench_direct_alpha_multik_shape_rows,
+    )
+    glassbench_direct_alpha_multik_heldout_prediction_rows = (
+        write_sota_glassbench_direct_alpha_multik_heldout_prediction_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv",
+            root_rows=glassbench_alpha_anchor_cached_fs_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_multik_heldout_prediction_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.svg",
+        glassbench_direct_alpha_multik_heldout_prediction_rows,
+    )
+    glassbench_direct_alpha_transport_rows = write_sota_glassbench_direct_alpha_transport_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.csv",
+        direct_alpha_rows=glassbench_direct_alpha_curve_rows,
+        observable_semantics_rows=glassbench_cached_particle_observable_semantics_rows,
+    )
+    write_sota_glassbench_direct_alpha_transport_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.svg",
+        glassbench_direct_alpha_transport_rows,
+    )
+    glassbench_direct_alpha_pe_bound_rows = write_sota_glassbench_direct_alpha_pe_bound_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv",
+        transport_rows=glassbench_direct_alpha_transport_rows,
+    )
+    write_sota_glassbench_direct_alpha_pe_bound_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg",
+        glassbench_direct_alpha_pe_bound_rows,
+    )
+    glassbench_direct_alpha_displacement_tail_bound_rows = (
+        write_sota_glassbench_direct_alpha_displacement_tail_bound_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv",
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+            transport_rows=glassbench_direct_alpha_transport_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_displacement_tail_bound_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg",
+        glassbench_direct_alpha_displacement_tail_bound_rows,
+    )
+    glassbench_direct_alpha_multilag_crossing_canary_rows = (
+        write_sota_glassbench_direct_alpha_multilag_crossing_canary_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.csv",
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.svg",
+        glassbench_direct_alpha_multilag_crossing_canary_rows,
+    )
+    glassbench_direct_alpha_event_clock_contract_rows = (
+        write_sota_glassbench_direct_alpha_event_clock_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv",
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+            tail_rows=glassbench_direct_alpha_displacement_tail_bound_rows,
+            crossing_rows=glassbench_direct_alpha_multilag_crossing_canary_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_event_clock_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.svg",
+        glassbench_direct_alpha_event_clock_contract_rows,
+    )
+    glassbench_sparse_lag_event_clock_rows = write_sota_glassbench_sparse_lag_event_clock_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.csv",
+        contract_rows=glassbench_direct_alpha_event_clock_contract_rows,
+    )
+    write_sota_glassbench_sparse_lag_event_clock_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.svg",
+        glassbench_sparse_lag_event_clock_rows,
+    )
+    glassbench_interval_censored_first_crossing_clock_rows = (
+        write_sota_glassbench_interval_censored_first_crossing_clock_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv",
+            sparse_lag_rows=glassbench_sparse_lag_event_clock_rows,
+            crossing_rows=glassbench_direct_alpha_multilag_crossing_canary_rows,
+        )
+    )
+    write_sota_glassbench_interval_censored_first_crossing_clock_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg",
+        glassbench_interval_censored_first_crossing_clock_rows,
+    )
+    glassbench_interval_censored_persistence_fit_rows = (
+        write_sota_glassbench_interval_censored_persistence_fit_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv",
+            interval_clock_rows=glassbench_interval_censored_first_crossing_clock_rows,
+            direct_alpha_rows=glassbench_direct_alpha_curve_rows,
+        )
+    )
+    write_sota_glassbench_interval_censored_persistence_fit_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.svg",
+        glassbench_interval_censored_persistence_fit_rows,
+    )
+    glassbench_waiting_law_selection_rows = write_sota_glassbench_waiting_law_selection_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.csv",
+        interval_clock_rows=glassbench_interval_censored_first_crossing_clock_rows,
+        persistence_fit_rows=glassbench_interval_censored_persistence_fit_rows,
+    )
+    write_sota_glassbench_waiting_law_selection_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.svg",
+        glassbench_waiting_law_selection_rows,
+    )
+    glassbench_finite_exchange_envelope_rows = (
+        write_sota_glassbench_finite_exchange_envelope_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.csv",
+            persistence_fit_rows=glassbench_interval_censored_persistence_fit_rows,
+        )
+    )
+    write_sota_glassbench_finite_exchange_envelope_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.svg",
+        glassbench_finite_exchange_envelope_rows,
+    )
+    glassbench_late_recovery_protocol_rows = (
+        write_sota_glassbench_late_recovery_protocol_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.csv",
+            envelope_rows=glassbench_finite_exchange_envelope_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_protocol_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.svg",
+        glassbench_late_recovery_protocol_rows,
+    )
+    glassbench_late_recovery_ingestion_contract_rows = (
+        write_sota_glassbench_late_recovery_ingestion_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.csv",
+            envelope_rows=glassbench_finite_exchange_envelope_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_ingestion_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.svg",
+        glassbench_late_recovery_ingestion_contract_rows,
+    )
+    glassbench_late_recovery_timecode_target_rows = (
+        write_sota_glassbench_late_recovery_timecode_target_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.csv",
+            envelope_rows=glassbench_finite_exchange_envelope_rows,
+            interval_clock_rows=glassbench_interval_censored_first_crossing_clock_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_timecode_target_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_timecode_target.svg",
+        glassbench_late_recovery_timecode_target_rows,
+    )
+    glassbench_direct_alpha_post_window_prediction_target_rows = (
+        write_sota_glassbench_direct_alpha_post_window_prediction_targets_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.csv",
+            heldout_prediction_rows=glassbench_direct_alpha_multik_heldout_prediction_rows,
+            timecode_target_rows=glassbench_late_recovery_timecode_target_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_post_window_prediction_targets_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.svg",
+        glassbench_direct_alpha_post_window_prediction_target_rows,
+    )
+    glassbench_direct_alpha_post_window_verdict_rows = (
+        write_sota_glassbench_direct_alpha_post_window_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv",
+            target_rows=glassbench_direct_alpha_post_window_prediction_target_rows,
+        )
+    )
+    write_sota_glassbench_direct_alpha_post_window_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.svg",
+        glassbench_direct_alpha_post_window_verdict_rows,
+    )
+    glassbench_late_recovery_cache_request_contract_rows = (
+        write_sota_glassbench_late_recovery_cache_request_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_cache_request_contract.csv",
+            timecode_target_rows=glassbench_late_recovery_timecode_target_rows,
+            multilag_target_rows=glassbench_multilag_particle_cache_targets_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_cache_request_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_cache_request_contract.svg",
+        glassbench_late_recovery_cache_request_contract_rows,
+    )
+    glassbench_late_recovery_membership_probe_contract_rows = (
+        write_sota_glassbench_late_recovery_membership_probe_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.csv",
+            cache_request_rows=glassbench_late_recovery_cache_request_contract_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_membership_probe_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.svg",
+        glassbench_late_recovery_membership_probe_contract_rows,
+    )
+    glassbench_late_recovery_public_timecode_ceiling_rows = (
+        write_sota_glassbench_late_recovery_public_timecode_ceiling_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.csv",
+            timecode_target_rows=glassbench_late_recovery_timecode_target_rows,
+            membership_probe_rows=glassbench_late_recovery_membership_probe_contract_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_public_timecode_ceiling_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.svg",
+        glassbench_late_recovery_public_timecode_ceiling_rows,
+    )
+    glassbench_censored_window_claim_audit_rows = (
+        write_sota_glassbench_censored_window_claim_audit_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.csv",
+            public_ceiling_rows=glassbench_late_recovery_public_timecode_ceiling_rows,
+            finite_exchange_envelope_rows=glassbench_finite_exchange_envelope_rows,
+        )
+    )
+    write_sota_glassbench_censored_window_claim_audit_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_censored_window_claim_audit.svg",
+        glassbench_censored_window_claim_audit_rows,
+    )
+    glassbench_public_window_verdict_signature_rows = dynamic_signature_alignment_rows + [
+        {
+            "signature": "late_gaussian_recovery",
+            "phenomenon": "long_time_gaussian_recovery",
+            "model_support": 1.0,
+            "literature_qualitative_support": 1.0,
+        }
+    ]
+    glassbench_public_window_verdict_rows = (
+        write_sota_glassbench_public_window_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_public_window_verdict.csv",
+            censored_window_rows=glassbench_censored_window_claim_audit_rows,
+            dynamic_signature_rows=glassbench_public_window_verdict_signature_rows,
+        )
+    )
+    write_sota_glassbench_public_window_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_public_window_verdict.svg",
+        glassbench_public_window_verdict_rows,
+    )
+    glassbench_late_recovery_experiment_design_rows = (
+        write_sota_glassbench_late_recovery_experiment_design_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.csv",
+            late_recovery_protocol_rows=glassbench_late_recovery_protocol_rows,
+            timecode_target_rows=glassbench_late_recovery_timecode_target_rows,
+            public_window_verdict_rows=glassbench_public_window_verdict_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_experiment_design_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_experiment_design.svg",
+        glassbench_late_recovery_experiment_design_rows,
+    )
+    glassbench_late_recovery_uncertainty_verdict_rows = (
+        write_sota_glassbench_late_recovery_uncertainty_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.csv",
+            late_recovery_protocol_rows=glassbench_late_recovery_protocol_rows,
+            ingestion_rows=glassbench_late_recovery_ingestion_contract_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_uncertainty_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.svg",
+        glassbench_late_recovery_uncertainty_verdict_rows,
+    )
+    glassbench_late_recovery_outcome_matrix_rows = (
+        write_sota_glassbench_late_recovery_outcome_matrix_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.csv",
+            experiment_design_rows=glassbench_late_recovery_experiment_design_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_outcome_matrix_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.svg",
+        glassbench_late_recovery_outcome_matrix_rows,
+    )
+    glassbench_real_cached_microdynamic_verdict_rows = (
+        write_sota_glassbench_real_cached_microdynamic_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv",
+            persistence_fit_rows=glassbench_interval_censored_persistence_fit_rows,
+            finite_exchange_envelope_rows=glassbench_finite_exchange_envelope_rows,
+            event_clock_contract_rows=glassbench_direct_alpha_event_clock_contract_rows,
+            late_recovery_outcome_rows=glassbench_late_recovery_outcome_matrix_rows,
+        )
+    )
+    write_sota_glassbench_real_cached_microdynamic_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.svg",
+        glassbench_real_cached_microdynamic_verdict_rows,
+    )
+    glassbench_late_recovery_decision_power_plan_rows = (
+        write_sota_glassbench_late_recovery_decision_power_plan_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv",
+            outcome_matrix_rows=glassbench_late_recovery_outcome_matrix_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_decision_power_plan_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.svg",
+        glassbench_late_recovery_decision_power_plan_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",
@@ -10375,6 +15263,28 @@ def main() -> None:
         FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.svg",
         trajectory_observable_rows,
     )
+    trajectory_cage_jump_event_rows = write_trajectory_cage_jump_events_csv(
+        DATA_DIR / "renewal_cage_trajectory_cage_jump_events.csv"
+    )
+    write_trajectory_cage_jump_events_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_cage_jump_events.svg",
+        trajectory_cage_jump_event_rows,
+    )
+    trajectory_event_clock_macro_prediction_rows = write_trajectory_event_clock_macro_predictions_csv(
+        DATA_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.csv",
+        trajectory_cage_jump_event_rows,
+    )
+    write_trajectory_event_clock_macro_predictions_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.svg",
+        trajectory_event_clock_macro_prediction_rows,
+    )
+    trajectory_event_clock_threshold_robustness_rows = write_trajectory_event_clock_threshold_robustness_csv(
+        DATA_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.csv"
+    )
+    write_trajectory_event_clock_threshold_robustness_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.svg",
+        trajectory_event_clock_threshold_robustness_rows,
+    )
     write_trajectory_adapter_demo_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_demo.csv"
     )
@@ -10403,6 +15313,67 @@ def main() -> None:
     write_simultaneous_closure_svg(
         FIGURE_DIR / "renewal_cage_simultaneous_closure.svg",
         simultaneous_closure_rows,
+    )
+    microdynamic_prediction_scorecard_rows = write_microdynamic_prediction_scorecard_csv(
+        DATA_DIR / "renewal_cage_microdynamic_prediction_scorecard.csv",
+        event_prediction_rows=trajectory_event_clock_macro_prediction_rows,
+        simultaneous_closure_rows=simultaneous_closure_rows,
+        glassbench_closed_loop_rows=microdynamic_closed_loop_rows,
+        late_recovery_power_rows=glassbench_late_recovery_decision_power_plan_rows,
+    )
+    write_microdynamic_prediction_scorecard_svg(
+        FIGURE_DIR / "renewal_cage_microdynamic_prediction_scorecard.svg",
+        microdynamic_prediction_scorecard_rows,
+    )
+    microdynamic_minimality_rows = write_microdynamic_minimality_audit_csv(
+        DATA_DIR / "renewal_cage_microdynamic_minimality_audit.csv",
+        scorecard_rows=microdynamic_prediction_scorecard_rows,
+    )
+    write_microdynamic_minimality_audit_svg(
+        FIGURE_DIR / "renewal_cage_microdynamic_minimality_audit.svg",
+        microdynamic_minimality_rows,
+    )
+    sota_experimental_verdict_rows = write_sota_experimental_verdict_matrix_csv(
+        DATA_DIR / "renewal_cage_sota_experimental_verdict_matrix.csv",
+        dynamic_alignment_rows=dynamic_signature_alignment_rows,
+        microdynamic_scorecard_rows=microdynamic_prediction_scorecard_rows,
+        minimality_rows=microdynamic_minimality_rows,
+    )
+    write_sota_experimental_verdict_matrix_svg(
+        FIGURE_DIR / "renewal_cage_sota_experimental_verdict_matrix.svg",
+        sota_experimental_verdict_rows,
+    )
+    glassbench_real_evidence_claim_synthesis_rows = (
+        write_sota_glassbench_real_evidence_claim_synthesis_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv",
+            dynamic_alignment_rows=dynamic_signature_alignment_rows,
+            multik_shape_rows=glassbench_direct_alpha_multik_shape_rows,
+            heldout_prediction_rows=glassbench_direct_alpha_multik_heldout_prediction_rows,
+            post_window_verdict_rows=glassbench_direct_alpha_post_window_verdict_rows,
+            transport_rows=glassbench_direct_alpha_transport_rows,
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+            microdynamic_verdict_rows=glassbench_real_cached_microdynamic_verdict_rows,
+            experimental_verdict_rows=sota_experimental_verdict_rows,
+        )
+    )
+    write_sota_glassbench_real_evidence_claim_synthesis_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.svg",
+        glassbench_real_evidence_claim_synthesis_rows,
+    )
+    glassbench_real_data_closure_priority_rows = (
+        write_sota_glassbench_real_data_closure_priority_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.csv",
+            evidence_rows=glassbench_real_evidence_claim_synthesis_rows,
+            closed_loop_rows=microdynamic_closed_loop_rows,
+            unlock_rows=glassbench_real_inversion_unlock_protocol_rows,
+            post_window_rows=glassbench_direct_alpha_post_window_prediction_target_rows,
+            late_recovery_rows=glassbench_late_recovery_timecode_target_rows,
+            four_point_rows=glassbench_direct_four_point_claim_gate_rows,
+        )
+    )
+    write_sota_glassbench_real_data_closure_priority_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.svg",
+        glassbench_real_data_closure_priority_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

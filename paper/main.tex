@@ -128,7 +128,7 @@ extended coarse-grained landscape, schematically
   +[\Delta U_0+\chi\zeta-\epsilon s_1s_2]B(x-C)
   +W_1(s_1)+W_2(s_2)+W_\zeta(\zeta).
 \end{equation}
-In plain text notation this is U(x,C,s_1,s_2,zeta). Its projections map onto
+In plain text notation this is \verb|U(x,C,s_1,s_2,zeta)|. Its projections map onto
 different effective layers: the harmonic projection gives the OU cage; the
 periodic projection gives the Vorselaars-type cage-to-cage baseline; the
 softness-gate projection gives the delayed hazard; and the mobility-environment projection gives finite-exchange heterogeneity. A thermodynamic
@@ -1482,8 +1482,12 @@ self-intermediate scattering at several wave numbers, and overlap-\(\chi_4\).
 A subsequent semantic audit uses the official KA2D trajectory README to correct
 the interpretation: the leading \texttt{positions} axis is not a time axis but
 the 20 isoconfigurational replicas, while the physical lag time is encoded by
-the file-name \texttt{tc} code. The manuscript still keeps real inversion
-disabled until enough members are extracted across all official time codes.
+the file-name \texttt{tc} code. In the current 8 MB prefix cache,
+\(T=0.23\) now has all eight official time codes with at least four complete
+members per code, whereas \(T=0.30\) remains sparse at \texttt{tc01} only. The
+manuscript therefore promotes \(T=0.23\) to a physical-time observable curve
+ready for the next inversion gate, while still keeping real
+persistence/exchange fitting disabled until that protocol is run.
 
 \begin{figure}[p]
   \centering
@@ -1509,13 +1513,189 @@ disabled until enough members are extracted across all official time codes.
   \centering
   \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf}
   \caption{GlassBench KA2D time-code semantic audit. The official trajectory
-  README maps \texttt{tc05}=0.1 and \texttt{tc10}=1.1 at \(T=0.23\), and
-  \texttt{tc01}=0.11 at \(T=0.30\) for the currently extracted prefix members,
-  and identifies the \texttt{positions} leading axis as isoconfigurational
-  replicas. This is a genuine physical-time correction, but it is still too
-  sparse for persistence/exchange inversion because the extracted prefix covers
-  only 2 of 8 official \(T=0.23\) time codes and 1 of 6 official \(T=0.30\)
-  time codes.}
+  README maps \texttt{tc} codes to physical lag times and identifies the
+  \texttt{positions} leading axis as isoconfigurational replicas. The current
+  prefix cache covers all eight official \(T=0.23\) time codes, including
+  \texttt{tc40}=1.5e6, with at least four complete members per code; the same
+  cache still covers only \texttt{tc01}=0.11 at \(T=0.30\). Thus the
+  GlassBench comparison has crossed from metadata-only evidence to a
+  one-temperature physical-time observable curve, but not yet to a completed
+  persistence/exchange inversion.}
+\end{figure}
+
+The next bridge converts that corrected time-code curve into the same
+trajectory persistence/exchange pre-inversion schema used by the synthetic
+falsification protocol. This is the first real-trajectory row in the manuscript
+that carries physical lag times, member standard errors, MSD, NGP, multi-\(k\)
+self-intermediate scattering, and an overlap-\(\chi_4\) proxy on a shared
+temperature and lag grid. The resulting row remains blocked, as it should:
+for \(T=0.23\) the latest cached point reaches only about
+\(1.63\tau_\alpha\) and the anchor \(F_s(k=1.1,t)\) remains above the
+\(e^{-1}\) alpha threshold, while \(T=0.30\) still lacks the official time-code
+coverage. The model comparison therefore advances from ``metadata ready'' to a
+quantitative real-data pre-inversion blocker, without claiming a completed
+GlassBench fit or any thermodynamic transition.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf}
+  \caption{GlassBench time-code curve bridge. Corrected KA2D physical-time
+  rows are translated into the trajectory persistence/exchange pre-inversion
+  schema. The \(T=0.23\) row is a real observable curve but remains blocked by
+  the missing alpha-threshold crossing and insufficient long-time diffusion
+  window; the \(T=0.30\) row remains blocked by sparse time-code coverage.}
+\end{figure}
+
+The same blocker can be made sharper by auditing the GlassBench
+\(\tau_\alpha\) metadata against the anchor threshold used by the present
+diagnostic. For \(T=0.23\), the cached time-code curve already extends beyond
+the tabulated metadata value, with \(t_{\max}/\tau_\alpha\simeq 1.63\), but
+the anchor \(F_s(k=1.1,t_{\max})\) is still far above \(e^{-1}\). This is not
+promoted to a contradiction or a fit failure. Instead, the audit records a
+definition-level mismatch and quantifies it at the latest observed lag. A
+fixed-lag fit of \(F_s(k,t_{\max})\) over the available wave numbers estimates
+that the \(F_s=e^{-1}\) crossing would occur near \(k^\ast\simeq2.70\), about
+\(1.69\) times the largest published GlassBench wave number \(k=1.6\). Thus
+the real persistence/exchange inversion is blocked because the current
+time-code curve does not cover the alpha-anchor wave number required by this
+diagnostic, not because MSD, NGP, or fixed-lag \(F_s\) are unreproducible.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf}
+  \caption{GlassBench alpha-threshold horizon audit. The \(T=0.23\) row has
+  reached the metadata \(\tau_\alpha\) horizon but has not crossed the
+  diagnostic anchor \(F_s(k=1.1,t)=e^{-1}\) threshold. The latest-lag
+  wave-number audit estimates \(k^\ast\simeq2.70>1.6\), so the package records
+  an alpha-anchor wave-number coverage blocker rather than claiming a real
+  persistence/exchange inversion.}
+\end{figure}
+
+Even before parameter inversion, the same real curve can be used as a
+model-independent SOTA signature check. The \(T=0.23\) GlassBench row supports
+four dynamical signatures on the corrected physical-time grid: MSD grows by
+about \(3.4\times 10^2\), the anchor \(F_s(k=1.1,t)\) decays substantially,
+the two-dimensional NGP has a transient peak followed by partial recovery, and
+the overlap-\(\chi_4\) proxy also peaks and partially relaxes. These are the
+same qualitative dynamical signatures targeted by the renewal diagnostic
+theory. The row is still marked pre-inversion because \(F_s(k=1.1,t)\) has not
+crossed \(e^{-1}\), and the gate again carries
+\texttt{thermodynamic\_claim\_allowed=0}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf}
+  \caption{GlassBench time-code signature support. The corrected \(T=0.23\)
+  curve supports MSD growth, self-intermediate-scattering decay, a transient
+  NGP peak, and a transient overlap-\(\chi_4\) proxy peak, while remaining
+  blocked from real persistence/exchange inversion by the missing alpha
+  threshold crossing.}
+\end{figure}
+
+The SOTA alignment ledger then puts those real-curve observations next to the
+model diagnostics and the literature-level benchmark claims. It separates five
+cases that should not be conflated. MSD growth/cage escape and transient NGP
+are supported simultaneously by the model, by classic Kob--Andersen
+benchmarks, and by the current GlassBench time-code curve. The
+self-intermediate-scattering row is also supported by the real curve but remains
+pre-\(\alpha\)-threshold. The \(\chi_4\) row is treated as a proxy alignment
+because the current GlassBench row uses overlap-\(\chi_4\) rather than a full
+four-point function and dynamic length. The persistence/exchange row is
+supported by the model and by the Hedges persistence/exchange literature but is
+not yet a real GlassBench inversion. The thermodynamic-transition row remains a
+scope boundary.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_dynamic_signature_alignment.pdf}
+  \caption{SOTA dynamic-signature alignment ledger. Each row combines model
+  diagnostic support, literature-level qualitative support, and the current
+  real GlassBench time-code evidence. The ledger marks real dynamical support
+  where available and keeps persistence/exchange inversion, spatial
+  four-point-length claims, and thermodynamic glass-transition claims as
+  separate blockers.}
+\end{figure}
+
+The member-ensemble trajectory probe can also be reduced to an intentionally
+weaker cage-jump canary. For each frame-index row, we combine the aggregate
+displacement scale, the short-frame NGP, and the multi-\(k\) scattering decay
+into a single jump-like proxy score. This is useful because it identifies where
+the streamed trajectory prefix already contains intermittent, cage-breaking
+candidate frames. It is not a cage-jump event clock: the rows are aggregate
+observables, not particle-resolved waiting and exchange events, and they still
+lack physical time semantics. The canary therefore tightens the next target
+from ``get more data'' to ``extract particle-resolved cage-jump events with a
+physical clock'' \cite{weeks2002cage,pastore2017cage,hedges2007persistence}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf}
+  \caption{GlassBench cage-jump proxy canary. Aggregate frame-index MSD, NGP,
+  and self-intermediate-scattering decay mark jump-like candidate frames in the
+  streamed member-ensemble trajectory prefix. The gate explicitly keeps
+  particle-resolved cage-jump events, physical time semantics, and
+  persistence/exchange event clocks blocked.}
+\end{figure}
+
+The same distinction is enforced for the event-clock threshold robustness test.
+The package includes a GlassBench threshold-readiness ledger showing that the
+KA2D archive exposes the required particle-coordinate schema and short-window
+member-ensemble observables. The companion first-NPZ particle-cache manifest
+uses bounded HTTP range reads to persist the two first-NPZ coordinate caches and
+verifies their NPZ MD5 hashes and coordinate shape \(20\times1290\times2\).
+The real threshold-robustness claim remains blocked, however, because those
+cached coordinates still lack a physical-time trajectory axis,
+threshold-sweep event clocks, and held-out macro observables.
+The cached-particle time-code bridge narrows this statement: the cached first
+NPZ files now have official physical lag times attached, but their leading
+coordinate axis is an isoconfigurational-replica axis rather than a physical
+time axis. Hence they support fixed-lag particle observables, not yet a
+particle event-clock trajectory. A structure-matched multi-lag target manifest
+therefore lists the exact official NPZ members and hashes that must be cached
+before this fixed-lag evidence can become a particle-level event-clock test.
+For the cold KA2D \(T=0.23\) structure-151 ladder, extended bounded-prefix
+extraction now caches all eight official lag targets. This closes the
+structure-matched particle-cache gap for that ladder, but it still does not by
+itself create a physical-time event-clock trajectory. The cached-coordinate
+observable audit now uses the cached \texttt{initial\_positions} arrays to
+recompute minimal-image displacement observables. For all eight cold
+structure-151 lag targets, the recomputed MSD reproduces the official
+GlassBench MSD to numerical precision. The same audit also resolves the NGP
+averaging convention: the official two-dimensional NGP is the mean over
+isoconfigurational replicas of each replica's alpha-two value, not a pooled
+ratio over all replicas and particles. With that convention the cached
+displacements reproduce the official NGP as well, while the raw coordinate MSD
+and pooled NGP remain rejected proxies. Finally, the same displacement tensor
+reproduces the official multi-\(k\) self-intermediate scattering when
+\(F_s(k,t)\) is computed as the average of the \(x\)- and \(y\)-axis cosine
+projections; a single-axis convention is rejected by the audit. Thus the
+archive-to-observable semantic gap is closed for MSD, NGP, and multi-\(k\)
+\(F_s\) on this fixed-lag ladder; the remaining promotion blockers are event
+segmentation, persistence/exchange clocks, and alpha-threshold coverage, not
+fixed-lag observable reproducibility.
+
+The next convergence test is stricter: it asks whether the real trajectory
+statistics can already be used as microscopic inputs for held-out
+macro-dynamical predictions. The current answer is useful but negative. The
+GlassBench member-ensemble probe gives real frame-index microstatistics,
+including a cage-length proxy, short-frame NGP, short-frame multi-\(k\)
+scattering decay, and member uncertainties. The corrected time-code curve
+gives real macro dynamical signatures. However, these two evidence streams are
+not yet a closed loop because the frame-index trajectory probe has no physical
+time semantics, no cage-jump event segmentation, no persistence/exchange event
+clock, and the anchor alpha definition is still inconsistent with the metadata
+\(\tau_\alpha\). We therefore treat the real data as supporting the diagnostic
+direction, but not yet as a successful microstatistics-to-held-out-prediction
+test.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf}
+  \caption{GlassBench microdynamic closed-loop audit. The \(T=0.23\) row has
+  both real frame-index microstatistics and real macro dynamical signatures,
+  but it is still blocked from held-out micro-to-macro prediction by missing
+  physical time semantics, cage-jump event segmentation, persistence/exchange
+  event clocks, and alpha-definition consistency.}
 \end{figure}
 
 \begin{figure}[p]
@@ -1642,6 +1822,25 @@ repository now has a direct trajectory-to-diagnostic bridge before any
 machine-readable simulation or experimental trajectory is promoted to an
 uncertainty-weighted benchmark.
 The companion
+\texttt{renewal\_cage\_trajectory\_cage\_jump\_events.csv} adds the event-clock
+layer required by the same trajectory bridge. Particle-resolved threshold
+displacements define first-persistence intervals and subsequent exchange
+intervals, giving the \(\tau_p/\tau_x\) statistics needed by the renewal
+diagnostic. This is still a synthetic API canary rather than a GlassBench
+microdynamic closure: the row keeps
+\texttt{real\_benchmark\_closed\_loop\_ready=0} and
+\texttt{thermodynamic\_claim\_allowed=0}.
+The follow-on ledger
+\texttt{renewal\_cage\_trajectory\_event\_clock\_macro\_predictions.csv}
+uses those event clocks, without refitting macro observables, to predict
+diffusion, multi-\(k\) alpha times, late NGP, and an overlap-\(\chi_4\) peak;
+a deliberately mismatched late-NGP row fails the same gate.
+The threshold-robustness companion
+\texttt{renewal\_cage\_trajectory\_event\_clock\_threshold\_robustness.csv}
+then asks whether this prediction is stable under a cage-jump threshold sweep,
+accepting a finite threshold window and rejecting both over-segmented and
+under-segmented event clocks.
+The separate
 \texttt{renewal\_cage\_trajectory\_uncertainty\_protocol.csv} supplies that
 missing uncertainty layer by applying a time-origin block jackknife to the same
 trajectory-derived observables. Its columns

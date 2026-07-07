@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Sequence
 from dataclasses import dataclass
 import hashlib
 import math
@@ -119,50 +120,6 @@ class ActivatedBarrierParams:
 
 
 @dataclass(frozen=True)
-class LangevinCageLandscapeParams:
-    """Local Langevin landscape used to derive an effective renewal cage.
-
-    The microscopic starting point is an overdamped Langevin/Smoluchowski
-    dynamics in a metastable basin. ``cage_curvature`` is the harmonic basin
-    curvature, ``saddle_curvature`` is the magnitude of the unstable saddle
-    curvature, and ``barrier_height`` is the basin-to-saddle free-energy gap.
-    The two extra barriers encode the coarse-grained fact that the first cage
-    escape and later exchanges can cross different effective barriers.
-    """
-
-    temperature: float
-    friction: float
-    cage_curvature: float
-    saddle_curvature: float
-    barrier_height: float
-    jump_length: float
-    persistence_barrier_extra: float = 0.0
-    exchange_barrier_extra: float = 0.0
-    dimension: int = 3
-
-
-@dataclass(frozen=True)
-class PeriodicSoftnessGateParams:
-    """Periodic cage potential with two slow precursor gates.
-
-    The effective potential is a Vorselaars-style periodic cage landscape,
-    ``U(x)=DeltaU[1-cos(2*pi*x/L)]/2``, augmented by two coarse-grained
-    softness/precursor modes. Each precursor becomes ready with probability
-    ``1-exp(-t/precursor_relaxation_time)`` after entering a cage. Escape
-    requires both gates, so the Kramers rate is multiplied by the product of
-    their readiness probabilities.
-    """
-
-    temperature: float
-    friction: float
-    barrier_height: float
-    period: float
-    precursor_relaxation_time: float
-    precursor_count: int = 2
-    dimension: int = 3
-
-
-@dataclass(frozen=True)
 class FacilitatedExchangeLawParams:
     """Activated facilitation law for finite-exchange heterogeneity.
 
@@ -193,6 +150,44 @@ class PersistenceExchangeParams:
     jump_variance: float
     persistence_mean: float
     exchange_mean: float
+
+
+@dataclass(frozen=True)
+class LangevinCageLandscapeParams:
+    """Overdamped Langevin landscape inputs for an effective renewal bridge.
+
+    This is a microscopic-parameter bridge for a local metastable basin and an
+    activated escape saddle. It does not derive the many-body landscape itself.
+    """
+
+    temperature: float
+    friction: float
+    cage_curvature: float
+    saddle_curvature: float
+    barrier_height: float
+    jump_length: float
+    persistence_barrier_extra: float = 0.0
+    exchange_barrier_extra: float = 0.0
+    dimension: int = 2
+
+
+@dataclass(frozen=True)
+class PeriodicSoftnessGateParams:
+    """Periodic cage potential with two slow precursor gates.
+
+    The effective potential is a Vorselaars-style periodic cage landscape,
+    ``U(x)=DeltaU[1-cos(2*pi*x/L)]/2``, augmented by coarse-grained
+    softness/precursor modes. Escape requires both gates, so the Kramers rate
+    is multiplied by the product of their readiness probabilities.
+    """
+
+    temperature: float
+    friction: float
+    barrier_height: float
+    period: float
+    precursor_relaxation_time: float
+    precursor_count: int = 2
+    dimension: int = 2
 
 
 @dataclass(frozen=True)
@@ -278,43 +273,6 @@ def _validate_mct_beta_params(params: MCTBetaParams) -> None:
         raise ValueError("beta_time must be positive")
 
 
-def _validate_langevin_cage_landscape(params: LangevinCageLandscapeParams) -> None:
-    for name in (
-        "temperature",
-        "friction",
-        "cage_curvature",
-        "saddle_curvature",
-        "barrier_height",
-        "jump_length",
-    ):
-        value = getattr(params, name)
-        if value <= 0.0:
-            raise ValueError(f"{name} must be positive")
-    for name in ("persistence_barrier_extra", "exchange_barrier_extra"):
-        value = getattr(params, name)
-        if value < 0.0:
-            raise ValueError(f"{name} must be nonnegative")
-    if params.dimension <= 0:
-        raise ValueError("dimension must be positive")
-
-
-def _validate_periodic_softness_gate(params: PeriodicSoftnessGateParams) -> None:
-    for name in (
-        "temperature",
-        "friction",
-        "barrier_height",
-        "period",
-        "precursor_relaxation_time",
-    ):
-        value = getattr(params, name)
-        if value <= 0.0:
-            raise ValueError(f"{name} must be positive")
-    if params.precursor_count != 2:
-        raise ValueError("precursor_count must be 2 for the square delayed hazard bridge")
-    if params.dimension <= 0:
-        raise ValueError("dimension must be positive")
-
-
 def _validate_facilitated_exchange_law(law: FacilitatedExchangeLawParams) -> None:
     for name in ("reference_temperature", "shape_ref", "exchange_renewal_count_ref"):
         value = getattr(law, name)
@@ -331,6 +289,43 @@ def _validate_persistence_exchange(params: PersistenceExchangeParams) -> None:
         value = getattr(params, name)
         if value <= 0.0:
             raise ValueError(f"{name} must be positive")
+
+
+def _validate_langevin_landscape(params: LangevinCageLandscapeParams) -> None:
+    for name in (
+        "temperature",
+        "friction",
+        "cage_curvature",
+        "saddle_curvature",
+        "barrier_height",
+        "jump_length",
+    ):
+        value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    for name in ("persistence_barrier_extra", "exchange_barrier_extra"):
+        value = getattr(params, name)
+        if value < 0.0:
+            raise ValueError(f"{name} must be nonnegative")
+    if int(params.dimension) != params.dimension or params.dimension <= 0:
+        raise ValueError("dimension must be a positive integer")
+
+
+def _validate_periodic_softness_gate(params: PeriodicSoftnessGateParams) -> None:
+    for name in (
+        "temperature",
+        "friction",
+        "barrier_height",
+        "period",
+        "precursor_relaxation_time",
+    ):
+        value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if int(params.precursor_count) != params.precursor_count or params.precursor_count != 2:
+        raise ValueError("precursor_count must be 2 for the square delayed hazard bridge")
+    if int(params.dimension) != params.dimension or params.dimension <= 0:
+        raise ValueError("dimension must be a positive integer")
 
 
 def _validate_translation_rotation(params: TranslationRotationExchangeParams) -> None:
@@ -376,18 +371,17 @@ def activated_barrier_temperature_law(barrier: ActivatedBarrierParams) -> Temper
 
 
 def langevin_bare_diffusion(params: LangevinCageLandscapeParams) -> float:
-    """Einstein diffusion scale of the overdamped Langevin equation."""
+    """Einstein diffusion coefficient for an overdamped Langevin particle."""
 
-    _validate_langevin_cage_landscape(params)
+    _validate_langevin_landscape(params)
     return params.temperature / params.friction
 
 
 def langevin_cage_ou_parameters(params: LangevinCageLandscapeParams) -> dict[str, float]:
-    """Harmonic-basin OU variance and relaxation time from Langevin dynamics."""
+    """OU cage variance and relaxation time from equipartition and friction."""
 
-    _validate_langevin_cage_landscape(params)
+    _validate_langevin_landscape(params)
     return {
-        "bare_diffusion": langevin_bare_diffusion(params),
         "cage_variance": params.temperature / params.cage_curvature,
         "cage_tau": params.friction / params.cage_curvature,
     }
@@ -401,12 +395,7 @@ def kramers_escape_rate(
     saddle_curvature: float,
     barrier_height: float,
 ) -> float:
-    """Overdamped Kramers escape rate for a harmonic basin and saddle.
-
-    The formula is the local-quadratic Smoluchowski limit
-    sqrt(k_min |k_s|) / (2 pi gamma) * exp(-Delta F / T). Temperatures and
-    barriers use reduced units with k_B = 1.
-    """
+    """Overdamped one-dimensional Kramers escape rate for a local barrier."""
 
     for name, value in (
         ("temperature", temperature),
@@ -422,7 +411,7 @@ def kramers_escape_rate(
 
 
 def periodic_cage_curvature(barrier_height: float, period: float) -> float:
-    """Curvature of U(x)=DeltaU[1-cos(2*pi*x/L)]/2 at a minimum or saddle."""
+    """Curvature of ``DeltaU[1-cos(2*pi*x/L)]/2`` at a minimum or saddle."""
 
     if barrier_height <= 0.0:
         raise ValueError("barrier_height must be positive")
@@ -431,12 +420,12 @@ def periodic_cage_curvature(barrier_height: float, period: float) -> float:
     return 2.0 * math.pi**2 * barrier_height / period**2
 
 
-def precursor_gate_hazard(time: float, long_time_rate: float, precursor_times: list[float] | tuple[float, ...]) -> float:
-    """Escape hazard from independent precursor readiness gates.
-
-    Each precursor becomes ready with probability ``1-exp(-t/tau_i)``. Escape
-    requires all gates, so the Kramers rate is multiplied by their product.
-    """
+def precursor_gate_hazard(
+    time: float,
+    long_time_rate: float,
+    precursor_times: list[float] | tuple[float, ...],
+) -> float:
+    """Scalar escape hazard from independent precursor readiness gates."""
 
     if time < 0.0:
         raise ValueError("time must be nonnegative")
@@ -457,7 +446,7 @@ def precursor_gate_mean_count(
     long_time_rate: float,
     precursor_times: list[float] | tuple[float, ...],
 ) -> float:
-    """Integrated renewal count for one or two independent precursor gates."""
+    """Integrated scalar renewal count for one or two precursor gates."""
 
     if time < 0.0:
         raise ValueError("time must be nonnegative")
@@ -482,7 +471,9 @@ def precursor_gate_mean_count(
     raise ValueError("closed-form precursor_gate_mean_count supports one or two gates")
 
 
-def periodic_softness_gate_to_delayed_renewal(params: PeriodicSoftnessGateParams) -> DelayedRenewalCageParams:
+def periodic_softness_gate_to_delayed_renewal(
+    params: PeriodicSoftnessGateParams,
+) -> DelayedRenewalCageParams:
     """Map a periodic cage potential plus two precursor gates to renewal parameters."""
 
     _validate_periodic_softness_gate(params)
@@ -497,7 +488,7 @@ def periodic_softness_gate_to_delayed_renewal(params: PeriodicSoftnessGateParams
     return DelayedRenewalCageParams(
         cage_variance=params.temperature / curvature,
         cage_tau=params.friction / curvature,
-        jump_variance=params.period**2 / params.dimension,
+        jump_variance=params.period**2 / float(params.dimension),
         renewal_rate=rate,
         renewal_delay=params.precursor_relaxation_time,
     )
@@ -510,16 +501,7 @@ def periodic_softness_gate_bridge_audit(params: PeriodicSoftnessGateParams) -> d
     renewal = periodic_softness_gate_to_delayed_renewal(params)
     curvature = periodic_cage_curvature(params.barrier_height, params.period)
     sample_time = params.precursor_relaxation_time
-    hazard = precursor_gate_hazard(
-        sample_time,
-        renewal.renewal_rate,
-        [params.precursor_relaxation_time, params.precursor_relaxation_time],
-    )
-    mean_count = precursor_gate_mean_count(
-        sample_time,
-        renewal.renewal_rate,
-        [params.precursor_relaxation_time, params.precursor_relaxation_time],
-    )
+    gate_times = [params.precursor_relaxation_time, params.precursor_relaxation_time]
     return {
         "bridge_stage": "periodic_softness_gate_to_delayed_hazard",
         "effective_periodic_potential_specified": 1.0,
@@ -538,20 +520,14 @@ def periodic_softness_gate_bridge_audit(params: PeriodicSoftnessGateParams) -> d
         "cage_tau": renewal.cage_tau,
         "jump_variance": renewal.jump_variance,
         "long_time_kramers_rate": renewal.renewal_rate,
-        "sample_hazard_at_tau_d": hazard,
-        "sample_mean_count_at_tau_d": mean_count,
+        "sample_hazard_at_tau_d": precursor_gate_hazard(sample_time, renewal.renewal_rate, gate_times),
+        "sample_mean_count_at_tau_d": precursor_gate_mean_count(sample_time, renewal.renewal_rate, gate_times),
         "remaining_assumption": "collective_softness_precursors_and_effective_periodic_potential",
     }
 
 
 def potential_effective_theory_taxonomy() -> list[dict[str, int | str]]:
-    """Map coarse-grained landscape choices to effective-theory modules.
-
-    The rows are a claim-boundary ledger, not a new dynamical solver. They
-    record which pieces of the renewal-cage effective theory can be derived
-    from a specified potential or free-energy projection, and which pieces
-    remain coarse-grained assumptions.
-    """
+    """Map coarse-grained landscape choices to effective-theory modules."""
 
     return [
         {
@@ -643,7 +619,7 @@ def basin_adjacency_jump_statistics(
     *,
     weights: np.ndarray | None = None,
 ) -> dict[str, float | int]:
-    """Derive the renewal jump variance from neighboring basin centers."""
+    """Derive renewal jump variance from neighboring basin centers."""
 
     centers = np.asarray(centers, dtype=float)
     if centers.ndim != 2:
@@ -671,21 +647,23 @@ def basin_adjacency_jump_statistics(
             raise ValueError("weights must have positive total")
         normalized_weights = normalized_weights / total
     mean_squared_jump = float(np.sum(normalized_weights * squared))
+    lengths = np.sqrt(squared)
+    mean_jump_length = float(np.sum(normalized_weights * lengths))
     return {
         "edge_count": len(edges),
         "dimension": dimension,
         "mean_squared_jump": mean_squared_jump,
-        "jump_variance_q": mean_squared_jump / dimension,
-        "mean_jump_length": float(np.sum(normalized_weights * np.sqrt(squared))),
-        "jump_length_variance": float(np.sum(normalized_weights * (squared - mean_squared_jump) ** 2)),
+        "jump_variance_q": mean_squared_jump / float(dimension),
+        "mean_jump_length": mean_jump_length,
+        "jump_length_variance": float(np.sum(normalized_weights * (lengths - mean_jump_length) ** 2)),
         "complete_dynamic_derivation_claim_allowed": 0,
     }
 
 
 def langevin_to_persistence_exchange(params: LangevinCageLandscapeParams) -> PersistenceExchangeParams:
-    """Coarse-grain a local Langevin landscape into persistence/exchange clocks."""
+    """Coarse-grain a local Langevin barrier model to persistence/exchange parameters."""
 
-    _validate_langevin_cage_landscape(params)
+    _validate_langevin_landscape(params)
     ou = langevin_cage_ou_parameters(params)
     persistence_rate = kramers_escape_rate(
         temperature=params.temperature,
@@ -704,51 +682,66 @@ def langevin_to_persistence_exchange(params: LangevinCageLandscapeParams) -> Per
     return PersistenceExchangeParams(
         cage_variance=ou["cage_variance"],
         cage_tau=ou["cage_tau"],
-        jump_variance=params.jump_length**2 / params.dimension,
+        jump_variance=params.jump_length**2 / float(params.dimension),
         persistence_mean=1.0 / persistence_rate,
         exchange_mean=1.0 / exchange_rate,
     )
 
 
-def langevin_coarse_graining_bridge_audit(
-    params: LangevinCageLandscapeParams,
-) -> dict[str, float | str]:
-    """Summarize what is derived from Langevin input and what remains assumed."""
+def langevin_first_principles_bridge_audit(params: LangevinCageLandscapeParams) -> dict[str, float | str]:
+    """Audit what the Langevin-to-renewal bridge derives and what it assumes."""
 
-    _validate_langevin_cage_landscape(params)
     effective = langevin_to_persistence_exchange(params)
-    alpha_time = persistence_exchange_alpha_relaxation_time(
-        wave_number=1.0,
-        threshold=math.exp(-1.0),
-        params=effective,
-    )
-    diffusion = persistence_exchange_diffusion_coefficient(effective)
     return {
-        "bridge_stage": "langevin_kramers_to_effective_clock_bridge",
+        "bridge_stage": "langevin_kramers_to_renewal_effective_theory",
         "langevin_equation_specified": 1.0,
-        "smoluchowski_limit_used": 1.0,
-        "harmonic_cage_ou_derived": 1.0,
+        "ou_cage_params_derived": 1.0,
         "kramers_rates_derived": 1.0,
         "persistence_exchange_params_derived": 1.0,
-        "temperature": params.temperature,
-        "friction": params.friction,
-        "cage_curvature": params.cage_curvature,
-        "saddle_curvature": params.saddle_curvature,
-        "barrier_height": params.barrier_height,
-        "persistence_barrier": params.barrier_height + params.persistence_barrier_extra,
-        "exchange_barrier": params.barrier_height + params.exchange_barrier_extra,
+        "bare_diffusion": langevin_bare_diffusion(params),
         "cage_variance": effective.cage_variance,
         "cage_tau": effective.cage_tau,
         "jump_variance": effective.jump_variance,
         "persistence_mean": effective.persistence_mean,
         "exchange_mean": effective.exchange_mean,
         "persistence_exchange_ratio": effective.persistence_mean / effective.exchange_mean,
-        "derived_diffusion_coefficient": diffusion,
-        "derived_alpha_time_k1": alpha_time,
-        "derived_stokes_einstein_product": diffusion * alpha_time,
-        "entire_effective_theory_from_langevin_claim_allowed": 0.0,
+        "full_many_body_first_principles_claim_allowed": 0.0,
         "remaining_assumption": "metastable_basin_partition_and_barrier_inputs",
     }
+
+
+def langevin_coarse_graining_bridge_audit(
+    params: LangevinCageLandscapeParams,
+) -> dict[str, float | str]:
+    """Compatibility audit for the Langevin-to-effective-clock bridge."""
+
+    row = dict(langevin_first_principles_bridge_audit(params))
+    effective = langevin_to_persistence_exchange(params)
+    alpha_time = persistence_exchange_alpha_relaxation_time(
+        wave_number=1.0,
+        params=effective,
+        threshold=math.exp(-1.0),
+    )
+    diffusion = persistence_exchange_diffusion_coefficient(effective)
+    row.update(
+        {
+            "bridge_stage": "langevin_kramers_to_effective_clock_bridge",
+            "smoluchowski_limit_used": 1.0,
+            "harmonic_cage_ou_derived": 1.0,
+            "temperature": params.temperature,
+            "friction": params.friction,
+            "cage_curvature": params.cage_curvature,
+            "saddle_curvature": params.saddle_curvature,
+            "barrier_height": params.barrier_height,
+            "persistence_barrier": params.barrier_height + params.persistence_barrier_extra,
+            "exchange_barrier": params.barrier_height + params.exchange_barrier_extra,
+            "derived_diffusion_coefficient": diffusion,
+            "derived_alpha_time_k1": alpha_time,
+            "derived_stokes_einstein_product": diffusion * alpha_time,
+            "entire_effective_theory_from_langevin_claim_allowed": 0.0,
+        }
+    )
+    return row
 
 
 def temperature_dependent_params(temperature: float, law: TemperatureLawParams) -> DelayedRenewalCageParams:
@@ -801,9 +794,9 @@ def inherent_state_landscape_thermodynamics(
 ) -> list[dict[str, float | int]]:
     """Compute configurational thermodynamics from a discrete basin density.
 
-    ``log_density`` represents ``log Omega(e_i)`` for each inherent-state energy
-    bin. The calculation is the discrete version of
-    ``Z_conf = int de Omega(e) exp(-e/T)`` in reduced units with ``k_B=1``.
+    This is a thermodynamic closure calculation. It deliberately does not mark
+    the renewal dynamics as a first-principles thermodynamic glass transition
+    theory.
     """
 
     temperatures = np.asarray(temperatures, dtype=float)
@@ -831,17 +824,14 @@ def inherent_state_landscape_thermodynamics(
         mean_energy = float(np.sum(probabilities * energies))
         mean_energy_squared = float(np.sum(probabilities * energies**2))
         energy_variance = max(mean_energy_squared - mean_energy**2, 0.0)
-        free_energy = -temperature * log_z
-        entropy = log_z + mean_energy / temperature
-        heat_capacity = energy_variance / temperature**2
         rows.append(
             {
                 "temperature": float(temperature),
                 "log_configurational_partition": float(log_z),
-                "configurational_free_energy": float(free_energy),
+                "configurational_free_energy": float(-temperature * log_z),
                 "mean_inherent_energy": mean_energy,
-                "configurational_entropy": float(entropy),
-                "excess_heat_capacity": float(heat_capacity),
+                "configurational_entropy": float(log_z + mean_energy / temperature),
+                "excess_heat_capacity": float(energy_variance / temperature**2),
                 "energy_variance": float(energy_variance),
                 "energy_bin_count": int(energies.size),
                 "complete_dynamic_derivation_claim_allowed": 0,
@@ -5827,6 +5817,8 @@ def sota_glassbench_ka2d_timecode_semantics_gate(
                     "sigma_self_intermediate_scattering_by_k_member_sem": ";".join(
                         f"{value:.12g}" for value in fs_sigmas
                     ),
+                    "self_intermediate_scattering": float(fs_means[0]),
+                    "sigma_self_intermediate_scattering_member_sem": float(fs_sigmas[0]),
                     "overlap_radius": overlap_radius,
                     "chi4_overlap_replica": chi4,
                     "sigma_chi4_overlap_member_sem": sigma_chi4,
@@ -5843,6 +5835,6038 @@ def sota_glassbench_ka2d_timecode_semantics_gate(
                 }
             )
     return out
+
+
+def glassbench_timecode_curve_bridge(
+    *,
+    benchmark_id: str,
+    rows: Sequence[dict[str, object]],
+    required_wave_numbers: Sequence[float],
+    anchor_wave_number: float,
+    threshold: float = math.exp(-1.0),
+    dimension: float = 2.0,
+    min_lag_time_over_tau_alpha_for_diffusion: float = 3.0,
+) -> list[dict[str, float | str]]:
+    """Bridge corrected GlassBench time-code curves to the PE pre-inversion schema."""
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not rows:
+        raise ValueError("rows must be nonempty")
+    if dimension <= 0.0:
+        raise ValueError("dimension must be positive")
+    if min_lag_time_over_tau_alpha_for_diffusion <= 0.0:
+        raise ValueError("min_lag_time_over_tau_alpha_for_diffusion must be positive")
+    required = list(dict.fromkeys(float(wave_number) for wave_number in required_wave_numbers))
+    if not required or any(wave_number <= 0.0 for wave_number in required):
+        raise ValueError("required_wave_numbers must be positive and nonempty")
+    if float(anchor_wave_number) not in required:
+        raise ValueError("required_wave_numbers must include anchor_wave_number")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("lag_time", 0.0)))
+        ready_rows = [row for row in sorted_group if float(row.get("timecode_curve_ready", 0.0)) == 1.0]
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        observed_time_codes = [str(row.get("time_code", "none")) for row in sorted_group]
+        tau_alpha = max(float(row.get("tau_alpha", 0.0) or 0.0) for row in sorted_group)
+        lag_count = len(sorted_group)
+
+        if len(ready_rows) != len(sorted_group) or not ready_rows:
+            blocker = str(
+                next(
+                    (
+                        row.get("primary_blocker")
+                        for row in sorted_group
+                        if row.get("primary_blocker") != "none"
+                    ),
+                    "timecode_curve_ready",
+                )
+            )
+            out.append(
+                {
+                    "benchmark_id": benchmark_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_paths": ";".join(source_paths) if source_paths else "none",
+                    "observed_time_codes": ";".join(observed_time_codes) if observed_time_codes else "none",
+                    "lag_count": float(lag_count),
+                    "tau_alpha": float(tau_alpha),
+                    "latest_lag_time": max(float(row.get("lag_time", 0.0) or 0.0) for row in sorted_group),
+                    "latest_lag_time_over_tau_alpha": 0.0,
+                    "latest_self_intermediate_scattering_anchor": 0.0,
+                    "timecode_curve_ready": 0.0,
+                    "real_time_observable_curve_ready": 0.0,
+                    "curve_bridge_ready": 0.0,
+                    "diffusion_asymptote_window_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": "extract_members_across_all_official_time_codes",
+                    "bridge_stage": "glassbench_timecode_curve_upstream_incomplete",
+                }
+            )
+            continue
+
+        bridge_rows: list[dict[str, object]] = []
+        positive_uncertainty_rows = 0
+        latest_anchor_fs = 0.0
+        for row in ready_rows:
+            wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
+            fs_values = _parse_semicolon_float_values(
+                row["self_intermediate_scattering_by_k"],
+                name="self_intermediate_scattering_by_k",
+            )
+            if len(wave_numbers) != len(fs_values):
+                raise ValueError("GlassBench wave_numbers and Fs lengths must match")
+            fs_lookup = {float(wave): float(value) for wave, value in zip(wave_numbers, fs_values)}
+            latest_anchor_fs = fs_lookup.get(float(anchor_wave_number), latest_anchor_fs)
+            sigma_fs = _parse_semicolon_float_values(
+                row.get("sigma_self_intermediate_scattering_by_k_member_sem", "none"),
+                name="sigma_self_intermediate_scattering_by_k_member_sem",
+            )
+            if (
+                float(row.get("sigma_msd_member_sem", 0.0) or 0.0) > 0.0
+                and float(row.get("sigma_ngp_2d_member_sem", 0.0) or 0.0) > 0.0
+                and float(row.get("sigma_chi4_overlap_member_sem", 0.0) or 0.0) > 0.0
+                and sigma_fs
+                and all(value > 0.0 for value in sigma_fs)
+            ):
+                positive_uncertainty_rows += 1
+            bridge_rows.append(
+                {
+                    "lag_time": float(row["lag_time"]),
+                    "dimension": float(dimension),
+                    "msd": float(row["msd"]),
+                    "ngp": float(row["ngp_2d"]),
+                    "wave_numbers": row["wave_numbers"],
+                    "self_intermediate_scattering_by_k": row["self_intermediate_scattering_by_k"],
+                    "chi4_overlap": float(row["chi4_overlap_replica"]),
+                }
+            )
+
+        bridge = trajectory_observable_curve_bridge(
+            benchmark_id=f"{benchmark_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+            rows=bridge_rows,
+            required_wave_numbers=required,
+            anchor_wave_number=anchor_wave_number,
+            threshold=threshold,
+        )
+        latest_lag = max(float(row["lag_time"]) for row in ready_rows)
+        latest_lag_over_tau = latest_lag / tau_alpha if tau_alpha > 0.0 else 0.0
+        diffusion_window_ready = latest_lag_over_tau >= min_lag_time_over_tau_alpha_for_diffusion
+        uncertainty_ready = positive_uncertainty_rows == len(ready_rows)
+        bridge_ready = float(bridge["curve_bridge_ready"]) == 1.0
+        real_inversion_ready = bridge_ready and diffusion_window_ready and uncertainty_ready
+        if not bridge_ready:
+            blocker = str(bridge["primary_blocker"])
+            next_action = "extend_timecode_curve_until_alpha_threshold_crossing"
+        elif not diffusion_window_ready:
+            blocker = "diffusion_asymptote_window"
+            next_action = "extend_lag_window_beyond_multiple_tau_alpha"
+        elif not uncertainty_ready:
+            blocker = "positive_member_uncertainties"
+            next_action = "extract_more_members_for_positive_uncertainties"
+        else:
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        out.append(
+            {
+                **bridge,
+                "benchmark_id": benchmark_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "observed_time_codes": ";".join(observed_time_codes),
+                "tau_alpha": float(tau_alpha),
+                "latest_lag_time": float(latest_lag),
+                "latest_lag_time_over_tau_alpha": float(latest_lag_over_tau),
+                "latest_self_intermediate_scattering_anchor": float(latest_anchor_fs),
+                "positive_uncertainty_row_count": float(positive_uncertainty_rows),
+                "timecode_curve_ready": 1.0,
+                "real_time_observable_curve_ready": 1.0,
+                "diffusion_asymptote_window_ready": float(diffusion_window_ready),
+                "real_pe_inversion_ready": float(real_inversion_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "bridge_stage": "glassbench_timecode_curve_bridge_ready"
+                if real_inversion_ready
+                else "glassbench_timecode_curve_bridge_incomplete",
+            }
+        )
+    return out
+
+
+def glassbench_alpha_threshold_horizon_audit(
+    *,
+    audit_id: str,
+    timecode_rows: Sequence[dict[str, object]],
+    bridge_rows: Sequence[dict[str, object]],
+    anchor_wave_number: float,
+    threshold: float = math.exp(-1.0),
+    min_extension_factor: float = 1.25,
+) -> list[dict[str, float | str]]:
+    """Audit whether GlassBench tau-alpha metadata matches the anchor Fs threshold."""
+
+    def estimate_threshold_wave_number(
+        wave_numbers: list[float],
+        fs_values: list[float],
+    ) -> float:
+        pairs = sorted(
+            (float(wave), float(fs_value))
+            for wave, fs_value in zip(wave_numbers, fs_values)
+            if float(wave) > 0.0 and 0.0 < float(fs_value) < 1.0
+        )
+        if not pairs:
+            return 0.0
+        for wave, fs_value in pairs:
+            if fs_value <= threshold:
+                return float(wave)
+        if len(pairs) < 2:
+            return 0.0
+        log_k = np.log(np.array([wave for wave, _fs_value in pairs], dtype=float))
+        log_minus_log_fs = np.log(-np.log(np.array([fs_value for _wave, fs_value in pairs], dtype=float)))
+        if not np.all(np.isfinite(log_k)) or not np.all(np.isfinite(log_minus_log_fs)):
+            return 0.0
+        slope, intercept = np.polyfit(log_k, log_minus_log_fs, 1)
+        if slope <= 0.0:
+            return 0.0
+        target = math.log(-math.log(threshold))
+        return float(math.exp((target - float(intercept)) / float(slope)))
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not timecode_rows:
+        raise ValueError("timecode_rows must be nonempty")
+    if not bridge_rows:
+        raise ValueError("bridge_rows must be nonempty")
+    for name, value in {
+        "anchor_wave_number": anchor_wave_number,
+        "threshold": threshold,
+        "min_extension_factor": min_extension_factor,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if threshold >= 1.0:
+        raise ValueError("threshold must be below one")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in timecode_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+    bridge_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in bridge_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("lag_time", 0.0)))
+        bridge = bridge_by_key.get((system_id, temperature), {})
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        observed_time_codes = [str(row.get("time_code", "none")) for row in sorted_group]
+        tau_alpha = max(float(row.get("tau_alpha", 0.0) or 0.0) for row in sorted_group)
+        latest_lag = max(float(row.get("lag_time", 0.0) or 0.0) for row in sorted_group)
+        latest_lag_over_tau = latest_lag / tau_alpha if tau_alpha > 0.0 else 0.0
+        real_curve_ready = (
+            bool(sorted_group)
+            and all(float(row.get("timecode_curve_ready", 0.0)) == 1.0 for row in sorted_group)
+            and float(bridge.get("real_time_observable_curve_ready", 0.0)) == 1.0
+        )
+
+        if not real_curve_ready:
+            blocker = str(
+                bridge.get(
+                    "primary_blocker",
+                    next(
+                        (
+                            row.get("primary_blocker")
+                            for row in sorted_group
+                            if row.get("primary_blocker") != "none"
+                        ),
+                        "timecode_curve_ready",
+                    ),
+                )
+            )
+            out.append(
+                {
+                    "audit_id": audit_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_paths": ";".join(source_paths) if source_paths else "none",
+                    "observed_time_codes": ";".join(observed_time_codes) if observed_time_codes else "none",
+                    "lag_count": float(len(sorted_group)),
+                    "tau_alpha_metadata": float(tau_alpha),
+                    "latest_lag_time": float(latest_lag),
+                    "latest_lag_time_over_tau_alpha_metadata": float(latest_lag_over_tau),
+                    "latest_self_intermediate_scattering_anchor": 0.0,
+                    "latest_wave_numbers": "none",
+                    "latest_self_intermediate_scattering_by_k": "none",
+                    "estimated_threshold_wave_number_at_latest_lag": 0.0,
+                    "threshold_wave_number_over_max_observed": 0.0,
+                    "alpha_threshold_wave_number_covered": 0.0,
+                    "threshold": float(threshold),
+                    "metadata_tau_alpha_reached": float(tau_alpha > 0.0 and latest_lag >= tau_alpha),
+                    "alpha_threshold_crossed": 0.0,
+                    "metadata_tau_alpha_consistent_with_anchor_fs": 0.0,
+                    "estimated_threshold_lag_time": 0.0,
+                    "estimated_lag_extension_factor": 0.0,
+                    "extension_factor_above_minimum": 0.0,
+                    "real_time_observable_curve_ready": 0.0,
+                    "real_pe_inversion_ready": float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0),
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": "complete_timecode_curve_before_alpha_horizon_audit",
+                    "audit_stage": "timecode_curve_upstream_incomplete",
+                }
+            )
+            continue
+
+        lag_times: list[float] = []
+        fs_anchor: list[float] = []
+        latest_wave_numbers: list[float] = []
+        latest_fs_values: list[float] = []
+        for row in sorted_group:
+            wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
+            fs_values = _parse_semicolon_float_values(
+                row["self_intermediate_scattering_by_k"],
+                name="self_intermediate_scattering_by_k",
+            )
+            if len(wave_numbers) != len(fs_values):
+                raise ValueError("GlassBench wave_numbers and Fs lengths must match")
+            lookup = {float(wave): float(value) for wave, value in zip(wave_numbers, fs_values)}
+            if float(anchor_wave_number) not in lookup:
+                raise ValueError("anchor_wave_number must be present in every time-code row")
+            lag = float(row["lag_time"])
+            fs_value = float(lookup[float(anchor_wave_number)])
+            if lag <= 0.0 or fs_value <= 0.0:
+                raise ValueError("GlassBench alpha horizon rows require positive lag times and Fs")
+            lag_times.append(lag)
+            fs_anchor.append(fs_value)
+            latest_wave_numbers = wave_numbers
+            latest_fs_values = fs_values
+
+        latest_fs = float(fs_anchor[-1])
+        max_observed_wave_number = max(latest_wave_numbers) if latest_wave_numbers else 0.0
+        estimated_threshold_wave_number = estimate_threshold_wave_number(latest_wave_numbers, latest_fs_values)
+        threshold_wave_number_ratio = (
+            estimated_threshold_wave_number / max_observed_wave_number
+            if max_observed_wave_number > 0.0 and estimated_threshold_wave_number > 0.0
+            else 0.0
+        )
+        threshold_wave_number_covered = (
+            estimated_threshold_wave_number > 0.0
+            and max_observed_wave_number > 0.0
+            and estimated_threshold_wave_number <= max_observed_wave_number
+        )
+        metadata_reached = tau_alpha > 0.0 and latest_lag >= tau_alpha
+        alpha_crossed = latest_fs <= threshold
+        metadata_consistent = (not metadata_reached) or alpha_crossed
+        estimated_threshold_lag = latest_lag if alpha_crossed else 0.0
+        estimated_extension_factor = 1.0 if alpha_crossed else 0.0
+        if not alpha_crossed and len(lag_times) >= 2:
+            t_prev, t_last = float(lag_times[-2]), float(lag_times[-1])
+            fs_prev, fs_last = float(fs_anchor[-2]), float(fs_anchor[-1])
+            if t_last > t_prev > 0.0 and fs_prev > 0.0 and fs_last > 0.0:
+                slope = (math.log(fs_last) - math.log(fs_prev)) / (math.log(t_last) - math.log(t_prev))
+                if slope < 0.0:
+                    log_t_cross = math.log(t_last) + (math.log(threshold) - math.log(fs_last)) / slope
+                    if log_t_cross > math.log(t_last):
+                        estimated_threshold_lag = float(math.exp(log_t_cross))
+                        estimated_extension_factor = estimated_threshold_lag / t_last
+
+        real_pe_ready = float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0)
+        extension_above_minimum = estimated_extension_factor >= min_extension_factor
+        if metadata_reached and not alpha_crossed:
+            stage = "metadata_tau_alpha_anchor_fs_mismatch"
+            if not threshold_wave_number_covered and estimated_threshold_wave_number > 0.0:
+                blocker = "alpha_anchor_wave_number_outside_observed_grid"
+                next_action = "extend_or_recompute_glassbench_fs_at_alpha_anchor_wave_number"
+            else:
+                blocker = "anchor_wave_number_or_alpha_definition_mismatch"
+                next_action = "verify_alpha_definition_or_extend_archive_to_threshold_crossing"
+        elif real_pe_ready == 1.0 and alpha_crossed:
+            stage = "alpha_threshold_horizon_inversion_ready"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        elif alpha_crossed:
+            stage = "alpha_threshold_crossed_preinversion"
+            blocker = str(bridge.get("primary_blocker", "persistence_exchange_inversion"))
+            next_action = str(bridge.get("next_required_action", "run_preinversion_checks"))
+        else:
+            stage = "alpha_threshold_not_yet_reached"
+            blocker = "alpha_threshold_crossing"
+            next_action = "extend_timecode_curve_until_alpha_threshold_crossing"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "observed_time_codes": ";".join(observed_time_codes) if observed_time_codes else "none",
+                "lag_count": float(len(sorted_group)),
+                "tau_alpha_metadata": float(tau_alpha),
+                "latest_lag_time": float(latest_lag),
+                "latest_lag_time_over_tau_alpha_metadata": float(latest_lag_over_tau),
+                "latest_self_intermediate_scattering_anchor": latest_fs,
+                "latest_wave_numbers": ";".join(f"{value:.17g}" for value in latest_wave_numbers),
+                "latest_self_intermediate_scattering_by_k": ";".join(
+                    f"{value:.17g}" for value in latest_fs_values
+                ),
+                "estimated_threshold_wave_number_at_latest_lag": float(estimated_threshold_wave_number),
+                "threshold_wave_number_over_max_observed": float(threshold_wave_number_ratio),
+                "alpha_threshold_wave_number_covered": float(threshold_wave_number_covered),
+                "threshold": float(threshold),
+                "metadata_tau_alpha_reached": float(metadata_reached),
+                "alpha_threshold_crossed": float(alpha_crossed),
+                "metadata_tau_alpha_consistent_with_anchor_fs": float(metadata_consistent),
+                "estimated_threshold_lag_time": float(estimated_threshold_lag),
+                "estimated_lag_extension_factor": float(estimated_extension_factor),
+                "extension_factor_above_minimum": float(extension_above_minimum),
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": real_pe_ready,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "audit_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_alpha_anchor_rescue_protocol(
+    *,
+    protocol_id: str,
+    alpha_horizon_rows: Sequence[dict[str, object]],
+    event_clock_rows: Sequence[dict[str, object]],
+    closed_loop_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """State what an added GlassBench alpha-anchor Fs measurement would unlock."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not alpha_horizon_rows:
+        raise ValueError("alpha_horizon_rows must be nonempty")
+    if not event_clock_rows:
+        raise ValueError("event_clock_rows must be nonempty")
+    if not closed_loop_rows:
+        raise ValueError("closed_loop_rows must be nonempty")
+
+    event_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in event_clock_rows
+    }
+    closed_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in closed_loop_rows
+    }
+
+    def split_missing(value: object) -> list[str]:
+        text = str(value or "none")
+        if not text or text == "none":
+            return []
+        return [part for part in text.split(";") if part and part != "none"]
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        alpha_horizon_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        key = (system_id, temperature)
+        event = event_by_key.get(key, {})
+        closed = closed_by_key.get(key, {})
+
+        required_k = float(row.get("estimated_threshold_wave_number_at_latest_lag", 0.0) or 0.0)
+        k_ratio = float(row.get("threshold_wave_number_over_max_observed", 0.0) or 0.0)
+        k_covered = float(row.get("alpha_threshold_wave_number_covered", 0.0) or 0.0) == 1.0
+        alpha_consistent_now = (
+            float(row.get("metadata_tau_alpha_consistent_with_anchor_fs", 0.0) or 0.0) == 1.0
+        )
+        alpha_blocker = str(row.get("primary_blocker", "none"))
+        alpha_measurement_required = (
+            alpha_blocker == "alpha_anchor_wave_number_outside_observed_grid"
+            and required_k > 0.0
+            and not k_covered
+        )
+        rescue_design_ready = alpha_measurement_required and k_ratio > 1.0
+        post_rescue_alpha_consistent = alpha_consistent_now or rescue_design_ready
+
+        remaining = split_missing(event.get("missing_real_threshold_inputs", "none"))
+        remaining.extend(split_missing(closed.get("missing_closed_loop_inputs", "none")))
+        if post_rescue_alpha_consistent:
+            remaining = [
+                item
+                for item in remaining
+                if item
+                not in {
+                    "alpha_definition_consistency",
+                    "alpha_anchor_wave_number_outside_observed_grid",
+                    "alpha_threshold_crossing",
+                }
+            ]
+        remaining = list(dict.fromkeys(remaining))
+
+        event_ready = float(event.get("real_event_clock_threshold_robustness_ready", 0.0) or 0.0) == 1.0
+        closed_ready_now = float(closed.get("closed_loop_ready", 0.0) or 0.0) == 1.0
+        post_rescue_closed_loop_ready = post_rescue_alpha_consistent and event_ready and closed_ready_now
+
+        if post_rescue_closed_loop_ready:
+            stage = "alpha_anchor_rescue_closed_loop_ready"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        elif rescue_design_ready:
+            stage = "alpha_anchor_rescue_design_ready_real_event_clock_blocked"
+            blocker = remaining[0] if remaining else str(event.get("primary_blocker", "real_event_clock"))
+            next_action = "recompute_fs_at_required_anchor_wave_number_then_extract_event_clock"
+        elif str(row.get("audit_stage", "")).endswith("upstream_incomplete"):
+            stage = "alpha_anchor_rescue_upstream_incomplete"
+            blocker = alpha_blocker
+            next_action = "complete_timecode_curve_before_alpha_anchor_rescue"
+        elif alpha_consistent_now:
+            stage = "alpha_anchor_already_consistent_real_event_clock_blocked"
+            blocker = remaining[0] if remaining else str(event.get("primary_blocker", "real_event_clock"))
+            next_action = "extract_event_clock_and_heldout_macro_observables"
+        else:
+            stage = "alpha_anchor_rescue_design_blocked"
+            blocker = alpha_blocker
+            next_action = "estimate_required_anchor_wave_number_before_rescue"
+
+        out.append(
+            {
+                "protocol_id": protocol_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "required_anchor_wave_number": float(required_k),
+                "required_anchor_wave_number_over_observed_max": float(k_ratio),
+                "observed_alpha_anchor_wave_number_covered": float(k_covered),
+                "alpha_anchor_measurement_required": float(alpha_measurement_required),
+                "alpha_anchor_rescue_design_ready": float(rescue_design_ready),
+                "current_alpha_definition_consistent": float(alpha_consistent_now),
+                "post_rescue_alpha_definition_consistent": float(post_rescue_alpha_consistent),
+                "post_rescue_event_clock_ready": float(event_ready),
+                "post_rescue_real_closed_loop_ready": float(post_rescue_closed_loop_ready),
+                "remaining_post_rescue_blockers": ";".join(remaining) if remaining else "none",
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "rescue_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_alpha_anchor_cached_fs_audit(
+    *,
+    audit_id: str,
+    rescue_rows: Sequence[dict[str, object]],
+    cached_anchor_rows: Sequence[dict[str, object]],
+    threshold: float = math.exp(-1.0),
+) -> list[dict[str, float | str]]:
+    """Audit an arbitrary-k cached-displacement Fs measurement for alpha rescue."""
+
+    def parse_float_list(value: object) -> list[float]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            if not value or value == "none":
+                return []
+            return [float(item) for item in value.split(";") if item]
+        if isinstance(value, Sequence):
+            return [float(item) for item in value]
+        return []
+
+    def estimate_threshold_wave_number(wave_numbers: list[float], fs_values: list[float]) -> float:
+        pairs = sorted(
+            (float(wave), float(fs_value))
+            for wave, fs_value in zip(wave_numbers, fs_values)
+            if float(wave) > 0.0 and 0.0 < float(fs_value) < 1.0
+        )
+        if not pairs:
+            return 0.0
+        for wave, fs_value in pairs:
+            if fs_value <= threshold:
+                return float(wave)
+        if len(pairs) < 2:
+            return 0.0
+        log_k = np.log(np.array([wave for wave, _fs_value in pairs], dtype=float))
+        log_minus_log_fs = np.log(-np.log(np.array([fs_value for _wave, fs_value in pairs], dtype=float)))
+        if not np.all(np.isfinite(log_k)) or not np.all(np.isfinite(log_minus_log_fs)):
+            return 0.0
+        slope, intercept = np.polyfit(log_k, log_minus_log_fs, 1)
+        if slope <= 0.0:
+            return 0.0
+        target = math.log(-math.log(threshold))
+        return float(math.exp((target - float(intercept)) / float(slope)))
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not rescue_rows:
+        raise ValueError("rescue_rows must be nonempty")
+    if threshold <= 0.0 or threshold >= 1.0:
+        raise ValueError("threshold must lie between zero and one")
+
+    cached_by_key: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in cached_anchor_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        cached_by_key.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for rescue in sorted(
+        rescue_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(rescue.get("system_id", "unknown"))
+        temperature = str(rescue.get("temperature", "none"))
+        candidate_k = float(rescue.get("required_anchor_wave_number", 0.0) or 0.0)
+        design_ready = float(rescue.get("alpha_anchor_rescue_design_ready", 0.0) or 0.0) == 1.0
+        post_rescue_closed_loop_ready = (
+            float(rescue.get("post_rescue_real_closed_loop_ready", 0.0) or 0.0) == 1.0
+        )
+        candidates = sorted(
+            cached_by_key.get((system_id, temperature), []),
+            key=lambda item: (
+                str(item.get("structure_id", "none")),
+                float(item.get("lag_time", 0.0) or 0.0),
+            ),
+        )
+        measured = [row for row in candidates if float(row.get("candidate_anchor_wave_number", 0.0) or 0.0) > 0.0]
+        latest = max(measured, key=lambda item: float(item.get("lag_time", 0.0) or 0.0)) if measured else {}
+        structure_id = str(latest.get("structure_id", "none"))
+        time_code = str(latest.get("time_code", "none"))
+        lag_time = float(latest.get("lag_time", 0.0) or 0.0)
+        cached_fs = float(latest.get("cached_fs_at_candidate_anchor", 0.0) or 0.0)
+        wave_numbers = parse_float_list(latest.get("latest_wave_numbers", "none"))
+        fs_by_k = parse_float_list(latest.get("latest_cached_fs_by_k", "none"))
+        cached_threshold_k = estimate_threshold_wave_number(wave_numbers, fs_by_k)
+        threshold_over_candidate = cached_threshold_k / candidate_k if candidate_k > 0.0 else 0.0
+        direct_threshold_k = float(latest.get("direct_threshold_wave_number", 0.0) or 0.0)
+        direct_fs_at_threshold = float(latest.get("direct_fs_at_threshold_wave_number", 0.0) or 0.0)
+        direct_root_bracketed = float(latest.get("direct_root_bracketed", 0.0) or 0.0) == 1.0
+        direct_threshold_over_candidate = direct_threshold_k / candidate_k if candidate_k > 0.0 else 0.0
+        candidate_crossed = cached_fs > 0.0 and cached_fs <= threshold
+        cached_rescue_ready = design_ready and candidate_crossed
+
+        if cached_rescue_ready and post_rescue_closed_loop_ready:
+            stage = "cached_anchor_measurement_closes_full_loop"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        elif cached_rescue_ready:
+            stage = "cached_anchor_measurement_closes_alpha_gap_event_clock_blocked"
+            blocker = "real_event_clock"
+            next_action = "extract_event_clock_and_heldout_macro_observables"
+        elif design_ready and measured and direct_root_bracketed and direct_threshold_k > candidate_k:
+            stage = "cached_direct_anchor_root_refines_required_k"
+            blocker = "cached_direct_anchor_wave_number_higher_than_protocol"
+            next_action = "recompute_cached_fs_at_direct_alpha_anchor_wave_number"
+        elif design_ready and measured:
+            stage = "cached_anchor_measurement_refines_required_k"
+            blocker = "cached_structure_anchor_wave_number_higher_than_protocol"
+            next_action = "recompute_cached_fs_near_structure_specific_threshold_wave_number"
+        elif design_ready:
+            stage = "cached_anchor_measurement_missing"
+            blocker = "cached_structure_anchor_fs_measurement"
+            next_action = "compute_cached_displacement_fs_at_candidate_anchor_wave_number"
+        else:
+            stage = "cached_anchor_upstream_incomplete"
+            blocker = "alpha_anchor_rescue_design"
+            next_action = "complete_alpha_anchor_rescue_design_before_cached_fs_audit"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": time_code,
+                "lag_time": float(lag_time),
+                "candidate_anchor_wave_number": float(candidate_k),
+                "cached_fs_at_candidate_anchor": float(cached_fs),
+                "threshold": float(threshold),
+                "candidate_anchor_threshold_crossed": float(candidate_crossed),
+                "latest_wave_numbers": ";".join(f"{value:.17g}" for value in wave_numbers) if wave_numbers else "none",
+                "latest_cached_fs_by_k": ";".join(f"{value:.17g}" for value in fs_by_k) if fs_by_k else "none",
+                "cached_structure_threshold_wave_number": float(cached_threshold_k),
+                "cached_structure_threshold_over_candidate": float(threshold_over_candidate),
+                "cached_direct_threshold_wave_number": float(direct_threshold_k),
+                "cached_direct_fs_at_threshold_wave_number": float(direct_fs_at_threshold),
+                "cached_direct_threshold_over_candidate": float(direct_threshold_over_candidate),
+                "cached_direct_root_bracketed": float(direct_root_bracketed),
+                "alpha_anchor_rescue_design_ready": float(design_ready),
+                "cached_alpha_anchor_rescue_ready": float(cached_rescue_ready),
+                "post_rescue_real_closed_loop_ready": float(post_rescue_closed_loop_ready and cached_rescue_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "cached_anchor_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_curve_audit(
+    *,
+    audit_id: str,
+    root_rows: Sequence[dict[str, object]],
+    curve_rows: Sequence[dict[str, object]],
+    threshold: float = math.exp(-1.0),
+) -> list[dict[str, float | str]]:
+    """Audit a cached structure-matched alpha curve at the direct k-root."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not root_rows:
+        raise ValueError("root_rows must be nonempty")
+    if threshold <= 0.0 or threshold >= 1.0:
+        raise ValueError("threshold must lie between zero and one")
+
+    curve_by_key: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in curve_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        curve_by_key.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for root in sorted(
+        root_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            float(item.get("temperature", 0.0)),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(root.get("system_id", "unknown"))
+        temperature = str(root.get("temperature", "none"))
+        structure_id = str(root.get("structure_id", "none"))
+        direct_k = float(root.get("cached_direct_threshold_wave_number", 0.0) or 0.0)
+        root_ready = (
+            float(root.get("cached_direct_root_bracketed", 0.0) or 0.0) == 1.0
+            and direct_k > 0.0
+        )
+        group = sorted(
+            curve_by_key.get((system_id, temperature, structure_id), []),
+            key=lambda item: float(item.get("lag_time", 0.0) or 0.0),
+        )
+        lag_times = [float(row.get("lag_time", 0.0) or 0.0) for row in group]
+        time_codes = [str(row.get("time_code", "none")) for row in group]
+        fs_values = [float(row.get("direct_alpha_fs", 0.0) or 0.0) for row in group]
+        sigma_values = [float(row.get("sigma_direct_alpha_fs", 0.0) or 0.0) for row in group]
+        uncertainty_ready = bool(group) and all(value > 0.0 for value in sigma_values)
+        uncertainty_method = next(
+            (
+                str(row.get("direct_alpha_uncertainty_method"))
+                for row in group
+                if row.get("direct_alpha_uncertainty_method") not in {None, "", "none"}
+            ),
+            "none",
+        )
+        latest_fs = fs_values[-1] if fs_values else 0.0
+        latest_lag = lag_times[-1] if lag_times else 0.0
+        crossing_index = next((idx for idx, value in enumerate(fs_values) if value <= threshold), None)
+        crossed = crossing_index is not None
+        crossing_lag = lag_times[crossing_index] if crossing_index is not None else 0.0
+        crossing_code = time_codes[crossing_index] if crossing_index is not None else "none"
+        strictly_monotone = all(
+            fs_values[idx + 1] <= fs_values[idx] for idx in range(len(fs_values) - 1)
+        ) if len(fs_values) >= 2 else False
+        curve_ready = root_ready and len(group) >= 2 and crossed
+
+        if curve_ready:
+            stage = "cached_direct_alpha_curve_ready_event_clock_blocked"
+            blocker = "event_clock_trajectory"
+            next_action = "extract_particle_event_clock_at_direct_alpha_anchor"
+        elif root_ready and len(group) >= 2:
+            stage = "cached_direct_alpha_curve_prethreshold"
+            blocker = "alpha_threshold_crossing"
+            next_action = "extend_structure_matched_lag_window_at_direct_alpha_anchor"
+        elif root_ready:
+            stage = "cached_direct_alpha_curve_missing"
+            blocker = "cached_direct_alpha_curve"
+            next_action = "compute_structure_matched_direct_alpha_curve"
+        else:
+            stage = "cached_direct_alpha_root_upstream_incomplete"
+            blocker = "cached_direct_alpha_root"
+            next_action = "solve_cached_direct_alpha_anchor_before_curve_audit"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(direct_k),
+                "threshold": float(threshold),
+                "lag_count": float(len(group)),
+                "time_codes": ";".join(time_codes) if time_codes else "none",
+                "lag_times": ";".join(f"{value:.17g}" for value in lag_times) if lag_times else "none",
+                "direct_alpha_fs_curve": ";".join(f"{value:.17g}" for value in fs_values) if fs_values else "none",
+                "sigma_direct_alpha_fs_curve": ";".join(f"{value:.12g}" for value in sigma_values) if sigma_values else "none",
+                "direct_alpha_uncertainty_method": uncertainty_method,
+                "direct_alpha_uncertainty_ready": float(uncertainty_ready),
+                "latest_lag_time": float(latest_lag),
+                "latest_direct_alpha_fs": float(latest_fs),
+                "alpha_threshold_crossed": float(crossed),
+                "threshold_crossing_lag_time": float(crossing_lag),
+                "threshold_crossing_time_code": crossing_code,
+                "strictly_monotone_decay": float(strictly_monotone),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "direct_alpha_curve_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_shape_selection(
+    *,
+    selection_id: str,
+    direct_alpha_rows: Sequence[dict[str, object]],
+    min_aic_improvement_for_kww: float,
+    min_points_for_shape_fit: int,
+    min_decay: float,
+    max_decay: float,
+) -> list[dict[str, float | str]]:
+    """Compare a threshold-anchored exponential alpha null with a KWW shape fit.
+
+    The null model uses the measured direct alpha crossing as ``tau_alpha``:
+    ``F_s(t)=exp(-t/tau_alpha)``.  The KWW comparison is therefore a shape
+    diagnostic, not a free transport or persistence/exchange inversion.
+    """
+
+    if not selection_id:
+        raise ValueError("selection_id must be nonempty")
+    if not direct_alpha_rows:
+        raise ValueError("direct_alpha_rows must be nonempty")
+    if min_aic_improvement_for_kww < 0.0:
+        raise ValueError("min_aic_improvement_for_kww must be nonnegative")
+    if min_points_for_shape_fit < 3:
+        raise ValueError("min_points_for_shape_fit must be at least three")
+    if not (0.0 < min_decay < max_decay < 1.0):
+        raise ValueError("decay window must lie inside (0, 1)")
+
+    def parse_float_series(text: object) -> np.ndarray:
+        value = str(text)
+        if value == "none" or not value:
+            return np.array([], dtype=float)
+        return np.array([float(part) for part in value.split(";") if part], dtype=float)
+
+    rows: list[dict[str, float | str]] = []
+    for direct in sorted(
+        direct_alpha_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(direct.get("system_id", "unknown"))
+        temperature = str(direct.get("temperature", "none"))
+        structure_id = str(direct.get("structure_id", "none"))
+        time = parse_float_series(direct.get("lag_times", "none"))
+        decay = parse_float_series(direct.get("direct_alpha_fs_curve", "none"))
+        sigma_decay = parse_float_series(direct.get("sigma_direct_alpha_fs_curve", "none"))
+        tau_alpha = float(direct.get("threshold_crossing_lag_time", 0.0) or 0.0)
+        crossed = float(direct.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+        monotone = float(direct.get("strictly_monotone_decay", 0.0) or 0.0) == 1.0
+        uncertainty_ready = (
+            sigma_decay.size == decay.size
+            and sigma_decay.size > 0
+            and bool(np.all(np.isfinite(sigma_decay)))
+            and bool(np.all(sigma_decay > 0.0))
+        )
+        ready = (
+            crossed
+            and tau_alpha > 0.0
+            and time.size == decay.size
+            and time.size >= min_points_for_shape_fit
+        )
+
+        if ready:
+            mask = (
+                (time > 0.0)
+                & (decay > 0.0)
+                & (decay < 1.0)
+                & (decay >= min_decay)
+                & (decay <= max_decay)
+            )
+            points_used = int(np.count_nonzero(mask))
+        else:
+            mask = np.zeros_like(time, dtype=bool)
+            points_used = 0
+
+        if ready and points_used >= min_points_for_shape_fit:
+            fit = kww_alpha_fit(time, decay, min_decay=min_decay, max_decay=max_decay)
+            monotone_z_threshold = 2.0
+            if decay.size >= 2 and uncertainty_ready:
+                upward = decay[1:] - decay[:-1]
+                combined_sigma = np.sqrt(sigma_decay[1:] ** 2 + sigma_decay[:-1] ** 2)
+                upward_z = np.divide(
+                    upward,
+                    combined_sigma,
+                    out=np.zeros_like(upward),
+                    where=combined_sigma > 0.0,
+                )
+                max_monotone_z = float(np.max(np.maximum(upward_z, 0.0)))
+            else:
+                max_monotone_z = 0.0
+            monotone_compatible = bool(monotone or (uncertainty_ready and max_monotone_z <= monotone_z_threshold))
+            x = np.log(time[mask])
+            observed = np.log(-np.log(decay[mask]))
+            exponential_prediction = x - math.log(tau_alpha)
+            kww_prediction = float(fit["kww_beta"]) * x + float(fit["kww_intercept"])
+            exp_residual = observed - exponential_prediction
+            kww_residual = observed - kww_prediction
+            exp_rss = max(float(np.sum(exp_residual**2)), 1e-300)
+            kww_rss = max(float(np.sum(kww_residual**2)), 1e-300)
+            n = float(points_used)
+            exp_aic = n * math.log(exp_rss / n) + 2.0
+            kww_aic = n * math.log(kww_rss / n) + 4.0
+            delta_aic = exp_aic - kww_aic
+            kww_beta = float(fit["kww_beta"])
+            kww_tau = float(fit["kww_tau"])
+            kww_rmse = float(math.sqrt(kww_rss / n))
+            exp_rmse = float(math.sqrt(exp_rss / n))
+            candidate = kww_beta < 0.9 and delta_aic >= min_aic_improvement_for_kww
+            claim_ready = False
+            if claim_ready:
+                stage = "cached_alpha_shape_stretched_supported"
+                blocker = "none"
+                next_action = "predict_heldout_multi_k_alpha_shape_from_event_clock"
+            elif candidate:
+                if monotone_compatible and uncertainty_ready:
+                    stage = "cached_alpha_shape_stretched_candidate_multik_blocked"
+                    blocker = "multi_k_alpha_shape"
+                    next_action = "measure_heldout_uncertainty_weighted_multi_k_alpha_shape"
+                elif monotone:
+                    stage = "cached_alpha_shape_stretched_candidate_uncertainty_blocked"
+                    blocker = "missing_uncertainty"
+                elif uncertainty_ready:
+                    stage = "cached_alpha_shape_stretched_candidate_monotonicity_blocked"
+                    blocker = "nonmonotone_sparse_curve"
+                else:
+                    stage = "cached_alpha_shape_stretched_candidate_uncertainty_blocked"
+                    blocker = "nonmonotone_sparse_curve_and_missing_uncertainty"
+                next_action = "measure_monotone_uncertainty_weighted_multi_k_alpha_curve"
+            else:
+                stage = "cached_alpha_shape_exponential_not_rejected"
+                blocker = "shape_selection_power"
+                next_action = "extend_alpha_shape_window_before_claiming_stretching"
+            selection_ready = True
+        else:
+            exp_aic = 0.0
+            kww_aic = 0.0
+            delta_aic = 0.0
+            kww_beta = 0.0
+            kww_tau = 0.0
+            kww_rmse = 0.0
+            exp_rmse = 0.0
+            max_monotone_z = 0.0
+            monotone_z_threshold = 2.0
+            monotone_compatible = False
+            candidate = False
+            claim_ready = False
+            stage = "cached_alpha_shape_selection_upstream_incomplete"
+            blocker = "direct_alpha_curve"
+            next_action = "complete_direct_alpha_curve_before_shape_selection"
+            selection_ready = False
+
+        rows.append(
+            {
+                "selection_id": selection_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(direct.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(tau_alpha),
+                "lag_count": float(time.size),
+                "shape_fit_points_used": float(points_used),
+                "min_decay": float(min_decay),
+                "max_decay": float(max_decay),
+                "threshold_anchored_exponential_aic": float(exp_aic),
+                "kww_aic": float(kww_aic),
+                "delta_aic_exponential_minus_kww": float(delta_aic),
+                "min_aic_improvement_for_kww": float(min_aic_improvement_for_kww),
+                "exponential_log_shape_rmse": float(exp_rmse),
+                "kww_log_shape_rmse": float(kww_rmse),
+                "kww_beta": float(kww_beta),
+                "kww_tau": float(kww_tau),
+                "stretched_alpha_candidate_supported": float(candidate),
+                "strictly_monotone_decay": float(monotone),
+                "uncertainty_columns_ready": float(uncertainty_ready),
+                "max_monotonicity_violation_z": float(max_monotone_z),
+                "monotone_compatibility_z_threshold": float(monotone_z_threshold),
+                "monotone_compatible_with_uncertainty": float(monotone_compatible),
+                "alpha_shape_selection_ready": float(selection_ready),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "alpha_shape_selection_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_direct_alpha_multik_shape_gate(
+    *,
+    gate_id: str,
+    multik_rows: Sequence[dict[str, object]],
+    min_crossed_k_count: int,
+    max_beta_spread: float,
+    monotone_z_threshold: float,
+) -> list[dict[str, float | str]]:
+    """Gate cached multi-k alpha-shape support before promoting a real claim."""
+
+    if not gate_id:
+        raise ValueError("gate_id must be nonempty")
+    if not multik_rows:
+        raise ValueError("multik_rows must be nonempty")
+    if min_crossed_k_count < 2:
+        raise ValueError("min_crossed_k_count must be at least two")
+    if max_beta_spread < 0.0:
+        raise ValueError("max_beta_spread must be nonnegative")
+    if monotone_z_threshold <= 0.0:
+        raise ValueError("monotone_z_threshold must be positive")
+
+    grouped: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in multik_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature, structure_id), group in sorted(grouped.items()):
+        sorted_group = sorted(
+            group,
+            key=lambda item: float(item.get("direct_alpha_wave_number", 0.0) or 0.0),
+        )
+        crossed_rows = [
+            row for row in sorted_group
+            if float(row.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+        ]
+        compatible_rows = [
+            row for row in crossed_rows
+            if float(row.get("uncertainty_columns_ready", 0.0) or 0.0) == 1.0
+            and float(row.get("monotone_compatible_with_uncertainty", 0.0) or 0.0) == 1.0
+            and float(row.get("max_monotonicity_violation_z", 0.0) or 0.0) <= monotone_z_threshold
+        ]
+        betas = [float(row.get("kww_beta", 0.0) or 0.0) for row in compatible_rows]
+        beta_min = min(betas) if betas else 0.0
+        beta_max = max(betas) if betas else 0.0
+        beta_spread = beta_max - beta_min if betas else 0.0
+        max_z = max(
+            (float(row.get("max_monotonicity_violation_z", 0.0) or 0.0) for row in compatible_rows),
+            default=0.0,
+        )
+        all_edge = bool(crossed_rows) and all(
+            float(row.get("threshold_crossing_is_last_lag", 0.0) or 0.0) == 1.0
+            for row in crossed_rows
+        )
+        enough_crossed = len(crossed_rows) >= min_crossed_k_count
+        enough_compatible = len(compatible_rows) >= min_crossed_k_count
+        beta_consistent = bool(betas) and beta_spread <= max_beta_spread
+        candidate_ready = enough_crossed and enough_compatible and beta_consistent
+        claim_ready = candidate_ready and not all_edge
+
+        if claim_ready:
+            stage = "cached_multik_alpha_shape_supported"
+            blocker = "none"
+            next_action = "predict_heldout_macro_alpha_shape"
+        elif candidate_ready and all_edge:
+            stage = "cached_multik_alpha_shape_window_edge_blocked"
+            blocker = "post_alpha_window_depth"
+            next_action = "extend_cached_lag_window_beyond_alpha_crossing_for_multik_shape"
+        elif enough_crossed:
+            stage = "cached_multik_alpha_shape_inconsistent"
+            blocker = "beta_spread_or_monotonicity"
+            next_action = "increase_uncertainty_weighted_multik_sampling"
+        else:
+            stage = "cached_multik_alpha_shape_upstream_incomplete"
+            blocker = "crossed_k_count"
+            next_action = "measure_more_high_k_alpha_crossings"
+
+        out.append(
+            {
+                "gate_id": gate_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "tested_k_values": ";".join(
+                    f"{float(row.get('direct_alpha_wave_number', 0.0) or 0.0):.12g}"
+                    for row in sorted_group
+                ),
+                "tested_k_count": float(len(sorted_group)),
+                "crossed_k_count": float(len(crossed_rows)),
+                "monotone_compatible_k_count": float(len(compatible_rows)),
+                "min_crossed_k_count": float(min_crossed_k_count),
+                "kww_beta_min": float(beta_min),
+                "kww_beta_max": float(beta_max),
+                "kww_beta_spread": float(beta_spread),
+                "max_beta_spread": float(max_beta_spread),
+                "max_monotonicity_violation_z": float(max_z),
+                "monotone_z_threshold": float(monotone_z_threshold),
+                "all_crossings_at_window_edge": float(all_edge),
+                "multik_shape_candidate_ready": float(candidate_ready),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "multik_shape_gate_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_multik_heldout_prediction_gate(
+    *,
+    prediction_id: str,
+    multik_rows: Sequence[dict[str, object]],
+    min_calibration_k_count: int,
+    max_heldout_beta_abs_error: float,
+    max_heldout_shape_rmse: float,
+    min_decay: float = 0.30,
+    max_decay: float = 0.99,
+) -> list[dict[str, float | str]]:
+    """Leave one high-k alpha curve out and predict its normalized KWW shape."""
+
+    if not prediction_id:
+        raise ValueError("prediction_id must be nonempty")
+    if not multik_rows:
+        raise ValueError("multik_rows must be nonempty")
+    if min_calibration_k_count < 1:
+        raise ValueError("min_calibration_k_count must be positive")
+    if max_heldout_beta_abs_error < 0.0:
+        raise ValueError("max_heldout_beta_abs_error must be nonnegative")
+    if max_heldout_shape_rmse < 0.0:
+        raise ValueError("max_heldout_shape_rmse must be nonnegative")
+    if not (0.0 < min_decay < max_decay <= 1.0):
+        raise ValueError("decay bounds must satisfy 0 < min_decay < max_decay <= 1")
+
+    def parse_float_series(value: object) -> np.ndarray:
+        text = str(value or "")
+        if not text or text == "none":
+            return np.array([], dtype=float)
+        return np.array([float(part) for part in text.split(";") if part and part != "none"], dtype=float)
+
+    def parse_text_series(value: object) -> list[str]:
+        text = str(value or "")
+        if not text or text == "none":
+            return []
+        return [part for part in text.split(";") if part and part != "none"]
+
+    grouped: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in multik_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature, structure_id), group in sorted(grouped.items()):
+        eligible = [
+            row for row in sorted(group, key=lambda item: float(item.get("direct_alpha_wave_number", 0.0) or 0.0))
+            if float(row.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+            and float(row.get("uncertainty_columns_ready", 0.0) or 0.0) == 1.0
+            and float(row.get("monotone_compatible_with_uncertainty", 0.0) or 0.0) == 1.0
+        ]
+
+        heldout_errors: list[float] = []
+        heldout_shape_rmse: list[float] = []
+        heldout_k_values: list[float] = []
+        calibrated_betas: list[float] = []
+        per_holdout_points: list[int] = []
+        for holdout_index, heldout in enumerate(eligible):
+            calibration = [row for index, row in enumerate(eligible) if index != holdout_index]
+            if len(calibration) < min_calibration_k_count:
+                continue
+            beta_values = [float(row.get("kww_beta", 0.0) or 0.0) for row in calibration]
+            calibrated_beta = float(np.mean(beta_values)) if beta_values else 0.0
+            observed_beta = float(heldout.get("kww_beta", 0.0) or 0.0)
+            lag_times = parse_float_series(heldout.get("lag_times", "none"))
+            decay = parse_float_series(heldout.get("direct_alpha_fs_curve", "none"))
+            time_codes = parse_text_series(heldout.get("time_codes", "none"))
+            crossing_code = str(heldout.get("threshold_crossing_time_code", "none"))
+            if lag_times.size != decay.size or lag_times.size == 0:
+                continue
+            if crossing_code in time_codes:
+                tau_alpha = float(lag_times[time_codes.index(crossing_code)])
+            else:
+                crossing_index = next(
+                    (idx for idx, value in enumerate(decay) if value <= math.exp(-1.0) + 1e-12),
+                    None,
+                )
+                tau_alpha = float(lag_times[crossing_index]) if crossing_index is not None else 0.0
+            if tau_alpha <= 0.0 or calibrated_beta <= 0.0:
+                continue
+            mask = (lag_times > 0.0) & (decay >= min_decay) & (decay <= max_decay)
+            if not np.any(mask):
+                continue
+            observed_shape = -np.log(np.clip(decay[mask], 1e-12, 1.0))
+            predicted_shape = (lag_times[mask] / tau_alpha) ** calibrated_beta
+            shape_rmse = float(np.sqrt(np.mean((observed_shape - predicted_shape) ** 2)))
+            heldout_errors.append(abs(observed_beta - calibrated_beta))
+            heldout_shape_rmse.append(shape_rmse)
+            heldout_k_values.append(float(heldout.get("direct_alpha_wave_number", 0.0) or 0.0))
+            calibrated_betas.append(calibrated_beta)
+            per_holdout_points.append(int(np.count_nonzero(mask)))
+
+        heldout_count = len(heldout_errors)
+        max_beta_error = max(heldout_errors) if heldout_errors else 0.0
+        max_shape_error = max(heldout_shape_rmse) if heldout_shape_rmse else 0.0
+        all_edge = bool(eligible) and all(
+            float(row.get("threshold_crossing_is_last_lag", 0.0) or 0.0) == 1.0
+            for row in eligible
+        )
+        enough = heldout_count >= len(eligible) and heldout_count >= min_calibration_k_count + 1
+        errors_pass = (
+            enough
+            and max_beta_error <= max_heldout_beta_abs_error
+            and max_shape_error <= max_heldout_shape_rmse
+        )
+
+        if errors_pass and all_edge:
+            stage = "cached_multik_heldout_prediction_window_edge_blocked"
+            blocker = "post_alpha_window_depth"
+            next_action = "extend_cached_lag_window_beyond_alpha_crossing_for_heldout_prediction"
+            claim_ready = False
+            candidate_ready = True
+        elif errors_pass:
+            stage = "cached_multik_heldout_prediction_supported"
+            blocker = "none"
+            next_action = "predict_unfitted_macro_alpha_transport_signature"
+            claim_ready = True
+            candidate_ready = True
+        elif heldout_count:
+            stage = "cached_multik_heldout_prediction_mismatch"
+            blocker = "heldout_alpha_shape_residual"
+            next_action = "increase_multi_k_sampling_or_reject_shared_shape"
+            claim_ready = False
+            candidate_ready = False
+        else:
+            stage = "cached_multik_heldout_prediction_upstream_incomplete"
+            blocker = "heldout_curve_inputs"
+            next_action = "compute_per_k_alpha_curves_before_heldout_prediction"
+            claim_ready = False
+            candidate_ready = False
+
+        out.append(
+            {
+                "prediction_id": prediction_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "eligible_k_count": float(len(eligible)),
+                "heldout_count": float(heldout_count),
+                "heldout_k_values": ";".join(f"{value:.12g}" for value in heldout_k_values)
+                if heldout_k_values
+                else "none",
+                "calibrated_betas": ";".join(f"{value:.12g}" for value in calibrated_betas)
+                if calibrated_betas
+                else "none",
+                "heldout_beta_abs_errors": ";".join(f"{value:.12g}" for value in heldout_errors)
+                if heldout_errors
+                else "none",
+                "heldout_shape_rmse": ";".join(f"{value:.12g}" for value in heldout_shape_rmse)
+                if heldout_shape_rmse
+                else "none",
+                "heldout_shape_point_counts": ";".join(str(value) for value in per_holdout_points)
+                if per_holdout_points
+                else "none",
+                "min_calibration_k_count": float(min_calibration_k_count),
+                "max_heldout_beta_abs_error": float(max_beta_error),
+                "max_allowed_heldout_beta_abs_error": float(max_heldout_beta_abs_error),
+                "max_heldout_shape_rmse": float(max_shape_error),
+                "max_allowed_heldout_shape_rmse": float(max_heldout_shape_rmse),
+                "all_crossings_at_window_edge": float(all_edge),
+                "heldout_prediction_candidate_ready": float(candidate_ready),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "heldout_prediction_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_post_window_prediction_targets(
+    *,
+    target_id: str,
+    heldout_prediction_rows: Sequence[dict[str, object]],
+    current_time_code: str,
+    current_lag_time: float,
+    target_time_codes: Sequence[str],
+    terminal_target_time_code: str,
+    terminal_target_lag_time: float,
+    abs_log_fs_tolerance: float,
+) -> list[dict[str, float | str]]:
+    """Preregister post-alpha F_s targets from held-out multi-k alpha prediction."""
+
+    if not target_id:
+        raise ValueError("target_id must be nonempty")
+    if not heldout_prediction_rows:
+        raise ValueError("heldout_prediction_rows must be nonempty")
+    if not current_time_code:
+        raise ValueError("current_time_code must be nonempty")
+    if current_lag_time <= 0.0:
+        raise ValueError("current_lag_time must be positive")
+    if not target_time_codes:
+        raise ValueError("target_time_codes must be nonempty")
+    if not terminal_target_time_code:
+        raise ValueError("terminal_target_time_code must be nonempty")
+    if terminal_target_lag_time <= current_lag_time:
+        raise ValueError("terminal_target_lag_time must exceed current_lag_time")
+    if abs_log_fs_tolerance < 0.0:
+        raise ValueError("abs_log_fs_tolerance must be nonnegative")
+
+    def timecode_number(code: str) -> int:
+        match = re.fullmatch(r"tc(\d+)", code)
+        if not match:
+            raise ValueError(f"invalid time code: {code}")
+        return int(match.group(1))
+
+    def split_floats(value: object) -> list[float]:
+        text = str(value or "")
+        if not text or text == "none":
+            return []
+        return [float(part) for part in text.split(";") if part and part != "none"]
+
+    current_number = timecode_number(current_time_code)
+    terminal_number = timecode_number(terminal_target_time_code)
+    if terminal_number <= current_number:
+        raise ValueError("terminal_target_time_code must be after current_time_code")
+
+    def target_lag(code: str) -> float:
+        number = timecode_number(code)
+        if number <= current_number:
+            raise ValueError("target_time_codes must be after current_time_code")
+        if number > terminal_number:
+            raise ValueError("target_time_codes must not exceed terminal_target_time_code")
+        fraction = (number - current_number) / (terminal_number - current_number)
+        log_lag = math.log(current_lag_time) + fraction * (
+            math.log(terminal_target_lag_time) - math.log(current_lag_time)
+        )
+        return float(math.exp(log_lag))
+
+    rows: list[dict[str, float | str]] = []
+    for heldout in sorted(
+        heldout_prediction_rows,
+        key=lambda row: (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(heldout.get("system_id", "unknown"))
+        temperature = str(heldout.get("temperature", "none"))
+        structure_id = str(heldout.get("structure_id", "none"))
+        candidate_ready = float(heldout.get("heldout_prediction_candidate_ready", 0.0) or 0.0) == 1.0
+        k_values = split_floats(heldout.get("heldout_k_values", "none"))
+        betas = split_floats(heldout.get("calibrated_betas", "none"))
+        paired = len(k_values) == len(betas) and len(k_values) > 0
+        prediction_ready = candidate_ready and paired
+
+        if not prediction_ready:
+            rows.append(
+                {
+                    "target_id": target_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "current_time_code": current_time_code,
+                    "current_lag_time": float(current_lag_time),
+                    "target_time_code": "none",
+                    "target_lag_time": 0.0,
+                    "direct_alpha_wave_number": 0.0,
+                    "calibrated_beta": 0.0,
+                    "predicted_fs": 0.0,
+                    "abs_log_fs_tolerance": float(abs_log_fs_tolerance),
+                    "acceptance_fs_low": 0.0,
+                    "acceptance_fs_high": 0.0,
+                    "observed_post_window_fs_ready": 0.0,
+                    "prediction_target_ready": 0.0,
+                    "real_alpha_shape_claim_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "heldout_prediction_candidate",
+                    "next_required_action": "complete_heldout_multi_k_alpha_prediction_before_targets",
+                    "post_window_target_stage": "post_alpha_prediction_target_upstream_incomplete",
+                }
+            )
+            continue
+
+        for code in target_time_codes:
+            lag = target_lag(str(code))
+            for wave_number, beta in zip(k_values, betas):
+                predicted_fs = math.exp(-((lag / current_lag_time) ** beta))
+                low = predicted_fs * math.exp(-abs_log_fs_tolerance)
+                high = min(1.0, predicted_fs * math.exp(abs_log_fs_tolerance))
+                rows.append(
+                    {
+                        "target_id": target_id,
+                        "system_id": system_id,
+                        "temperature": temperature,
+                        "structure_id": structure_id,
+                        "current_time_code": current_time_code,
+                        "current_lag_time": float(current_lag_time),
+                        "target_time_code": str(code),
+                        "target_lag_time": float(lag),
+                        "direct_alpha_wave_number": float(wave_number),
+                        "calibrated_beta": float(beta),
+                        "predicted_fs": float(predicted_fs),
+                        "abs_log_fs_tolerance": float(abs_log_fs_tolerance),
+                        "acceptance_fs_low": float(low),
+                        "acceptance_fs_high": float(high),
+                        "observed_post_window_fs_ready": 0.0,
+                        "prediction_target_ready": 1.0,
+                        "real_alpha_shape_claim_ready": 0.0,
+                        "real_pe_inversion_ready": 0.0,
+                        "thermodynamic_claim_allowed": 0.0,
+                        "primary_blocker": "post_alpha_window_observation",
+                        "next_required_action": f"measure_glassbench_{code}_fs_at_high_k_alpha_targets",
+                        "post_window_target_stage": "post_alpha_prediction_target_preregistered",
+                    }
+                )
+    return rows
+
+
+def glassbench_direct_alpha_post_window_verdict(
+    *,
+    verdict_id: str,
+    target_rows: Sequence[dict[str, object]],
+    observed_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Compare post-alpha F_s observations against preregistered prediction bands."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not target_rows:
+        raise ValueError("target_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str, str, str]:
+        wave_number = float(row.get("direct_alpha_wave_number", 0.0) or 0.0)
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+            str(row.get("target_time_code", "none")),
+            f"{wave_number:.12g}",
+        )
+
+    observed_by_key = {key_for(row): row for row in observed_rows}
+    out: list[dict[str, float | str]] = []
+    for target in sorted(target_rows, key=key_for):
+        system_id, temperature, structure_id, target_time_code, wave_text = key_for(target)
+        prediction_ready = float(target.get("prediction_target_ready", 0.0) or 0.0) == 1.0
+        predicted_fs = float(target.get("predicted_fs", 0.0) or 0.0)
+        tolerance = float(target.get("abs_log_fs_tolerance", 0.0) or 0.0)
+        observed = observed_by_key.get((system_id, temperature, structure_id, target_time_code, wave_text), {})
+        observed_ready = float(observed.get("observed_post_window_fs_ready", 0.0) or 0.0) == 1.0
+        observed_fs = float(observed.get("observed_fs", 0.0) or 0.0)
+        sigma_log_fs = float(observed.get("sigma_log_fs", 0.0) or 0.0)
+
+        if prediction_ready and observed_ready and predicted_fs > 0.0 and observed_fs > 0.0:
+            abs_residual = abs(math.log(observed_fs / predicted_fs))
+            support_margin = tolerance - (abs_residual + 2.0 * sigma_log_fs)
+            rejection_margin = (abs_residual - 2.0 * sigma_log_fs) - tolerance
+            supported = support_margin >= 0.0
+            rejected = rejection_margin > 0.0
+        else:
+            abs_residual = 0.0
+            support_margin = 0.0
+            rejection_margin = 0.0
+            supported = False
+            rejected = False
+
+        if not prediction_ready:
+            stage = "post_alpha_prediction_target_incomplete"
+            blocker = "post_alpha_prediction_target"
+            next_action = "complete_post_alpha_prediction_targets"
+            claim_ready = False
+        elif not observed_ready:
+            stage = "post_alpha_observation_not_ready"
+            blocker = "post_alpha_window_observation"
+            next_action = f"measure_glassbench_{target_time_code}_fs_at_k_{wave_text}"
+            claim_ready = False
+        elif supported:
+            stage = "post_alpha_prediction_supported"
+            blocker = "none"
+            next_action = "combine_post_alpha_targets_into_real_alpha_shape_claim"
+            claim_ready = True
+        elif rejected:
+            stage = "post_alpha_prediction_rejected"
+            blocker = "post_alpha_shape_residual"
+            next_action = "reject_or_reparameterize_shared_alpha_shape_extrapolation"
+            claim_ready = False
+        else:
+            stage = "post_alpha_prediction_indeterminate"
+            blocker = "post_alpha_window_uncertainty"
+            next_action = "reduce_post_alpha_fs_uncertainty_or_measure_additional_k"
+            claim_ready = False
+
+        out.append(
+            {
+                "verdict_id": verdict_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "target_time_code": target_time_code,
+                "target_lag_time": float(target.get("target_lag_time", 0.0) or 0.0),
+                "direct_alpha_wave_number": wave_text,
+                "predicted_fs": float(predicted_fs),
+                "observed_fs": float(observed_fs),
+                "sigma_log_fs": float(sigma_log_fs),
+                "abs_log_fs_residual": float(abs_residual),
+                "abs_log_fs_tolerance": float(tolerance),
+                "support_margin_2sigma": float(support_margin),
+                "rejection_margin_2sigma": float(rejection_margin),
+                "observed_post_window_fs_ready": float(observed_ready),
+                "prediction_target_ready": float(prediction_ready),
+                "post_window_prediction_supported": float(supported),
+                "post_window_prediction_rejected": float(rejected),
+                "real_alpha_shape_claim_ready": float(claim_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "post_window_verdict_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_transport_coupling_audit(
+    *,
+    audit_id: str,
+    direct_alpha_rows: Sequence[dict[str, object]],
+    observable_semantics_rows: Sequence[dict[str, object]],
+    dimension: int = 2,
+) -> list[dict[str, float | str]]:
+    """Couple a cached direct-alpha crossing to the matched displacement observable."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not direct_alpha_rows:
+        raise ValueError("direct_alpha_rows must be nonempty")
+    if not observable_semantics_rows:
+        raise ValueError("observable_semantics_rows must be nonempty")
+    if dimension <= 0:
+        raise ValueError("dimension must be positive")
+
+    observable_by_key: dict[tuple[str, str, str, str], dict[str, object]] = {}
+    for row in observable_semantics_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+            str(row.get("time_code", "none")),
+        )
+        observable_by_key[key] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        direct_alpha_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        crossing_time_code = str(row.get("threshold_crossing_time_code", "none"))
+        tau_alpha = float(row.get("threshold_crossing_lag_time", 0.0) or 0.0)
+        alpha_crossed = float(row.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+        observable = observable_by_key.get((system_id, temperature, structure_id, crossing_time_code), {})
+        observable_reproduced = (
+            float(observable.get("official_displacement_observable_reproducible", 0.0) or 0.0) == 1.0
+        )
+        matched_msd = float(observable.get("official_msd", 0.0) or 0.0)
+        if matched_msd <= 0.0:
+            matched_msd = float(observable.get("initial_reference_msd", 0.0) or 0.0)
+        matched_lag = float(observable.get("lag_time", 0.0) or 0.0)
+        matched_ngp = float(observable.get("official_ngp_2d", 0.0) or 0.0)
+        proxy_ready = alpha_crossed and observable_reproduced and tau_alpha > 0.0 and matched_msd > 0.0
+
+        if proxy_ready:
+            apparent_diffusion = matched_msd / (2.0 * float(dimension) * tau_alpha)
+            apparent_product = apparent_diffusion * tau_alpha
+            stage = "cached_direct_alpha_transport_proxy_ready_event_clock_blocked"
+            blocker = "event_clock_trajectory"
+            next_action = "extract_particle_event_clock_for_persistence_exchange_inversion"
+        elif alpha_crossed:
+            apparent_diffusion = 0.0
+            apparent_product = 0.0
+            stage = "direct_alpha_crossed_transport_observable_blocked"
+            blocker = "matched_transport_observable"
+            next_action = "reproduce_structure_matched_displacement_observable"
+        else:
+            apparent_diffusion = 0.0
+            apparent_product = 0.0
+            stage = "direct_alpha_crossing_upstream_incomplete"
+            blocker = "direct_alpha_threshold_crossing"
+            next_action = "complete_direct_alpha_curve_threshold_crossing"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(tau_alpha),
+                "threshold_crossing_time_code": crossing_time_code,
+                "matched_lag_time": float(matched_lag),
+                "matched_msd": float(matched_msd),
+                "matched_ngp_2d": float(matched_ngp),
+                "dimension": float(dimension),
+                "apparent_diffusion_coefficient": float(apparent_diffusion),
+                "apparent_stokes_einstein_product": float(apparent_product),
+                "direct_alpha_transport_proxy_ready": float(proxy_ready),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "transport_coupling_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_pe_feasibility_bound(
+    *,
+    audit_id: str,
+    transport_rows: Sequence[dict[str, object]],
+    reference_jump_variance_fraction: float = 0.2,
+) -> list[dict[str, float | str]]:
+    """Bound PE identifiability from a direct-alpha/transport proxy.
+
+    The direct-alpha transport row fixes ``D tau_alpha`` but not the per-event
+    jump variance. This gate computes the largest jump variance for which the
+    Poisson exchange baseline remains no slower than the observed alpha time,
+    then reports a conditional PE inference at a stated reference fraction of
+    the matched MSD.
+    """
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not transport_rows:
+        raise ValueError("transport_rows must be nonempty")
+    if reference_jump_variance_fraction <= 0.0:
+        raise ValueError("reference_jump_variance_fraction must be positive")
+
+    def poisson_tau(
+        wave_number: float,
+        jump_variance: float,
+        diffusion_coefficient: float,
+    ) -> float:
+        exchange_mean = jump_variance / (2.0 * diffusion_coefficient)
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=jump_variance,
+            persistence_mean=exchange_mean,
+            exchange_mean=exchange_mean,
+        )
+        return persistence_exchange_alpha_relaxation_time(wave_number, params)
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        transport_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        wave_number = float(row.get("direct_alpha_wave_number", 0.0) or 0.0)
+        tau_alpha = float(row.get("tau_alpha_direct", 0.0) or 0.0)
+        diffusion = float(row.get("apparent_diffusion_coefficient", 0.0) or 0.0)
+        matched_msd = float(row.get("matched_msd", 0.0) or 0.0)
+        proxy_ready = float(row.get("direct_alpha_transport_proxy_ready", 0.0) or 0.0) == 1.0
+
+        full_feasible = False
+        q_upper = 0.0
+        reference_q = 0.0
+        reference_exchange = 0.0
+        reference_persistence = 0.0
+        reference_ratio = 0.0
+        reference_poisson_tau = 0.0
+        conditional_ready = False
+
+        if proxy_ready and wave_number > 0.0 and tau_alpha > 0.0 and diffusion > 0.0 and matched_msd > 0.0:
+            full_poisson_tau = poisson_tau(wave_number, matched_msd, diffusion)
+            full_feasible = full_poisson_tau <= tau_alpha or math.isclose(
+                full_poisson_tau,
+                tau_alpha,
+                rel_tol=1e-12,
+                abs_tol=1e-12,
+            )
+            if full_feasible:
+                q_upper = matched_msd
+            else:
+                lower = max(matched_msd * 1.0e-9, 1.0e-12)
+                upper = matched_msd
+                if poisson_tau(wave_number, lower, diffusion) > tau_alpha:
+                    q_upper = 0.0
+                else:
+                    for _ in range(80):
+                        mid = 0.5 * (lower + upper)
+                        if poisson_tau(wave_number, mid, diffusion) <= tau_alpha:
+                            lower = mid
+                        else:
+                            upper = mid
+                    q_upper = 0.5 * (lower + upper)
+
+            candidate_q = reference_jump_variance_fraction * matched_msd
+            if q_upper > 0.0:
+                reference_q = min(candidate_q, 0.99 * q_upper)
+            if reference_q > 0.0:
+                inferred = infer_persistence_exchange_from_alpha_transport(
+                    wave_number=wave_number,
+                    jump_variance=reference_q,
+                    diffusion_coefficient=diffusion,
+                    observed_tau_alpha=tau_alpha,
+                )
+                reference_exchange = inferred["exchange_mean"]
+                reference_persistence = inferred["persistence_mean"]
+                reference_ratio = inferred["persistence_exchange_ratio"]
+                reference_poisson_tau = inferred["poisson_tau_alpha"]
+                conditional_ready = True
+
+        if conditional_ready:
+            stage = "direct_alpha_transport_bounds_pe_but_event_clock_missing"
+            blocker = "event_clock_jump_variance"
+            next_action = "measure_cage_jump_event_variance_from_particle_event_clock"
+        elif proxy_ready:
+            stage = "direct_alpha_transport_pe_bound_infeasible"
+            blocker = "jump_variance_identifiability"
+            next_action = "measure_event_jump_variance_before_pe_inversion"
+        else:
+            stage = "direct_alpha_transport_upstream_incomplete"
+            blocker = "direct_alpha_transport_proxy"
+            next_action = "complete_direct_alpha_transport_proxy"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(wave_number),
+                "tau_alpha_direct": float(tau_alpha),
+                "apparent_diffusion_coefficient": float(diffusion),
+                "matched_msd": float(matched_msd),
+                "apparent_stokes_einstein_product": float(
+                    row.get("apparent_stokes_einstein_product", 0.0) or 0.0
+                ),
+                "full_msd_jump_variance_feasible": float(full_feasible),
+                "jump_variance_upper_bound": float(q_upper),
+                "jump_variance_upper_over_msd": float(q_upper / matched_msd) if matched_msd > 0.0 else 0.0,
+                "reference_jump_variance_fraction": float(reference_jump_variance_fraction),
+                "reference_jump_variance": float(reference_q),
+                "reference_exchange_mean": float(reference_exchange),
+                "reference_persistence_mean": float(reference_persistence),
+                "reference_persistence_exchange_ratio": float(reference_ratio),
+                "reference_poisson_tau_alpha": float(reference_poisson_tau),
+                "conditional_pe_inference_ready": float(conditional_ready),
+                "pe_feasibility_bound_ready": float(conditional_ready),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "pe_feasibility_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_displacement_tail_bound(
+    *,
+    audit_id: str,
+    pe_bound_rows: Sequence[dict[str, object]],
+    displacement_rows: Sequence[dict[str, object]],
+    min_tail_fraction: float = 0.05,
+) -> list[dict[str, float | str]]:
+    """Compare direct-lag displacement tails to the PE single-event variance bound."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not pe_bound_rows:
+        raise ValueError("pe_bound_rows must be nonempty")
+    if not displacement_rows:
+        raise ValueError("displacement_rows must be nonempty")
+    if not 0.0 < min_tail_fraction < 1.0:
+        raise ValueError("min_tail_fraction must lie between zero and one")
+
+    displacement_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in displacement_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        displacement_by_key[key] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        pe_bound_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        pe_ready = float(row.get("pe_feasibility_bound_ready", 0.0) or 0.0) == 1.0
+        q_bound = float(row.get("jump_variance_upper_bound", 0.0) or 0.0)
+        displacement = displacement_by_key.get((system_id, temperature, structure_id), {})
+        q_all = float(displacement.get("q_all", 0.0) or 0.0)
+        fraction_le = float(displacement.get("fraction_q_le_bound", 0.0) or 0.0)
+        fraction_gt = float(displacement.get("fraction_q_gt_bound", 0.0) or 0.0)
+        mean_q_above = float(displacement.get("mean_q_above_bound", 0.0) or 0.0)
+        has_tail_stats = q_bound > 0.0 and q_all > 0.0 and (fraction_le > 0.0 or fraction_gt > 0.0)
+        tail_exceeds = has_tail_stats and fraction_gt >= min_tail_fraction and mean_q_above > q_bound
+        q_all_exceeds = has_tail_stats and q_all > q_bound
+
+        if pe_ready and tail_exceeds:
+            stage = "direct_displacement_tail_exceeds_pe_single_event_bound"
+            blocker = "event_segmentation"
+            next_action = "segment_particle_cage_jump_events_and_measure_per_event_q"
+            ready = True
+        elif pe_ready and has_tail_stats:
+            stage = "direct_displacement_tail_within_pe_single_event_bound"
+            blocker = "event_clock_jump_variance"
+            next_action = "measure_event_clock_jump_variance_to_confirm_single_event_bound"
+            ready = True
+        elif pe_ready:
+            stage = "direct_displacement_tail_stats_missing"
+            blocker = "displacement_tail_statistics"
+            next_action = "compute_direct_alpha_displacement_tail_statistics"
+            ready = False
+        else:
+            stage = "pe_feasibility_bound_upstream_incomplete"
+            blocker = "pe_feasibility_bound"
+            next_action = "complete_direct_alpha_pe_feasibility_bound"
+            ready = False
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": str(displacement.get("time_code", "none")),
+                "sample_count": float(displacement.get("sample_count", 0.0) or 0.0),
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(row.get("tau_alpha_direct", 0.0) or 0.0),
+                "q_bound": float(q_bound),
+                "q_all": float(q_all),
+                "q_all_over_bound": float(q_all / q_bound) if q_bound > 0.0 else 0.0,
+                "fraction_q_le_bound": float(fraction_le),
+                "fraction_q_gt_bound": float(fraction_gt),
+                "mean_q_above_bound": float(mean_q_above),
+                "mean_q_above_over_bound": float(mean_q_above / q_bound) if q_bound > 0.0 else 0.0,
+                "q_median": float(displacement.get("q_median", 0.0) or 0.0),
+                "q_p90": float(displacement.get("q_p90", 0.0) or 0.0),
+                "q_p95": float(displacement.get("q_p95", 0.0) or 0.0),
+                "min_tail_fraction": float(min_tail_fraction),
+                "q_all_exceeds_bound": float(q_all_exceeds),
+                "event_segmentation_required": float(tail_exceeds),
+                "tail_bound_ready": float(ready),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "tail_bound_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_multilag_crossing_canary(
+    *,
+    audit_id: str,
+    pe_bound_rows: Sequence[dict[str, object]],
+    crossing_rows: Sequence[dict[str, object]],
+    min_crossing_fraction: float = 0.05,
+) -> list[dict[str, float | str]]:
+    """Audit multi-lag displacement threshold crossings without promoting replica axes."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not pe_bound_rows:
+        raise ValueError("pe_bound_rows must be nonempty")
+    if not crossing_rows:
+        raise ValueError("crossing_rows must be nonempty")
+    if not 0.0 < min_crossing_fraction < 1.0:
+        raise ValueError("min_crossing_fraction must lie between zero and one")
+
+    crossing_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in crossing_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        crossing_by_key[key] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        pe_bound_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        pe_ready = float(row.get("pe_feasibility_bound_ready", 0.0) or 0.0) == 1.0
+        q_bound = float(row.get("jump_variance_upper_bound", 0.0) or 0.0)
+        crossing = crossing_by_key.get((system_id, temperature, structure_id), {})
+        axis0_semantics = str(crossing.get("axis0_semantics", "unknown"))
+        axis0_replica = axis0_semantics == "isoconfigurational_trajectory_replicates"
+        ever_crossed = float(crossing.get("ever_crossed_fraction", 0.0) or 0.0)
+        first_q_mean = float(crossing.get("first_crossing_q_mean", 0.0) or 0.0)
+        has_crossing_stats = q_bound > 0.0 and ever_crossed > 0.0 and first_q_mean > 0.0
+        target_ready = pe_ready and has_crossing_stats and ever_crossed >= min_crossing_fraction
+
+        if target_ready and axis0_replica:
+            stage = "multilag_displacement_crossing_canary_ready_replica_axis_blocked"
+            blocker = "frame_axis_is_isoconfigurational_replicates"
+            next_action = "extract_true_particle_time_trajectory_for_event_clock_segmentation"
+            canary_ready = True
+        elif target_ready:
+            stage = "multilag_displacement_crossing_canary_ready_event_clock_pending"
+            blocker = "event_clock_segmentation"
+            next_action = "run_threshold_sweep_event_clock_segmentation"
+            canary_ready = True
+        elif pe_ready:
+            stage = "multilag_displacement_crossing_canary_incomplete"
+            blocker = "multilag_crossing_statistics"
+            next_action = "compute_multilag_displacement_threshold_crossings"
+            canary_ready = False
+        else:
+            stage = "pe_feasibility_bound_upstream_incomplete"
+            blocker = "pe_feasibility_bound"
+            next_action = "complete_direct_alpha_pe_feasibility_bound"
+            canary_ready = False
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(row.get("tau_alpha_direct", 0.0) or 0.0),
+                "q_bound": float(q_bound),
+                "axis0_semantics": axis0_semantics,
+                "axis0_is_isoconfigurational_replica": float(axis0_replica),
+                "time_codes": str(crossing.get("time_codes", "none")),
+                "lag_times": str(crossing.get("lag_times", "none")),
+                "sample_count": float(crossing.get("sample_count", 0.0) or 0.0),
+                "above_bound_fractions_by_lag": str(crossing.get("above_bound_fractions_by_lag", "none")),
+                "first_crossing_fractions_by_time_code": str(
+                    crossing.get("first_crossing_fractions_by_time_code", "none")
+                ),
+                "ever_crossed_fraction": float(ever_crossed),
+                "never_crossed_fraction": float(crossing.get("never_crossed_fraction", 0.0) or 0.0),
+                "post_crossing_recross_fraction": float(
+                    crossing.get("post_crossing_recross_fraction", 0.0) or 0.0
+                ),
+                "first_crossing_q_mean": float(first_q_mean),
+                "first_crossing_q_mean_over_bound": float(first_q_mean / q_bound) if q_bound > 0.0 else 0.0,
+                "first_crossing_q_median": float(crossing.get("first_crossing_q_median", 0.0) or 0.0),
+                "first_crossing_q_p90": float(crossing.get("first_crossing_q_p90", 0.0) or 0.0),
+                "min_crossing_fraction": float(min_crossing_fraction),
+                "event_segmentation_target_ready": float(target_ready),
+                "crossing_canary_ready": float(canary_ready),
+                "persistence_exchange_event_clock_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "crossing_canary_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_alpha_event_clock_extraction_contract(
+    *,
+    audit_id: str,
+    pe_bound_rows: Sequence[dict[str, object]],
+    tail_rows: Sequence[dict[str, object]],
+    crossing_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """State the exact data contract required before claiming PE event clocks."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not pe_bound_rows:
+        raise ValueError("pe_bound_rows must be nonempty")
+    if not tail_rows:
+        raise ValueError("tail_rows must be nonempty")
+    if not crossing_rows:
+        raise ValueError("crossing_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    tail_by_key = {key_for(row): row for row in tail_rows}
+    crossing_by_key = {key_for(row): row for row in crossing_rows}
+    required_arrays = (
+        "positions[time,particle,dimension];time_or_lag;trajectory_id;"
+        "box_or_unwrapped_positions;event_threshold_sweep"
+    )
+    forbidden_substitutes = (
+        "isoconfigurational_replica_axis;direct_lag_displacement_tail;"
+        "lag_ladder_crossing_canary;single_alpha_transport_proxy"
+    )
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        pe_bound_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id, temperature, structure_id = key_for(row)
+        tail = tail_by_key.get((system_id, temperature, structure_id), {})
+        crossing = crossing_by_key.get((system_id, temperature, structure_id), {})
+        conditional_ready = float(row.get("conditional_pe_inference_ready", 0.0) or 0.0) == 1.0
+        pe_bound_ready = float(row.get("pe_feasibility_bound_ready", 0.0) or 0.0) == 1.0
+        tail_ready = float(tail.get("tail_bound_ready", 0.0) or 0.0) == 1.0
+        segmentation_required = float(tail.get("event_segmentation_required", 0.0) or 0.0) == 1.0
+        target_ready = float(crossing.get("event_segmentation_target_ready", 0.0) or 0.0) == 1.0
+        crossing_ready = float(crossing.get("crossing_canary_ready", 0.0) or 0.0) == 1.0
+        axis0_replica = float(crossing.get("axis0_is_isoconfigurational_replica", 0.0) or 0.0) == 1.0
+        axis0_semantics = str(crossing.get("axis0_semantics", "unknown"))
+        axis0_physical = axis0_semantics in {
+            "physical_time",
+            "physical_time_frames",
+            "particle_time_trajectory",
+        }
+        true_time_required = pe_bound_ready and tail_ready and target_ready and not axis0_physical
+
+        if pe_bound_ready and tail_ready and target_ready and axis0_replica:
+            stage = "segmentation_target_ready_true_event_clock_missing"
+            blocker = "physical_time_trajectory_axis"
+            next_action = "extract_positions_time_particle_dimension_before_pe_inversion"
+            event_clock_ready = False
+        elif pe_bound_ready and tail_ready and target_ready and axis0_physical:
+            stage = "true_event_clock_payload_ready_for_segmentation"
+            blocker = "event_clock_segmentation_not_run"
+            next_action = "run_threshold_sweep_event_clock_segmentation"
+            event_clock_ready = True
+        elif pe_bound_ready and tail_ready:
+            stage = "direct_tail_ready_crossing_target_missing"
+            blocker = "multilag_crossing_target"
+            next_action = "compute_multilag_displacement_crossing_canary"
+            event_clock_ready = False
+        elif pe_bound_ready:
+            stage = "pe_bound_ready_tail_contract_missing"
+            blocker = "direct_displacement_tail_bound"
+            next_action = "compute_direct_alpha_displacement_tail_bound"
+            event_clock_ready = False
+        else:
+            stage = "event_clock_contract_upstream_incomplete"
+            blocker = "pe_feasibility_bound"
+            next_action = "complete_direct_alpha_pe_feasibility_bound"
+            event_clock_ready = False
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(row.get("direct_alpha_wave_number", 0.0) or 0.0),
+                "tau_alpha_direct": float(row.get("tau_alpha_direct", 0.0) or 0.0),
+                "q_bound": float(row.get("jump_variance_upper_bound", 0.0) or 0.0),
+                "conditional_pe_inference_ready": float(conditional_ready),
+                "pe_feasibility_bound_ready": float(pe_bound_ready),
+                "direct_displacement_tail_ready": float(tail_ready),
+                "event_segmentation_required": float(segmentation_required),
+                "event_segmentation_target_ready": float(target_ready),
+                "cached_replica_ladder_ready": float(crossing_ready and axis0_replica),
+                "axis0_semantics": axis0_semantics,
+                "axis0_is_physical_time": float(axis0_physical),
+                "requires_true_time_trajectory": float(true_time_required),
+                "event_clock_extraction_ready": float(event_clock_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "sample_count": float(crossing.get("sample_count", 0.0) or 0.0),
+                "ever_crossed_fraction": float(crossing.get("ever_crossed_fraction", 0.0) or 0.0),
+                "post_crossing_recross_fraction": float(
+                    crossing.get("post_crossing_recross_fraction", 0.0) or 0.0
+                ),
+                "fraction_q_gt_bound": float(tail.get("fraction_q_gt_bound", 0.0) or 0.0),
+                "mean_q_above_over_bound": float(tail.get("mean_q_above_over_bound", 0.0) or 0.0),
+                "first_crossing_q_mean_over_bound": float(
+                    crossing.get("first_crossing_q_mean_over_bound", 0.0) or 0.0
+                ),
+                "required_arrays": required_arrays,
+                "forbidden_substitutes": forbidden_substitutes,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "event_clock_contract_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_sparse_lag_event_clock_audit(
+    *,
+    audit_id: str,
+    cache_rows: Sequence[dict[str, object]],
+    contract_rows: Sequence[dict[str, object]],
+    required_time_codes: Sequence[str],
+    max_initial_mismatch_tolerance: float = 1e-10,
+) -> list[dict[str, float | str]]:
+    """Audit whether cached lag files form a sparse physical-lag tensor candidate."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not cache_rows:
+        raise ValueError("cache_rows must be nonempty")
+    if not contract_rows:
+        raise ValueError("contract_rows must be nonempty")
+    if not required_time_codes:
+        raise ValueError("required_time_codes must be nonempty")
+    if max_initial_mismatch_tolerance < 0.0:
+        raise ValueError("max_initial_mismatch_tolerance must be nonnegative")
+
+    required_codes = tuple(str(code) for code in required_time_codes)
+    grouped_cache: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in cache_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped_cache.setdefault(key, []).append(row)
+
+    contract_by_key = {
+        (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        ): row
+        for row in contract_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for key in sorted(set(grouped_cache) | set(contract_by_key)):
+        system_id, temperature, structure_id = key
+        rows = grouped_cache.get(key, [])
+        contract = contract_by_key.get(key, {})
+        observed_codes = sorted(
+            {str(row.get("time_code", "none")) for row in rows if str(row.get("time_code", "none")) != "none"},
+            key=lambda code: required_codes.index(code) if code in required_codes else len(required_codes),
+        )
+        observed_required = [code for code in observed_codes if code in required_codes]
+        coverage = len(set(observed_required)) / float(len(required_codes))
+        cached_ready = all(float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0 for row in rows)
+        initial_cached = all(float(row.get("initial_reference_positions_cached", 0.0) or 0.0) == 1.0 for row in rows)
+        shapes = {str(row.get("positions_shape", "none")) for row in rows}
+        same_shape = len(shapes) == 1 and "none" not in shapes and bool(rows)
+        max_mismatch = max(
+            (float(row.get("max_initial_position_mismatch", 0.0) or 0.0) for row in rows),
+            default=float("inf"),
+        )
+        same_initial = bool(initial_cached and max_mismatch <= max_initial_mismatch_tolerance)
+        lag_times = [
+            float(row.get("lag_time", 0.0) or 0.0)
+            for row in rows
+            if str(row.get("time_code", "none")) in required_codes
+        ]
+        positive_lag_order = bool(lag_times and all(value > 0.0 for value in lag_times))
+        full_coverage = coverage >= 1.0
+        physical_tensor_ready = bool(cached_ready and same_shape and same_initial and full_coverage and positive_lag_order)
+        target_ready = float(contract.get("event_segmentation_target_ready", 0.0) or 0.0) == 1.0
+        coarse_candidate_ready = bool(physical_tensor_ready and target_ready)
+        replica_identity_ready = bool(
+            str(contract.get("replica_identity_semantics", "none")) == "stable_replica_ids_across_time_codes"
+        )
+
+        if coarse_candidate_ready and not replica_identity_ready:
+            stage = "sparse_lag_tensor_ready_replica_identity_unverified"
+            blocker = "replica_identity_alignment"
+            next_action = "verify_stable_replica_ids_or_segment_with_interval_censoring"
+        elif coarse_candidate_ready and replica_identity_ready:
+            stage = "sparse_lag_event_clock_ready_for_interval_segmentation"
+            blocker = "interval_censored_event_segmentation"
+            next_action = "run_interval_censored_threshold_sweep"
+        elif full_coverage and target_ready:
+            stage = "sparse_lag_tensor_identity_incomplete"
+            blocker = "lag_tensor_identity"
+            next_action = "verify_shapes_initial_positions_and_particle_cache"
+        else:
+            stage = "sparse_lag_event_clock_upstream_incomplete"
+            blocker = "time_code_coverage" if not full_coverage else "event_segmentation_target"
+            next_action = (
+                "extract_all_required_time_code_particle_caches"
+                if not full_coverage
+                else "complete_direct_alpha_event_clock_contract"
+            )
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "required_time_codes": ";".join(required_codes),
+                "observed_time_codes": ";".join(observed_codes) if observed_codes else "none",
+                "time_code_coverage_fraction": float(coverage),
+                "lag_count": float(len(observed_required)),
+                "positions_shape": next(iter(shapes)) if same_shape else "mixed_or_missing",
+                "same_shape_across_lags": float(same_shape),
+                "same_initial_structure_verified": float(same_initial),
+                "max_initial_position_mismatch": float(max_mismatch if math.isfinite(max_mismatch) else 0.0),
+                "particle_cache_ready": float(cached_ready),
+                "physical_lag_tensor_ready": float(physical_tensor_ready),
+                "event_segmentation_target_ready": float(target_ready),
+                "coarse_event_clock_candidate_ready": float(coarse_candidate_ready),
+                "replica_identity_alignment_ready": float(replica_identity_ready),
+                "event_clock_resolution": "sparse_lag_interval" if coarse_candidate_ready else "none",
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "sparse_lag_event_clock_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_interval_censored_first_crossing_clock(
+    *,
+    audit_id: str,
+    sparse_lag_rows: Sequence[dict[str, object]],
+    crossing_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Convert sparse-lag threshold crossings into interval-censored clock bounds."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not sparse_lag_rows:
+        raise ValueError("sparse_lag_rows must be nonempty")
+    if not crossing_rows:
+        raise ValueError("crossing_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_first_crossing_terms(text: str) -> dict[str, float]:
+        if not text or text == "none":
+            return {}
+        out: dict[str, float] = {}
+        for term in text.split(";"):
+            if not term:
+                continue
+            if ":" not in term:
+                raise ValueError("first-crossing terms must use code:fraction format")
+            code, value = term.split(":", 1)
+            out[str(code)] = float(value)
+        return out
+
+    def parse_semicolon_floats(text: str) -> list[float]:
+        if not text or text == "none":
+            return []
+        return [float(value) for value in text.split(";") if value and value != "none"]
+
+    def parse_semicolon_text(text: str) -> list[str]:
+        if not text or text == "none":
+            return []
+        return [value for value in text.split(";") if value and value != "none"]
+
+    crossing_by_key = {key_for(row): row for row in crossing_rows}
+    rows: list[dict[str, float | str]] = []
+    for sparse in sorted(sparse_lag_rows, key=key_for):
+        key = key_for(sparse)
+        system_id, temperature, structure_id = key
+        crossing = crossing_by_key.get(key, {})
+        candidate_ready = float(sparse.get("coarse_event_clock_candidate_ready", 0.0) or 0.0) == 1.0
+        time_codes = parse_semicolon_text(str(crossing.get("time_codes", "")))
+        lag_times = parse_semicolon_floats(str(crossing.get("lag_times", "")))
+        fractions = parse_first_crossing_terms(str(crossing.get("first_crossing_fractions_by_time_code", "none")))
+        paired = len(time_codes) == len(lag_times) and len(time_codes) > 0
+        lag_by_code = dict(zip(time_codes, lag_times)) if paired else {}
+        crossed_fraction = float(crossing.get("ever_crossed_fraction", 0.0) or 0.0)
+        right_censored = float(crossing.get("never_crossed_fraction", 0.0) or 0.0)
+
+        lower_weighted = 0.0
+        upper_weighted = 0.0
+        midpoint_weighted = 0.0
+        width_weighted = 0.0
+        fraction_sum = 0.0
+        first_interval_terms: list[str] = []
+        for code in time_codes:
+            fraction = float(fractions.get(code, 0.0))
+            if fraction <= 0.0:
+                continue
+            idx = time_codes.index(code)
+            lower = 0.0 if idx == 0 else float(lag_by_code[time_codes[idx - 1]])
+            upper = float(lag_by_code[code])
+            midpoint = 0.5 * (lower + upper)
+            width = upper - lower
+            fraction_sum += fraction
+            lower_weighted += fraction * lower
+            upper_weighted += fraction * upper
+            midpoint_weighted += fraction * midpoint
+            width_weighted += fraction * width
+            first_interval_terms.append(f"{code}:{lower:.17g}:{upper:.17g}:{fraction:.17g}")
+
+        interval_ready = bool(candidate_ready and paired and fraction_sum > 0.0)
+        if interval_ready:
+            stage = "interval_censored_persistence_clock_candidate"
+            blocker = "interval_censoring_and_replica_identity"
+            next_action = "fit_interval_censored_persistence_distribution_and_verify_replica_identity"
+        elif candidate_ready:
+            stage = "interval_clock_crossing_distribution_missing"
+            blocker = "first_crossing_distribution"
+            next_action = "compute_first_crossing_fractions_by_time_code"
+        else:
+            stage = "interval_clock_sparse_lag_upstream_incomplete"
+            blocker = "sparse_lag_event_clock"
+            next_action = "complete_sparse_lag_event_clock_audit"
+
+        denom = fraction_sum if fraction_sum > 0.0 else 1.0
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_codes": ";".join(time_codes) if time_codes else "none",
+                "lag_times": ";".join(f"{value:.17g}" for value in lag_times) if lag_times else "none",
+                "first_crossing_intervals": ";".join(first_interval_terms) if first_interval_terms else "none",
+                "coarse_event_clock_candidate_ready": float(candidate_ready),
+                "interval_clock_candidate_ready": float(interval_ready),
+                "crossed_fraction": float(crossed_fraction),
+                "first_crossing_fraction_sum": float(fraction_sum),
+                "right_censored_fraction": float(right_censored),
+                "mean_first_crossing_lower_bound": float(lower_weighted / denom),
+                "mean_first_crossing_upper_bound": float(upper_weighted / denom),
+                "mean_first_crossing_midpoint": float(midpoint_weighted / denom),
+                "mean_interval_width": float(width_weighted / denom),
+                "latest_lag_time": float(max(lag_times) if lag_times else 0.0),
+                "event_clock_resolution": str(sparse.get("event_clock_resolution", "none")),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "interval_clock_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_interval_censored_persistence_fit(
+    *,
+    fit_id: str,
+    interval_clock_rows: Sequence[dict[str, object]],
+    direct_alpha_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Fit a one-parameter exponential persistence law with interval censoring."""
+
+    if not fit_id:
+        raise ValueError("fit_id must be nonempty")
+    if not interval_clock_rows:
+        raise ValueError("interval_clock_rows must be nonempty")
+    if not direct_alpha_rows:
+        raise ValueError("direct_alpha_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_intervals(text: str) -> list[tuple[float, float, float]]:
+        if not text or text == "none":
+            return []
+        parsed: list[tuple[float, float, float]] = []
+        for term in text.split(";"):
+            if not term:
+                continue
+            parts = term.split(":")
+            if len(parts) != 4:
+                raise ValueError("first-crossing interval terms must be code:lower:upper:fraction")
+            _, lower, upper, fraction = parts
+            parsed.append((float(lower), float(upper), float(fraction)))
+        return parsed
+
+    def interval_log_likelihood(rate: float, intervals: Sequence[tuple[float, float, float]], censored: float, latest: float) -> float:
+        if rate <= 0.0:
+            return -math.inf
+        total = 0.0
+        for lower, upper, weight in intervals:
+            if upper <= lower or weight <= 0.0:
+                continue
+            exponent_lower = -rate * lower
+            exponent_upper = -rate * upper
+            probability = math.exp(exponent_lower) * (-math.expm1(exponent_upper - exponent_lower))
+            if probability <= 0.0 or not math.isfinite(probability):
+                return -math.inf
+            total += weight * math.log(probability)
+        if censored > 0.0 and latest > 0.0:
+            total += censored * (-rate * latest)
+        return total
+
+    def fit_exponential_rate(intervals: Sequence[tuple[float, float, float]], censored: float, latest: float) -> tuple[float, float]:
+        low = math.log(1e-12)
+        high = math.log(1e-2)
+        for _ in range(240):
+            left = low + (high - low) / 3.0
+            right = high - (high - low) / 3.0
+            if interval_log_likelihood(math.exp(left), intervals, censored, latest) < interval_log_likelihood(
+                math.exp(right), intervals, censored, latest
+            ):
+                low = left
+            else:
+                high = right
+        rate = math.exp(0.5 * (low + high))
+        return rate, interval_log_likelihood(rate, intervals, censored, latest)
+
+    direct_by_key = {key_for(row): row for row in direct_alpha_rows}
+    rows: list[dict[str, float | str]] = []
+    for row in sorted(interval_clock_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(row)
+        ready = float(row.get("interval_clock_candidate_ready", 0.0) or 0.0) == 1.0
+        intervals = parse_intervals(str(row.get("first_crossing_intervals", "none")))
+        latest_lag = float(row.get("latest_lag_time", 0.0) or 0.0)
+        right_censored = float(row.get("right_censored_fraction", 0.0) or 0.0)
+        observed_crossed = float(
+            row.get(
+                "first_crossing_fraction_sum",
+                row.get("crossed_fraction", sum(fraction for _, _, fraction in intervals)),
+            )
+            or 0.0
+        )
+        direct = direct_by_key.get((system_id, temperature, structure_id), {})
+        tau_alpha_direct = float(direct.get("threshold_crossing_lag_time", 0.0) or 0.0)
+        alpha_crossed = float(direct.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
+
+        if ready and intervals and latest_lag > 0.0:
+            rate, log_likelihood = fit_exponential_rate(intervals, right_censored, latest_lag)
+            mean_time = 1.0 / rate
+            predicted_cdf = 1.0 - math.exp(-rate * latest_lag)
+            stage = "interval_censored_exponential_persistence_fit_ready"
+            blocker = "exchange_clock_and_replica_identity"
+            next_action = "estimate_exchange_clock_or_joint_pe_model_under_interval_censoring"
+            fit_ready = True
+        else:
+            rate = 0.0
+            log_likelihood = 0.0
+            mean_time = 0.0
+            predicted_cdf = 0.0
+            stage = "interval_censored_persistence_fit_upstream_incomplete"
+            blocker = "interval_censored_clock"
+            next_action = "complete_interval_censored_first_crossing_clock"
+            fit_ready = False
+
+        rows.append(
+            {
+                "fit_id": fit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "interval_clock_candidate_ready": float(ready),
+                "persistence_fit_ready": float(fit_ready),
+                "exponential_rate_mle": float(rate),
+                "exponential_mean_persistence_time": float(mean_time),
+                "log_likelihood": float(log_likelihood),
+                "observed_crossed_fraction": float(observed_crossed),
+                "predicted_crossed_fraction_at_latest_lag": float(predicted_cdf),
+                "right_censored_fraction": float(right_censored),
+                "latest_lag_time": float(latest_lag),
+                "tau_alpha_direct": float(tau_alpha_direct),
+                "alpha_threshold_crossed": float(alpha_crossed),
+                "mean_persistence_over_tau_alpha_direct": float(mean_time / tau_alpha_direct)
+                if tau_alpha_direct > 0.0
+                else 0.0,
+                "exchange_clock_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "persistence_fit_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_interval_censored_waiting_law_selection(
+    *,
+    selection_id: str,
+    interval_clock_rows: Sequence[dict[str, object]],
+    persistence_fit_rows: Sequence[dict[str, object]],
+    min_delta_aic_for_extra_parameter: float,
+) -> list[dict[str, float | str]]:
+    """Compare exponential and Weibull persistence laws on interval-censored crossings."""
+
+    if not selection_id:
+        raise ValueError("selection_id must be nonempty")
+    if not interval_clock_rows:
+        raise ValueError("interval_clock_rows must be nonempty")
+    if not persistence_fit_rows:
+        raise ValueError("persistence_fit_rows must be nonempty")
+    if min_delta_aic_for_extra_parameter < 0.0:
+        raise ValueError("min_delta_aic_for_extra_parameter must be nonnegative")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_intervals(text: str) -> list[tuple[float, float, float]]:
+        if not text or text == "none":
+            return []
+        out: list[tuple[float, float, float]] = []
+        for term in text.split(";"):
+            if not term:
+                continue
+            parts = term.split(":")
+            if len(parts) != 4:
+                raise ValueError("first-crossing interval terms must be code:lower:upper:fraction")
+            _, lower, upper, fraction = parts
+            out.append((float(lower), float(upper), float(fraction)))
+        return out
+
+    def weibull_log_likelihood(
+        shape: float,
+        scale: float,
+        intervals: Sequence[tuple[float, float, float]],
+        censored: float,
+        latest: float,
+    ) -> float:
+        if shape <= 0.0 or scale <= 0.0:
+            return -math.inf
+        total = 0.0
+        for lower, upper, weight in intervals:
+            if upper <= lower or weight <= 0.0:
+                continue
+            lower_power = (lower / scale) ** shape
+            upper_power = (upper / scale) ** shape
+            probability = math.exp(-lower_power) * (-math.expm1(-(upper_power - lower_power)))
+            if probability <= 0.0 or not math.isfinite(probability):
+                return -math.inf
+            total += weight * math.log(probability)
+        if censored > 0.0 and latest > 0.0:
+            total += censored * (-(latest / scale) ** shape)
+        return total
+
+    def fit_weibull(
+        intervals: Sequence[tuple[float, float, float]],
+        censored: float,
+        latest: float,
+    ) -> tuple[float, float, float]:
+        best_ll = -math.inf
+        best_shape = 1.0
+        best_scale = max(latest, 1.0)
+        min_scale = max(latest * 1.0e-3, 1.0e-6)
+        max_scale = max(latest * 1.0e4, min_scale * 10.0)
+        for shape_index in range(181):
+            shape = 0.2 + 0.01 * shape_index
+            for scale_index in range(361):
+                log_scale = math.log(min_scale) + (math.log(max_scale) - math.log(min_scale)) * scale_index / 360.0
+                scale = math.exp(log_scale)
+                ll = weibull_log_likelihood(shape, scale, intervals, censored, latest)
+                if ll > best_ll:
+                    best_ll = ll
+                    best_shape = shape
+                    best_scale = scale
+
+        ll = best_ll
+        shape = best_shape
+        scale = best_scale
+        for step in [0.08, 0.04, 0.02, 0.01, 0.005, 0.002, 0.001]:
+            improved = True
+            while improved:
+                improved = False
+                for d_shape in (-step, 0.0, step):
+                    for d_log_scale in (-step, 0.0, step):
+                        candidate_shape = shape + d_shape
+                        candidate_scale = scale * math.exp(d_log_scale)
+                        candidate_ll = weibull_log_likelihood(
+                            candidate_shape,
+                            candidate_scale,
+                            intervals,
+                            censored,
+                            latest,
+                        )
+                        if candidate_ll > ll:
+                            ll = candidate_ll
+                            shape = candidate_shape
+                            scale = candidate_scale
+                            improved = True
+        return shape, scale, ll
+
+    persistence_by_key = {key_for(row): row for row in persistence_fit_rows}
+    rows: list[dict[str, float | str]] = []
+    for interval in sorted(interval_clock_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(interval)
+        persistence = persistence_by_key.get((system_id, temperature, structure_id), {})
+        ready = (
+            float(interval.get("interval_clock_candidate_ready", 0.0) or 0.0) == 1.0
+            and float(persistence.get("persistence_fit_ready", 0.0) or 0.0) == 1.0
+        )
+        intervals = parse_intervals(str(interval.get("first_crossing_intervals", "none")))
+        latest = float(interval.get("latest_lag_time", 0.0) or 0.0)
+        censored = float(interval.get("right_censored_fraction", 0.0) or 0.0)
+        observed_crossed = max(0.0, sum(weight for _, _, weight in intervals))
+        if ready and intervals and latest > 0.0:
+            exp_log_likelihood = float(persistence.get("log_likelihood", 0.0) or 0.0)
+            exp_rate = float(persistence.get("exponential_rate_mle", 0.0) or 0.0)
+            exp_mean = float(persistence.get("exponential_mean_persistence_time", 0.0) or 0.0)
+            shape, scale, weibull_ll = fit_weibull(intervals, censored, latest)
+            weibull_mean = scale * math.gamma(1.0 + 1.0 / shape)
+            aic_exp = 2.0 - 2.0 * exp_log_likelihood
+            aic_weibull = 4.0 - 2.0 * weibull_ll
+            delta_aic = aic_exp - aic_weibull
+            extra_supported = delta_aic >= min_delta_aic_for_extra_parameter
+            stage = (
+                "weibull_waiting_law_preferred"
+                if extra_supported
+                else "exponential_waiting_law_not_rejected_sparse_cache"
+            )
+            blocker = "none" if extra_supported else "sparse_interval_censoring"
+            next_required_action = (
+                "use_weibull_waiting_law_in_heldout_pe_prediction"
+                if extra_supported
+                else "extend_interval_censored_event_clock_before_claiming_stretched_waiting_law"
+            )
+            selection_ready = True
+        else:
+            exp_log_likelihood = 0.0
+            exp_rate = 0.0
+            exp_mean = 0.0
+            shape = 0.0
+            scale = 0.0
+            weibull_ll = 0.0
+            weibull_mean = 0.0
+            aic_exp = 0.0
+            aic_weibull = 0.0
+            delta_aic = 0.0
+            extra_supported = False
+            stage = "waiting_law_selection_upstream_incomplete"
+            blocker = "interval_censored_persistence_fit"
+            next_required_action = "complete_interval_censored_persistence_fit"
+            selection_ready = False
+
+        rows.append(
+            {
+                "selection_id": selection_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "interval_clock_candidate_ready": float(interval.get("interval_clock_candidate_ready", 0.0) or 0.0),
+                "persistence_fit_ready": float(persistence.get("persistence_fit_ready", 0.0) or 0.0),
+                "waiting_law_selection_ready": float(selection_ready),
+                "exponential_rate_mle": float(exp_rate),
+                "exponential_mean_persistence_time": float(exp_mean),
+                "exponential_log_likelihood": float(exp_log_likelihood),
+                "exponential_aic": float(aic_exp),
+                "weibull_shape_mle": float(shape),
+                "weibull_scale_mle": float(scale),
+                "weibull_mean_persistence_time": float(weibull_mean),
+                "weibull_log_likelihood": float(weibull_ll),
+                "weibull_aic": float(aic_weibull),
+                "delta_aic_exponential_minus_weibull": float(delta_aic),
+                "min_delta_aic_for_extra_parameter": float(min_delta_aic_for_extra_parameter),
+                "extra_waiting_law_parameter_supported": float(extra_supported),
+                "observed_crossed_fraction": float(observed_crossed),
+                "right_censored_fraction": float(censored),
+                "latest_lag_time": float(latest),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_required_action,
+                "waiting_law_selection_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_finite_exchange_falsification_envelope(
+    *,
+    envelope_id: str,
+    persistence_fit_rows: Sequence[dict[str, object]],
+    max_exchange_mean_over_tau_alpha: float = 1.0,
+    min_exchange_events_for_gaussian_recovery: float = 25.0,
+) -> list[dict[str, float | str]]:
+    """Turn a censored persistence fit into a conditional finite-exchange test horizon.
+
+    The envelope does not infer the exchange clock.  It asks what follows if the
+    post-persistence exchange time is no slower than the measured alpha time:
+    ``tau_x <= max_exchange_mean_over_tau_alpha * tau_alpha``.  Under that
+    condition the fitted persistence scale gives a conservative lower bound on
+    ``tau_p/tau_x`` and an upper-bound lag at which a late-NGP / Gaussian
+    recovery measurement should have enough post-escape exchange events to test
+    the finite-exchange mechanism.
+    """
+
+    if not envelope_id:
+        raise ValueError("envelope_id must be nonempty")
+    if not persistence_fit_rows:
+        raise ValueError("persistence_fit_rows must be nonempty")
+    if max_exchange_mean_over_tau_alpha <= 0.0:
+        raise ValueError("max_exchange_mean_over_tau_alpha must be positive")
+    if min_exchange_events_for_gaussian_recovery <= 0.0:
+        raise ValueError("min_exchange_events_for_gaussian_recovery must be positive")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    rows: list[dict[str, float | str]] = []
+    for row in sorted(persistence_fit_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(row)
+        fit_ready = float(row.get("persistence_fit_ready", 0.0) or 0.0) == 1.0
+        tau_p = float(row.get("exponential_mean_persistence_time", 0.0) or 0.0)
+        tau_alpha = float(row.get("tau_alpha_direct", 0.0) or 0.0)
+        latest_lag = float(row.get("latest_lag_time", 0.0) or 0.0)
+
+        if fit_ready and tau_p > 0.0 and tau_alpha > 0.0:
+            exchange_upper = max_exchange_mean_over_tau_alpha * tau_alpha
+            ratio_lower = tau_p / exchange_upper
+            recovery_lag = tau_p + min_exchange_events_for_gaussian_recovery * exchange_upper
+            followup_multiplier = recovery_lag / latest_lag if latest_lag > 0.0 else math.inf
+            current_window_has_power = latest_lag >= recovery_lag
+            stage = "finite_exchange_falsification_horizon_ready"
+            blocker = "none" if current_window_has_power else "late_ngp_followup_and_exchange_clock"
+            next_action = (
+                "measure_late_ngp_or_van_hove_at_recovery_horizon_and_extract_exchange_clock"
+                if not current_window_has_power
+                else "score_late_ngp_gaussian_recovery_against_finite_exchange_and_static_null"
+            )
+            envelope_ready = True
+        else:
+            exchange_upper = 0.0
+            ratio_lower = 0.0
+            recovery_lag = 0.0
+            followup_multiplier = 0.0
+            current_window_has_power = False
+            stage = "finite_exchange_envelope_upstream_incomplete"
+            blocker = "interval_censored_persistence_fit"
+            next_action = "complete_interval_censored_persistence_fit"
+            envelope_ready = False
+
+        rows.append(
+            {
+                "envelope_id": envelope_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "persistence_fit_ready": float(fit_ready),
+                "envelope_ready": float(envelope_ready),
+                "exponential_mean_persistence_time": float(tau_p),
+                "tau_alpha_direct": float(tau_alpha),
+                "latest_lag_time": float(latest_lag),
+                "max_exchange_mean_over_tau_alpha": float(max_exchange_mean_over_tau_alpha),
+                "min_exchange_events_for_gaussian_recovery": float(min_exchange_events_for_gaussian_recovery),
+                "conditional_exchange_mean_upper_bound": float(exchange_upper),
+                "conditional_persistence_exchange_ratio_lower_bound": float(ratio_lower),
+                "gaussian_recovery_lag_upper_bound": float(recovery_lag),
+                "required_followup_lag_multiplier_over_current": float(followup_multiplier),
+                "current_window_has_gaussian_recovery_power": float(current_window_has_power),
+                "late_ngp_followup_ready": float(current_window_has_power),
+                "exchange_clock_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "envelope_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_real_cached_microdynamic_verdict(
+    *,
+    verdict_id: str,
+    persistence_fit_rows: Sequence[dict[str, object]],
+    finite_exchange_envelope_rows: Sequence[dict[str, object]],
+    event_clock_contract_rows: Sequence[dict[str, object]],
+    late_recovery_outcome_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Summarize real cached GlassBench microdynamic evidence without claiming full PE inversion."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not persistence_fit_rows:
+        raise ValueError("persistence_fit_rows must be nonempty")
+    if not finite_exchange_envelope_rows:
+        raise ValueError("finite_exchange_envelope_rows must be nonempty")
+    if not event_clock_contract_rows:
+        raise ValueError("event_clock_contract_rows must be nonempty")
+    if not late_recovery_outcome_rows:
+        raise ValueError("late_recovery_outcome_rows must be nonempty")
+
+    def number(row: dict[str, object], key: str) -> float:
+        return float(row.get(key, 0.0) or 0.0)
+
+    def first_ready(rows: Sequence[dict[str, object]], key: str) -> dict[str, object]:
+        for row in rows:
+            if number(row, key) == 1.0:
+                return row
+        return rows[0] if rows else {}
+
+    persistence = first_ready(persistence_fit_rows, "persistence_fit_ready")
+    envelope = first_ready(finite_exchange_envelope_rows, "envelope_ready")
+    contract = first_ready(event_clock_contract_rows, "event_segmentation_target_ready")
+    ready_outcomes = [
+        row
+        for row in late_recovery_outcome_rows
+        if number(row, "uncertainty_decision_ready") == 1.0
+    ]
+    support_scenarios = [
+        row for row in ready_outcomes if "supported" in str(row.get("claim_if_observed", ""))
+    ]
+    rejection_scenarios = [
+        row
+        for row in ready_outcomes
+        if "rejected" in str(row.get("claim_if_observed", ""))
+        or "reparameterization" in str(row.get("claim_if_observed", ""))
+    ]
+
+    persistence_ready = number(persistence, "persistence_fit_ready") == 1.0
+    envelope_ready = number(envelope, "envelope_ready") == 1.0
+    event_target_ready = number(contract, "event_segmentation_target_ready") == 1.0
+    event_clock_ready = number(contract, "event_clock_extraction_ready") == 1.0
+    exchange_clock_ready = max(number(persistence, "exchange_clock_ready"), number(envelope, "exchange_clock_ready"))
+    real_pe_ready = float(event_clock_ready and exchange_clock_ready == 1.0)
+    crossing_residual = abs(
+        number(persistence, "observed_crossed_fraction")
+        - number(persistence, "predicted_crossed_fraction_at_latest_lag")
+    )
+
+    blockers = []
+    if not event_clock_ready:
+        blockers.append(str(contract.get("primary_blocker", "physical_time_trajectory_axis")))
+    if exchange_clock_ready == 0.0:
+        blockers.append("exchange_clock")
+    if number(envelope, "late_ngp_followup_ready") == 0.0:
+        blockers.append("late_ngp_followup")
+    blocker = ";".join(dict.fromkeys(item for item in blockers if item and item != "none")) or "none"
+
+    base = {
+        "verdict_id": verdict_id,
+        "system_id": str(persistence.get("system_id", envelope.get("system_id", "unknown"))),
+        "temperature": str(persistence.get("temperature", envelope.get("temperature", "none"))),
+        "structure_id": str(persistence.get("structure_id", envelope.get("structure_id", "none"))),
+    }
+
+    def verdict_row(
+        *,
+        verdict_row_id: str,
+        stage: str,
+        allowed_claim_level: str,
+        real_cached_evidence_ready: float = 0.0,
+        interval_persistence_fit_ready: float = 0.0,
+        finite_exchange_envelope_ready: float = 0.0,
+        late_recovery_decision_protocol_ready: float = 0.0,
+        event_segmentation_target_ready: float = 0.0,
+        event_clock_extraction_ready: float = 0.0,
+        exchange_clock_ready_value: float = 0.0,
+        mechanism_selection_claim_allowed_now: float = 0.0,
+        real_pe_inversion_ready_value: float = 0.0,
+        primary_blocker: str = "none",
+    ) -> dict[str, float | str]:
+        return {
+            **base,
+            "verdict_row_id": verdict_row_id,
+            "real_cached_evidence_ready": float(real_cached_evidence_ready),
+            "interval_persistence_fit_ready": float(interval_persistence_fit_ready),
+            "finite_exchange_envelope_ready": float(finite_exchange_envelope_ready),
+            "late_recovery_decision_protocol_ready": float(late_recovery_decision_protocol_ready),
+            "event_segmentation_target_ready": float(event_segmentation_target_ready),
+            "event_clock_extraction_ready": float(event_clock_extraction_ready),
+            "exchange_clock_ready": float(exchange_clock_ready_value),
+            "mean_persistence_time": number(persistence, "exponential_mean_persistence_time"),
+            "tau_alpha_direct": number(persistence, "tau_alpha_direct"),
+            "mean_persistence_over_tau_alpha": number(persistence, "mean_persistence_over_tau_alpha_direct"),
+            "crossing_fraction_abs_residual": float(crossing_residual),
+            "conditional_pe_ratio_lower_bound": number(envelope, "conditional_persistence_exchange_ratio_lower_bound"),
+            "gaussian_recovery_lag_upper_bound": number(envelope, "gaussian_recovery_lag_upper_bound"),
+            "required_followup_lag_multiplier_over_current": number(
+                envelope,
+                "required_followup_lag_multiplier_over_current",
+            ),
+            "ready_late_recovery_outcome_count": float(len(ready_outcomes)),
+            "support_outcome_count": float(len(support_scenarios)),
+            "rejection_outcome_count": float(len(rejection_scenarios)),
+            "mechanism_selection_claim_allowed_now": float(mechanism_selection_claim_allowed_now),
+            "real_pe_inversion_ready": float(real_pe_inversion_ready_value),
+            "thermodynamic_claim_allowed": 0.0,
+            "allowed_claim_level": allowed_claim_level,
+            "primary_blocker": primary_blocker,
+            "cached_microdynamic_verdict_stage": stage,
+        }
+
+    return [
+        verdict_row(
+            verdict_row_id="real_cached_persistence_clock",
+            stage="real_cached_persistence_clock_quantified"
+            if persistence_ready
+            else "real_cached_persistence_clock_incomplete",
+            allowed_claim_level="interval_censored_persistence_candidate",
+            real_cached_evidence_ready=float(persistence_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            primary_blocker=str(persistence.get("primary_blocker", "interval_censored_clock"))
+            if not persistence_ready
+            else "exchange_clock_and_replica_identity",
+        ),
+        verdict_row(
+            verdict_row_id="conditional_persistence_exchange_bound",
+            stage="conditional_pe_decoupling_bound_ready"
+            if envelope_ready
+            else "conditional_pe_decoupling_bound_incomplete",
+            allowed_claim_level="conditional_pe_ratio_bound_not_full_inversion",
+            real_cached_evidence_ready=float(envelope_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            finite_exchange_envelope_ready=float(envelope_ready),
+            exchange_clock_ready_value=exchange_clock_ready,
+            real_pe_inversion_ready_value=real_pe_ready,
+            primary_blocker=str(envelope.get("primary_blocker", "finite_exchange_envelope")),
+        ),
+        verdict_row(
+            verdict_row_id="late_recovery_decision_protocol",
+            stage="late_recovery_protocol_preregistered"
+            if support_scenarios and rejection_scenarios
+            else "late_recovery_protocol_incomplete",
+            allowed_claim_level="preregistered_late_recovery_decision_protocol",
+            real_cached_evidence_ready=float(envelope_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            finite_exchange_envelope_ready=float(envelope_ready),
+            late_recovery_decision_protocol_ready=float(bool(support_scenarios and rejection_scenarios)),
+            event_segmentation_target_ready=float(event_target_ready),
+            event_clock_extraction_ready=float(event_clock_ready),
+            exchange_clock_ready_value=exchange_clock_ready,
+            mechanism_selection_claim_allowed_now=0.0,
+            real_pe_inversion_ready_value=real_pe_ready,
+            primary_blocker="late_recovery_measurement" if support_scenarios and rejection_scenarios else "outcome_matrix",
+        ),
+        verdict_row(
+            verdict_row_id="real_pe_inversion_boundary",
+            stage="real_pe_inversion_ready" if real_pe_ready == 1.0 else "real_pe_inversion_still_blocked",
+            allowed_claim_level="real_pe_inversion_claim_blocked"
+            if real_pe_ready == 0.0
+            else "real_persistence_exchange_inversion_ready",
+            real_cached_evidence_ready=float(persistence_ready and envelope_ready and event_target_ready),
+            interval_persistence_fit_ready=float(persistence_ready),
+            finite_exchange_envelope_ready=float(envelope_ready),
+            late_recovery_decision_protocol_ready=float(bool(support_scenarios and rejection_scenarios)),
+            event_segmentation_target_ready=float(event_target_ready),
+            event_clock_extraction_ready=float(event_clock_ready),
+            exchange_clock_ready_value=exchange_clock_ready,
+            mechanism_selection_claim_allowed_now=0.0,
+            real_pe_inversion_ready_value=real_pe_ready,
+            primary_blocker=blocker,
+        ),
+    ]
+
+
+def glassbench_late_recovery_falsification_protocol(
+    *,
+    protocol_id: str,
+    envelope_rows: Sequence[dict[str, object]],
+    late_observable_rows: Sequence[dict[str, object]],
+    max_finite_exchange_late_ngp: float = 0.05,
+    min_static_plateau_rejection_gap: float = 0.05,
+) -> list[dict[str, float | str]]:
+    """Classify late-NGP / van-Hove follow-up measurements against mechanisms."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not envelope_rows:
+        raise ValueError("envelope_rows must be nonempty")
+    if max_finite_exchange_late_ngp < 0.0:
+        raise ValueError("max_finite_exchange_late_ngp must be nonnegative")
+    if min_static_plateau_rejection_gap < 0.0:
+        raise ValueError("min_static_plateau_rejection_gap must be nonnegative")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    late_by_key = {key_for(row): row for row in late_observable_rows}
+    rows: list[dict[str, float | str]] = []
+    for envelope in sorted(envelope_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(envelope)
+        envelope_ready = float(envelope.get("envelope_ready", 0.0) or 0.0) == 1.0
+        required_lag = float(envelope.get("gaussian_recovery_lag_upper_bound", 0.0) or 0.0)
+        ratio_lower = float(envelope.get("conditional_persistence_exchange_ratio_lower_bound", 0.0) or 0.0)
+        late = late_by_key.get((system_id, temperature, structure_id))
+
+        observed_lag = 0.0
+        observed_late_ngp = 0.0
+        observed_recovery = False
+        static_plateau = 0.0
+        lag_power = False
+        finite_supported = False
+        finite_rejected = False
+        static_rejected = False
+        mechanism_ready = False
+
+        if not envelope_ready:
+            stage = "late_recovery_protocol_upstream_incomplete"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_falsification_envelope"
+        elif late is None:
+            stage = "late_recovery_acquisition_required"
+            blocker = "late_recovery_observation"
+            next_action = "measure_late_ngp_or_van_hove_at_required_followup_lag"
+        else:
+            observed_lag = float(late.get("observed_lag_time", 0.0) or 0.0)
+            observed_late_ngp = float(late.get("observed_late_ngp", 0.0) or 0.0)
+            observed_recovery = float(late.get("observed_tail_gaussian_recovery", 0.0) or 0.0) == 1.0
+            static_plateau = float(late.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+            lag_power = observed_lag >= required_lag and required_lag > 0.0
+            finite_supported = bool(
+                lag_power
+                and observed_recovery
+                and observed_late_ngp <= max_finite_exchange_late_ngp
+            )
+            finite_rejected = bool(
+                lag_power
+                and (not observed_recovery or observed_late_ngp > max_finite_exchange_late_ngp)
+            )
+            static_rejected = bool(
+                finite_supported
+                and static_plateau - observed_late_ngp >= min_static_plateau_rejection_gap
+            )
+            mechanism_ready = lag_power
+            if finite_supported:
+                stage = "finite_exchange_late_recovery_supported"
+                blocker = "exchange_clock"
+                next_action = "extract_exchange_clock_to_upgrade_mechanism_selection_to_pe_inversion"
+            elif finite_rejected:
+                stage = "finite_exchange_late_recovery_failed"
+                blocker = "late_gaussian_recovery"
+                next_action = "reject_or_reparameterize_finite_exchange_mechanism"
+            else:
+                stage = "late_recovery_lag_insufficient"
+                blocker = "late_recovery_horizon"
+                next_action = "extend_late_recovery_measurement_to_required_horizon"
+
+        rows.append(
+            {
+                "protocol_id": protocol_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "envelope_ready": float(envelope_ready),
+                "required_followup_lag_time": float(required_lag),
+                "conditional_persistence_exchange_ratio_lower_bound": float(ratio_lower),
+                "observed_lag_time": float(observed_lag),
+                "observed_late_ngp": float(observed_late_ngp),
+                "max_finite_exchange_late_ngp": float(max_finite_exchange_late_ngp),
+                "observed_tail_gaussian_recovery": float(observed_recovery),
+                "static_gamma_late_ngp_plateau": float(static_plateau),
+                "min_static_plateau_rejection_gap": float(min_static_plateau_rejection_gap),
+                "late_measurement_has_horizon_power": float(lag_power),
+                "mechanism_selection_ready": float(mechanism_ready),
+                "finite_exchange_supported": float(finite_supported),
+                "finite_exchange_rejected": float(finite_rejected),
+                "static_disorder_rejected": float(static_rejected),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "late_recovery_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_late_recovery_ingestion_contract(
+    *,
+    contract_id: str,
+    envelope_rows: Sequence[dict[str, object]],
+    candidate_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Validate late-recovery observations before mechanism falsification."""
+
+    if not contract_id:
+        raise ValueError("contract_id must be nonempty")
+    if not envelope_rows:
+        raise ValueError("envelope_rows must be nonempty")
+
+    required_columns = [
+        "observed_lag_time",
+        "observed_late_ngp",
+        "observed_tail_gaussian_recovery",
+        "source_trajectory_identity",
+    ]
+    uncertainty_columns = ["sigma_late_ngp", "sigma_tail_recovery"]
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def present(row: dict[str, object], column: str) -> bool:
+        value = row.get(column)
+        return value is not None and str(value) not in {"", "none", "nan"}
+
+    candidates_by_key: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in candidate_rows:
+        candidates_by_key.setdefault(key_for(row), []).append(row)
+
+    rows: list[dict[str, float | str]] = []
+    for envelope in sorted(envelope_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(envelope)
+        required_lag = float(envelope.get("gaussian_recovery_lag_upper_bound", 0.0) or 0.0)
+        envelope_ready = float(
+            envelope.get("envelope_ready", 1.0 if required_lag > 0.0 else 0.0) or 0.0
+        ) == 1.0
+        group = candidates_by_key.get((system_id, temperature, structure_id), [])
+        if not group:
+            group = [{}]
+
+        for index, candidate in enumerate(group):
+            missing_columns = [column for column in required_columns if not present(candidate, column)]
+            missing_uncertainty = [column for column in uncertainty_columns if not present(candidate, column)]
+            machine_readable = float(candidate.get("machine_readable", 0.0) or 0.0) == 1.0
+            shared_units = float(candidate.get("shared_time_units", 0.0) or 0.0) == 1.0
+            observed_lag = float(candidate.get("observed_lag_time", 0.0) or 0.0)
+            horizon_satisfied = observed_lag >= required_lag and required_lag > 0.0
+            structural_ready = bool(machine_readable and shared_units and not missing_columns)
+            uncertainty_ready = not missing_uncertainty
+            ready = structural_ready and uncertainty_ready and horizon_satisfied
+
+            if not envelope_ready:
+                stage = "late_recovery_envelope_upstream_incomplete"
+                blocker = "finite_exchange_envelope"
+                next_action = "complete_finite_exchange_falsification_envelope"
+            elif candidate == {}:
+                stage = "late_recovery_observation_missing"
+                blocker = "late_recovery_observation"
+                next_action = "provide_machine_readable_late_recovery_observation_with_uncertainty"
+            elif not machine_readable:
+                stage = "late_recovery_machine_readable_incomplete"
+                blocker = "machine_readable_data"
+                next_action = "provide_machine_readable_late_recovery_table"
+            elif not shared_units:
+                stage = "late_recovery_time_units_incomplete"
+                blocker = "shared_time_units"
+                next_action = "map_late_recovery_time_units_to_glassbench_lag_time"
+            elif missing_columns:
+                stage = "late_recovery_columns_incomplete"
+                blocker = missing_columns[0]
+                next_action = "provide_required_late_recovery_columns"
+            elif not horizon_satisfied:
+                stage = "late_recovery_horizon_incomplete"
+                blocker = "late_recovery_horizon"
+                next_action = "extend_late_recovery_measurement_to_required_followup_lag"
+            elif missing_uncertainty:
+                stage = "late_recovery_uncertainty_incomplete"
+                blocker = missing_uncertainty[0]
+                next_action = "provide_uncertainty_columns_for_late_recovery_observation"
+            else:
+                stage = "late_recovery_observation_ingestion_ready"
+                blocker = "none"
+                next_action = "run_late_recovery_falsification_protocol"
+
+            rows.append(
+                {
+                    "contract_id": contract_id,
+                    "candidate_id": f"{system_id}:{temperature}:{structure_id}:{index}",
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "required_followup_lag_time": float(required_lag),
+                    "observed_lag_time": float(observed_lag),
+                    "observed_late_ngp": float(candidate.get("observed_late_ngp", 0.0) or 0.0),
+                    "sigma_late_ngp": float(candidate.get("sigma_late_ngp", 0.0) or 0.0),
+                    "observed_tail_gaussian_recovery": float(
+                        candidate.get("observed_tail_gaussian_recovery", 0.0) or 0.0
+                    ),
+                    "sigma_tail_recovery": float(candidate.get("sigma_tail_recovery", 0.0) or 0.0),
+                    "machine_readable_ready": float(machine_readable),
+                    "shared_time_units_ready": float(shared_units),
+                    "source_trajectory_identity": str(candidate.get("source_trajectory_identity", "none")),
+                    "horizon_satisfied": float(horizon_satisfied),
+                    "structural_ingestion_ready": float(structural_ready),
+                    "uncertainty_ready": float(uncertainty_ready),
+                    "late_recovery_observation_ready": float(ready),
+                    "missing_columns": ";".join(missing_columns) if missing_columns else "none",
+                    "missing_uncertainty_columns": ";".join(missing_uncertainty)
+                    if missing_uncertainty
+                    else "none",
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": next_action,
+                    "late_recovery_ingestion_stage": stage,
+                }
+            )
+    return rows
+
+
+def glassbench_late_recovery_timecode_target(
+    *,
+    target_id: str,
+    envelope_rows: Sequence[dict[str, object]],
+    interval_clock_rows: Sequence[dict[str, object]],
+    time_code_step: int | None = None,
+) -> list[dict[str, float | str]]:
+    """Map the required late-recovery lag horizon onto the next time-code cache."""
+
+    if not target_id:
+        raise ValueError("target_id must be nonempty")
+    if not envelope_rows:
+        raise ValueError("envelope_rows must be nonempty")
+    if time_code_step is not None and time_code_step <= 0:
+        raise ValueError("time_code_step must be positive")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_series(row: dict[str, object]) -> list[tuple[int, str, float]]:
+        codes = [value for value in str(row.get("time_codes", "")).split(";") if value]
+        lag_text = [value for value in str(row.get("lag_times", "")).split(";") if value]
+        pairs: list[tuple[int, str, float]] = []
+        for code, lag in zip(codes, lag_text):
+            match = re.fullmatch(r"tc(\d+)", code)
+            if match is None:
+                continue
+            lag_value = float(lag)
+            if lag_value > 0.0:
+                pairs.append((int(match.group(1)), code, lag_value))
+        return sorted(pairs)
+
+    clock_by_key = {key_for(row): row for row in interval_clock_rows}
+    rows: list[dict[str, float | str]] = []
+    for envelope in sorted(envelope_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(envelope)
+        envelope_ready = float(envelope.get("envelope_ready", 0.0) or 0.0) == 1.0
+        required_lag = float(envelope.get("gaussian_recovery_lag_upper_bound", 0.0) or 0.0)
+        clock = clock_by_key.get((system_id, temperature, structure_id), {})
+        clock_ready = float(clock.get("interval_clock_candidate_ready", 0.0) or 0.0) == 1.0
+        pairs = parse_series(clock)
+        current_code = pairs[-1][1] if pairs else "none"
+        current_code_number = pairs[-1][0] if pairs else 0
+        current_lag = pairs[-1][2] if pairs else 0.0
+        target_code = "none"
+        target_code_number = 0
+        target_lag = 0.0
+        log_step = 0.0
+        current_ratio = current_lag / required_lag if required_lag > 0.0 else 0.0
+        target_ratio = 0.0
+        steps_needed = 0
+        target_ready = False
+
+        if not envelope_ready:
+            stage = "late_recovery_timecode_target_upstream_incomplete"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_falsification_envelope"
+        elif not clock_ready or len(pairs) < 2 or required_lag <= 0.0:
+            stage = "late_recovery_timecode_target_clock_incomplete"
+            blocker = "interval_censored_first_crossing_clock"
+            next_action = "complete_interval_censored_first_crossing_clock"
+        else:
+            prev_code_number, _, prev_lag = pairs[-2]
+            observed_step = current_code_number - prev_code_number
+            step = int(time_code_step or observed_step)
+            log_step = math.log(current_lag / prev_lag) / observed_step * step
+            if current_lag >= required_lag:
+                target_code_number = current_code_number
+                target_code = current_code
+                target_lag = current_lag
+                stage = "late_recovery_timecode_target_already_covered"
+                blocker = "late_recovery_observation"
+                next_action = "measure_late_ngp_or_van_hove_at_current_max_time_code"
+            else:
+                steps_needed = max(
+                    1,
+                    math.ceil(math.log(required_lag / current_lag) / log_step),
+                )
+                target_code_number = current_code_number + step * steps_needed
+                target_code = f"tc{target_code_number:02d}"
+                target_lag = current_lag * math.exp(log_step * steps_needed)
+                stage = "late_recovery_timecode_target_ready"
+                blocker = "late_recovery_time_code_cache"
+                next_action = (
+                    f"extract_or_cache_glassbench_time_code_{target_code}_late_recovery_observables"
+                )
+            target_ratio = target_lag / required_lag if required_lag > 0.0 else 0.0
+            target_ready = target_lag >= required_lag and target_code != "none"
+
+        rows.append(
+            {
+                "target_id": target_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "envelope_ready": float(envelope_ready),
+                "interval_clock_candidate_ready": float(clock_ready),
+                "required_followup_lag_time": float(required_lag),
+                "current_max_time_code": current_code,
+                "current_max_time_code_number": float(current_code_number),
+                "current_max_lag_time": float(current_lag),
+                "current_lag_over_required": float(current_ratio),
+                "target_time_code": target_code,
+                "target_time_code_number": float(target_code_number),
+                "target_lag_time": float(target_lag),
+                "target_lag_over_required": float(target_ratio),
+                "timecode_log_lag_step": float(log_step),
+                "timecode_steps_needed": float(steps_needed),
+                "timecode_target_ready": float(target_ready),
+                "late_recovery_observation_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "timecode_target_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_late_recovery_cache_request_contract(
+    *,
+    contract_id: str,
+    timecode_target_rows: Sequence[dict[str, object]],
+    multilag_target_rows: Sequence[dict[str, object]],
+    cache_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Turn a late-recovery time-code target into a concrete cache request."""
+
+    if not contract_id:
+        raise ValueError("contract_id must be nonempty")
+    if not timecode_target_rows:
+        raise ValueError("timecode_target_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", row.get("selected_structure_id", "none"))),
+        )
+
+    def split_semicolon(value: object) -> list[str]:
+        return [item for item in str(value or "").split(";") if item]
+
+    def infer_member(existing_members: list[str], current_code: str, target_code: str) -> str:
+        for member in reversed(existing_members):
+            if current_code != "none" and current_code in member:
+                return member.replace(current_code, target_code)
+        for member in reversed(existing_members):
+            match = re.search(r"tc\d+", member)
+            if match is not None:
+                return member[: match.start()] + target_code + member[match.end() :]
+        return "none"
+
+    def cache_path_for(system_id: str, temperature: str, member: str) -> str:
+        stem = Path(member).stem
+        temp_label = temperature.replace(".", "_")
+        return (
+            "data/third_party/glassbench/particle_cache/"
+            f"glassbench_{system_id.lower()}_T{temp_label}_{stem}_positions.npz"
+        )
+
+    multilag_by_key = {key_for(row): row for row in multilag_target_rows}
+    cached_members: set[tuple[str, str, str, str]] = set()
+    for row in cache_rows:
+        if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+            continue
+        cached_members.add(
+            (
+                str(row.get("system_id", "unknown")),
+                str(row.get("temperature", "none")),
+                str(row.get("structure_id", "none")),
+                str(row.get("target_member", row.get("first_npz_member", "none"))),
+            )
+        )
+
+    rows: list[dict[str, float | str]] = []
+    for target in sorted(timecode_target_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(target)
+        target_ready = float(target.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        target_time_code = str(target.get("target_time_code", "none"))
+        current_time_code = str(target.get("current_max_time_code", "none"))
+        required_lag = float(target.get("required_followup_lag_time", 0.0) or 0.0)
+        current_lag = float(target.get("current_max_lag_time", 0.0) or 0.0)
+        target_lag = float(target.get("target_lag_time", 0.0) or 0.0)
+        multilag = multilag_by_key.get((system_id, temperature, structure_id), {})
+        source_path = str(multilag.get("source_path", "none"))
+        members = split_semicolon(multilag.get("target_members", ""))
+        member_md5s = split_semicolon(multilag.get("target_member_md5s", ""))
+        code_list = split_semicolon(multilag.get("selected_time_codes", ""))
+        inferred_member = (
+            infer_member(members, current_time_code, target_time_code)
+            if target_ready and target_time_code != "none"
+            else "none"
+        )
+        inferred_ready = inferred_member != "none" and target_time_code != "none"
+        md5_by_member = dict(zip(members, member_md5s))
+        target_member_md5 = md5_by_member.get(inferred_member, "none")
+        official_metadata_ready = target_member_md5 != "none" and target_time_code in code_list
+        expected_cache_path = (
+            cache_path_for(system_id, temperature, inferred_member) if inferred_ready else "none"
+        )
+        particle_cache_ready = (
+            system_id,
+            temperature,
+            structure_id,
+            inferred_member,
+        ) in cached_members
+        cache_request_ready = target_ready and inferred_ready
+
+        if not target_ready:
+            stage = "late_recovery_timecode_target_incomplete"
+            blocker = "late_recovery_timecode_target"
+            next_action = "complete_late_recovery_timecode_target"
+        elif not inferred_ready:
+            stage = "late_recovery_member_path_inference_incomplete"
+            blocker = "late_recovery_member_path_template"
+            next_action = "provide_structure_matched_late_recovery_member_template"
+        elif not official_metadata_ready:
+            stage = "late_recovery_member_metadata_required"
+            blocker = "late_recovery_npz_member_metadata"
+            next_action = (
+                f"verify_glassbench_archive_contains_time_code_{target_time_code}_"
+                f"for_structure_{structure_id}"
+            )
+        elif not particle_cache_ready:
+            stage = "late_recovery_particle_cache_required"
+            blocker = "late_recovery_particle_cache"
+            next_action = f"extract_late_recovery_particle_cache_for_{target_time_code}"
+        else:
+            stage = "late_recovery_particle_cache_ready"
+            blocker = "late_recovery_observable"
+            next_action = "compute_late_ngp_and_van_hove_recovery_observables"
+
+        rows.append(
+            {
+                "contract_id": contract_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "source_path": source_path,
+                "timecode_target_ready": float(target_ready),
+                "required_followup_lag_time": float(required_lag),
+                "current_max_time_code": current_time_code,
+                "current_max_lag_time": float(current_lag),
+                "target_time_code": target_time_code,
+                "target_lag_time": float(target_lag),
+                "inferred_target_member": inferred_member,
+                "inferred_member_path_ready": float(inferred_ready),
+                "official_target_member_metadata_ready": float(official_metadata_ready),
+                "target_member_md5": target_member_md5,
+                "expected_particle_cache_path": expected_cache_path,
+                "particle_cache_ready": float(particle_cache_ready),
+                "cache_request_ready": float(cache_request_ready),
+                "late_recovery_observable_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "cache_request_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_late_recovery_membership_probe_contract(
+    *,
+    probe_id: str,
+    cache_request_rows: Sequence[dict[str, object]],
+    member_index_manifest: dict[str, object],
+) -> list[dict[str, float | str]]:
+    """Check whether a late-recovery target member is visible in bounded tar probes."""
+
+    if not probe_id:
+        raise ValueError("probe_id must be nonempty")
+    if not cache_request_rows:
+        raise ValueError("cache_request_rows must be nonempty")
+    entries = member_index_manifest.get("entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("member_index_manifest entries must be a list")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def member_names(entry: dict[str, object]) -> list[str]:
+        members = entry.get("npz_members", [])
+        if not isinstance(members, list):
+            return []
+        names: list[str] = []
+        for member in members:
+            if isinstance(member, dict):
+                names.append(str(member.get("name", "none")))
+        return names
+
+    def time_code_number(code: str) -> int:
+        match = re.fullmatch(r"tc(\d+)", code)
+        return int(match.group(1)) if match is not None else -1
+
+    entries_by_path = {
+        str(entry.get("path", entry.get("source_path", "none"))): entry
+        for entry in entries
+        if isinstance(entry, dict)
+    }
+
+    rows: list[dict[str, float | str]] = []
+    for request in sorted(cache_request_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(request)
+        source_path = str(request.get("source_path", "none"))
+        request_ready = float(request.get("cache_request_ready", 0.0) or 0.0) == 1.0
+        target_member = str(request.get("inferred_target_member", "none"))
+        target_time_code = str(request.get("target_time_code", "none"))
+        target_lag = float(request.get("target_lag_time", 0.0) or 0.0)
+        entry = entries_by_path.get(source_path, {})
+
+        names = member_names(entry)
+        target_visible = target_member in names
+        same_structure: list[tuple[str, str]] = []
+        for name in names:
+            match = re.search(rf"_{re.escape(structure_id)}_(tc\d+)\.npz$", name)
+            if match is not None:
+                same_structure.append((match.group(1), name))
+        same_structure.sort(key=lambda item: time_code_number(item[0]))
+        visible_codes = [code for code, _name in same_structure]
+        max_code = visible_codes[-1] if visible_codes else "none"
+        manifest_entry_ready = bool(entry)
+        compressed_probe_bytes = float(entry.get("compressed_probe_bytes", 0.0) or 0.0)
+        tar_probe_bytes = float(entry.get("tar_probe_bytes", 0.0) or 0.0)
+        member_count = float(entry.get("npz_member_count_in_probe", len(names)) or 0.0)
+
+        if not request_ready:
+            stage = "late_recovery_cache_request_incomplete"
+            blocker = "late_recovery_cache_request"
+            next_action = "complete_late_recovery_cache_request_contract"
+            probe_ready = False
+        elif not manifest_entry_ready:
+            stage = "late_recovery_member_index_probe_missing"
+            blocker = "late_recovery_member_index_probe"
+            next_action = "probe_glassbench_tar_prefix_for_late_recovery_target"
+            probe_ready = False
+        elif target_visible:
+            stage = "late_recovery_target_member_visible_in_probe"
+            blocker = "late_recovery_particle_cache"
+            next_action = f"extract_late_recovery_particle_cache_for_{target_time_code}"
+            probe_ready = True
+        else:
+            stage = "late_recovery_target_absent_from_extended_prefix"
+            blocker = "late_recovery_member_index_depth"
+            next_action = (
+                f"extend_glassbench_tar_prefix_probe_for_structure_{structure_id}_"
+                f"{target_time_code}_or_full_index"
+            )
+            probe_ready = True
+
+        rows.append(
+            {
+                "probe_id": probe_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "source_path": source_path,
+                "cache_request_ready": float(request_ready),
+                "target_time_code": target_time_code,
+                "target_lag_time": float(target_lag),
+                "inferred_target_member": target_member,
+                "member_index_entry_ready": float(manifest_entry_ready),
+                "compressed_probe_bytes": float(compressed_probe_bytes),
+                "tar_probe_bytes": float(tar_probe_bytes),
+                "npz_member_count_in_probe": float(member_count),
+                "target_member_visible_in_probe": float(target_visible),
+                "same_structure_member_count_in_probe": float(len(same_structure)),
+                "same_structure_visible_time_codes": ";".join(visible_codes) if visible_codes else "none",
+                "max_visible_time_code": max_code,
+                "membership_probe_ready": float(probe_ready),
+                "late_recovery_observable_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "membership_probe_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_late_recovery_public_timecode_ceiling(
+    *,
+    ceiling_id: str,
+    timecode_target_rows: Sequence[dict[str, object]],
+    semantics_manifest: dict[str, object],
+    membership_probe_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Compare late-recovery targets with the public GlassBench time-code ceiling."""
+
+    if not ceiling_id:
+        raise ValueError("ceiling_id must be nonempty")
+    if not timecode_target_rows:
+        raise ValueError("timecode_target_rows must be nonempty")
+    entries = semantics_manifest.get("entries", [])
+    if not isinstance(entries, list):
+        raise ValueError("semantics_manifest entries must be a list")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def time_code_number(code: str) -> int:
+        match = re.fullmatch(r"tc(\d+)", code)
+        return int(match.group(1)) if match is not None else -1
+
+    def code_sort(codes: set[str]) -> list[str]:
+        return sorted(codes, key=time_code_number)
+
+    semantic_by_key: dict[tuple[str, str], dict[str, object]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        semantic_by_key[(str(entry.get("system_id", "unknown")), str(entry.get("temperature", "none")))] = entry
+    membership_by_key = {key_for(row): row for row in membership_probe_rows}
+
+    rows: list[dict[str, float | str]] = []
+    for target in sorted(timecode_target_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(target)
+        target_ready = float(target.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        target_code = str(target.get("target_time_code", "none"))
+        target_lag = float(target.get("target_lag_time", 0.0) or 0.0)
+        required_lag = float(target.get("required_followup_lag_time", 0.0) or 0.0)
+        semantic = semantic_by_key.get((system_id, temperature), {})
+        members = semantic.get("members", []) if isinstance(semantic, dict) else []
+        public_codes: set[str] = set()
+        structure_codes: set[str] = set()
+        lag_by_code: dict[str, float] = {}
+        if isinstance(members, list):
+            for member in members:
+                if not isinstance(member, dict):
+                    continue
+                code = str(member.get("time_code", "none"))
+                if code == "none":
+                    continue
+                public_codes.add(code)
+                lag_by_code[code] = max(
+                    lag_by_code.get(code, 0.0),
+                    float(member.get("lag_time", 0.0) or 0.0),
+                )
+                if str(member.get("structure_id", "none")) == structure_id:
+                    structure_codes.add(code)
+
+        public_sorted = code_sort(public_codes)
+        structure_sorted = code_sort(structure_codes)
+        public_max = public_sorted[-1] if public_sorted else "none"
+        structure_max = structure_sorted[-1] if structure_sorted else "none"
+        public_max_lag = lag_by_code.get(public_max, 0.0)
+        target_published = target_code in public_codes
+        target_beyond_public = (
+            target_ready
+            and target_code != "none"
+            and public_max != "none"
+            and time_code_number(target_code) > time_code_number(public_max)
+        )
+        membership = membership_by_key.get((system_id, temperature, structure_id), {})
+        membership_ready = float(membership.get("membership_probe_ready", 0.0) or 0.0) == 1.0
+        target_visible = float(membership.get("target_member_visible_in_probe", 0.0) or 0.0) == 1.0
+
+        if not target_ready:
+            stage = "late_recovery_timecode_target_incomplete"
+            blocker = "late_recovery_timecode_target"
+            next_action = "complete_late_recovery_timecode_target"
+            ceiling_ready = False
+        elif not public_codes:
+            stage = "public_timecode_semantics_missing"
+            blocker = "public_timecode_semantics"
+            next_action = "load_official_glassbench_timecode_semantics"
+            ceiling_ready = False
+        elif target_published and target_visible:
+            stage = "late_recovery_public_timecode_member_visible"
+            blocker = "late_recovery_particle_cache"
+            next_action = f"extract_late_recovery_particle_cache_for_{target_code}"
+            ceiling_ready = True
+        elif target_published:
+            stage = "late_recovery_public_timecode_published_probe_needed"
+            blocker = "late_recovery_member_index_probe"
+            next_action = f"probe_or_extract_published_time_code_{target_code}"
+            ceiling_ready = True
+        elif target_beyond_public:
+            stage = "late_recovery_beyond_public_timecode_ceiling"
+            blocker = "public_glassbench_timecode_ceiling"
+            next_action = (
+                f"obtain_new_glassbench_export_or_trajectory_beyond_{public_max}_"
+                "for_late_recovery"
+            )
+            ceiling_ready = True
+        else:
+            stage = "late_recovery_timecode_not_in_public_semantics"
+            blocker = "public_glassbench_timecode_semantics"
+            next_action = "verify_target_time_code_against_public_semantics"
+            ceiling_ready = bool(membership_ready)
+
+        rows.append(
+            {
+                "ceiling_id": ceiling_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "timecode_target_ready": float(target_ready),
+                "target_time_code": target_code,
+                "target_lag_time": float(target_lag),
+                "required_followup_lag_time": float(required_lag),
+                "public_time_codes": ";".join(public_sorted) if public_sorted else "none",
+                "structure_time_codes": ";".join(structure_sorted) if structure_sorted else "none",
+                "public_max_time_code": public_max,
+                "structure_max_time_code": structure_max,
+                "public_max_lag_time": float(public_max_lag),
+                "target_lag_over_public_max": float(target_lag / public_max_lag)
+                if public_max_lag > 0.0
+                else 0.0,
+                "target_time_code_published": float(target_published),
+                "membership_probe_ready": float(membership_ready),
+                "target_member_visible_in_probe": float(target_visible),
+                "public_ceiling_ready": float(ceiling_ready),
+                "late_recovery_observation_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "public_ceiling_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_censored_window_claim_audit(
+    *,
+    audit_id: str,
+    public_ceiling_rows: Sequence[dict[str, object]],
+    finite_exchange_envelope_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Audit which GlassBench claims survive the public time-window censoring."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not public_ceiling_rows:
+        raise ValueError("public_ceiling_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    envelope_by_key = {key_for(row): row for row in finite_exchange_envelope_rows}
+    rows: list[dict[str, float | str]] = []
+    for ceiling in sorted(public_ceiling_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(ceiling)
+        envelope = envelope_by_key.get((system_id, temperature, structure_id), {})
+        public_max_lag = float(ceiling.get("public_max_lag_time", 0.0) or 0.0)
+        target_lag = float(ceiling.get("target_lag_time", 0.0) or 0.0)
+        target_ratio = float(ceiling.get("target_lag_over_public_max", 0.0) or 0.0)
+        tau_alpha = float(envelope.get("tau_alpha_direct", 0.0) or 0.0)
+        latest_lag = float(envelope.get("latest_lag_time", 0.0) or 0.0)
+        envelope_ready = float(envelope.get("envelope_ready", 0.0) or 0.0) == 1.0
+        target_ready = float(ceiling.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        ceiling_stage = str(ceiling.get("public_ceiling_stage", "unknown"))
+        alpha_anchor_ready = (
+            envelope_ready
+            and tau_alpha > 0.0
+            and max(public_max_lag, latest_lag) >= tau_alpha
+        )
+        late_recovery_window_ready = (
+            target_ready
+            and target_lag > 0.0
+            and public_max_lag >= target_lag
+        )
+
+        if not envelope_ready:
+            stage = "finite_exchange_envelope_upstream_incomplete"
+            allowed_claim = "short_window_canary_only"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_envelope_before_censored_window_audit"
+        elif late_recovery_window_ready:
+            stage = "late_recovery_public_window_ready"
+            allowed_claim = "late_recovery_falsification_ready"
+            blocker = "late_recovery_observable"
+            next_action = "run_late_recovery_falsification_protocol"
+        elif alpha_anchor_ready and ceiling_stage == "late_recovery_beyond_public_timecode_ceiling":
+            stage = "alpha_anchor_ready_late_recovery_censored"
+            allowed_claim = "alpha_anchor_and_pre_late_dynamic_signatures"
+            blocker = str(ceiling.get("primary_blocker", "public_glassbench_timecode_ceiling"))
+            next_action = str(
+                ceiling.get(
+                    "next_required_action",
+                    "obtain_new_glassbench_export_or_trajectory_beyond_public_ceiling",
+                )
+            )
+        elif alpha_anchor_ready:
+            stage = "alpha_anchor_ready_late_recovery_unresolved"
+            allowed_claim = "alpha_anchor_and_pre_late_dynamic_signatures"
+            blocker = str(ceiling.get("primary_blocker", "late_recovery_horizon"))
+            next_action = str(
+                ceiling.get(
+                    "next_required_action",
+                    "extend_public_window_or_ingest_late_recovery_observation",
+                )
+            )
+        else:
+            stage = "public_window_pre_alpha_only"
+            allowed_claim = "short_window_canary_only"
+            blocker = "alpha_anchor_window"
+            next_action = "extend_public_window_to_alpha_anchor"
+
+        short_window_allowed = envelope_ready or public_max_lag > 0.0
+        alpha_claim_allowed = alpha_anchor_ready
+        late_claim_allowed = late_recovery_window_ready
+        static_rejection_ready = late_recovery_window_ready
+
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "public_max_time_code": str(ceiling.get("public_max_time_code", "none")),
+                "target_time_code": str(ceiling.get("target_time_code", "none")),
+                "public_max_lag_time": float(public_max_lag),
+                "tau_alpha_direct": float(tau_alpha),
+                "target_lag_time": float(target_lag),
+                "public_window_fraction_of_target_lag": float(public_max_lag / target_lag)
+                if target_lag > 0.0
+                else 0.0,
+                "target_lag_over_public_max": float(target_ratio)
+                if target_ratio > 0.0
+                else (float(target_lag / public_max_lag) if public_max_lag > 0.0 else 0.0),
+                "alpha_anchor_window_ready": float(alpha_anchor_ready),
+                "late_recovery_window_ready": float(late_recovery_window_ready),
+                "short_window_dynamic_claim_allowed": float(short_window_allowed),
+                "alpha_relaxation_claim_allowed": float(alpha_claim_allowed),
+                "late_gaussian_recovery_claim_allowed": float(late_claim_allowed),
+                "static_vs_finite_exchange_rejection_ready": float(static_rejection_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_public_claim_level": allowed_claim,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "censored_window_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_sota_public_window_verdict(
+    *,
+    verdict_id: str,
+    censored_window_rows: Sequence[dict[str, object]],
+    dynamic_signature_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Map SOTA dynamic signatures onto the currently public GlassBench window."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not censored_window_rows:
+        raise ValueError("censored_window_rows must be nonempty")
+    if not dynamic_signature_rows:
+        raise ValueError("dynamic_signature_rows must be nonempty")
+
+    reference = max(
+        censored_window_rows,
+        key=lambda row: float(row.get("alpha_anchor_window_ready", 0.0) or 0.0),
+    )
+    alpha_ready = float(reference.get("alpha_anchor_window_ready", 0.0) or 0.0) == 1.0
+    short_window_ready = (
+        float(reference.get("short_window_dynamic_claim_allowed", 0.0) or 0.0) == 1.0
+    )
+    alpha_claim_ready = (
+        float(reference.get("alpha_relaxation_claim_allowed", 0.0) or 0.0) == 1.0
+    )
+    late_recovery_ready = (
+        float(reference.get("late_gaussian_recovery_claim_allowed", 0.0) or 0.0) == 1.0
+    )
+    mechanism_ready = (
+        float(reference.get("static_vs_finite_exchange_rejection_ready", 0.0) or 0.0) == 1.0
+    )
+    blocker = str(reference.get("primary_blocker", "public_glassbench_window"))
+    fraction = float(reference.get("public_window_fraction_of_target_lag", 0.0) or 0.0)
+    target_ratio = float(reference.get("target_lag_over_public_max", 0.0) or 0.0)
+    claim_level = str(reference.get("allowed_public_claim_level", "unknown"))
+
+    pre_late_signatures = {
+        "msd_growth_cage_escape",
+        "self_intermediate_alpha",
+        "transient_ngp_peak",
+    }
+    proxy_signatures = {"chi4_dynamic_heterogeneity_proxy"}
+    late_signatures = {"late_gaussian_recovery"}
+    mechanism_signatures = {"persistence_exchange_decoupling"}
+    thermodynamic_signatures = {"thermodynamic_transition"}
+
+    rows: list[dict[str, float | str]] = []
+    for signature_row in sorted(dynamic_signature_rows, key=lambda row: str(row.get("signature", ""))):
+        signature = str(signature_row.get("signature", "unknown"))
+        phenomenon = str(signature_row.get("phenomenon", signature))
+        model_support = float(signature_row.get("model_support", 0.0) or 0.0)
+        literature_support = float(signature_row.get("literature_qualitative_support", 0.0) or 0.0)
+
+        if signature in thermodynamic_signatures:
+            stage = "scope_boundary_not_tested"
+            allowed_claim = "not_a_thermodynamic_glass_transition_test"
+            public_allowed = False
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "thermodynamic_scope_boundary"
+        elif signature in mechanism_signatures:
+            stage = (
+                "mechanism_selection_public_window_ready"
+                if mechanism_ready
+                else "mechanism_selection_censored_unresolved"
+            )
+            allowed_claim = (
+                "mechanism_selection_ready"
+                if mechanism_ready
+                else "literature_consistent_but_real_mechanism_selection_censored"
+            )
+            public_allowed = mechanism_ready
+            late_required = True
+            mechanism_rejection_ready = mechanism_ready
+            primary_blocker = "none" if mechanism_ready else blocker
+        elif signature in late_signatures:
+            stage = (
+                "late_recovery_public_window_ready"
+                if late_recovery_ready
+                else "public_window_censored_sota_unresolved"
+            )
+            allowed_claim = (
+                "late_gaussian_recovery_test_ready"
+                if late_recovery_ready
+                else "sota_consistent_but_late_recovery_censored"
+            )
+            public_allowed = late_recovery_ready
+            late_required = True
+            mechanism_rejection_ready = mechanism_ready
+            primary_blocker = "none" if late_recovery_ready else blocker
+        elif signature in proxy_signatures:
+            stage = "public_proxy_consistent_spatial_boundary"
+            allowed_claim = "qualitative_dynamic_heterogeneity_proxy_only"
+            public_allowed = short_window_ready
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "direct_four_point_function_and_dynamic_length"
+        elif signature in pre_late_signatures:
+            stage = "public_window_sota_consistent" if alpha_ready or short_window_ready else "public_window_pre_alpha_only"
+            allowed_claim = claim_level if alpha_claim_ready or short_window_ready else "short_window_canary_only"
+            public_allowed = alpha_claim_ready or short_window_ready
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "none" if public_allowed else blocker
+        else:
+            stage = "signature_not_mapped_to_public_window_gate"
+            allowed_claim = "manual_review_required"
+            public_allowed = False
+            late_required = False
+            mechanism_rejection_ready = False
+            primary_blocker = "signature_mapping"
+
+        rows.append(
+            {
+                "verdict_id": verdict_id,
+                "signature": signature,
+                "phenomenon": phenomenon,
+                "model_support": float(model_support),
+                "literature_qualitative_support": float(literature_support),
+                "public_window_fraction_of_target_lag": float(fraction),
+                "target_lag_over_public_max": float(target_ratio),
+                "public_glassbench_claim_allowed": float(public_allowed),
+                "late_recovery_required": float(late_required),
+                "mechanism_rejection_ready": float(mechanism_rejection_ready),
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_public_claim": allowed_claim,
+                "primary_blocker": primary_blocker,
+                "public_window_verdict_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_late_recovery_experiment_design(
+    *,
+    design_id: str,
+    late_recovery_protocol_rows: Sequence[dict[str, object]],
+    timecode_target_rows: Sequence[dict[str, object]],
+    public_window_verdict_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Design the minimal GlassBench follow-up that can close late recovery."""
+
+    if not design_id:
+        raise ValueError("design_id must be nonempty")
+    if not late_recovery_protocol_rows:
+        raise ValueError("late_recovery_protocol_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    target_by_key = {key_for(row): row for row in timecode_target_rows}
+    blockers = {
+        str(row.get("primary_blocker", "none"))
+        for row in public_window_verdict_rows
+        if str(row.get("public_window_verdict_stage", "")).endswith("unresolved")
+    }
+    public_blocker = "public_glassbench_timecode_ceiling" if "public_glassbench_timecode_ceiling" in blockers else (
+        sorted(blockers)[0] if blockers else "late_recovery_observation"
+    )
+
+    rows: list[dict[str, float | str]] = []
+    for protocol in sorted(late_recovery_protocol_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(protocol)
+        target = target_by_key.get((system_id, temperature, structure_id), {})
+        envelope_ready = float(protocol.get("envelope_ready", 0.0) or 0.0) == 1.0
+        target_ready = float(target.get("timecode_target_ready", 0.0) or 0.0) == 1.0
+        minimum_lag = float(protocol.get("required_followup_lag_time", 0.0) or 0.0)
+        planned_lag = float(target.get("target_lag_time", 0.0) or 0.0)
+        required_time_code = str(target.get("target_time_code", "none"))
+        max_finite_ngp = float(protocol.get("max_finite_exchange_late_ngp", 0.0) or 0.0)
+        static_plateau = float(protocol.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+        if static_plateau <= 0.0:
+            static_plateau = max_finite_ngp + float(
+                protocol.get("min_static_plateau_rejection_gap", 0.0) or 0.0
+            )
+
+        if not envelope_ready:
+            stage = "finite_exchange_envelope_upstream_incomplete"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_falsification_envelope"
+            claim_ready_after_measurement = False
+        elif not target_ready or required_time_code == "none":
+            stage = "late_recovery_timecode_target_incomplete"
+            blocker = "late_recovery_timecode_target"
+            next_action = "complete_late_recovery_timecode_target"
+            claim_ready_after_measurement = False
+        else:
+            stage = f"minimal_{required_time_code}_followup_ready"
+            blocker = public_blocker
+            next_action = f"measure_required_observables_at_{required_time_code}"
+            claim_ready_after_measurement = True
+
+        rows.append(
+            {
+                "design_id": design_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "current_max_time_code": str(target.get("current_max_time_code", "none")),
+                "required_time_code": required_time_code,
+                "minimum_required_lag_time": float(minimum_lag),
+                "planned_lag_time": float(planned_lag),
+                "planned_lag_over_minimum_required": float(planned_lag / minimum_lag)
+                if minimum_lag > 0.0
+                else 0.0,
+                "required_observables": "MSD;NGP;F_s(k,t);self_van_hove_tail;member_uncertainty",
+                "finite_exchange_support_rule": "late_ngp <= max_finite_exchange_late_ngp",
+                "static_disorder_rejection_rule": "late_ngp + 2sigma < static_gamma_late_ngp_plateau",
+                "max_finite_exchange_late_ngp": float(max_finite_ngp),
+                "static_gamma_late_ngp_plateau": float(static_plateau),
+                "late_recovery_claim_ready_after_measurement": float(claim_ready_after_measurement),
+                "real_pe_inversion_ready_after_measurement": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "experiment_design_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_late_recovery_uncertainty_verdict(
+    *,
+    verdict_id: str,
+    late_recovery_protocol_rows: Sequence[dict[str, object]],
+    ingestion_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Score late-recovery observations with two-sigma mechanism decision rules."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not late_recovery_protocol_rows:
+        raise ValueError("late_recovery_protocol_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    ingestion_by_key: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in ingestion_rows:
+        ingestion_by_key.setdefault(key_for(row), []).append(row)
+
+    rows: list[dict[str, float | str]] = []
+    for protocol in sorted(late_recovery_protocol_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(protocol)
+        protocol_ready = float(protocol.get("envelope_ready", 0.0) or 0.0) == 1.0
+        minimum_lag = float(protocol.get("required_followup_lag_time", 0.0) or 0.0)
+        max_finite_ngp = float(protocol.get("max_finite_exchange_late_ngp", 0.0) or 0.0)
+        static_plateau = float(protocol.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+        if static_plateau <= 0.0:
+            static_plateau = max_finite_ngp + float(
+                protocol.get("min_static_plateau_rejection_gap", 0.0) or 0.0
+            )
+        group = ingestion_by_key.get((system_id, temperature, structure_id), [])
+        if not group:
+            group = [{}]
+
+        for index, ingestion in enumerate(group):
+            candidate_id = str(
+                ingestion.get("candidate_id", f"{system_id}:{temperature}:{structure_id}:{index}")
+            )
+            observation_ready = (
+                float(ingestion.get("late_recovery_observation_ready", 0.0) or 0.0) == 1.0
+            )
+            observed_lag = float(ingestion.get("observed_lag_time", 0.0) or 0.0)
+            observed_late_ngp = float(ingestion.get("observed_late_ngp", 0.0) or 0.0)
+            sigma_late_ngp = float(ingestion.get("sigma_late_ngp", 0.0) or 0.0)
+            observed_recovery = float(
+                ingestion.get("observed_tail_gaussian_recovery", 0.0) or 0.0
+            )
+            sigma_recovery = float(ingestion.get("sigma_tail_recovery", 0.0) or 0.0)
+            late_ngp_upper = observed_late_ngp + 2.0 * sigma_late_ngp
+            late_ngp_lower = observed_late_ngp - 2.0 * sigma_late_ngp
+            recovery_lower = observed_recovery - 2.0 * sigma_recovery
+            recovery_upper = observed_recovery + 2.0 * sigma_recovery
+            finite_margin = max_finite_ngp - late_ngp_upper
+            static_margin = static_plateau - late_ngp_upper
+            recovery_margin = recovery_lower - 0.5
+            finite_supported = bool(
+                protocol_ready
+                and observation_ready
+                and finite_margin >= 0.0
+                and recovery_margin >= 0.0
+            )
+            finite_rejected = bool(
+                protocol_ready
+                and observation_ready
+                and (late_ngp_lower > max_finite_ngp or recovery_upper < 0.5)
+            )
+            static_rejected = bool(protocol_ready and observation_ready and static_margin > 0.0)
+            decision_ready = bool((finite_supported and static_rejected) or finite_rejected)
+
+            if not protocol_ready:
+                stage = "late_recovery_verdict_protocol_incomplete"
+                blocker = "finite_exchange_envelope"
+                next_action = "complete_finite_exchange_falsification_envelope"
+            elif not observation_ready:
+                stage = "late_recovery_observation_not_ready"
+                blocker = str(ingestion.get("primary_blocker", "late_recovery_observation"))
+                next_action = "provide_uncertainty_weighted_late_recovery_observation"
+            elif finite_supported and static_rejected:
+                stage = "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected"
+                blocker = "exchange_clock"
+                next_action = "extract_exchange_clock_to_upgrade_to_persistence_exchange_inversion"
+            elif finite_rejected:
+                stage = "uncertainty_weighted_finite_exchange_rejected"
+                blocker = "late_gaussian_recovery"
+                next_action = "reject_or_reparameterize_finite_exchange_mechanism"
+            elif finite_supported:
+                stage = "finite_exchange_supported_static_disorder_not_rejected"
+                blocker = "static_disorder_uncertainty"
+                next_action = "extend_late_ngp_precision_or_static_null_plateau_estimate"
+            else:
+                stage = "late_recovery_uncertainty_indeterminate"
+                blocker = "tail_recovery_uncertainty" if recovery_margin < 0.0 else "late_ngp_uncertainty"
+                next_action = "reduce_late_recovery_uncertainty_or_add_later_lag_observation"
+
+            rows.append(
+                {
+                    "verdict_id": verdict_id,
+                    "candidate_id": candidate_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "minimum_required_lag_time": float(minimum_lag),
+                    "observed_lag_time": float(observed_lag),
+                    "observed_late_ngp": float(observed_late_ngp),
+                    "sigma_late_ngp": float(sigma_late_ngp),
+                    "late_ngp_upper_2sigma": float(late_ngp_upper),
+                    "tail_recovery_lower_2sigma": float(recovery_lower),
+                    "finite_exchange_support_margin": float(finite_margin),
+                    "static_disorder_rejection_margin": float(static_margin),
+                    "tail_recovery_support_margin": float(recovery_margin),
+                    "max_finite_exchange_late_ngp": float(max_finite_ngp),
+                    "static_gamma_late_ngp_plateau": float(static_plateau),
+                    "finite_exchange_uncertainty_supported": float(finite_supported),
+                    "finite_exchange_uncertainty_rejected": float(finite_rejected),
+                    "static_disorder_uncertainty_rejected": float(static_rejected),
+                    "uncertainty_decision_ready": float(decision_ready),
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": next_action,
+                    "uncertainty_verdict_stage": stage,
+                }
+        )
+    return rows
+
+
+def glassbench_late_recovery_outcome_matrix(
+    *,
+    matrix_id: str,
+    experiment_design_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Pre-register possible tc50 late-recovery outcomes and their claims."""
+
+    if not matrix_id:
+        raise ValueError("matrix_id must be nonempty")
+    if not experiment_design_rows:
+        raise ValueError("experiment_design_rows must be nonempty")
+
+    rows: list[dict[str, float | str]] = []
+    scenarios = [
+        (
+            "low_late_ngp_gaussian_recovery",
+            0.25,
+            0.03,
+            1.0,
+            0.04,
+        ),
+        (
+            "high_late_ngp_or_missing_recovery",
+            1.8,
+            0.06,
+            0.0,
+            0.04,
+        ),
+        (
+            "wide_uncertainty_requires_more_data",
+            0.9,
+            0.2,
+            1.0,
+            0.04,
+        ),
+    ]
+
+    for design in experiment_design_rows:
+        system_id = str(design.get("system_id", "unknown"))
+        temperature = str(design.get("temperature", "none"))
+        structure_id = str(design.get("structure_id", "none"))
+        target_time_code = str(design.get("required_time_code", "none"))
+        design_ready = (
+            float(design.get("late_recovery_claim_ready_after_measurement", 0.0) or 0.0) == 1.0
+        )
+        minimum_lag = float(design.get("minimum_required_lag_time", 0.0) or 0.0)
+        planned_lag = float(design.get("planned_lag_time", 0.0) or 0.0)
+        max_finite_ngp = float(design.get("max_finite_exchange_late_ngp", 0.0) or 0.0)
+        static_plateau = float(design.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+
+        for scenario, ngp_factor, sigma_factor, recovery, sigma_recovery in scenarios:
+            observed_late_ngp = max_finite_ngp * ngp_factor
+            sigma_late_ngp = max_finite_ngp * sigma_factor
+            protocol = {
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "envelope_ready": float(design_ready),
+                "required_followup_lag_time": minimum_lag,
+                "max_finite_exchange_late_ngp": max_finite_ngp,
+                "static_gamma_late_ngp_plateau": static_plateau,
+            }
+            ingestion = {
+                "candidate_id": f"{system_id}:{temperature}:{structure_id}:{scenario}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "observed_lag_time": planned_lag,
+                "observed_late_ngp": observed_late_ngp,
+                "sigma_late_ngp": sigma_late_ngp,
+                "observed_tail_gaussian_recovery": recovery,
+                "sigma_tail_recovery": sigma_recovery,
+                "late_recovery_observation_ready": float(design_ready),
+                "primary_blocker": str(design.get("primary_blocker", "late_recovery_observation")),
+            }
+            verdict = glassbench_late_recovery_uncertainty_verdict(
+                verdict_id=f"{matrix_id}_{scenario}",
+                late_recovery_protocol_rows=[protocol],
+                ingestion_rows=[ingestion],
+            )[0]
+            stage = str(verdict["uncertainty_verdict_stage"])
+            if stage == "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected":
+                claim = "finite_exchange_supported_static_disorder_rejected"
+                action = "extract_exchange_clock_for_persistence_exchange_inversion"
+            elif stage == "uncertainty_weighted_finite_exchange_rejected":
+                claim = "finite_exchange_rejected_or_model_reparameterization_required"
+                action = "reject_or_reparameterize_finite_exchange_mechanism"
+            elif design_ready:
+                claim = "no_mechanism_selection_claim"
+                action = "reduce_late_recovery_uncertainty_or_add_later_lag_observation"
+            else:
+                claim = "no_late_recovery_claim"
+                action = "complete_late_recovery_experiment_design"
+
+            rows.append(
+                {
+                    "matrix_id": matrix_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "target_time_code": target_time_code,
+                    "outcome_scenario": scenario,
+                    "synthetic_observed_lag_time": float(planned_lag),
+                    "synthetic_observed_late_ngp": float(observed_late_ngp),
+                    "synthetic_sigma_late_ngp": float(sigma_late_ngp),
+                    "synthetic_tail_recovery": float(recovery),
+                    "synthetic_sigma_tail_recovery": float(sigma_recovery),
+                    "predicted_uncertainty_verdict_stage": stage,
+                    "finite_exchange_support_margin": float(verdict["finite_exchange_support_margin"]),
+                    "static_disorder_rejection_margin": float(verdict["static_disorder_rejection_margin"]),
+                    "tail_recovery_support_margin": float(verdict["tail_recovery_support_margin"]),
+                    "uncertainty_decision_ready": float(verdict["uncertainty_decision_ready"]),
+                    "claim_if_observed": claim,
+                    "next_required_action_if_observed": action,
+                    "primary_blocker": str(verdict["primary_blocker"]),
+                    "thermodynamic_claim_allowed": 0.0,
+                    "outcome_matrix_stage": "tc50_outcome_matrix_preregistered"
+                    if design_ready
+                    else "late_recovery_design_incomplete",
+                }
+        )
+    return rows
+
+
+def glassbench_late_recovery_decision_power_plan(
+    *,
+    plan_id: str,
+    outcome_matrix_rows: Sequence[dict[str, object]],
+    current_member_count: int,
+) -> list[dict[str, float | str]]:
+    """Estimate member-count extension needed for two-sigma late-recovery decisions."""
+
+    if not plan_id:
+        raise ValueError("plan_id must be nonempty")
+    if not outcome_matrix_rows:
+        raise ValueError("outcome_matrix_rows must be nonempty")
+    if current_member_count <= 0:
+        raise ValueError("current_member_count must be positive")
+
+    rows: list[dict[str, float | str]] = []
+    for outcome in outcome_matrix_rows:
+        observed_ngp = float(outcome.get("synthetic_observed_late_ngp", 0.0) or 0.0)
+        current_sigma = float(outcome.get("synthetic_sigma_late_ngp", 0.0) or 0.0)
+        finite_margin = float(outcome.get("finite_exchange_support_margin", 0.0) or 0.0)
+        static_margin = float(outcome.get("static_disorder_rejection_margin", 0.0) or 0.0)
+        decision_ready = float(outcome.get("uncertainty_decision_ready", 0.0) or 0.0) == 1.0
+        inferred_max_ngp = observed_ngp + 2.0 * current_sigma + finite_margin
+        if decision_ready:
+            required_sigma = current_sigma
+            member_multiplier = 1.0
+            required_members = float(current_member_count)
+            additional_members = 0.0
+            stage = "decision_power_sufficient"
+            blocker = "none"
+            next_action = "record_tc50_observation_and_apply_preregistered_verdict"
+        elif inferred_max_ngp > observed_ngp:
+            required_sigma = max((inferred_max_ngp - observed_ngp) / 2.0, 0.0)
+            if required_sigma > 0.0 and current_sigma > required_sigma:
+                member_multiplier = (current_sigma / required_sigma) ** 2
+                raw_required_members = current_member_count * member_multiplier
+                nearest_required_members = round(raw_required_members)
+                if math.isclose(raw_required_members, nearest_required_members, rel_tol=1e-12, abs_tol=1e-9):
+                    required_members = float(nearest_required_members)
+                else:
+                    required_members = float(math.ceil(raw_required_members))
+                additional_members = max(required_members - float(current_member_count), 0.0)
+                stage = "late_ngp_power_extension_required"
+                blocker = "late_ngp_uncertainty"
+                next_action = "increase_tc50_member_count_or_reduce_late_ngp_uncertainty"
+            else:
+                member_multiplier = 1.0
+                required_members = float(current_member_count)
+                additional_members = 0.0
+                stage = "decision_power_sufficient"
+                blocker = "none"
+                next_action = "record_tc50_observation_and_apply_preregistered_verdict"
+        else:
+            required_sigma = 0.0
+            member_multiplier = 0.0
+            required_members = float(current_member_count)
+            additional_members = 0.0
+            stage = "mean_value_requires_model_rejection_not_more_precision"
+            blocker = "late_ngp_mean"
+            next_action = "apply_rejection_path_if_late_recovery_measurement_confirms_mean"
+
+        rows.append(
+            {
+                "plan_id": plan_id,
+                "system_id": str(outcome.get("system_id", "unknown")),
+                "temperature": str(outcome.get("temperature", "none")),
+                "structure_id": str(outcome.get("structure_id", "none")),
+                "target_time_code": str(outcome.get("target_time_code", "none")),
+                "outcome_scenario": str(outcome.get("outcome_scenario", "unknown")),
+                "claim_if_observed": str(outcome.get("claim_if_observed", "none")),
+                "current_member_count": float(current_member_count),
+                "current_sigma_late_ngp": float(current_sigma),
+                "required_sigma_late_ngp_for_decision": float(required_sigma),
+                "member_multiplier_needed": float(member_multiplier),
+                "required_member_count": float(required_members),
+                "additional_member_count_needed": float(additional_members),
+                "inferred_max_finite_exchange_late_ngp": float(inferred_max_ngp),
+                "finite_exchange_support_margin": float(finite_margin),
+                "static_disorder_rejection_margin": float(static_margin),
+                "uncertainty_decision_ready": float(decision_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "decision_power_stage": stage,
+            }
+        )
+    return rows
+
+
+def glassbench_cage_jump_proxy_canary(
+    *,
+    canary_id: str,
+    trajectory_rows: Sequence[dict[str, object]],
+    min_frame_count: int = 2,
+    min_member_count: float = 4.0,
+) -> list[dict[str, float | str]]:
+    """Extract aggregate frame-index cage-jump proxy candidates without claiming events."""
+
+    if not canary_id:
+        raise ValueError("canary_id must be nonempty")
+    if not trajectory_rows:
+        raise ValueError("trajectory_rows must be nonempty")
+    if min_frame_count <= 0:
+        raise ValueError("min_frame_count must be positive")
+    if min_member_count <= 0.0:
+        raise ValueError("min_member_count must be positive")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in trajectory_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("frame_index", 0.0)))
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        usable = [
+            row
+            for row in sorted_group
+            if float(row.get("frame_index", 0.0)) > 0.0
+            and float(row.get("frame_index_uncertainty_ready", 0.0)) == 1.0
+            and float(row.get("member_count", 0.0) or 0.0) >= min_member_count
+        ]
+
+        candidate_rows: list[dict[str, float]] = []
+        for row in usable:
+            msd = float(row.get("msd", 0.0) or 0.0)
+            ngp = max(0.0, float(row.get("ngp_2d", 0.0) or 0.0))
+            fs_decay = 0.0
+            fs_text = str(row.get("self_intermediate_scattering_by_k", "none"))
+            if fs_text and fs_text != "none":
+                fs_values = _parse_semicolon_float_values(
+                    fs_text,
+                    name="self_intermediate_scattering_by_k",
+                )
+                if fs_values:
+                    fs_decay = max(0.0, 1.0 - min(fs_values))
+            displacement = math.sqrt(msd) if msd > 0.0 else 0.0
+            score = displacement * max(ngp, 1e-12) * max(fs_decay, 1e-12)
+            candidate_rows.append(
+                {
+                    "frame_index": float(row.get("frame_index", 0.0)),
+                    "displacement": float(displacement),
+                    "ngp": float(ngp),
+                    "fs_decay": float(fs_decay),
+                    "score": float(score),
+                    "physical_time_ready": float(row.get("physical_time_ready", 0.0) or 0.0),
+                }
+            )
+
+        aggregate_ready = len(candidate_rows) >= min_frame_count and any(row["score"] > 0.0 for row in candidate_rows)
+        if candidate_rows:
+            peak = max(candidate_rows, key=lambda row: row["score"])
+            peak_ngp = max(candidate_rows, key=lambda row: row["ngp"])
+            max_fs_decay = max(row["fs_decay"] for row in candidate_rows)
+            physical_time_ready = aggregate_ready and all(row["physical_time_ready"] == 1.0 for row in candidate_rows)
+        else:
+            peak = {
+                "frame_index": 0.0,
+                "displacement": 0.0,
+                "ngp": 0.0,
+                "fs_decay": 0.0,
+                "score": 0.0,
+                "physical_time_ready": 0.0,
+            }
+            peak_ngp = peak
+            max_fs_decay = 0.0
+            physical_time_ready = False
+
+        if aggregate_ready:
+            stage = "aggregate_cage_jump_proxy_ready_particle_events_blocked"
+            blocker = "particle_resolved_displacements"
+            next_action = "extract_particle_resolved_cage_jump_events_and_physical_time_clock"
+        else:
+            stage = "aggregate_cage_jump_proxy_incomplete"
+            blocker = "frame_index_member_ensemble_microstatistics"
+            next_action = "extract_member_ensemble_frame_microstatistics"
+        missing = ["particle_resolved_displacements"]
+        if not physical_time_ready:
+            missing.append("physical_time_semantics")
+        missing.extend(["cage_identity_tracking", "persistence_exchange_event_clock"])
+
+        out.append(
+            {
+                "canary_id": canary_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "frame_count": float(len(sorted_group)),
+                "usable_frame_count": float(len(candidate_rows)),
+                "member_count_minimum": float(min_member_count),
+                "aggregate_jump_proxy_ready": float(aggregate_ready),
+                "particle_resolved_jump_events_ready": 0.0,
+                "physical_time_jump_clock_ready": float(physical_time_ready),
+                "persistence_exchange_event_clock_ready": 0.0,
+                "peak_proxy_event_frame": float(peak["frame_index"]),
+                "proxy_jump_length": float(peak["displacement"]),
+                "proxy_event_score": float(peak["score"]),
+                "peak_ngp_frame": float(peak_ngp["frame_index"]),
+                "peak_ngp_value": float(peak_ngp["ngp"]),
+                "max_short_frame_fs_decay": float(max_fs_decay),
+                "missing_event_clock_inputs": ";".join(dict.fromkeys(missing)),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "canary_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_event_clock_threshold_readiness_gate(
+    *,
+    benchmark_id: str,
+    system_id: str,
+    temperature: float | str,
+    positions_schema_ready: bool | float,
+    first_npz_observable_curve_ready: bool | float,
+    member_ensemble_observable_ready: bool | float,
+    particle_resolved_positions_cached: bool | float,
+    physical_time_semantics_ready: bool | float,
+    event_clock_threshold_protocol_available: bool | float,
+    macro_heldout_observables_ready: bool | float,
+) -> list[dict[str, float | str]]:
+    """Gate real GlassBench event-clock threshold robustness without overclaiming.
+
+    The synthetic threshold protocol is already available in the package. This
+    gate states whether the corresponding real GlassBench trajectory inputs are
+    present, including a reusable particle-resolved coordinate cache.
+    """
+
+    if not benchmark_id:
+        raise ValueError("benchmark_id must be nonempty")
+    if not system_id:
+        raise ValueError("system_id must be nonempty")
+
+    flags = {
+        "positions_schema_ready": float(bool(positions_schema_ready)),
+        "first_npz_observable_curve_ready": float(bool(first_npz_observable_curve_ready)),
+        "member_ensemble_observable_ready": float(bool(member_ensemble_observable_ready)),
+        "particle_resolved_positions_cached": float(bool(particle_resolved_positions_cached)),
+        "physical_time_semantics_ready": float(bool(physical_time_semantics_ready)),
+        "event_clock_threshold_protocol_available": float(bool(event_clock_threshold_protocol_available)),
+        "macro_heldout_observables_ready": float(bool(macro_heldout_observables_ready)),
+    }
+    threshold_sweep_ready = float(
+        bool(particle_resolved_positions_cached)
+        and bool(physical_time_semantics_ready)
+        and bool(event_clock_threshold_protocol_available)
+    )
+
+    blocker_order = [
+        ("positions_schema_ready", "positions_schema"),
+        ("first_npz_observable_curve_ready", "first_npz_observable_curve"),
+        ("member_ensemble_observable_ready", "member_ensemble_observable"),
+        ("particle_resolved_positions_cached", "particle_resolved_positions_cache"),
+        ("physical_time_semantics_ready", "physical_time_semantics"),
+        ("event_clock_threshold_protocol_available", "threshold_protocol"),
+        ("macro_heldout_observables_ready", "macro_heldout_observables"),
+    ]
+    missing = [blocker for key, blocker in blocker_order if flags[key] == 0.0]
+    if threshold_sweep_ready == 0.0 and "threshold_sweep_event_clock" not in missing:
+        missing.append("threshold_sweep_event_clock")
+
+    ready = float(
+        all(value == 1.0 for value in flags.values())
+        and threshold_sweep_ready == 1.0
+    )
+    stage = (
+        "real_event_clock_threshold_robustness_ready"
+        if ready
+        else "real_event_clock_threshold_robustness_blocked"
+    )
+    primary_blocker = "none"
+    if not ready:
+        for candidate in [
+            "positions_schema",
+            "first_npz_observable_curve",
+            "member_ensemble_observable",
+            "particle_resolved_positions_cache",
+            "physical_time_semantics",
+            "threshold_sweep_event_clock",
+            "macro_heldout_observables",
+        ]:
+            if candidate in missing:
+                primary_blocker = candidate
+                break
+
+    return [
+        {
+            "benchmark_id": benchmark_id,
+            "system_id": system_id,
+            "temperature": str(temperature),
+            **flags,
+            "threshold_sweep_event_clock_ready": threshold_sweep_ready,
+            "real_event_clock_threshold_robustness_ready": ready,
+            "real_benchmark_closed_loop_ready": ready,
+            "fit_parameters_from_macro_observables": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": primary_blocker,
+            "missing_real_threshold_inputs": ";".join(missing) if missing else "none",
+            "readiness_stage": stage,
+        }
+    ]
+
+
+def glassbench_first_npz_particle_cache_contract_gate(
+    *,
+    contract_id: str,
+    schema_entries: Sequence[dict[str, object]],
+    curve_entries: Sequence[dict[str, object]],
+    cache_root: str,
+    cached_particle_cache_targets: Sequence[str] | None = None,
+    physical_time_semantics_ready: bool | float = False,
+) -> list[dict[str, float | str]]:
+    """Pin the first-NPZ coordinate cache target needed for event-clock sweeps."""
+
+    if not contract_id:
+        raise ValueError("contract_id must be nonempty")
+    if not schema_entries:
+        raise ValueError("schema_entries must be nonempty")
+    if not curve_entries:
+        raise ValueError("curve_entries must be nonempty")
+    if not cache_root:
+        raise ValueError("cache_root must be nonempty")
+
+    curve_by_key = {
+        (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("first_npz_member", "none")),
+        ): row
+        for row in curve_entries
+    }
+    cached_targets = {str(target) for target in (cached_particle_cache_targets or [])}
+    root = cache_root.rstrip("/")
+
+    out: list[dict[str, float | str]] = []
+    for entry in sorted(
+        schema_entries,
+        key=lambda row: (str(row.get("system_id", "unknown")), float(row.get("temperature", 0.0))),
+    ):
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        first_npz_member = str(entry.get("first_npz_member", "none"))
+        source_path = str(entry.get("path", "none"))
+        key = (system_id, temperature, first_npz_member)
+        curve = curve_by_key.get(key, {})
+
+        positions_shape_values: list[int] = []
+        positions_dtype = "none"
+        for array in entry.get("arrays", []):
+            if isinstance(array, dict) and array.get("name") == "positions.npy":
+                positions_shape_values = [int(value) for value in array.get("shape", [])]
+                positions_dtype = str(array.get("dtype", "none"))
+                break
+        positions_shape = "x".join(str(value) for value in positions_shape_values) if positions_shape_values else "none"
+        frame_count = float(positions_shape_values[0]) if len(positions_shape_values) >= 1 else 0.0
+        particle_count = float(positions_shape_values[1]) if len(positions_shape_values) >= 2 else 0.0
+        spatial_dimension = float(positions_shape_values[2]) if len(positions_shape_values) >= 3 else 0.0
+
+        schema_ready = float(bool(positions_shape_values))
+        curve_ready = float(bool(curve))
+        md5 = str(entry.get("npz_member_md5", "none"))
+        npz_bytes = float(entry.get("npz_member_bytes", 0.0) or 0.0)
+        md5_matches_curve = float(
+            bool(curve)
+            and md5 != "none"
+            and md5 == str(curve.get("npz_member_md5", "none"))
+        )
+        byte_count_matches_curve = float(
+            bool(curve)
+            and npz_bytes > 0.0
+            and npz_bytes == float(curve.get("npz_member_bytes", -1.0) or -1.0)
+        )
+        contract_ready = float(
+            schema_ready == 1.0
+            and curve_ready == 1.0
+            and md5_matches_curve == 1.0
+            and byte_count_matches_curve == 1.0
+        )
+
+        safe_temp = temperature.replace(".", "_")
+        target = f"{root}/glassbench_{system_id.lower()}_T{safe_temp}_first_npz_positions.npz"
+        cached = float(target in cached_targets)
+        physical_time_ready = float(bool(physical_time_semantics_ready))
+        threshold_ready = float(contract_ready == 1.0 and cached == 1.0 and physical_time_ready == 1.0)
+
+        missing: list[str] = []
+        if schema_ready == 0.0:
+            missing.append("positions_schema")
+        if curve_ready == 0.0:
+            missing.append("first_npz_observable_curve")
+        if md5_matches_curve == 0.0 or byte_count_matches_curve == 0.0:
+            missing.append("npz_member_identity")
+        if contract_ready == 1.0 and cached == 0.0:
+            missing.append("particle_coordinate_cache")
+        if contract_ready == 1.0 and cached == 1.0 and physical_time_ready == 0.0:
+            missing.append("physical_time_semantics")
+
+        if threshold_ready == 1.0:
+            stage = "first_npz_particle_cache_ready_for_threshold_sweep"
+            blocker = "none"
+        elif contract_ready == 1.0 and cached == 0.0:
+            stage = "first_npz_particle_cache_contract_ready_cache_missing"
+            blocker = "persist_particle_coordinate_cache"
+        elif contract_ready == 1.0:
+            stage = "first_npz_particle_cache_contract_ready_time_blocked"
+            blocker = "physical_time_semantics"
+        else:
+            stage = "first_npz_particle_cache_contract_incomplete"
+            blocker = missing[0] if missing else "coordinate_cache_contract"
+
+        out.append(
+            {
+                "contract_id": contract_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "first_npz_member": first_npz_member,
+                "compressed_probe_range_start": float(curve.get("compressed_probe_range_start", 0.0) or 0.0),
+                "compressed_probe_range_end": float(curve.get("compressed_probe_range_end", 0.0) or 0.0),
+                "compressed_probe_bytes": float(curve.get("compressed_probe_bytes", 0.0) or 0.0),
+                "npz_member_bytes": npz_bytes,
+                "npz_member_md5": md5,
+                "positions_shape": positions_shape,
+                "positions_dtype": positions_dtype,
+                "frame_count": frame_count,
+                "particle_count": particle_count,
+                "spatial_dimension": spatial_dimension,
+                "coordinate_schema_ready": schema_ready,
+                "first_npz_observable_curve_ready": curve_ready,
+                "npz_identity_matches_observable_curve": float(
+                    md5_matches_curve == 1.0 and byte_count_matches_curve == 1.0
+                ),
+                "particle_cache_contract_ready": contract_ready,
+                "particle_cache_target": target,
+                "particle_resolved_positions_cached": cached,
+                "physical_time_semantics_ready": physical_time_ready,
+                "threshold_sweep_event_clock_ready": threshold_ready,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "missing_particle_cache_inputs": ";".join(missing) if missing else "none",
+                "cache_contract_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_cached_particle_timecode_bridge(
+    *,
+    bridge_id: str,
+    cache_rows: Sequence[dict[str, object]],
+    semantics_manifest: dict[str, object],
+) -> list[dict[str, float | str]]:
+    """Attach official KA2D lag-time semantics to cached first-NPZ coordinates."""
+
+    if not bridge_id:
+        raise ValueError("bridge_id must be nonempty")
+    if not cache_rows:
+        raise ValueError("cache_rows must be nonempty")
+    entries = semantics_manifest.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("semantics_manifest entries must be nonempty")
+
+    member_lookup: dict[tuple[str, str, str], dict[str, object]] = {}
+    tau_lookup: dict[tuple[str, str], float] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        tau_lookup[(system_id, temperature)] = float(entry.get("tau_alpha", 0.0) or 0.0)
+        for member in entry.get("members", []):
+            if isinstance(member, dict):
+                member_lookup[(system_id, temperature, str(member.get("member", "none")))] = member
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        cache_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        first_npz_member = str(row.get("first_npz_member", "none"))
+        key = (system_id, temperature, first_npz_member)
+        semantics = member_lookup.get(key, {})
+
+        cached = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
+        md5_matches = (
+            bool(semantics)
+            and str(row.get("npz_member_md5", "none")) == str(semantics.get("member_md5", "none"))
+        )
+        lag_time = float(semantics.get("lag_time", 0.0) or 0.0) if semantics else 0.0
+        tau_alpha = tau_lookup.get((system_id, temperature), 0.0)
+        lag_time_over_tau_alpha = (
+            float(semantics.get("lag_time_over_tau_alpha", 0.0) or 0.0)
+            if semantics
+            else 0.0
+        )
+        axis0_semantics = str(semantics.get("axis0_semantics", "none")) if semantics else "none"
+        axis0_replica = axis0_semantics == "isoconfigurational_trajectory_replicates"
+        physical_lag_ready = cached and md5_matches and lag_time > 0.0
+        frame_axis_is_time = False
+        event_clock_ready = physical_lag_ready and frame_axis_is_time
+
+        if event_clock_ready:
+            stage = "cached_particle_event_clock_ready"
+            blocker = "none"
+            next_action = "run_particle_event_clock_threshold_sweep"
+        elif physical_lag_ready and axis0_replica:
+            stage = "cached_particle_lag_time_ready_event_clock_blocked"
+            blocker = "frame_axis_is_isoconfigurational_replicates"
+            next_action = "extract_multi_lag_particle_cache_or_true_trajectory"
+        elif physical_lag_ready:
+            stage = "cached_particle_lag_time_ready_frame_axis_unknown"
+            blocker = "frame_axis_time_semantics"
+            next_action = "verify_cached_particle_axis_semantics"
+        else:
+            stage = "cached_particle_timecode_semantics_incomplete"
+            blocker = "timecode_member_identity" if cached else "particle_coordinate_cache"
+            next_action = "match_cached_npz_member_to_official_timecode_semantics"
+
+        out.append(
+            {
+                "bridge_id": bridge_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "particle_cache_path": str(row.get("particle_cache_path", "none")),
+                "first_npz_member": first_npz_member,
+                "npz_member_md5": str(row.get("npz_member_md5", "none")),
+                "time_code": str(semantics.get("time_code", "none")) if semantics else "none",
+                "lag_time": float(lag_time),
+                "tau_alpha": float(tau_alpha),
+                "lag_time_over_tau_alpha": float(lag_time_over_tau_alpha),
+                "positions_shape": str(row.get("positions_shape", "none")),
+                "axis0_semantics": axis0_semantics,
+                "replica_count": float(semantics.get("replica_count", 0.0) or 0.0) if semantics else 0.0,
+                "particle_resolved_positions_cached": float(cached),
+                "npz_identity_matches_timecode_semantics": float(md5_matches),
+                "physical_lag_time_ready": float(physical_lag_ready),
+                "axis0_is_isoconfigurational_replica": float(axis0_replica),
+                "frame_axis_is_physical_time": 0.0,
+                "event_clock_trajectory_ready": float(event_clock_ready),
+                "threshold_sweep_event_clock_ready": float(event_clock_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "timecode_bridge_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_multilag_particle_cache_targets(
+    *,
+    target_id: str,
+    semantics_manifest: dict[str, object],
+    cache_rows: Sequence[dict[str, object]],
+    minimum_time_codes: int,
+) -> list[dict[str, float | str]]:
+    """Select structure-matched multi-lag NPZ members needed for particle caches."""
+
+    if not target_id:
+        raise ValueError("target_id must be nonempty")
+    if int(minimum_time_codes) != minimum_time_codes or minimum_time_codes < 2:
+        raise ValueError("minimum_time_codes must be an integer >= 2")
+    entries = semantics_manifest.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("semantics_manifest entries must be nonempty")
+
+    cached_members: set[tuple[str, str, str, str]] = set()
+    for row in cache_rows:
+        cached = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
+        if not cached:
+            continue
+        member_name = str(row.get("first_npz_member", row.get("target_member", "none")))
+        member_md5 = str(row.get("npz_member_md5", row.get("target_member_md5", "none")))
+        cached_members.add(
+            (
+                str(row.get("system_id", "unknown")),
+                str(row.get("temperature", "none")),
+                member_name,
+                member_md5,
+            )
+        )
+
+    out: list[dict[str, float | str]] = []
+    for entry in sorted(
+        entries,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        if not isinstance(entry, dict):
+            continue
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        source_path = str(entry.get("source_path", "none"))
+        tau_alpha = float(entry.get("tau_alpha", 0.0) or 0.0)
+        by_structure: dict[str, list[dict[str, object]]] = {}
+        for member in entry.get("members", []):
+            if not isinstance(member, dict):
+                continue
+            structure_id = str(member.get("structure_id", "none"))
+            by_structure.setdefault(structure_id, []).append(member)
+
+        ladders: list[tuple[int, float, str, list[dict[str, object]]]] = []
+        for structure_id, members in by_structure.items():
+            dedup: dict[str, dict[str, object]] = {}
+            for member in members:
+                time_code = str(member.get("time_code", "none"))
+                current = dedup.get(time_code)
+                if current is None or float(member.get("lag_time", 0.0) or 0.0) < float(
+                    current.get("lag_time", 0.0) or 0.0
+                ):
+                    dedup[time_code] = member
+            ladder = sorted(dedup.values(), key=lambda item: float(item.get("lag_time", 0.0) or 0.0))
+            if not ladder:
+                continue
+            lag_span = float(ladder[-1].get("lag_time", 0.0) or 0.0) - float(
+                ladder[0].get("lag_time", 0.0) or 0.0
+            )
+            ladders.append((len(ladder), lag_span, structure_id, ladder))
+
+        def structure_sort_value(structure_id: str) -> float:
+            try:
+                return float(structure_id)
+            except ValueError:
+                return float("inf")
+
+        if ladders:
+            ladders.sort(key=lambda item: (-item[0], -item[1], structure_sort_value(item[2]), item[2]))
+            _, lag_span, selected_structure_id, selected_ladder = ladders[0]
+        else:
+            lag_span = 0.0
+            selected_structure_id = "none"
+            selected_ladder = []
+
+        target_keys = [
+            (
+                system_id,
+                temperature,
+                str(member.get("member", "none")),
+                str(member.get("member_md5", "none")),
+            )
+            for member in selected_ladder
+        ]
+        cached_target_count = sum(1 for key in target_keys if key in cached_members)
+        target_count = len(selected_ladder)
+        official_ready = target_count >= int(minimum_time_codes)
+        particle_cache_ready = official_ready and cached_target_count == target_count and target_count > 0
+        event_clock_ready = False
+
+        if event_clock_ready:
+            stage = "multi_lag_particle_event_clock_ready"
+            blocker = "none"
+            next_action = "run_structure_matched_event_clock_threshold_sweep"
+        elif particle_cache_ready:
+            stage = "multi_lag_particle_cache_ready_event_clock_axis_blocked"
+            blocker = "frame_axis_is_isoconfigurational_replicates"
+            next_action = "derive_event_clock_from_structure_matched_replicates"
+        elif official_ready:
+            stage = "official_multi_lag_ladder_ready_cache_missing"
+            blocker = "multi_lag_particle_cache_missing"
+            next_action = "extract_structure_matched_multi_lag_npz_members"
+        else:
+            stage = "official_multi_lag_ladder_incomplete"
+            blocker = "official_multi_lag_semantics"
+            next_action = "extend_official_timecode_member_ladder"
+
+        out.append(
+            {
+                "target_id": f"{target_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "selected_structure_id": selected_structure_id,
+                "selected_time_codes": ";".join(str(member.get("time_code", "none")) for member in selected_ladder),
+                "target_members": ";".join(str(member.get("member", "none")) for member in selected_ladder),
+                "target_member_md5s": ";".join(str(member.get("member_md5", "none")) for member in selected_ladder),
+                "target_lag_times": ";".join(str(float(member.get("lag_time", 0.0) or 0.0)) for member in selected_ladder),
+                "tau_alpha": float(tau_alpha),
+                "target_member_count": float(target_count),
+                "minimum_time_codes": float(minimum_time_codes),
+                "cached_target_member_count": float(cached_target_count),
+                "missing_target_member_count": float(max(0, target_count - cached_target_count)),
+                "lag_span": float(lag_span),
+                "official_multi_lag_ladder_ready": float(official_ready),
+                "particle_lag_ladder_cache_ready": float(particle_cache_ready),
+                "event_clock_trajectory_ready": float(event_clock_ready),
+                "heldout_macro_prediction_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "target_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_cached_particle_observable_semantics_audit(
+    *,
+    audit_id: str,
+    cached_observable_rows: Sequence[dict[str, object]],
+    official_observable_rows: Sequence[dict[str, object]],
+    max_reproducible_relative_error: float,
+) -> list[dict[str, float | str]]:
+    """Audit whether cached coordinate observables reproduce official displacement observables."""
+
+    def parse_float_list(value: object) -> list[float]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            if not value or value == "none":
+                return []
+            return [float(item) for item in value.split(";") if item]
+        if isinstance(value, Sequence):
+            return [float(item) for item in value]
+        return []
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not cached_observable_rows:
+        raise ValueError("cached_observable_rows must be nonempty")
+    if not official_observable_rows:
+        raise ValueError("official_observable_rows must be nonempty")
+    if max_reproducible_relative_error <= 0.0:
+        raise ValueError("max_reproducible_relative_error must be positive")
+
+    official_by_member: dict[tuple[str, str, str, str], dict[str, object]] = {}
+    official_by_code: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in official_observable_rows:
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        time_code = str(row.get("time_code", "none"))
+        member = str(row.get("member", row.get("target_member", "none")))
+        if member != "none":
+            official_by_member[(system_id, temperature, time_code, member)] = row
+        official_by_code[(system_id, temperature, time_code)] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        cached_observable_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            float(item.get("lag_time", 0.0) or 0.0),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        time_code = str(row.get("time_code", "none"))
+        target_member = str(row.get("target_member", "none"))
+        official = official_by_member.get(
+            (system_id, temperature, time_code, target_member),
+            official_by_code.get((system_id, temperature, time_code), {}),
+        )
+        official_msd = float(official.get("msd", 0.0) or 0.0) if official else 0.0
+        official_ngp_2d = float(official.get("ngp_2d", 0.0) or 0.0) if official else 0.0
+        official_fs = parse_float_list(official.get("self_intermediate_scattering_by_k", [])) if official else []
+        raw_coordinate_msd = float(row.get("raw_coordinate_msd", 0.0) or 0.0)
+        replica_spread_msd = float(row.get("replica_spread_msd", 0.0) or 0.0)
+        initial_reference_msd = float(row.get("initial_reference_msd", 0.0) or 0.0)
+        initial_reference_ngp_2d = float(row.get("initial_reference_ngp_2d", 0.0) or 0.0)
+        pooled_initial_reference_ngp_2d = float(row.get("pooled_initial_reference_ngp_2d", 0.0) or 0.0)
+        initial_reference_fs = parse_float_list(row.get("initial_reference_fs_by_k", []))
+        single_axis_x_fs = parse_float_list(row.get("single_axis_x_fs_by_k", []))
+        denominator = max(abs(official_msd), 1.0e-12)
+        raw_rel_error = abs(raw_coordinate_msd - official_msd) / denominator
+        spread_rel_error = abs(replica_spread_msd - official_msd) / denominator
+        initial_reference_rel_error = abs(initial_reference_msd - official_msd) / denominator
+        ngp_denominator = max(abs(official_ngp_2d), 1.0e-12)
+        initial_reference_ngp_rel_error = abs(initial_reference_ngp_2d - official_ngp_2d) / ngp_denominator
+        pooled_initial_reference_ngp_rel_error = (
+            abs(pooled_initial_reference_ngp_2d - official_ngp_2d) / ngp_denominator
+        )
+        fs_abs_errors = [abs(a - b) for a, b in zip(initial_reference_fs, official_fs)]
+        single_axis_x_fs_abs_errors = [abs(a - b) for a, b in zip(single_axis_x_fs, official_fs)]
+        initial_reference_fs_max_abs_error = max(fs_abs_errors) if fs_abs_errors else math.inf
+        single_axis_x_fs_max_abs_error = max(single_axis_x_fs_abs_errors) if single_axis_x_fs_abs_errors else math.inf
+        cached_ready = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
+        initial_ready = float(row.get("initial_reference_positions_ready", 0.0) or 0.0) == 1.0
+        official_available = official_msd > 0.0
+        reproducible = (
+            cached_ready
+            and initial_ready
+            and official_available
+            and initial_reference_rel_error <= max_reproducible_relative_error
+        )
+
+        if reproducible:
+            stage = "official_displacement_observable_reproduced"
+            blocker = "none"
+            next_action = "run_structure_matched_displacement_inversion"
+        elif cached_ready and not initial_ready:
+            stage = "cached_coordinate_proxy_ready_initial_reference_blocked"
+            blocker = "initial_positions_reference_missing"
+            next_action = "extract_initial_reference_positions_for_structure"
+        elif cached_ready:
+            stage = "cached_coordinate_proxy_ready_observable_mismatch"
+            blocker = "official_displacement_observable_mismatch"
+            next_action = "audit_displacement_reference_semantics"
+        else:
+            stage = "cached_coordinate_proxy_incomplete"
+            blocker = "particle_coordinate_cache"
+            next_action = "complete_particle_coordinate_cache"
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}_{time_code}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": time_code,
+                "lag_time": float(row.get("lag_time", 0.0) or 0.0),
+                "target_member": target_member,
+                "official_msd": float(official_msd),
+                "raw_coordinate_msd": float(raw_coordinate_msd),
+                "replica_spread_msd": float(replica_spread_msd),
+                "initial_reference_msd": float(initial_reference_msd),
+                "raw_coordinate_msd_relative_error": float(raw_rel_error),
+                "replica_spread_msd_relative_error": float(spread_rel_error),
+                "initial_reference_msd_relative_error": float(initial_reference_rel_error),
+                "official_ngp_2d": float(official_ngp_2d),
+                "cached_ngp_2d_proxy": float(row.get("cached_ngp_2d_proxy", 0.0) or 0.0),
+                "initial_reference_ngp_2d": float(initial_reference_ngp_2d),
+                "initial_reference_ngp_2d_relative_error": float(initial_reference_ngp_rel_error),
+                "initial_reference_ngp_2d_formula": str(
+                    row.get("initial_reference_ngp_2d_formula", "unspecified")
+                ),
+                "pooled_initial_reference_ngp_2d": float(pooled_initial_reference_ngp_2d),
+                "pooled_initial_reference_ngp_2d_relative_error": float(
+                    pooled_initial_reference_ngp_rel_error
+                ),
+                "official_ngp_2d_reproducible": float(
+                    initial_ready
+                    and official_available
+                    and initial_reference_ngp_rel_error <= max_reproducible_relative_error
+                ),
+                "official_fs_by_k": ";".join(f"{value:.17g}" for value in official_fs),
+                "initial_reference_fs_by_k": ";".join(f"{value:.17g}" for value in initial_reference_fs),
+                "initial_reference_fs_formula": str(row.get("initial_reference_fs_formula", "unspecified")),
+                "initial_reference_fs_max_abs_error": float(initial_reference_fs_max_abs_error),
+                "single_axis_x_fs_by_k": ";".join(f"{value:.17g}" for value in single_axis_x_fs),
+                "single_axis_x_fs_max_abs_error": float(single_axis_x_fs_max_abs_error),
+                "official_fs_reproducible": float(
+                    initial_ready
+                    and len(initial_reference_fs) == len(official_fs)
+                    and bool(official_fs)
+                    and initial_reference_fs_max_abs_error <= max_reproducible_relative_error
+                ),
+                "cached_coordinate_proxy_ready": float(cached_ready),
+                "initial_reference_positions_ready": float(initial_ready),
+                "official_displacement_observable_available": float(official_available),
+                "official_displacement_observable_reproducible": float(reproducible),
+                "event_clock_trajectory_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "observable_semantics_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_microdynamic_closed_loop_audit(
+    *,
+    audit_id: str,
+    trajectory_rows: Sequence[dict[str, object]],
+    signature_rows: Sequence[dict[str, object]],
+    alpha_horizon_rows: Sequence[dict[str, object]],
+    min_frame_count: int = 2,
+    min_member_count: float = 4.0,
+    required_signature_count: float = 4.0,
+) -> list[dict[str, float | str]]:
+    """Audit whether real GlassBench microstatistics can support held-out predictions."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not trajectory_rows:
+        raise ValueError("trajectory_rows must be nonempty")
+    if not signature_rows:
+        raise ValueError("signature_rows must be nonempty")
+    if not alpha_horizon_rows:
+        raise ValueError("alpha_horizon_rows must be nonempty")
+    if min_frame_count <= 0:
+        raise ValueError("min_frame_count must be positive")
+    for name, value in {
+        "min_member_count": min_member_count,
+        "required_signature_count": required_signature_count,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in trajectory_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+    signature_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in signature_rows
+    }
+    alpha_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in alpha_horizon_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("frame_index", 0.0)))
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        usable = [
+            row
+            for row in sorted_group
+            if float(row.get("frame_index_uncertainty_ready", 0.0)) == 1.0
+            and float(row.get("member_count", 0.0) or 0.0) >= min_member_count
+        ]
+        positive_usable = [row for row in usable if float(row.get("frame_index", 0.0)) > 0.0]
+        frame_microstats_ready = len(positive_usable) >= min_frame_count
+        physical_time_ready = frame_microstats_ready and all(
+            float(row.get("physical_time_ready", 0.0)) == 1.0 for row in positive_usable
+        )
+
+        msd_values = np.asarray([float(row.get("msd", 0.0) or 0.0) for row in positive_usable], dtype=float)
+        ngp_values = np.asarray([float(row.get("ngp_2d", 0.0) or 0.0) for row in positive_usable], dtype=float)
+        fs_decay_values: list[float] = []
+        for row in positive_usable:
+            fs_values = _parse_semicolon_float_values(
+                row.get("self_intermediate_scattering_by_k", "none"),
+                name="self_intermediate_scattering_by_k",
+            )
+            if fs_values:
+                fs_decay_values.append(max(0.0, 1.0 - min(fs_values)))
+        cage_length_proxy = float(math.sqrt(float(np.median(msd_values)))) if len(msd_values) else 0.0
+        short_frame_ngp_peak = float(np.max(ngp_values)) if len(ngp_values) else 0.0
+        short_frame_fs_decay = float(max(fs_decay_values)) if fs_decay_values else 0.0
+
+        signature = signature_by_key.get((system_id, temperature), {})
+        macro_signature_ready = (
+            float(signature.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+            and float(signature.get("supported_dynamical_signature_count", 0.0) or 0.0)
+            >= required_signature_count
+        )
+        macro_timecode_ready = float(signature.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+        alpha = alpha_by_key.get((system_id, temperature), {})
+        alpha_definition_consistent = (
+            float(alpha.get("metadata_tau_alpha_consistent_with_anchor_fs", 0.0) or 0.0) == 1.0
+        )
+        real_pe_inversion_ready = float(signature.get("real_pe_inversion_ready", 0.0) or 0.0) == 1.0
+        cage_jump_clock_ready = False
+        micro_to_macro_prediction_ready = (
+            frame_microstats_ready
+            and physical_time_ready
+            and cage_jump_clock_ready
+            and macro_signature_ready
+            and alpha_definition_consistent
+            and real_pe_inversion_ready
+        )
+        closed_loop_ready = micro_to_macro_prediction_ready
+
+        missing: list[str] = []
+        if not frame_microstats_ready:
+            missing.append("frame_index_member_ensemble_microstatistics")
+        if not physical_time_ready:
+            missing.append("physical_time_semantics")
+        missing.append("cage_jump_event_segmentation")
+        missing.append("persistence_exchange_event_clock")
+        if not macro_timecode_ready:
+            missing.append("macro_timecode_curve")
+        if macro_timecode_ready and not macro_signature_ready:
+            missing.append("macro_dynamical_signatures")
+        if macro_timecode_ready and not alpha_definition_consistent:
+            missing.append("alpha_definition_consistency")
+        if macro_timecode_ready and not real_pe_inversion_ready:
+            missing.append("real_persistence_exchange_inversion")
+        missing = list(dict.fromkeys(missing))
+
+        if closed_loop_ready:
+            stage = "real_microdynamic_closed_loop_ready"
+            blocker = "none"
+            next_action = "run_heldout_micro_to_macro_prediction"
+        elif not macro_timecode_ready:
+            stage = "macro_timecode_upstream_incomplete"
+            blocker = str(signature.get("primary_blocker", "macro_timecode_curve"))
+            next_action = "complete_real_timecode_curve_before_closed_loop_prediction"
+        elif frame_microstats_ready and macro_signature_ready:
+            stage = "real_microstats_macro_signatures_closed_loop_blocked"
+            blocker = missing[0] if missing else "closed_loop_prediction"
+            next_action = "attach_frame_time_mapping_and_extract_cage_jump_events"
+        elif frame_microstats_ready:
+            stage = "real_microstats_macro_signature_incomplete"
+            blocker = "macro_dynamical_signatures"
+            next_action = "complete_real_timecode_signature_support"
+        else:
+            stage = "trajectory_microstatistics_upstream_incomplete"
+            blocker = missing[0] if missing else "trajectory_microstatistics"
+            next_action = "extract_member_ensemble_frame_microstatistics"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "frame_count": float(len(sorted_group)),
+                "usable_frame_count": float(len(positive_usable)),
+                "member_count_minimum": float(min_member_count),
+                "cage_length_proxy": cage_length_proxy,
+                "short_frame_ngp_peak": short_frame_ngp_peak,
+                "short_frame_fs_decay": short_frame_fs_decay,
+                "frame_index_microstats_ready": float(frame_microstats_ready),
+                "physical_time_microstats_ready": float(physical_time_ready),
+                "cage_jump_clock_ready": 0.0,
+                "macro_timecode_ready": float(macro_timecode_ready),
+                "macro_signature_ready": float(macro_signature_ready),
+                "macro_signature_count": float(
+                    signature.get("supported_dynamical_signature_count", 0.0) or 0.0
+                ),
+                "alpha_definition_consistent": float(alpha_definition_consistent),
+                "real_pe_inversion_ready": float(real_pe_inversion_ready),
+                "micro_to_macro_prediction_ready": float(micro_to_macro_prediction_ready),
+                "closed_loop_ready": float(closed_loop_ready),
+                "missing_closed_loop_inputs": ";".join(missing) if missing else "none",
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "closed_loop_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_timecode_signature_support_gate(
+    *,
+    support_id: str,
+    timecode_rows: Sequence[dict[str, object]],
+    bridge_rows: Sequence[dict[str, object]],
+    anchor_wave_number: float,
+    alpha_threshold: float = math.exp(-1.0),
+    min_msd_growth_factor: float = 10.0,
+    min_fs_decay: float = 0.05,
+    min_peak_to_initial_factor: float = 3.0,
+    min_late_recovery_fraction: float = 0.1,
+) -> list[dict[str, float | str]]:
+    """Score real GlassBench time-code curves against dynamical glass signatures."""
+
+    if not support_id:
+        raise ValueError("support_id must be nonempty")
+    if not timecode_rows:
+        raise ValueError("timecode_rows must be nonempty")
+    if not bridge_rows:
+        raise ValueError("bridge_rows must be nonempty")
+    for name, value in {
+        "anchor_wave_number": anchor_wave_number,
+        "alpha_threshold": alpha_threshold,
+        "min_msd_growth_factor": min_msd_growth_factor,
+        "min_fs_decay": min_fs_decay,
+        "min_peak_to_initial_factor": min_peak_to_initial_factor,
+        "min_late_recovery_fraction": min_late_recovery_fraction,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if alpha_threshold >= 1.0:
+        raise ValueError("alpha_threshold must be below one")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in timecode_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+    bridge_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in bridge_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("lag_time", 0.0)))
+        bridge = bridge_by_key.get((system_id, temperature), {})
+        real_curve_ready = (
+            bool(sorted_group)
+            and all(float(row.get("timecode_curve_ready", 0.0)) == 1.0 for row in sorted_group)
+            and float(bridge.get("real_time_observable_curve_ready", 0.0)) == 1.0
+        )
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        if not real_curve_ready:
+            blocker = str(bridge.get("primary_blocker", sorted_group[0].get("primary_blocker", "timecode_curve_ready")))
+            out.append(
+                {
+                    "support_id": support_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "source_paths": ";".join(source_paths) if source_paths else "none",
+                    "lag_count": float(len(sorted_group)),
+                    "real_time_observable_curve_ready": 0.0,
+                    "real_pe_inversion_ready": float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0),
+                    "msd_growth_factor": 0.0,
+                    "msd_growth_signature": 0.0,
+                    "self_intermediate_decay": 0.0,
+                    "self_intermediate_decay_signature": 0.0,
+                    "ngp_peak_time": 0.0,
+                    "ngp_peak_value": 0.0,
+                    "ngp_late_recovery_fraction": 0.0,
+                    "transient_ngp_peak_signature": 0.0,
+                    "chi4_peak_time": 0.0,
+                    "chi4_peak_value": 0.0,
+                    "chi4_late_recovery_fraction": 0.0,
+                    "transient_chi4_peak_signature": 0.0,
+                    "latest_self_intermediate_scattering_anchor": 0.0,
+                    "alpha_threshold_crossed": 0.0,
+                    "supported_dynamical_signature_count": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": "complete_timecode_curve_before_signature_scoring",
+                    "signature_stage": "timecode_curve_upstream_incomplete",
+                }
+            )
+            continue
+
+        lag_times = np.asarray([float(row["lag_time"]) for row in sorted_group], dtype=float)
+        msd = np.asarray([float(row["msd"]) for row in sorted_group], dtype=float)
+        ngp = np.asarray([float(row["ngp_2d"]) for row in sorted_group], dtype=float)
+        chi4 = np.asarray([float(row["chi4_overlap_replica"]) for row in sorted_group], dtype=float)
+        fs_anchor: list[float] = []
+        for row in sorted_group:
+            wave_numbers = _parse_semicolon_float_values(row["wave_numbers"], name="wave_numbers")
+            fs_values = _parse_semicolon_float_values(
+                row["self_intermediate_scattering_by_k"],
+                name="self_intermediate_scattering_by_k",
+            )
+            if len(wave_numbers) != len(fs_values):
+                raise ValueError("GlassBench wave_numbers and Fs lengths must match")
+            lookup = {float(wave): float(value) for wave, value in zip(wave_numbers, fs_values)}
+            if float(anchor_wave_number) not in lookup:
+                raise ValueError("anchor_wave_number must be present in every time-code row")
+            fs_anchor.append(lookup[float(anchor_wave_number)])
+        fs = np.asarray(fs_anchor, dtype=float)
+        if np.any(msd <= 0.0) or np.any(fs <= 0.0) or np.any(chi4 < 0.0) or np.any(ngp < 0.0):
+            raise ValueError("GlassBench signature observables must be nonnegative with positive MSD and Fs")
+
+        msd_growth_factor = float(msd[-1] / msd[0])
+        fs_decay = float(fs[0] - fs[-1])
+        ngp_peak_index = int(np.argmax(ngp))
+        ngp_peak_value = float(ngp[ngp_peak_index])
+        ngp_late_recovery = (
+            (ngp_peak_value - float(ngp[-1])) / ngp_peak_value if ngp_peak_value > 0.0 else 0.0
+        )
+        chi4_peak_index = int(np.argmax(chi4))
+        chi4_peak_value = float(chi4[chi4_peak_index])
+        chi4_late_recovery = (
+            (chi4_peak_value - float(chi4[-1])) / chi4_peak_value if chi4_peak_value > 0.0 else 0.0
+        )
+        msd_signature = msd_growth_factor >= min_msd_growth_factor
+        fs_signature = fs_decay >= min_fs_decay
+        ngp_signature = (
+            ngp_peak_index < len(ngp) - 1
+            and ngp_peak_value >= min_peak_to_initial_factor * max(float(ngp[0]), 1e-15)
+            and ngp_late_recovery >= min_late_recovery_fraction
+        )
+        chi4_signature = (
+            chi4_peak_index < len(chi4) - 1
+            and chi4_peak_value >= min_peak_to_initial_factor * max(float(chi4[0]), 1e-15)
+            and chi4_late_recovery >= min_late_recovery_fraction
+        )
+        alpha_crossed = float(fs[-1] <= alpha_threshold)
+        supported_count = float(sum([msd_signature, fs_signature, ngp_signature, chi4_signature]))
+        real_pe_ready = float(bridge.get("real_pe_inversion_ready", 0.0) or 0.0)
+        if real_pe_ready == 1.0:
+            stage = "real_curve_dynamic_signature_support_and_inversion_ready"
+            blocker = "none"
+            next_action = "run_persistence_exchange_real_data_inversion"
+        else:
+            stage = "real_curve_dynamic_signature_support_preinversion"
+            blocker = str(bridge.get("primary_blocker", "persistence_exchange_inversion"))
+            next_action = str(bridge.get("next_required_action", "extend_real_timecode_curve"))
+
+        out.append(
+            {
+                "support_id": support_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "lag_count": float(len(sorted_group)),
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": real_pe_ready,
+                "msd_growth_factor": msd_growth_factor,
+                "msd_growth_signature": float(msd_signature),
+                "self_intermediate_decay": fs_decay,
+                "self_intermediate_decay_signature": float(fs_signature),
+                "ngp_peak_time": float(lag_times[ngp_peak_index]),
+                "ngp_peak_value": ngp_peak_value,
+                "ngp_late_recovery_fraction": float(ngp_late_recovery),
+                "transient_ngp_peak_signature": float(ngp_signature),
+                "chi4_peak_time": float(lag_times[chi4_peak_index]),
+                "chi4_peak_value": chi4_peak_value,
+                "chi4_late_recovery_fraction": float(chi4_late_recovery),
+                "transient_chi4_peak_signature": float(chi4_signature),
+                "latest_self_intermediate_scattering_anchor": float(fs[-1]),
+                "alpha_threshold_crossed": alpha_crossed,
+                "supported_dynamical_signature_count": supported_count,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "signature_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_direct_four_point_claim_gate(
+    *,
+    gate_id: str,
+    signature_rows: Sequence[dict[str, object]],
+    dynamic_alignment_rows: Sequence[dict[str, object]],
+    member_ensemble_rows: Sequence[dict[str, object]],
+    min_member_count: float = 4.0,
+) -> list[dict[str, float | str]]:
+    """Keep overlap-chi4 proxy evidence separate from direct four-point claims."""
+
+    if not gate_id:
+        raise ValueError("gate_id must be nonempty")
+    if not signature_rows:
+        raise ValueError("signature_rows must be nonempty")
+    if not dynamic_alignment_rows:
+        raise ValueError("dynamic_alignment_rows must be nonempty")
+    if not member_ensemble_rows:
+        raise ValueError("member_ensemble_rows must be nonempty")
+    if min_member_count <= 0.0:
+        raise ValueError("min_member_count must be positive")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str]:
+        return (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+
+    signature_by_key = {key_for(row): row for row in signature_rows}
+    groups: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in member_ensemble_rows:
+        groups.setdefault(key_for(row), []).append(row)
+    chi4_alignment = next(
+        (
+            row
+            for row in dynamic_alignment_rows
+            if str(row.get("signature", "")) == "chi4_dynamic_heterogeneity_proxy"
+        ),
+        {},
+    )
+    alignment_blocker = str(
+        chi4_alignment.get("primary_blocker", "direct_four_point_function_and_dynamic_length")
+    )
+    alignment_proxy_supported = (
+        float(chi4_alignment.get("real_glassbench_support", 0.0) or 0.0) == 1.0
+        and str(chi4_alignment.get("alignment_stage", "")) == "real_proxy_supported_spatial_boundary"
+    )
+
+    out: list[dict[str, float | str]] = []
+    for key, group in sorted(groups.items(), key=lambda item: (item[0][0], float(item[0][1]))):
+        system_id, temperature = key
+        signature = signature_by_key.get(key, {})
+        usable = [
+            row
+            for row in group
+            if float(row.get("frame_index", 0.0) or 0.0) > 0.0
+            and float(row.get("member_count", 0.0) or 0.0) >= min_member_count
+            and float(row.get("ensemble_member_threshold_pass", 0.0) or 0.0) == 1.0
+            and float(row.get("frame_index_uncertainty_ready", 0.0) or 0.0) == 1.0
+            and float(row.get("chi4_overlap", 0.0) or 0.0) > 0.0
+            and float(row.get("sigma_chi4_overlap", 0.0) or 0.0) > 0.0
+        ]
+        overlap_peak = max((float(row.get("chi4_overlap", 0.0) or 0.0) for row in usable), default=0.0)
+        overlap_sigma = max((float(row.get("sigma_chi4_overlap", 0.0) or 0.0) for row in usable), default=0.0)
+        overlap_radius = max((float(row.get("overlap_radius", 0.0) or 0.0) for row in usable), default=0.0)
+        member_count = max((float(row.get("member_count", 0.0) or 0.0) for row in group), default=0.0)
+        physical_time_ready = bool(usable) and all(
+            float(row.get("physical_time_ready", 0.0) or 0.0) == 1.0 for row in usable
+        )
+        signature_proxy_ready = (
+            float(signature.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+            and float(signature.get("transient_chi4_peak_signature", 0.0) or 0.0) == 1.0
+        )
+        overlap_proxy_ready = bool(usable) and (signature_proxy_ready or alignment_proxy_supported)
+        direct_four_point_ready = (
+            overlap_proxy_ready
+            and physical_time_ready
+            and float(signature.get("direct_four_point_susceptibility_ready", 0.0) or 0.0) == 1.0
+        )
+        dynamic_length_ready = float(signature.get("dynamic_length_ready", 0.0) or 0.0) == 1.0
+        direct_claim_ready = direct_four_point_ready and dynamic_length_ready
+        proxy_promotion_allowed = direct_claim_ready
+
+        if direct_claim_ready:
+            stage = "direct_four_point_dynamic_length_claim_ready"
+            blocker = "none"
+            next_action = "promote_direct_four_point_dynamic_length_claim"
+        elif overlap_proxy_ready:
+            stage = "overlap_chi4_proxy_supported_direct_four_point_blocked"
+            blocker = alignment_blocker
+            next_action = "compute_direct_four_point_function_and_dynamic_length"
+        else:
+            stage = "overlap_chi4_proxy_incomplete"
+            blocker = "overlap_chi4_proxy"
+            next_action = "complete_overlap_chi4_member_ensemble_and_timecode_signature"
+
+        out.append(
+            {
+                "gate_id": gate_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "member_count": float(member_count),
+                "min_member_count": float(min_member_count),
+                "usable_frame_count": float(len(usable)),
+                "overlap_radius": float(overlap_radius),
+                "overlap_chi4_peak": float(overlap_peak),
+                "sigma_overlap_chi4_peak": float(overlap_sigma),
+                "timecode_chi4_peak": float(signature.get("chi4_peak_value", 0.0) or 0.0),
+                "timecode_chi4_late_recovery_fraction": float(
+                    signature.get("chi4_late_recovery_fraction", 0.0) or 0.0
+                ),
+                "overlap_chi4_proxy_ready": float(overlap_proxy_ready),
+                "physical_time_ready": float(physical_time_ready),
+                "direct_four_point_susceptibility_ready": float(direct_four_point_ready),
+                "dynamic_length_ready": float(dynamic_length_ready),
+                "direct_four_point_claim_ready": float(direct_claim_ready),
+                "proxy_promotion_allowed": float(proxy_promotion_allowed),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "four_point_claim_stage": stage,
+            }
+        )
+    return out
+
+
+def glassbench_real_data_closure_priority_ledger(
+    *,
+    ledger_id: str,
+    evidence_rows: Sequence[dict[str, object]],
+    closed_loop_rows: Sequence[dict[str, object]],
+    unlock_rows: Sequence[dict[str, object]],
+    post_window_rows: Sequence[dict[str, object]],
+    late_recovery_rows: Sequence[dict[str, object]],
+    four_point_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Rank the minimum real-data payloads needed to close GlassBench claims."""
+
+    if not ledger_id:
+        raise ValueError("ledger_id must be nonempty")
+    for name, rows in {
+        "evidence_rows": evidence_rows,
+        "closed_loop_rows": closed_loop_rows,
+        "unlock_rows": unlock_rows,
+        "post_window_rows": post_window_rows,
+        "late_recovery_rows": late_recovery_rows,
+        "four_point_rows": four_point_rows,
+    }.items():
+        if not rows:
+            raise ValueError(f"{name} must be nonempty")
+
+    def split_tokens(value: object) -> list[str]:
+        return [token for token in str(value or "").split(";") if token and token != "none"]
+
+    def join_tokens(values: Sequence[str]) -> str:
+        seen: set[str] = set()
+        out: list[str] = []
+        for value in values:
+            if value and value not in seen:
+                out.append(value)
+                seen.add(value)
+        return ";".join(out) if out else "none"
+
+    evidence_by_id = {str(row.get("claim_row_id", "")): row for row in evidence_rows}
+    dynamic = evidence_by_id.get("real_dynamic_signature_support", {})
+    pe_bound = evidence_by_id.get("conditional_alpha_transport_pe_bound", {})
+    mechanism = evidence_by_id.get("real_mechanism_selection", {})
+    closed = closed_loop_rows[0]
+    unlock = unlock_rows[0]
+    four_point = four_point_rows[0]
+
+    closed_missing = split_tokens(closed.get("missing_closed_loop_inputs", ""))
+    unlock_payload = split_tokens(unlock.get("minimum_required_payload", ""))
+    event_payload = join_tokens(
+        unlock_payload
+        + closed_missing
+        + [
+            "particle_resolved_cage_jump_events",
+            "persistence_exchange_event_clock",
+            "uncertainty_weighted_macro_observables",
+        ]
+    )
+    event_blocked_count = float(
+        sum(
+            [
+                float(closed.get("closed_loop_ready", 0.0) or 0.0) == 0.0,
+                float(unlock.get("minimum_unlock_ready", 0.0) or 0.0) == 0.0,
+                float(pe_bound.get("claim_ready_now", 0.0) or 0.0) == 0.0,
+                float(mechanism.get("claim_ready_now", 0.0) or 0.0) == 0.0,
+            ]
+        )
+    )
+    post_targets = sorted(
+        {
+            str(row.get("target_time_code", "post_alpha"))
+            for row in post_window_rows
+            if float(row.get("prediction_target_ready", 0.0) or 0.0) == 1.0
+        }
+    )
+    late_targets = sorted(
+        {
+            str(row.get("target_time_code", "late_recovery"))
+            for row in late_recovery_rows
+            if float(row.get("target_ready", row.get("timecode_target_ready", 0.0)) or 0.0) == 1.0
+        }
+    )
+    four_point_blocked = float(four_point.get("direct_four_point_claim_ready", 0.0) or 0.0) == 0.0
+
+    rows = [
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "physical_time_event_clock_and_cage_jump_segmentation",
+            "priority_rank": 1.0,
+            "current_evidence_level": "real_signatures_and_frame_microstats_cached",
+            "current_claim_level": str(dynamic.get("allowed_claim_level", "dynamical_signature_supported")),
+            "post_unlock_claim_level": "uncertainty_weighted_real_microdynamic_inversion_and_heldout_macro_prediction",
+            "minimum_required_payload": event_payload,
+            "blocked_gate_count": event_blocked_count,
+            "primary_blocker": str(closed.get("primary_blocker", "physical_time_semantics")),
+            "next_required_action": "attach_frame_time_mapping_segment_cage_jumps_and_fit_persistence_exchange_clock",
+            "unlocks_quantitative_inversion": 1.0,
+            "unlocks_micro_to_macro_prediction": 1.0,
+            "unlocks_heldout_alpha_prediction": 0.0,
+            "unlocks_mechanism_selection": 0.0,
+            "unlocks_direct_spatial_claim": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "minimum_real_inversion_closure_priority",
+        },
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "post_alpha_multik_fs_targets",
+            "priority_rank": 2.0,
+            "current_evidence_level": "cached_multik_alpha_shape_candidate",
+            "current_claim_level": "cached_alpha_shape_consistency",
+            "post_unlock_claim_level": "heldout_multik_alpha_shape_prediction_test",
+            "minimum_required_payload": join_tokens(
+                [f"observe_{target}_Fs_multik" for target in post_targets]
+                + ["sigma_self_intermediate_scattering_by_k", "post_alpha_threshold_crossing"]
+            ),
+            "blocked_gate_count": float(
+                sum(float(row.get("post_window_prediction_supported", 0.0) or 0.0) == 0.0 for row in post_window_rows)
+            ),
+            "primary_blocker": "post_alpha_window_observation",
+            "next_required_action": "measure_preregistered_post_alpha_fs_targets",
+            "unlocks_quantitative_inversion": 0.0,
+            "unlocks_micro_to_macro_prediction": 0.0,
+            "unlocks_heldout_alpha_prediction": 1.0,
+            "unlocks_mechanism_selection": 0.0,
+            "unlocks_direct_spatial_claim": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "heldout_alpha_prediction_priority",
+        },
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "late_ngp_recovery_and_exchange_horizon",
+            "priority_rank": 3.0,
+            "current_evidence_level": "late_recovery_protocol_preregistered",
+            "current_claim_level": str(mechanism.get("allowed_claim_level", "preregistered_real_mechanism_selection_protocol")),
+            "post_unlock_claim_level": "finite_exchange_vs_static_disorder_real_mechanism_selection",
+            "minimum_required_payload": join_tokens(
+                [f"observe_{target}_late_ngp" for target in late_targets]
+                + ["sigma_late_ngp", "late_self_van_hove_tail", "exchange_clock_fit"]
+            ),
+            "blocked_gate_count": float(
+                sum(
+                    float(
+                        row.get("late_recovery_observed", row.get("late_recovery_observation_ready", 0.0))
+                        or 0.0
+                    )
+                    == 0.0
+                    for row in late_recovery_rows
+                )
+            ),
+            "primary_blocker": str(mechanism.get("primary_blocker", "late_recovery_measurement")),
+            "next_required_action": "measure_late_ngp_recovery_and_extract_exchange_clock",
+            "unlocks_quantitative_inversion": 0.0,
+            "unlocks_micro_to_macro_prediction": 0.0,
+            "unlocks_heldout_alpha_prediction": 0.0,
+            "unlocks_mechanism_selection": 1.0,
+            "unlocks_direct_spatial_claim": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "mechanism_selection_priority",
+        },
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "direct_four_point_function_and_dynamic_length",
+            "priority_rank": 4.0,
+            "current_evidence_level": "overlap_chi4_proxy_supported",
+            "current_claim_level": "dynamic_heterogeneity_proxy_only",
+            "post_unlock_claim_level": "direct_four_point_susceptibility_and_dynamic_length_claim",
+            "minimum_required_payload": "direct_four_point_susceptibility;dynamic_correlation_length;physical_time_chi4_uncertainty",
+            "blocked_gate_count": float(four_point_blocked),
+            "primary_blocker": str(four_point.get("primary_blocker", "direct_four_point_function_and_dynamic_length")),
+            "next_required_action": "compute_direct_four_point_function_and_dynamic_length",
+            "unlocks_quantitative_inversion": 0.0,
+            "unlocks_micro_to_macro_prediction": 0.0,
+            "unlocks_heldout_alpha_prediction": 0.0,
+            "unlocks_mechanism_selection": 0.0,
+            "unlocks_direct_spatial_claim": 1.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "spatial_four_point_boundary_priority",
+        },
+    ]
+    return rows
+
+
+def dynamic_signature_alignment_ledger(
+    *,
+    alignment_id: str,
+    claim_rows: Sequence[dict[str, object]],
+    literature_rows: Sequence[dict[str, object]],
+    glassbench_signature_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Align model diagnostics, literature claims, and real GlassBench signature support."""
+
+    if not alignment_id:
+        raise ValueError("alignment_id must be nonempty")
+    if not claim_rows:
+        raise ValueError("claim_rows must be nonempty")
+    if not literature_rows:
+        raise ValueError("literature_rows must be nonempty")
+    if not glassbench_signature_rows:
+        raise ValueError("glassbench_signature_rows must be nonempty")
+
+    claim_by_phenomenon = {str(row.get("phenomenon", "")): row for row in claim_rows}
+    literature_sources = {str(row.get("benchmark_source", "")) for row in literature_rows}
+    real_rows = [
+        row
+        for row in glassbench_signature_rows
+        if float(row.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+    ]
+    real = real_rows[0] if real_rows else {}
+    real_ready = float(real.get("real_time_observable_curve_ready", 0.0) or 0.0)
+    real_inversion_ready = float(real.get("real_pe_inversion_ready", 0.0) or 0.0)
+    real_blocker = str(real.get("primary_blocker", "real_glassbench_signature_support"))
+
+    def claim_support(phenomenon: str) -> tuple[float, str, str]:
+        row = claim_by_phenomenon.get(phenomenon, {})
+        alignment = str(row.get("claim_alignment", "missing"))
+        support_level = str(row.get("model_support_level", "missing"))
+        model_support = 1.0 if alignment == "supported" else 0.5 if alignment == "partial" else 0.0
+        blocker = str(row.get("primary_blocker", "claim_alignment"))
+        return model_support, support_level, blocker
+
+    def literature_support(required_sources: Sequence[str]) -> float:
+        return float(all(source in literature_sources for source in required_sources))
+
+    specs = [
+        {
+            "signature": "msd_growth_cage_escape",
+            "phenomenon": "cage_plateau_transient_ngp_van_hove_tail",
+            "sources": ["kob1995vanhove"],
+            "real_support": float(real.get("msd_growth_signature", 0.0) or 0.0),
+            "stage_if_real": "real_curve_supported",
+            "blocker": "none",
+        },
+        {
+            "signature": "self_intermediate_alpha",
+            "phenomenon": "self_intermediate_scattering_alpha_relaxation",
+            "sources": ["kob1995intermediate"],
+            "real_support": float(real.get("self_intermediate_decay_signature", 0.0) or 0.0),
+            "stage_if_real": "real_curve_supported_pre_alpha_threshold"
+            if float(real.get("alpha_threshold_crossed", 0.0) or 0.0) == 0.0
+            else "real_curve_supported",
+            "blocker": real_blocker if float(real.get("alpha_threshold_crossed", 0.0) or 0.0) == 0.0 else "none",
+        },
+        {
+            "signature": "transient_ngp_peak",
+            "phenomenon": "cage_plateau_transient_ngp_van_hove_tail",
+            "sources": ["kob1995vanhove"],
+            "real_support": float(real.get("transient_ngp_peak_signature", 0.0) or 0.0),
+            "stage_if_real": "real_curve_supported",
+            "blocker": "none",
+        },
+        {
+            "signature": "chi4_dynamic_heterogeneity_proxy",
+            "phenomenon": "chi4_peak_and_dynamic_length_growth",
+            "sources": ["lacevic2003fourpoint"],
+            "real_support": float(real.get("transient_chi4_peak_signature", 0.0) or 0.0),
+            "stage_if_real": "real_proxy_supported_spatial_boundary",
+            "blocker": "direct_four_point_function_and_dynamic_length",
+        },
+        {
+            "signature": "persistence_exchange_decoupling",
+            "phenomenon": "persistence_exchange_decoupling",
+            "sources": ["hedges2007persistence"],
+            "real_support": 0.0,
+            "stage_if_real": "model_literature_supported_real_inversion_blocked",
+            "blocker": real_blocker,
+        },
+        {
+            "signature": "thermodynamic_transition",
+            "phenomenon": "configurational_entropy_and_ideal_glass_scope",
+            "sources": [],
+            "real_support": 0.0,
+            "stage_if_real": "scope_boundary_not_explained",
+            "blocker": "thermodynamic_input_law",
+        },
+    ]
+
+    rows: list[dict[str, float | str]] = []
+    for spec in specs:
+        signature = str(spec["signature"])
+        phenomenon = str(spec["phenomenon"])
+        model_support, model_support_level, claim_blocker = claim_support(phenomenon)
+        lit_support = literature_support(spec["sources"])  # type: ignore[arg-type]
+        real_support = float(spec["real_support"])
+        if signature == "thermodynamic_transition":
+            stage = "scope_boundary_not_explained"
+            blocker = str(spec["blocker"])
+        elif real_support == 1.0:
+            stage = str(spec["stage_if_real"])
+            blocker = str(spec["blocker"])
+        elif model_support > 0.0 and lit_support == 1.0:
+            stage = str(spec["stage_if_real"])
+            blocker = str(spec["blocker"])
+        elif model_support > 0.0:
+            stage = "model_supported_literature_or_real_data_pending"
+            blocker = claim_blocker
+        else:
+            stage = "unsupported_or_scope_boundary"
+            blocker = claim_blocker
+        if blocker == "none" and real_inversion_ready == 0.0 and signature in {
+            "self_intermediate_alpha",
+            "persistence_exchange_decoupling",
+        }:
+            blocker = real_blocker
+        rows.append(
+            {
+                "alignment_id": alignment_id,
+                "signature": signature,
+                "phenomenon": phenomenon,
+                "model_support": float(model_support),
+                "model_support_level": model_support_level,
+                "literature_qualitative_support": lit_support,
+                "real_glassbench_support": real_support,
+                "real_time_observable_curve_ready": real_ready,
+                "real_quantitative_inversion_ready": real_inversion_ready,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "alignment_stage": stage,
+            }
+        )
+    return rows
 
 
 def sota_glassbench_visible_member_ensemble_audit_gate(
@@ -7963,6 +13987,114 @@ def trajectory_observable_protocol(
     return rows
 
 
+def trajectory_cage_jump_event_protocol(
+    *,
+    protocol_id: str,
+    positions: np.ndarray,
+    times: np.ndarray,
+    jump_displacement_threshold: float,
+    min_particles_with_jumps: int = 1,
+    min_exchange_interval_count: int = 0,
+) -> dict[str, float | str]:
+    """Segment particle-resolved cage jumps into persistence and exchange clocks."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    position_array = np.asarray(positions, dtype=float)
+    time_array = np.asarray(times, dtype=float)
+    if position_array.ndim != 3:
+        raise ValueError("positions must have shape (frames, particles, dimensions)")
+    if time_array.ndim != 1:
+        raise ValueError("times must be one-dimensional")
+    if position_array.shape[0] != time_array.size:
+        raise ValueError("times length must match the number of trajectory frames")
+    if position_array.shape[0] < 2:
+        raise ValueError("at least two frames are required")
+    if position_array.shape[1] < 1 or position_array.shape[2] < 1:
+        raise ValueError("positions must include particles and dimensions")
+    if np.any(np.diff(time_array) <= 0.0):
+        raise ValueError("times must be strictly increasing")
+    if jump_displacement_threshold <= 0.0:
+        raise ValueError("jump_displacement_threshold must be positive")
+    if int(min_particles_with_jumps) != min_particles_with_jumps or min_particles_with_jumps < 1:
+        raise ValueError("min_particles_with_jumps must be a positive integer")
+    if int(min_exchange_interval_count) != min_exchange_interval_count or min_exchange_interval_count < 0:
+        raise ValueError("min_exchange_interval_count must be a nonnegative integer")
+
+    step_displacements = position_array[1:, :, :] - position_array[:-1, :, :]
+    step_lengths = np.sqrt(np.sum(step_displacements * step_displacements, axis=2))
+    jump_mask = step_lengths >= float(jump_displacement_threshold)
+    jump_step_indices, jump_particle_indices = np.nonzero(jump_mask)
+    jump_lengths = step_lengths[jump_mask]
+    jump_times = time_array[jump_step_indices + 1]
+
+    persistence_intervals: list[float] = []
+    exchange_intervals: list[float] = []
+    particles_with_exchange = 0
+    for particle_idx in range(position_array.shape[1]):
+        particle_jump_times = jump_times[jump_particle_indices == particle_idx]
+        if particle_jump_times.size == 0:
+            continue
+        particle_jump_times = np.sort(particle_jump_times)
+        persistence_intervals.append(float(particle_jump_times[0] - time_array[0]))
+        if particle_jump_times.size >= 2:
+            particles_with_exchange += 1
+            exchange_intervals.extend(float(value) for value in np.diff(particle_jump_times))
+
+    total_jump_event_count = int(jump_times.size)
+    particles_with_jump_count = len(persistence_intervals)
+    exchange_interval_count = len(exchange_intervals)
+    particle_ready = particles_with_jump_count >= int(min_particles_with_jumps)
+    exchange_ready = exchange_interval_count >= int(min_exchange_interval_count)
+    event_clock_ready = particle_ready and exchange_ready
+
+    if event_clock_ready:
+        stage = "particle_resolved_cage_jump_event_clock_ready"
+        blocker = "none"
+    elif total_jump_event_count == 0:
+        stage = "particle_resolved_cage_jump_events_incomplete"
+        blocker = "jump_displacement_threshold"
+    elif not particle_ready:
+        stage = "particle_resolved_cage_jump_events_incomplete"
+        blocker = "particles_with_jump_count"
+    else:
+        stage = "persistence_exchange_event_clock_incomplete"
+        blocker = "exchange_intervals"
+
+    first_jump_time = float(np.min(jump_times)) if total_jump_event_count else math.nan
+    last_jump_time = float(np.max(jump_times)) if total_jump_event_count else math.nan
+    mean_jump_length = float(np.mean(jump_lengths)) if total_jump_event_count else math.nan
+    jump_length_variance = float(np.var(jump_lengths)) if total_jump_event_count else math.nan
+    mean_squared_jump_length = float(np.mean(jump_lengths * jump_lengths)) if total_jump_event_count else math.nan
+    persistence_mean = float(np.mean(persistence_intervals)) if persistence_intervals else math.nan
+    exchange_mean = float(np.mean(exchange_intervals)) if exchange_intervals else math.nan
+
+    return {
+        "protocol_id": protocol_id,
+        "frame_count": float(position_array.shape[0]),
+        "particle_count": float(position_array.shape[1]),
+        "dimension": float(position_array.shape[2]),
+        "jump_displacement_threshold": float(jump_displacement_threshold),
+        "total_jump_event_count": float(total_jump_event_count),
+        "particles_with_jump_count": float(particles_with_jump_count),
+        "particles_with_exchange_count": float(particles_with_exchange),
+        "exchange_interval_count": float(exchange_interval_count),
+        "first_jump_time_min": first_jump_time,
+        "last_jump_time_max": last_jump_time,
+        "mean_jump_length": mean_jump_length,
+        "jump_length_variance": jump_length_variance,
+        "mean_squared_jump_length": mean_squared_jump_length,
+        "persistence_mean": persistence_mean,
+        "exchange_mean": exchange_mean,
+        "particle_resolved_jump_events_ready": float(particle_ready),
+        "physical_time_jump_clock_ready": float(particle_ready),
+        "persistence_exchange_event_clock_ready": float(event_clock_ready),
+        "thermodynamic_claim_allowed": 0.0,
+        "primary_blocker": blocker,
+        "event_protocol_stage": stage,
+    }
+
+
 def _parse_semicolon_float_values(value: object, *, name: str) -> list[float]:
     parts = str(value).split(";")
     if not parts or any(part == "" for part in parts):
@@ -8109,6 +14241,339 @@ def _parse_wave_number_value_map(value: object, *, name: str) -> dict[float, flo
             raise ValueError(f"{name} wave numbers must be positive")
         out[wave_number] = float(value_text)
     return out
+
+
+def trajectory_event_clock_macro_prediction_protocol(
+    *,
+    protocol_id: str,
+    event_row: dict[str, object],
+    anchor_wave_number: float,
+    wave_numbers: Sequence[float],
+    observed_diffusion_coefficient: float,
+    diffusion_relative_error: float,
+    observed_tau_alpha_by_k: dict[float, float],
+    tau_alpha_relative_error_by_k: dict[float, float],
+    late_time: float,
+    observed_late_ngp: float,
+    late_ngp_relative_error: float,
+    observed_chi4_peak: float,
+    chi4_peak_relative_error: float,
+    time_grid: np.ndarray,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    threshold: float = math.exp(-1.0),
+    z_threshold: float = 2.0,
+) -> dict[str, float | str]:
+    """Predict macro dynamical signatures directly from a trajectory event clock."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    event_ready = float(event_row.get("persistence_exchange_event_clock_ready", 0.0)) == 1.0
+    if not event_ready:
+        return {
+            "protocol_id": protocol_id,
+            "source_event_protocol_id": str(event_row.get("protocol_id", "unknown")),
+            "micro_to_macro_prediction_ready": 0.0,
+            "micro_to_macro_predictions_pass": 0.0,
+            "calibrated_from_event_clock_only": 0.0,
+            "fit_parameters_from_macro_observables": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": str(event_row.get("primary_blocker", "persistence_exchange_event_clock_ready")),
+            "prediction_stage": "event_clock_incomplete",
+        }
+
+    required_event_fields = [
+        "persistence_mean",
+        "exchange_mean",
+        "mean_squared_jump_length",
+        "dimension",
+    ]
+    missing_event_fields = [field for field in required_event_fields if field not in event_row]
+    if missing_event_fields:
+        return {
+            "protocol_id": protocol_id,
+            "source_event_protocol_id": str(event_row.get("protocol_id", "unknown")),
+            "micro_to_macro_prediction_ready": 0.0,
+            "micro_to_macro_predictions_pass": 0.0,
+            "calibrated_from_event_clock_only": 0.0,
+            "fit_parameters_from_macro_observables": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": missing_event_fields[0],
+            "prediction_stage": "event_clock_missing_jump_statistics",
+        }
+
+    if anchor_wave_number <= 0.0:
+        raise ValueError("anchor_wave_number must be positive")
+    if not wave_numbers:
+        raise ValueError("wave_numbers must be nonempty")
+    if observed_diffusion_coefficient <= 0.0 or late_time <= 0.0:
+        raise ValueError("observed_diffusion_coefficient and late_time must be positive")
+    if observed_late_ngp <= 0.0 or observed_chi4_peak <= 0.0:
+        raise ValueError("observed_late_ngp and observed_chi4_peak must be positive")
+    if cage_variance <= 0.0 or cage_tau <= 0.0:
+        raise ValueError("cage parameters must be positive")
+    if z_threshold <= 0.0:
+        raise ValueError("z_threshold must be positive")
+    if not 0.0 < threshold < 1.0:
+        raise ValueError("threshold must be between zero and one")
+
+    unique_wave_numbers = list(dict.fromkeys(float(wave_number) for wave_number in wave_numbers))
+    if anchor_wave_number not in unique_wave_numbers:
+        unique_wave_numbers.insert(0, float(anchor_wave_number))
+    for wave_number in unique_wave_numbers:
+        if wave_number <= 0.0:
+            raise ValueError("wave_numbers must be positive")
+        if wave_number not in observed_tau_alpha_by_k:
+            raise ValueError("observed_tau_alpha_by_k must include every wave number")
+        if wave_number not in tau_alpha_relative_error_by_k:
+            raise ValueError("tau_alpha_relative_error_by_k must include every wave number")
+        if observed_tau_alpha_by_k[wave_number] <= 0.0:
+            raise ValueError("observed tau_alpha values must be positive")
+
+    persistence_mean = float(event_row["persistence_mean"])
+    exchange_mean = float(event_row["exchange_mean"])
+    dimension = float(event_row["dimension"])
+    mean_squared_jump_length = float(event_row["mean_squared_jump_length"])
+    if persistence_mean <= 0.0 or exchange_mean <= 0.0 or dimension <= 0.0 or mean_squared_jump_length <= 0.0:
+        raise ValueError("event-clock means, dimension, and jump second moment must be positive")
+    jump_variance = mean_squared_jump_length / dimension
+
+    time_grid = np.asarray(time_grid, dtype=float)
+    if time_grid.ndim != 1 or time_grid.size == 0 or np.any(time_grid <= 0.0):
+        raise ValueError("time_grid must be a positive one-dimensional array")
+
+    params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=jump_variance,
+        persistence_mean=persistence_mean,
+        exchange_mean=exchange_mean,
+    )
+    predicted_diffusion = persistence_exchange_diffusion_coefficient(params)
+    predicted_tau_by_k = {
+        wave_number: persistence_exchange_alpha_relaxation_time(
+            wave_number,
+            params,
+            threshold=threshold,
+        )
+        for wave_number in unique_wave_numbers
+    }
+    predicted_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+    predicted_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(anchor_wave_number, time_grid, params))
+    )
+
+    diffusion_z = abs(math.log(observed_diffusion_coefficient / predicted_diffusion)) / _log_sigma_from_relative_error(
+        diffusion_relative_error,
+        "diffusion_relative_error",
+    )
+    max_tau_z = 0.0
+    for wave_number in unique_wave_numbers:
+        sigma = _log_sigma_from_relative_error(
+            tau_alpha_relative_error_by_k[wave_number],
+            "tau_alpha_relative_error_by_k",
+        )
+        residual = math.log(observed_tau_alpha_by_k[wave_number] / predicted_tau_by_k[wave_number])
+        max_tau_z = max(max_tau_z, abs(residual) / sigma)
+    late_ngp_z = abs(math.log(observed_late_ngp / predicted_late_ngp)) / _log_sigma_from_relative_error(
+        late_ngp_relative_error,
+        "late_ngp_relative_error",
+    )
+    chi4_z = abs(math.log(observed_chi4_peak / predicted_chi4_peak)) / _log_sigma_from_relative_error(
+        chi4_peak_relative_error,
+        "chi4_peak_relative_error",
+    )
+    diffusion_pass = diffusion_z <= z_threshold
+    tau_pass = max_tau_z <= z_threshold
+    late_ngp_pass = late_ngp_z <= z_threshold
+    chi4_pass = chi4_z <= z_threshold
+    predictions_pass = diffusion_pass and tau_pass and late_ngp_pass and chi4_pass
+
+    return {
+        "protocol_id": protocol_id,
+        "source_event_protocol_id": str(event_row.get("protocol_id", "unknown")),
+        "wave_numbers": ";".join(f"{wave_number:g}" for wave_number in unique_wave_numbers),
+        "anchor_wave_number": float(anchor_wave_number),
+        "jump_variance_from_event_clock": float(jump_variance),
+        "persistence_mean": persistence_mean,
+        "exchange_mean": exchange_mean,
+        "persistence_exchange_ratio": persistence_mean / exchange_mean,
+        "observed_diffusion_coefficient": float(observed_diffusion_coefficient),
+        "predicted_diffusion_coefficient": float(predicted_diffusion),
+        "diffusion_z": float(diffusion_z),
+        "observed_tau_alpha_by_k": ";".join(
+            f"{wave_number:g}:{observed_tau_alpha_by_k[wave_number]:.12g}" for wave_number in unique_wave_numbers
+        ),
+        "predicted_tau_alpha_by_k": ";".join(
+            f"{wave_number:g}:{predicted_tau_by_k[wave_number]:.12g}" for wave_number in unique_wave_numbers
+        ),
+        "max_tau_alpha_z": float(max_tau_z),
+        "late_time": float(late_time),
+        "observed_late_ngp": float(observed_late_ngp),
+        "predicted_late_ngp": float(predicted_late_ngp),
+        "late_ngp_z": float(late_ngp_z),
+        "observed_chi4_peak": float(observed_chi4_peak),
+        "predicted_chi4_peak": float(predicted_chi4_peak),
+        "chi4_peak_z": float(chi4_z),
+        "z_threshold": float(z_threshold),
+        "diffusion_prediction_pass": float(diffusion_pass),
+        "tau_alpha_prediction_pass": float(tau_pass),
+        "late_ngp_prediction_pass": float(late_ngp_pass),
+        "chi4_peak_prediction_pass": float(chi4_pass),
+        "micro_to_macro_prediction_ready": 1.0,
+        "micro_to_macro_predictions_pass": float(predictions_pass),
+        "calibrated_from_event_clock_only": 1.0,
+        "fit_parameters_from_macro_observables": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+        "primary_blocker": "none" if predictions_pass else "heldout_macro_signature_mismatch",
+        "prediction_stage": "event_clock_micro_to_macro_prediction_ready"
+        if predictions_pass
+        else "event_clock_micro_to_macro_prediction_failed",
+    }
+
+
+def trajectory_event_clock_threshold_robustness_protocol(
+    *,
+    protocol_id: str,
+    positions: np.ndarray,
+    times: np.ndarray,
+    thresholds: Sequence[float],
+    reference_threshold: float,
+    anchor_wave_number: float,
+    wave_numbers: Sequence[float],
+    late_time: float,
+    time_grid: np.ndarray,
+    min_particles_with_jumps: int = 1,
+    min_exchange_interval_count: int = 0,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    diffusion_relative_error: float = 0.10,
+    tau_alpha_relative_error: float = 0.10,
+    late_ngp_relative_error: float = 0.20,
+    chi4_peak_relative_error: float = 0.20,
+    z_threshold: float = 2.0,
+) -> list[dict[str, float | str]]:
+    """Audit whether event-clock macro predictions are robust to jump threshold."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not thresholds:
+        raise ValueError("thresholds must be nonempty")
+    unique_thresholds = list(dict.fromkeys(float(threshold) for threshold in thresholds))
+    if reference_threshold not in unique_thresholds:
+        unique_thresholds.append(float(reference_threshold))
+    reference_event = trajectory_cage_jump_event_protocol(
+        protocol_id=f"{protocol_id}_reference_event_clock",
+        positions=positions,
+        times=times,
+        jump_displacement_threshold=float(reference_threshold),
+        min_particles_with_jumps=min_particles_with_jumps,
+        min_exchange_interval_count=min_exchange_interval_count,
+    )
+    if float(reference_event.get("persistence_exchange_event_clock_ready", 0.0)) != 1.0:
+        raise ValueError("reference_threshold must yield a ready event clock")
+
+    reference_params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=float(reference_event["mean_squared_jump_length"]) / float(reference_event["dimension"]),
+        persistence_mean=float(reference_event["persistence_mean"]),
+        exchange_mean=float(reference_event["exchange_mean"]),
+    )
+    wave_list = list(dict.fromkeys(float(wave_number) for wave_number in wave_numbers))
+    if anchor_wave_number not in wave_list:
+        wave_list.insert(0, float(anchor_wave_number))
+    observed_tau_alpha_by_k = {
+        wave_number: persistence_exchange_alpha_relaxation_time(wave_number, reference_params)
+        for wave_number in wave_list
+    }
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), reference_params)[0])
+    observed_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(anchor_wave_number, time_grid, reference_params))
+    )
+    observed_diffusion = persistence_exchange_diffusion_coefficient(reference_params)
+    tau_errors = {wave_number: tau_alpha_relative_error for wave_number in wave_list}
+
+    rows: list[dict[str, float | str]] = []
+    pass_count = 0
+    pending_pass_rows: list[dict[str, float | str]] = []
+    for threshold in unique_thresholds:
+        event = trajectory_cage_jump_event_protocol(
+            protocol_id=f"{protocol_id}_threshold_{threshold:g}",
+            positions=positions,
+            times=times,
+            jump_displacement_threshold=threshold,
+            min_particles_with_jumps=min_particles_with_jumps,
+            min_exchange_interval_count=min_exchange_interval_count,
+        )
+        row: dict[str, float | str]
+        if float(event.get("persistence_exchange_event_clock_ready", 0.0)) != 1.0:
+            row = {
+                "protocol_id": protocol_id,
+                "jump_displacement_threshold": float(threshold),
+                "reference_threshold": float(reference_threshold),
+                "event_clock_ready": 0.0,
+                "threshold_prediction_pass": 0.0,
+                "stable_threshold_window_count": 0.0,
+                "fit_parameters_from_macro_observables": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": str(event.get("primary_blocker", "event_clock_ready")),
+                "robustness_stage": "event_clock_threshold_event_clock_incomplete",
+            }
+        else:
+            prediction = trajectory_event_clock_macro_prediction_protocol(
+                protocol_id=f"{protocol_id}_threshold_{threshold:g}",
+                event_row=event,
+                anchor_wave_number=anchor_wave_number,
+                wave_numbers=wave_list,
+                observed_diffusion_coefficient=observed_diffusion,
+                diffusion_relative_error=diffusion_relative_error,
+                observed_tau_alpha_by_k=observed_tau_alpha_by_k,
+                tau_alpha_relative_error_by_k=tau_errors,
+                late_time=late_time,
+                observed_late_ngp=observed_late_ngp,
+                late_ngp_relative_error=late_ngp_relative_error,
+                observed_chi4_peak=observed_chi4_peak,
+                chi4_peak_relative_error=chi4_peak_relative_error,
+                time_grid=time_grid,
+                cage_variance=cage_variance,
+                cage_tau=cage_tau,
+                z_threshold=z_threshold,
+            )
+            pass_flag = float(prediction["micro_to_macro_predictions_pass"]) == 1.0
+            if pass_flag:
+                pass_count += 1
+            row = {
+                "protocol_id": protocol_id,
+                "jump_displacement_threshold": float(threshold),
+                "reference_threshold": float(reference_threshold),
+                "event_clock_ready": 1.0,
+                "threshold_prediction_pass": float(pass_flag),
+                "stable_threshold_window_count": 0.0,
+                "total_jump_event_count": float(event["total_jump_event_count"]),
+                "particles_with_jump_count": float(event["particles_with_jump_count"]),
+                "exchange_interval_count": float(event["exchange_interval_count"]),
+                "persistence_mean": float(event["persistence_mean"]),
+                "exchange_mean": float(event["exchange_mean"]),
+                "jump_variance_from_event_clock": float(prediction["jump_variance_from_event_clock"]),
+                "diffusion_z": float(prediction["diffusion_z"]),
+                "max_tau_alpha_z": float(prediction["max_tau_alpha_z"]),
+                "late_ngp_z": float(prediction["late_ngp_z"]),
+                "chi4_peak_z": float(prediction["chi4_peak_z"]),
+                "fit_parameters_from_macro_observables": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "none" if pass_flag else "threshold_macro_signature_mismatch",
+                "robustness_stage": "event_clock_threshold_prediction_passed"
+                if pass_flag
+                else "event_clock_threshold_prediction_failed",
+            }
+            if pass_flag:
+                pending_pass_rows.append(row)
+        rows.append(row)
+
+    for row in pending_pass_rows:
+        row["stable_threshold_window_count"] = float(pass_count)
+    return rows
 
 
 def trajectory_curve_persistence_exchange_gate(
@@ -9091,6 +15556,170 @@ def delayed_poisson_mean(t: np.ndarray, params: DelayedRenewalCageParams) -> np.
     return np.where(x < 1e-3, series, direct)
 
 
+def gated_precursor_hazard(
+    t: np.ndarray,
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+) -> np.ndarray:
+    """Renewal hazard generated by independent exponential precursor gates."""
+
+    if asymptotic_rate <= 0.0:
+        raise ValueError("asymptotic_rate must be positive")
+    if precursor_time <= 0.0:
+        raise ValueError("precursor_time must be positive")
+    if int(precursor_count) != precursor_count or precursor_count < 1:
+        raise ValueError("precursor_count must be a positive integer")
+    t = np.asarray(t, dtype=float)
+    if np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative")
+    gate_probability = 1.0 - np.exp(-t / precursor_time)
+    return asymptotic_rate * gate_probability ** int(precursor_count)
+
+
+def gated_precursor_mean_count(
+    t: np.ndarray,
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+) -> np.ndarray:
+    """Integrated renewal hazard for an independent precursor-gated escape clock."""
+
+    t = np.asarray(t, dtype=float)
+    hazard = gated_precursor_hazard(
+        t,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    if int(precursor_count) == 1:
+        return asymptotic_rate * (t - precursor_time * (1.0 - np.exp(-t / precursor_time)))
+    if int(precursor_count) == 2:
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=1.0,
+            jump_variance=1.0,
+            renewal_rate=asymptotic_rate,
+            renewal_delay=precursor_time,
+        )
+        return delayed_poisson_mean(t, params)
+
+    order = np.argsort(t)
+    sorted_t = t[order]
+    sorted_hazard = hazard[order]
+    cumulative = np.zeros_like(sorted_t)
+    if len(sorted_t) > 1:
+        dt = np.diff(sorted_t)
+        cumulative[1:] = np.cumsum(0.5 * (sorted_hazard[1:] + sorted_hazard[:-1]) * dt)
+    out = np.zeros_like(cumulative)
+    out[order] = cumulative
+    return out
+
+
+def gated_precursor_survival(
+    t: np.ndarray,
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+) -> np.ndarray:
+    """Survival probability for the first escape under a precursor-gated hazard."""
+
+    mean_count = gated_precursor_mean_count(
+        t,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    return np.exp(-mean_count)
+
+
+def precursor_escape_simulation_diagnostic(
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+    sample_count: int,
+    time_max: float,
+    bin_count: int,
+    seed: int,
+) -> dict[str, float | str]:
+    """Simulate first escapes from the precursor-gated hazard and compare to theory."""
+
+    if sample_count <= 0:
+        raise ValueError("sample_count must be positive")
+    if time_max <= 0.0:
+        raise ValueError("time_max must be positive")
+    if bin_count < 2:
+        raise ValueError("bin_count must be at least 2")
+
+    rng = np.random.default_rng(seed)
+    grid = np.linspace(0.0, time_max, max(5000, 80 * bin_count))
+    cumulative = gated_precursor_mean_count(
+        grid,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    survival = np.exp(-cumulative)
+    max_cdf = 1.0 - survival[-1]
+    uniforms = rng.random(sample_count)
+    finite_mask = uniforms < max_cdf
+    targets = -np.log1p(-uniforms[finite_mask])
+    samples = np.full(sample_count, time_max)
+    samples[finite_mask] = np.interp(targets, cumulative, grid)
+
+    edges = np.linspace(0.0, time_max, bin_count + 1)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    counts, _ = np.histogram(samples[finite_mask], bins=edges)
+    at_risk = np.array([np.count_nonzero(samples >= edge) for edge in edges[:-1]], dtype=float)
+    dt = edges[1] - edges[0]
+    empirical_hazard = np.divide(counts, at_risk * dt, out=np.zeros_like(at_risk), where=at_risk > 0.0)
+    theoretical_hazard = gated_precursor_hazard(
+        centers,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    mask = (at_risk > 0.1 * sample_count) & (theoretical_hazard > 0.05 * asymptotic_rate)
+    relative_errors = np.divide(
+        empirical_hazard[mask] - theoretical_hazard[mask],
+        theoretical_hazard[mask],
+        out=np.zeros(np.count_nonzero(mask)),
+        where=theoretical_hazard[mask] > 0.0,
+    )
+    hazard_rms = float(np.sqrt(np.mean(relative_errors**2))) if relative_errors.size else 0.0
+
+    analytic_mean = float(np.trapezoid(survival, grid))
+    sample_mean = float(np.mean(samples))
+    late_theoretical = float(theoretical_hazard[mask][-1]) if np.any(mask) else float(theoretical_hazard[-1])
+    late_empirical = float(empirical_hazard[mask][-1]) if np.any(mask) else float(empirical_hazard[-1])
+    late_relative = (
+        (late_empirical - late_theoretical) / late_theoretical
+        if late_theoretical > 0.0
+        else 0.0
+    )
+    return {
+        "asymptotic_rate": float(asymptotic_rate),
+        "precursor_time": float(precursor_time),
+        "precursor_count": float(precursor_count),
+        "sample_count": float(sample_count),
+        "time_max": float(time_max),
+        "bin_count": float(bin_count),
+        "hazard_rms_relative_error": hazard_rms,
+        "mean_escape_time": sample_mean,
+        "analytic_mean_escape_time": analytic_mean,
+        "mean_escape_time_relative_error": (sample_mean - analytic_mean) / analytic_mean
+        if analytic_mean > 0.0
+        else 0.0,
+        "late_hazard_relative_error": float(late_relative),
+        "full_many_body_first_principles_claim_allowed": 0.0,
+        "bridge_stage": "precursor_gated_langevin_escape_closure",
+    }
+
+
 def moments_1d(t: np.ndarray, params: DelayedRenewalCageParams) -> dict[str, np.ndarray]:
     """Return second and fourth moments for the 1D delayed renewal cage model.
 
@@ -10044,6 +16673,724 @@ def simultaneous_dynamical_signature_closure_gate(
     for flag in required:
         base[flag] = float(scored_row.get(flag, 0.0))
     return base
+
+
+def microdynamic_prediction_scorecard(
+    *,
+    scorecard_id: str,
+    event_prediction_rows: Sequence[dict[str, object]],
+    simultaneous_closure_rows: Sequence[dict[str, object]],
+    glassbench_closed_loop_rows: Sequence[dict[str, object]],
+    late_recovery_power_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Summarize microstatistics-to-macro prediction evidence without overclaiming."""
+
+    if not scorecard_id:
+        raise ValueError("scorecard_id must be nonempty")
+    if not event_prediction_rows:
+        raise ValueError("event_prediction_rows must be nonempty")
+    if not simultaneous_closure_rows:
+        raise ValueError("simultaneous_closure_rows must be nonempty")
+    if not glassbench_closed_loop_rows:
+        raise ValueError("glassbench_closed_loop_rows must be nonempty")
+
+    closure_by_id = {
+        str(row.get("protocol_id", "unknown")): row for row in simultaneous_closure_rows
+    }
+    passed_closure = next(
+        (
+            row
+            for row in simultaneous_closure_rows
+            if float(row.get("all_required_dynamical_predictions_pass", 0.0) or 0.0) == 1.0
+        ),
+        next(iter(closure_by_id.values())),
+    )
+
+    rows: list[dict[str, float | str]] = []
+    prediction_flags = [
+        "diffusion_prediction_pass",
+        "tau_alpha_prediction_pass",
+        "late_ngp_prediction_pass",
+        "chi4_peak_prediction_pass",
+    ]
+    for prediction in event_prediction_rows:
+        row_id = str(prediction.get("protocol_id", "unknown_event_prediction"))
+        ready = float(prediction.get("micro_to_macro_prediction_ready", 0.0) or 0.0) == 1.0
+        passed = float(prediction.get("micro_to_macro_predictions_pass", 0.0) or 0.0) == 1.0
+        failed_flags = [
+            flag for flag in prediction_flags if float(prediction.get(flag, 0.0) or 0.0) != 1.0
+        ]
+        if ready and passed:
+            stage = "microstats_to_macro_prediction_passed"
+            blocker = "none"
+            mechanism_rejection_ready = 0.0
+            allowed_claim = "synthetic_microdynamic_closure_canary"
+        elif ready:
+            stage = "heldout_macro_prediction_rejected"
+            blocker = failed_flags[0] if failed_flags else str(prediction.get("primary_blocker", "heldout_prediction"))
+            mechanism_rejection_ready = 1.0
+            allowed_claim = "synthetic_negative_control_rejected"
+        else:
+            stage = "microstats_to_macro_prediction_incomplete"
+            blocker = str(prediction.get("primary_blocker", "micro_to_macro_prediction_ready"))
+            mechanism_rejection_ready = 0.0
+            allowed_claim = "no_prediction_claim"
+
+        rows.append(
+            {
+                "scorecard_id": scorecard_id,
+                "scorecard_row_id": row_id,
+                "source_class": "synthetic_event_clock",
+                "allowed_claim_level": allowed_claim,
+                "micro_input_count": 4.0,
+                "calibration_observable_count": 0.0,
+                "heldout_macro_prediction_count": float(sum(1 for flag in prediction_flags if flag in prediction)),
+                "macro_fit_parameter_count": float(prediction.get("fit_parameters_from_macro_observables", 0.0) or 0.0),
+                "micro_to_macro_prediction_ready": float(ready),
+                "all_required_predictions_pass": float(passed),
+                "mechanism_rejection_ready": float(mechanism_rejection_ready),
+                "real_data_comparison_ready": 0.0,
+                "current_member_count": 0.0,
+                "required_member_count": 0.0,
+                "additional_member_count_needed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "scorecard_stage": stage,
+            }
+        )
+
+    rows.append(
+        {
+            "scorecard_id": scorecard_id,
+            "scorecard_row_id": "synthetic_minimal_dynamical_closure",
+            "source_class": "synthetic_minimal_inversion",
+            "allowed_claim_level": "diffusion_plus_anchor_alpha_closure_canary",
+            "micro_input_count": 0.0,
+            "calibration_observable_count": float(passed_closure.get("calibration_count", 2.0) or 2.0),
+            "heldout_macro_prediction_count": float(passed_closure.get("heldout_count", 0.0) or 0.0),
+            "macro_fit_parameter_count": 2.0,
+            "micro_to_macro_prediction_ready": float(passed_closure.get("simultaneous_closure_ready", 0.0) or 0.0),
+            "all_required_predictions_pass": float(
+                passed_closure.get("all_required_dynamical_predictions_pass", 0.0) or 0.0
+            ),
+            "mechanism_rejection_ready": 0.0,
+            "real_data_comparison_ready": 0.0,
+            "current_member_count": 0.0,
+            "required_member_count": 0.0,
+            "additional_member_count_needed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": str(passed_closure.get("primary_blocker", "none")),
+            "scorecard_stage": str(passed_closure.get("closure_stage", "simultaneous_closure_unscored")),
+        }
+    )
+
+    power_candidates = [
+        row
+        for row in late_recovery_power_rows
+        if str(row.get("decision_power_stage", "")) == "late_ngp_power_extension_required"
+    ]
+    power = power_candidates[0] if power_candidates else (late_recovery_power_rows[0] if late_recovery_power_rows else {})
+    for closed_loop in glassbench_closed_loop_rows:
+        system_id = str(closed_loop.get("system_id", "unknown")).lower()
+        temperature = str(closed_loop.get("temperature", "none"))
+        safe_temperature = temperature.replace(".", "_")
+        prediction_ready = float(closed_loop.get("micro_to_macro_prediction_ready", 0.0) or 0.0) == 1.0
+        if prediction_ready:
+            stage = "real_glassbench_microdynamic_prediction_ready"
+            claim = "real_microdynamic_prediction_test_ready"
+            blocker = "none"
+        else:
+            stage = "real_glassbench_prediction_blocked"
+            claim = "real_signature_support_not_microdynamic_prediction"
+            blocker = str(closed_loop.get("primary_blocker", "micro_to_macro_prediction_ready"))
+        rows.append(
+            {
+                "scorecard_id": scorecard_id,
+                "scorecard_row_id": f"glassbench_{system_id}_{safe_temperature}_current_closed_loop",
+                "source_class": "real_glassbench_public_data",
+                "allowed_claim_level": claim,
+                "micro_input_count": 0.0,
+                "calibration_observable_count": 0.0,
+                "heldout_macro_prediction_count": 0.0,
+                "macro_fit_parameter_count": 0.0,
+                "micro_to_macro_prediction_ready": float(prediction_ready),
+                "all_required_predictions_pass": 0.0,
+                "mechanism_rejection_ready": 0.0,
+                "real_data_comparison_ready": float(prediction_ready),
+                "current_member_count": float(power.get("current_member_count", 0.0) or 0.0),
+                "required_member_count": float(power.get("required_member_count", 0.0) or 0.0),
+                "additional_member_count_needed": float(power.get("additional_member_count_needed", 0.0) or 0.0),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "scorecard_stage": stage,
+            }
+        )
+    return rows
+
+
+def microdynamic_minimality_audit(
+    *,
+    audit_id: str,
+    required_micro_inputs: Sequence[str],
+    variant_rows: Sequence[dict[str, object]],
+    scorecard_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Audit which microdynamic inputs are necessary before prediction claims."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not required_micro_inputs:
+        raise ValueError("required_micro_inputs must be nonempty")
+    if not variant_rows:
+        raise ValueError("variant_rows must be nonempty")
+    if not scorecard_rows:
+        raise ValueError("scorecard_rows must be nonempty")
+    required = list(dict.fromkeys(str(item) for item in required_micro_inputs if str(item)))
+    if len(required) != len(required_micro_inputs):
+        raise ValueError("required_micro_inputs must contain nonempty names")
+
+    def parse_inputs(value: object) -> set[str]:
+        text = str(value)
+        if not text or text == "none":
+            return set()
+        return {item for item in text.split(";") if item and item != "none"}
+
+    rows: list[dict[str, float | str]] = []
+    for variant in variant_rows:
+        row_id = str(variant.get("variant_id", "unknown_variant"))
+        available = parse_inputs(variant.get("available_micro_inputs", "none"))
+        missing = [item for item in required if item not in available]
+        macro_fit_count = float(variant.get("macro_fit_parameter_count", 0.0) or 0.0)
+        heldout_count = float(variant.get("heldout_macro_prediction_count", 0.0) or 0.0)
+        pass_flag = float(variant.get("all_required_predictions_pass", 0.0) or 0.0) == 1.0
+        fit_only = macro_fit_count > 0.0 and heldout_count == 0.0
+        if fit_only:
+            stage = "macro_fit_only_overclaim_risk"
+            blocker = "heldout_macro_predictions"
+            claim = "fit_only_not_microdynamic_prediction"
+            overclaim = 1.0
+            minimal = 0.0
+        elif missing:
+            stage = "required_microstatistics_missing"
+            blocker = missing[0]
+            claim = "microdynamic_prediction_not_identified"
+            overclaim = 0.0
+            minimal = 0.0
+        elif pass_flag and heldout_count > 0.0:
+            stage = "necessary_microstatistics_sufficient"
+            blocker = "none"
+            claim = "minimal_microdynamic_prediction_basis"
+            overclaim = 0.0
+            minimal = 1.0
+        else:
+            stage = "necessary_microstatistics_present_but_not_predictive"
+            blocker = str(variant.get("primary_blocker", "heldout_macro_prediction"))
+            claim = "microdynamic_basis_requires_rejection_or_extension"
+            overclaim = 0.0
+            minimal = 0.0
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "audit_row_id": row_id,
+                "source_class": str(variant.get("source_class", "synthetic_variant")),
+                "required_micro_inputs": ";".join(required),
+                "available_micro_inputs": ";".join(sorted(available)) if available else "none",
+                "missing_required_inputs": ";".join(missing) if missing else "none",
+                "required_micro_input_count": float(len(required)),
+                "available_micro_input_count": float(len(available & set(required))),
+                "missing_required_input_count": float(len(missing)),
+                "heldout_macro_prediction_count": heldout_count,
+                "macro_fit_parameter_count": macro_fit_count,
+                "all_required_predictions_pass": float(pass_flag),
+                "microdynamic_basis_minimal": float(minimal),
+                "real_data_comparison_ready": 0.0,
+                "current_member_count": 0.0,
+                "required_member_count": 0.0,
+                "overclaim_risk": float(overclaim),
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_claim_level": claim,
+                "primary_blocker": blocker,
+                "minimality_stage": stage,
+            }
+        )
+
+    for scorecard in scorecard_rows:
+        if str(scorecard.get("source_class", "")) != "real_glassbench_public_data":
+            continue
+        row_id = str(scorecard.get("scorecard_row_id", "real_glassbench_row"))
+        ready = float(scorecard.get("real_data_comparison_ready", 0.0) or 0.0) == 1.0
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "audit_row_id": row_id,
+                "source_class": "real_glassbench_public_data",
+                "required_micro_inputs": ";".join(required),
+                "available_micro_inputs": "real_frame_microstatistics_only",
+                "missing_required_inputs": "physical_time_semantics;cage_jump_event_segmentation;persistence_exchange_event_clock",
+                "required_micro_input_count": float(len(required)),
+                "available_micro_input_count": 0.0,
+                "missing_required_input_count": float(len(required)),
+                "heldout_macro_prediction_count": 0.0,
+                "macro_fit_parameter_count": 0.0,
+                "all_required_predictions_pass": 0.0,
+                "microdynamic_basis_minimal": 0.0,
+                "real_data_comparison_ready": float(ready),
+                "current_member_count": float(scorecard.get("current_member_count", 0.0) or 0.0),
+                "required_member_count": float(scorecard.get("required_member_count", 0.0) or 0.0),
+                "overclaim_risk": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "allowed_claim_level": str(scorecard.get("allowed_claim_level", "real_signature_support_only")),
+                "primary_blocker": "none" if ready else str(scorecard.get("primary_blocker", "real_microdynamic_inputs")),
+                "minimality_stage": "real_data_microdynamic_inputs_ready"
+                if ready
+                else "real_data_microdynamic_inputs_missing",
+            }
+        )
+    return rows
+
+
+def sota_experimental_verdict_matrix(
+    *,
+    verdict_id: str,
+    dynamic_alignment_rows: Sequence[dict[str, object]],
+    microdynamic_scorecard_rows: Sequence[dict[str, object]],
+    minimality_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Collapse SOTA evidence, real-data blockers, and scope boundaries into verdict rows."""
+
+    if not verdict_id:
+        raise ValueError("verdict_id must be nonempty")
+    if not dynamic_alignment_rows:
+        raise ValueError("dynamic_alignment_rows must be nonempty")
+    if not microdynamic_scorecard_rows:
+        raise ValueError("microdynamic_scorecard_rows must be nonempty")
+    if not minimality_rows:
+        raise ValueError("minimality_rows must be nonempty")
+
+    def number(row: dict[str, object], key: str) -> float:
+        return float(row.get(key, 0.0) or 0.0)
+
+    def max_flag(rows: Sequence[dict[str, object]], key: str) -> float:
+        return max((number(row, key) for row in rows), default=0.0)
+
+    def first_row(rows: Sequence[dict[str, object]], key: str, value: str) -> dict[str, object]:
+        for row in rows:
+            if str(row.get(key, "")) == value:
+                return row
+        return {}
+
+    dynamic_rows = [
+        row
+        for row in dynamic_alignment_rows
+        if str(row.get("signature", ""))
+        not in {"thermodynamic_transition", "persistence_exchange_decoupling"}
+    ]
+    persistence_exchange = first_row(
+        dynamic_alignment_rows,
+        "signature",
+        "persistence_exchange_decoupling",
+    )
+    thermodynamic = first_row(dynamic_alignment_rows, "signature", "thermodynamic_transition")
+    real_scorecards = [
+        row
+        for row in microdynamic_scorecard_rows
+        if str(row.get("source_class", "")) == "real_glassbench_public_data"
+    ]
+    real_scorecard = real_scorecards[0] if real_scorecards else {}
+    real_minimality = first_row(
+        minimality_rows,
+        "audit_row_id",
+        str(real_scorecard.get("scorecard_row_id", "")),
+    )
+
+    dynamic_supported = (
+        max_flag(dynamic_rows, "model_support") > 0.0
+        and max_flag(dynamic_rows, "literature_qualitative_support") > 0.0
+        and max_flag(dynamic_rows, "real_glassbench_support") > 0.0
+    )
+    micro_prediction_support = float(
+        any(number(row, "all_required_predictions_pass") == 1.0 for row in microdynamic_scorecard_rows)
+    )
+    mechanism_rejection_ready = float(
+        any(number(row, "mechanism_rejection_ready") == 1.0 for row in microdynamic_scorecard_rows)
+    )
+    minimality_ready = float(any(number(row, "microdynamic_basis_minimal") == 1.0 for row in minimality_rows))
+    mechanism_supported = (
+        number(persistence_exchange, "literature_qualitative_support") > 0.0
+        and micro_prediction_support == 1.0
+        and mechanism_rejection_ready == 1.0
+        and minimality_ready == 1.0
+    )
+    real_quantitative_ready = max_flag(dynamic_alignment_rows, "real_quantitative_inversion_ready")
+    real_comparison_ready = max_flag(real_scorecards, "real_data_comparison_ready")
+    real_closed_loop_ready = real_quantitative_ready == 1.0 and real_comparison_ready == 1.0
+
+    real_blocker = str(
+        real_scorecard.get(
+            "primary_blocker",
+            real_minimality.get("primary_blocker", "real_microdynamic_inputs"),
+        )
+    )
+    if real_blocker == "none" and not real_closed_loop_ready:
+        real_blocker = "real_microdynamic_inputs"
+
+    def row(
+        *,
+        verdict_row_id: str,
+        stage: str,
+        allowed_claim_level: str,
+        model_dynamic_support: float = 0.0,
+        literature_trend_support: float = 0.0,
+        real_glassbench_support: float = 0.0,
+        microdynamic_prediction_support: float = 0.0,
+        mechanism_rejection_ready: float = 0.0,
+        minimality_ready: float = 0.0,
+        real_quantitative_inversion_ready: float = 0.0,
+        thermodynamic_claim_allowed: float = 0.0,
+        primary_blocker: str = "none",
+    ) -> dict[str, float | str]:
+        return {
+            "verdict_id": verdict_id,
+            "verdict_row_id": verdict_row_id,
+            "model_dynamic_support": float(model_dynamic_support),
+            "literature_trend_support": float(literature_trend_support),
+            "real_glassbench_support": float(real_glassbench_support),
+            "microdynamic_prediction_support": float(microdynamic_prediction_support),
+            "mechanism_rejection_ready": float(mechanism_rejection_ready),
+            "minimality_ready": float(minimality_ready),
+            "real_quantitative_inversion_ready": float(real_quantitative_inversion_ready),
+            "thermodynamic_claim_allowed": float(thermodynamic_claim_allowed),
+            "allowed_claim_level": allowed_claim_level,
+            "primary_blocker": primary_blocker,
+            "sota_verdict_stage": stage,
+        }
+
+    return [
+        row(
+            verdict_row_id="sota_dynamic_signature_support",
+            stage="sota_dynamic_signatures_supported"
+            if dynamic_supported
+            else "sota_dynamic_signatures_partial",
+            allowed_claim_level="dynamical_signature_supported",
+            model_dynamic_support=max_flag(dynamic_rows, "model_support"),
+            literature_trend_support=max_flag(dynamic_rows, "literature_qualitative_support"),
+            real_glassbench_support=max_flag(dynamic_rows, "real_glassbench_support"),
+            thermodynamic_claim_allowed=max_flag(dynamic_rows, "thermodynamic_claim_allowed"),
+            primary_blocker="none" if dynamic_supported else "dynamic_signature_support",
+        ),
+        row(
+            verdict_row_id="sota_mechanism_selection",
+            stage="mechanism_selection_protocol_supported"
+            if mechanism_supported
+            else "mechanism_selection_protocol_incomplete",
+            allowed_claim_level="mechanism_selection_protocol_supported_not_real_glassbench_fit",
+            model_dynamic_support=number(persistence_exchange, "model_support"),
+            literature_trend_support=number(persistence_exchange, "literature_qualitative_support"),
+            microdynamic_prediction_support=micro_prediction_support,
+            mechanism_rejection_ready=mechanism_rejection_ready,
+            minimality_ready=minimality_ready,
+            thermodynamic_claim_allowed=number(persistence_exchange, "thermodynamic_claim_allowed"),
+            primary_blocker="none" if mechanism_supported else "mechanism_selection_inputs",
+        ),
+        row(
+            verdict_row_id="sota_real_glassbench_closed_loop",
+            stage="real_glassbench_closed_loop_ready"
+            if real_closed_loop_ready
+            else "real_glassbench_closed_loop_blocked",
+            allowed_claim_level="real_signature_support_preinversion"
+            if not real_closed_loop_ready
+            else "real_microdynamic_prediction_test_ready",
+            real_glassbench_support=max_flag(dynamic_rows, "real_glassbench_support"),
+            microdynamic_prediction_support=max_flag(real_scorecards, "all_required_predictions_pass"),
+            minimality_ready=number(real_minimality, "microdynamic_basis_minimal"),
+            real_quantitative_inversion_ready=real_quantitative_ready,
+            thermodynamic_claim_allowed=max_flag(real_scorecards, "thermodynamic_claim_allowed"),
+            primary_blocker="none" if real_closed_loop_ready else real_blocker,
+        ),
+        row(
+            verdict_row_id="sota_thermodynamic_boundary",
+            stage="thermodynamic_transition_out_of_scope",
+            allowed_claim_level="dynamical_theory_only",
+            model_dynamic_support=number(thermodynamic, "model_support"),
+            literature_trend_support=number(thermodynamic, "literature_qualitative_support"),
+            real_glassbench_support=number(thermodynamic, "real_glassbench_support"),
+            real_quantitative_inversion_ready=number(thermodynamic, "real_quantitative_inversion_ready"),
+            thermodynamic_claim_allowed=0.0,
+            primary_blocker=str(thermodynamic.get("primary_blocker", "thermodynamic_input_law")),
+        ),
+    ]
+
+
+def glassbench_real_evidence_claim_synthesis(
+    *,
+    synthesis_id: str,
+    dynamic_alignment_rows: Sequence[dict[str, object]],
+    multik_shape_rows: Sequence[dict[str, object]],
+    heldout_prediction_rows: Sequence[dict[str, object]],
+    post_window_verdict_rows: Sequence[dict[str, object]],
+    transport_rows: Sequence[dict[str, object]],
+    pe_bound_rows: Sequence[dict[str, object]],
+    microdynamic_verdict_rows: Sequence[dict[str, object]],
+    experimental_verdict_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Collapse real GlassBench evidence into manuscript-safe claim levels."""
+
+    if not synthesis_id:
+        raise ValueError("synthesis_id must be nonempty")
+    required_inputs = {
+        "dynamic_alignment_rows": dynamic_alignment_rows,
+        "multik_shape_rows": multik_shape_rows,
+        "heldout_prediction_rows": heldout_prediction_rows,
+        "post_window_verdict_rows": post_window_verdict_rows,
+        "transport_rows": transport_rows,
+        "pe_bound_rows": pe_bound_rows,
+        "microdynamic_verdict_rows": microdynamic_verdict_rows,
+        "experimental_verdict_rows": experimental_verdict_rows,
+    }
+    for name, rows in required_inputs.items():
+        if not rows:
+            raise ValueError(f"{name} must be nonempty")
+
+    def number(row: dict[str, object], key: str) -> float:
+        return float(row.get(key, 0.0) or 0.0)
+
+    def max_flag(rows: Sequence[dict[str, object]], key: str) -> float:
+        return max((number(row, key) for row in rows), default=0.0)
+
+    def first_by_key(rows: Sequence[dict[str, object]], key: str, value: str) -> dict[str, object]:
+        for row in rows:
+            if str(row.get(key, "")) == value:
+                return row
+        return {}
+
+    def first_blocker(rows: Sequence[dict[str, object]], default: str) -> str:
+        for row in rows:
+            blocker = str(row.get("primary_blocker", "none"))
+            if blocker and blocker != "none":
+                return blocker
+        return default
+
+    dynamic_rows = [
+        row
+        for row in dynamic_alignment_rows
+        if str(row.get("signature", "")) not in {"thermodynamic_transition", "persistence_exchange_decoupling"}
+    ]
+    supported_dynamic_count = float(
+        sum(
+            1
+            for row in dynamic_rows
+            if number(row, "model_support") > 0.0
+            and number(row, "literature_qualitative_support") > 0.0
+            and number(row, "real_glassbench_support") > 0.0
+        )
+    )
+    dynamic_ready = supported_dynamic_count > 0.0
+    dynamic_inversion_ready = max_flag(dynamic_rows, "real_quantitative_inversion_ready")
+    if dynamic_ready and dynamic_inversion_ready == 1.0:
+        dynamic_stage = "real_dynamic_signatures_supported_and_inversion_ready"
+        dynamic_blocker = "none"
+        dynamic_action = "run_real_microdynamic_inversion"
+        dynamic_claim_ready = 1.0
+    elif dynamic_ready:
+        dynamic_stage = "real_dynamic_signatures_supported_preinversion"
+        dynamic_blocker = "none"
+        dynamic_action = "keep_dynamic_signature_claim_separate_from_real_inversion"
+        dynamic_claim_ready = 1.0
+    else:
+        dynamic_stage = "real_dynamic_signatures_not_supported"
+        dynamic_blocker = first_blocker(dynamic_rows, "real_dynamic_signature_support")
+        dynamic_action = "complete_real_dynamic_signature_support"
+        dynamic_claim_ready = 0.0
+
+    multik_ready = max_flag(multik_shape_rows, "multik_shape_candidate_ready")
+    heldout_ready = max_flag(heldout_prediction_rows, "heldout_prediction_candidate_ready")
+    supported_post = max_flag(post_window_verdict_rows, "post_window_prediction_supported")
+    rejected_post = max_flag(post_window_verdict_rows, "post_window_prediction_rejected")
+    observed_post_ready = min((number(row, "observed_post_window_fs_ready") for row in post_window_verdict_rows), default=0.0)
+    alpha_candidate_ready = float(multik_ready == 1.0 and heldout_ready == 1.0)
+    alpha_claim_ready = float(
+        alpha_candidate_ready == 1.0
+        and supported_post == 1.0
+        and rejected_post == 0.0
+        and observed_post_ready == 1.0
+    )
+    if alpha_claim_ready == 1.0:
+        alpha_stage = "multik_alpha_shape_prediction_supported"
+        alpha_blocker = "none"
+        alpha_action = "promote_to_real_alpha_shape_claim"
+    elif alpha_candidate_ready == 1.0 and rejected_post == 0.0:
+        alpha_stage = "multik_alpha_candidate_preregistered_post_window"
+        alpha_blocker = first_blocker(post_window_verdict_rows, first_blocker(multik_shape_rows, "post_alpha_window_depth"))
+        alpha_action = "measure_preregistered_post_alpha_fs_targets"
+    elif rejected_post == 1.0:
+        alpha_stage = "multik_alpha_prediction_rejected"
+        alpha_blocker = "post_alpha_shape_residual"
+        alpha_action = "reject_shared_alpha_shape_extrapolation"
+    else:
+        alpha_stage = "multik_alpha_claim_incomplete"
+        alpha_blocker = first_blocker(multik_shape_rows, "multik_alpha_shape")
+        alpha_action = "complete_multik_alpha_shape_and_heldout_prediction"
+
+    transport_ready = max_flag(transport_rows, "direct_alpha_transport_proxy_ready")
+    pe_bound_ready = max_flag(pe_bound_rows, "pe_feasibility_bound_ready")
+    conditional_pe_ready = max_flag(pe_bound_rows, "conditional_pe_inference_ready")
+    transport_pe_ready = float(transport_ready == 1.0 and pe_bound_ready == 1.0 and conditional_pe_ready == 1.0)
+    transport_real_pe_ready = max(max_flag(transport_rows, "real_pe_inversion_ready"), max_flag(pe_bound_rows, "real_pe_inversion_ready"))
+    pe_ratio = max((number(row, "reference_persistence_exchange_ratio") for row in pe_bound_rows), default=0.0)
+    if transport_pe_ready == 1.0 and transport_real_pe_ready == 1.0:
+        transport_stage = "real_alpha_transport_pe_inversion_ready"
+        transport_blocker = "none"
+        transport_action = "run_real_persistence_exchange_inversion"
+        transport_claim_ready = 1.0
+    elif transport_pe_ready == 1.0:
+        transport_stage = "conditional_transport_pe_bound_ready_event_clock_blocked"
+        transport_blocker = first_blocker(pe_bound_rows, first_blocker(transport_rows, "event_clock_trajectory"))
+        transport_action = "measure_cage_jump_event_variance_and_exchange_clock"
+        transport_claim_ready = 0.0
+    else:
+        transport_stage = "alpha_transport_pe_bound_incomplete"
+        transport_blocker = first_blocker(transport_rows, "direct_alpha_transport_proxy")
+        transport_action = "complete_direct_alpha_transport_and_pe_bound"
+        transport_claim_ready = 0.0
+
+    mechanism_protocol = first_by_key(
+        microdynamic_verdict_rows,
+        "verdict_row_id",
+        "late_recovery_decision_protocol",
+    )
+    protocol_ready = number(mechanism_protocol, "late_recovery_decision_protocol_ready")
+    mechanism_now = number(mechanism_protocol, "mechanism_selection_claim_allowed_now")
+    real_pe_ready = number(mechanism_protocol, "real_pe_inversion_ready")
+    if mechanism_now == 1.0 and real_pe_ready == 1.0:
+        mechanism_stage = "real_mechanism_selection_ready"
+        mechanism_blocker = "none"
+        mechanism_action = "promote_real_mechanism_selection_claim"
+        mechanism_rejection_ready = 1.0
+    elif protocol_ready == 1.0:
+        mechanism_stage = "mechanism_selection_preregistered_late_recovery_missing"
+        mechanism_blocker = str(mechanism_protocol.get("primary_blocker", "late_recovery_measurement"))
+        mechanism_action = "measure_late_ngp_recovery_and_extract_exchange_clock"
+        mechanism_rejection_ready = 0.0
+    else:
+        mechanism_stage = "mechanism_selection_protocol_incomplete"
+        mechanism_blocker = str(mechanism_protocol.get("primary_blocker", "late_recovery_protocol"))
+        mechanism_action = "complete_late_recovery_decision_protocol"
+        mechanism_rejection_ready = 0.0
+
+    thermodynamic = first_by_key(dynamic_alignment_rows, "signature", "thermodynamic_transition")
+    experimental_dynamic = first_by_key(
+        experimental_verdict_rows,
+        "verdict_row_id",
+        "sota_dynamic_signature_support",
+    )
+
+    def row(
+        *,
+        claim_row_id: str,
+        family: str,
+        stage: str,
+        allowed_claim: str,
+        candidate_ready: float,
+        claim_ready_now: float,
+        real_glassbench_support: float,
+        supported_real_signature_count: float = 0.0,
+        real_quantitative_inversion_ready: float = 0.0,
+        real_pe_inversion_ready: float = 0.0,
+        mechanism_rejection_ready: float = 0.0,
+        pe_ratio_or_bound: float = 0.0,
+        thermodynamic_claim_allowed: float = 0.0,
+        primary_blocker: str = "none",
+        next_required_action: str = "none",
+    ) -> dict[str, float | str]:
+        return {
+            "synthesis_id": synthesis_id,
+            "claim_row_id": claim_row_id,
+            "claim_family": family,
+            "allowed_claim_level": allowed_claim,
+            "candidate_ready": float(candidate_ready),
+            "claim_ready_now": float(claim_ready_now),
+            "real_glassbench_support": float(real_glassbench_support),
+            "supported_real_signature_count": float(supported_real_signature_count),
+            "real_quantitative_inversion_ready": float(real_quantitative_inversion_ready),
+            "real_pe_inversion_ready": float(real_pe_inversion_ready),
+            "mechanism_rejection_ready": float(mechanism_rejection_ready),
+            "pe_ratio_or_bound": float(pe_ratio_or_bound),
+            "thermodynamic_claim_allowed": float(thermodynamic_claim_allowed),
+            "primary_blocker": primary_blocker,
+            "next_required_action": next_required_action,
+            "claim_synthesis_stage": stage,
+        }
+
+    return [
+        row(
+            claim_row_id="real_dynamic_signature_support",
+            family="dynamical_signatures",
+            stage=dynamic_stage,
+            allowed_claim=str(
+                experimental_dynamic.get("allowed_claim_level", "real_dynamical_signature_support")
+            ),
+            candidate_ready=float(dynamic_ready),
+            claim_ready_now=dynamic_claim_ready,
+            real_glassbench_support=float(dynamic_ready),
+            supported_real_signature_count=supported_dynamic_count,
+            real_quantitative_inversion_ready=dynamic_inversion_ready,
+            primary_blocker=dynamic_blocker,
+            next_required_action=dynamic_action,
+        ),
+        row(
+            claim_row_id="cached_multik_alpha_shape_prediction",
+            family="alpha_shape_prediction",
+            stage=alpha_stage,
+            allowed_claim="cached_multik_alpha_candidate_with_preregistered_post_window_test",
+            candidate_ready=alpha_candidate_ready,
+            claim_ready_now=alpha_claim_ready,
+            real_glassbench_support=alpha_candidate_ready,
+            supported_real_signature_count=1.0 if alpha_candidate_ready == 1.0 else 0.0,
+            real_quantitative_inversion_ready=0.0,
+            primary_blocker=alpha_blocker,
+            next_required_action=alpha_action,
+        ),
+        row(
+            claim_row_id="conditional_alpha_transport_pe_bound",
+            family="alpha_transport_pe",
+            stage=transport_stage,
+            allowed_claim="conditional_alpha_transport_bound_not_event_clock_inversion",
+            candidate_ready=transport_pe_ready,
+            claim_ready_now=transport_claim_ready,
+            real_glassbench_support=transport_pe_ready,
+            real_quantitative_inversion_ready=transport_real_pe_ready,
+            real_pe_inversion_ready=transport_real_pe_ready,
+            pe_ratio_or_bound=pe_ratio,
+            primary_blocker=transport_blocker,
+            next_required_action=transport_action,
+        ),
+        row(
+            claim_row_id="real_mechanism_selection",
+            family="mechanism_selection",
+            stage=mechanism_stage,
+            allowed_claim="preregistered_real_mechanism_selection_protocol",
+            candidate_ready=protocol_ready,
+            claim_ready_now=mechanism_now,
+            real_glassbench_support=0.0,
+            real_pe_inversion_ready=real_pe_ready,
+            mechanism_rejection_ready=mechanism_rejection_ready,
+            primary_blocker=mechanism_blocker,
+            next_required_action=mechanism_action,
+        ),
+        row(
+            claim_row_id="thermodynamic_scope_boundary",
+            family="scope_boundary",
+            stage="thermodynamic_transition_out_of_scope",
+            allowed_claim="dynamical_glass_signatures_only",
+            candidate_ready=0.0,
+            claim_ready_now=0.0,
+            real_glassbench_support=number(thermodynamic, "real_glassbench_support"),
+            real_quantitative_inversion_ready=number(thermodynamic, "real_quantitative_inversion_ready"),
+            thermodynamic_claim_allowed=0.0,
+            primary_blocker=str(thermodynamic.get("primary_blocker", "thermodynamic_input_law")),
+            next_required_action="do_not_promote_to_thermodynamic_glass_transition_claim",
+        ),
+    ]
 
 
 def persistence_exchange_scan(

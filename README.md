@@ -181,6 +181,23 @@ diffusion and one anchor `tau_alpha(k)` are calibration inputs, while multi-k
 alpha shape, late NGP recovery, Stokes-Einstein growth, and the `chi4` proxy
 must pass as held-out predictions; thermodynamic-transition claims remain
 disallowed for this gate.
+The microdynamic prediction scorecard makes the core claim more compact:
+particle event-clock statistics can pass or fail a no-macro-fit
+micro-to-macro prediction canary, while the current GlassBench rows remain real
+dynamical-signature support rather than completed microdynamic predictions.
+The microdynamic minimality audit then checks that this is not a loose
+post-hoc accounting exercise: persistence, exchange, jump variance, and cage
+scale are all required before a micro-to-macro prediction claim is allowed.
+The SOTA experimental verdict matrix consolidates the literature trend checks,
+GlassBench evidence, microdynamic prediction scorecard, and thermodynamic
+scope boundary into final manuscript-safe claim levels.
+The GlassBench real-evidence claim synthesis then compresses the real-data
+chain into five manuscript-facing rows: real dynamical signatures, cached
+multi-k alpha-shape prediction, conditional alpha/transport PE bound, real
+mechanism-selection readiness, and the thermodynamic scope boundary. It
+therefore makes the current claim boundary explicit: real dynamic signatures
+are supported, post-alpha and mechanism-selection checks are preregistered but
+not observed, and thermodynamic glass-transition claims remain disallowed.
 The inversion-identifiability audit then checks fit-rank margins, held-out
 predictions, closure dependence, and parameter degeneracy before any real-data
 fit is claimed.
@@ -309,17 +326,157 @@ multi-k `F_s(k,t)`, and overlap-`chi4` into array-index means and standard
 errors. The official KA2D trajectory README then corrects the semantics: the
 leading `positions` axis is the 20-isoconfigurational-trajectory replica axis,
 not a time axis, and the physical lag time is encoded by the file-name `tc`
-code. The corrected time-code gate now maps the extracted prefix members to
-real lag times (`tc05=0.1` and `tc10=1.1` at `T=0.23`, `tc01=0.11` at
-`T=0.30`) and recomputes fixed-time observables relative to
-`initial_positions`. This is a genuine physical-time correction, but it still
-keeps persistence/exchange inversion disabled until enough members are
-extracted across all official time codes.
+code. The corrected time-code gate now maps the extracted 8 MB prefix members
+to real lag times and recomputes fixed-time observables relative to
+`initial_positions`. The result is asymmetric but useful: `T=0.23` covers all
+eight official time codes (`tc05` through `tc40`) with at least four complete
+members per time code, so it is a physical-time observable curve ready for the
+next persistence/exchange inversion gate; `T=0.30` still covers only `tc01` and
+therefore remains blocked by sparse time-code coverage.
+The cached-particle observable-semantics audit now verifies the same boundary
+at the single-structure cache level: raw coordinate MSD is rejected as a proxy,
+while minimal-image displacement from cached `initial_positions` reproduces
+the official GlassBench MSD for the structure-151 cold lag ladder to numerical
+precision. It also resolves the official NGP convention: GlassBench reports
+the mean over isoconfigurational replicas of each replica's two-dimensional
+alpha2, not the pooled ratio over all replicas and particles. With that
+convention, the cached displacements reproduce the official NGP as well. This
+audit also reproduces the official multi-`k` self-intermediate scattering by
+using the axis-averaged convention
+`0.5*(<cos(k dx)> + <cos(k dy)>)`; a single-axis convention is explicitly
+rejected. This upgrades the remaining blocker from fixed-lag observable
+semantics to event segmentation, persistence/exchange clocks, and
+alpha-threshold coverage.
+The time-code curve bridge now runs that `T=0.23` curve through the same
+trajectory pre-inversion schema used by the persistence/exchange protocol. It
+promotes the row from metadata-only evidence to a real physical-time
+observable curve, but it still blocks real inversion because the cached curve
+does not cross the alpha threshold even though its latest point reaches about
+`1.63 tau_alpha`. The alpha-horizon audit now estimates that the latest-lag
+`F_s=e^-1` crossing would require `k*=2.70`, about `1.69x` the largest
+published GlassBench wave number `k=1.6`; `T=0.30` remains blocked by sparse
+time-code coverage.
+The companion signature-support gate then asks what can already be concluded
+without fitting: the real `T=0.23` curve supports MSD growth, substantial
+anchor-`F_s` decay, a transient NGP peak with partial recovery, and a transient
+overlap-`chi4` proxy peak with partial recovery. It still records
+`thermodynamic_claim_allowed=0` and keeps the real persistence/exchange
+inversion blocked by alpha-anchor wave-number coverage.
+The alpha-anchor rescue protocol turns that blocker into a concrete
+measurement target: recompute or extend GlassBench `F_s(k,t)` near `k*=2.70`
+to test the same alpha threshold. It also records that this would only remove
+the alpha-definition blocker; physical-time event clocks, threshold sweeps, and
+held-out macro observables remain separate requirements before a real
+persistence/exchange closed-loop claim.
+The cached alpha-anchor `F_s` audit then tests that proposed wave number
+directly on the structure-151 cached displacement ladder. At the latest lag,
+`F_s(k=2.6966,t)` is `0.528`, still above `e^-1`. Fitting the same cached
+latest-lag `F_s(k)` grid gives a structure-specific estimate `k*=3.01`, but a
+direct bisection solve on the cached displacement tensor gives the stricter
+root `k_root=4.80`. This refines the next measurement target without promoting
+the result to an event-clock or thermodynamic claim.
+The direct-alpha curve audit then evaluates all eight cached structure-151 lag
+targets at this `k_root`: `F_s` decreases from `0.980` at `tc05` to `e^-1` at
+`tc40`, so the cached coordinate ladder now contains a real structure-matched
+alpha-threshold crossing. The audit still keeps `event_clock_trajectory_ready=0`
+and `real_pe_inversion_ready=0`, because the NPZ axis is an isoconfigurational
+replica axis rather than a physical event-clock trajectory.
+The direct-alpha shape selection then compares this real cached alpha curve
+with a threshold-anchored exponential null and a KWW shape fit. The current
+curve strongly favors a stretched-alpha candidate (`beta=0.159`, KWW log-shape
+RMSE `0.510` versus exponential RMSE `7.77`). Frame-block standard errors from
+the cached particle tensor now provide machine-readable `sigma_F_s` values. The
+only upward step has `z=0.78`, so the sparse nonmonotonicity is statistically
+compatible with a monotone alpha decay under a two-sigma rule.
+The direct-alpha multi-k shape gate then recomputes the same cached tensor at
+three high wave numbers (`k=4.80`, `5.4`, and `6.0`). All three curves cross the
+alpha threshold with a consistent KWW shape (`beta` spread `0.013`) and
+uncertainty-compatible monotonicity (`z_max=0.804`). This is now a multi-k
+stretched-alpha candidate, but not a completed real alpha-shape claim: all
+three threshold crossings occur at the final cached lag `tc40`, so the remaining
+blocker is post-alpha window depth rather than mechanism selection or sparse
+nonmonotonicity.
+The held-out multi-k alpha prediction gate then makes this stricter: each of
+the three high-`k` curves is held out, the other two calibrate the KWW shape
+exponent, and the held-out curve is predicted without refitting that curve. The
+maximum held-out beta error is `0.00995`, and the maximum normalized shape RMSE
+is `0.226`. This moves the GlassBench alpha-shape evidence from consistency
+toward prediction, while preserving the same `tc40` edge-crossing blocker.
+The post-alpha prediction-target gate then turns that blocker into explicit
+future checks. Using the existing `tc50` late-recovery timecode target and a
+log-time interpolated `tc45`, it preregisters high-`k` predictions:
+`F_s(tc45)=0.236--0.241` and `F_s(tc50)=0.125--0.133`, with a fixed
+absolute-log tolerance band. These rows are falsification targets for a future
+GlassBench extension, not observed post-window evidence.
+The post-alpha verdict gate then maps those preregistered targets and any
+future post-window `F_s` observations into supported, rejected, indeterminate,
+or not-ready rows. The current GlassBench verdict remains not-ready because no
+post-window observation has been ingested, so this is a falsifiable verdict
+protocol rather than observed support.
+The direct-alpha transport proxy then matches that same `tc40` crossing to the
+reproduced GlassBench displacement observable: `MSD=0.9747508406`, giving
+`D_eff=1.6246e-7` and `D_eff tau_alpha=0.24369` in 2D. This is a useful
+alpha/transport anchor for the real-data loop, not a persistence/exchange
+ratio or a thermodynamic glass-transition claim.
+The direct-alpha PE feasibility bound uses that anchor to test what would be
+identifiable if a particle event clock supplied the per-event jump variance.
+It finds that treating the full `tc40` MSD as a single jump variance is already
+infeasible for the finite-exchange alpha/transport equations; the feasible
+event jump variance is bounded by `q <= 0.48556`, about `0.498 MSD`. Under the
+explicit conditional reference `q=0.2 MSD`, the same equations give
+`tau_x=6.0e5`, `tau_p=1.409e6`, and `tau_p/tau_x=2.35`. This converts the
+real GlassBench proxy into a falsifiable jump-variance target while keeping
+`real_pe_inversion_ready=0`.
+The direct-alpha displacement-tail bound then compares the raw cached `tc40`
+displacement distribution with that PE single-event bound. In the
+structure-151 cache, `q_all/q_max=1.004`, about `23.5%` of displacement samples
+already exceed the single-event bound, and the above-bound tail has mean
+`q_tail/q_max=3.69`. This rules out treating the broad direct-lag displacement
+tail as one measured jump variance and makes cage-jump event segmentation the
+next required real-data step.
+The multi-lag crossing canary then scans the cached structure-151 lag ladder
+against the same `q_max` threshold. About `24.0%` of replica-particle samples
+cross at least once, most first crossings occur at `tc40`, and the mean
+first-crossing `q` is `3.44 q_max`; however, `23.6%` of post-crossing samples
+recross below the threshold and the leading axis remains an isoconfigurational
+replica axis. The canary therefore supplies a concrete segmentation target but
+still records `persistence_exchange_event_clock_ready=0`.
+The real-cached microdynamic verdict then consolidates this lag ladder into a
+stronger real-data statement: the interval-censored fit quantifies a cached
+persistence-clock candidate with `tau_p/tau_alpha=3.65` and a crossed-fraction
+residual below `10^-3`, while the conditional finite-exchange envelope gives a
+`tau_p/tau_x` lower bound under the explicit exchange-clock assumption. It still
+blocks full persistence/exchange inversion because the exchange clock, true
+physical-time trajectory axis, and late-recovery measurement are not present.
+The interval-censored waiting-law selection then asks whether the real cached
+first-crossing ladder justifies adding a stretched/Weibull persistence law. It
+does not: the fitted Weibull shape is near exponential (`shape=1.06`), and the
+AIC penalty favors retaining the one-parameter exponential law for the current
+sparse cache. This constrains the phenomenological waiting-time law without
+claiming a stretched waiting distribution or thermodynamic glass transition.
+The SOTA dynamic-signature alignment ledger then joins model diagnostics,
+literature-level benchmarks, and the current GlassBench real curve. It marks
+MSD growth/cage escape and transient NGP as model+literature+real-curve
+supported, marks self-intermediate scattering as real-curve supported but still
+pre-alpha-threshold, marks `chi4` as a proxy spatial-heterogeneity alignment,
+keeps persistence/exchange decoupling blocked until real inversion, and leaves
+thermodynamic transition as a scope boundary.
+The direct four-point claim gate then prevents that `chi4` proxy from being
+over-promoted: overlap-`chi4` can support a qualitative dynamic-heterogeneity
+signature, but direct four-point susceptibility and dynamic-length claims remain
+blocked until physical time, uncertainty-weighted four-point data, and a
+measured dynamic length are present.
+The real-data closure priority ledger then ranks the minimum next payloads that
+would turn the current GlassBench evidence into stronger falsification tests:
+physical-time event clocks and cage-jump segmentation first, post-alpha multi-k
+`F_s` targets second, late-NGP recovery third, and direct four-point/dynamic
+length data fourth. Every row keeps thermodynamic-transition claims disallowed.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
-gate ready, while the real inversion remains blocked until full time-code
-coverage is attached.
+gate ready, while the real inversion remains blocked until the cached
+GlassBench lag window is extended far enough for alpha-threshold crossing and
+long-time diffusion checks.
 The observable-coverage audit isolates the remaining real-inversion observable
 gap: both current KA2D first-NPZ rows now expose frame index, MSD, 2D NGP,
 multi-k `F_s(k,t)`, and a single-origin overlap-`chi4` proxy. They still lack
@@ -448,6 +605,10 @@ figures/renewal_cage_sota_claim_alignment.svg
 figures/renewal_cage_sota_signed_constraints.svg
 figures/renewal_cage_sota_evidence_class.svg
 figures/renewal_cage_simultaneous_closure.svg
+figures/renewal_cage_microdynamic_prediction_scorecard.svg
+figures/renewal_cage_microdynamic_minimality_audit.svg
+figures/renewal_cage_sota_experimental_verdict_matrix.svg
+figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.svg
 figures/renewal_cage_real_benchmark_assimilation_gate.svg
 figures/renewal_cage_cross_observable_prediction_ledger.svg
 figures/renewal_cage_inversion_identifiability_audit.svg
@@ -473,6 +634,50 @@ figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.sv
 figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.svg
 figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.svg
 figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.svg
+figures/renewal_cage_sota_glassbench_timecode_curve_bridge.svg
+figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.svg
+figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg
+figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_curve.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_transport.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.svg
+figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.svg
+figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg
+figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.svg
+figures/renewal_cage_sota_glassbench_waiting_law_selection.svg
+figures/renewal_cage_sota_glassbench_finite_exchange_envelope.svg
+figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.svg
+figures/renewal_cage_sota_glassbench_late_recovery_protocol.svg
+figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.svg
+figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.svg
+figures/renewal_cage_sota_glassbench_late_recovery_cache_request_contract.svg
+figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.svg
+figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.svg
+figures/renewal_cage_sota_glassbench_censored_window_claim_audit.svg
+figures/renewal_cage_sota_glassbench_public_window_verdict.svg
+figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.svg
+figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.svg
+figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.svg
+figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.svg
+figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
+figures/renewal_cage_sota_dynamic_signature_alignment.svg
+figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.svg
+figures/renewal_cage_sota_glassbench_real_data_closure_priority.svg
+figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
+figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg
+figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg
+figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.svg
+figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.svg
+figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.svg
+figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.svg
 figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.svg
 figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.svg
 figures/renewal_cage_sota_glassbench_observable_coverage_audit.svg
@@ -492,6 +697,9 @@ figures/renewal_cage_raw_curve_ingestion_contract.svg
 figures/renewal_cage_raw_curve_diagnostic_readiness.svg
 figures/renewal_cage_raw_curve_persistence_exchange_protocol.svg
 figures/renewal_cage_trajectory_observable_protocol.svg
+figures/renewal_cage_trajectory_cage_jump_events.svg
+figures/renewal_cage_trajectory_event_clock_macro_predictions.svg
+figures/renewal_cage_trajectory_event_clock_threshold_robustness.svg
 figures/renewal_cage_trajectory_uncertainty_protocol.svg
 figures/renewal_cage_trajectory_member_ensemble_uncertainty.svg
 figures/renewal_cage_trajectory_inversion_readiness.svg
@@ -533,6 +741,10 @@ data/renewal_cage_sota_claim_alignment.csv
 data/renewal_cage_sota_signed_constraints.csv
 data/renewal_cage_sota_evidence_class.csv
 data/renewal_cage_simultaneous_closure.csv
+data/renewal_cage_microdynamic_prediction_scorecard.csv
+data/renewal_cage_microdynamic_minimality_audit.csv
+data/renewal_cage_sota_experimental_verdict_matrix.csv
+data/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv
 data/renewal_cage_real_benchmark_assimilation_gate.csv
 data/renewal_cage_cross_observable_prediction_ledger.csv
 data/renewal_cage_inversion_identifiability_audit.csv
@@ -559,6 +771,52 @@ data/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readiness.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_member_index.csv
 data/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.csv
 data/renewal_cage_sota_glassbench_ka2d_timecode_semantics.csv
+data/renewal_cage_sota_glassbench_timecode_curve_bridge.csv
+data/renewal_cage_sota_glassbench_alpha_threshold_horizon.csv
+data/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv
+data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
+data/renewal_cage_sota_glassbench_direct_alpha_curve.csv
+data/renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv
+data/renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv
+data/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv
+data/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.csv
+data/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv
+data/renewal_cage_sota_glassbench_direct_alpha_transport.csv
+data/renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv
+data/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv
+data/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.csv
+data/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv
+data/renewal_cage_sota_glassbench_sparse_lag_event_clock.csv
+data/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv
+data/renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv
+data/renewal_cage_sota_glassbench_waiting_law_selection.csv
+data/renewal_cage_sota_glassbench_finite_exchange_envelope.csv
+data/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv
+data/renewal_cage_sota_glassbench_late_recovery_protocol.csv
+data/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.csv
+data/renewal_cage_sota_glassbench_late_recovery_timecode_target.csv
+data/renewal_cage_sota_glassbench_late_recovery_cache_request_contract.csv
+data/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.csv
+data/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.csv
+data/renewal_cage_sota_glassbench_censored_window_claim_audit.csv
+data/renewal_cage_sota_glassbench_public_window_verdict.csv
+data/renewal_cage_sota_glassbench_late_recovery_experiment_design.csv
+data/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.csv
+data/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.csv
+data/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv
+data/renewal_cage_sota_glassbench_timecode_signature_support.csv
+data/renewal_cage_sota_dynamic_signature_alignment.csv
+data/renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv
+data/renewal_cage_sota_glassbench_real_data_closure_priority.csv
+data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
+data/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv
+data/renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv
+data/renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv
+data/renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv
+data/renewal_cage_sota_glassbench_event_clock_threshold_readiness.csv
+data/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.csv
+data/renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv
+data/renewal_cage_sota_glassbench_microdynamic_closed_loop.csv
 data/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv
 data/renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv
 data/renewal_cage_sota_glassbench_observable_coverage_audit.csv
@@ -594,6 +852,9 @@ data/renewal_cage_raw_curve_ingestion_contract.csv
 data/renewal_cage_raw_curve_diagnostic_readiness.csv
 data/renewal_cage_raw_curve_persistence_exchange_protocol.csv
 data/renewal_cage_trajectory_observable_protocol.csv
+data/renewal_cage_trajectory_cage_jump_events.csv
+data/renewal_cage_trajectory_event_clock_macro_predictions.csv
+data/renewal_cage_trajectory_event_clock_threshold_robustness.csv
 data/renewal_cage_trajectory_adapter_demo.csv
 data/renewal_cage_trajectory_csv_adapter_source.csv
 data/renewal_cage_trajectory_csv_adapter_demo.csv
@@ -643,6 +904,10 @@ paper/figures/renewal_cage_sota_claim_alignment.pdf
 paper/figures/renewal_cage_sota_signed_constraints.pdf
 paper/figures/renewal_cage_sota_evidence_class.pdf
 paper/figures/renewal_cage_simultaneous_closure.pdf
+paper/figures/renewal_cage_microdynamic_prediction_scorecard.pdf
+paper/figures/renewal_cage_microdynamic_minimality_audit.pdf
+paper/figures/renewal_cage_sota_experimental_verdict_matrix.pdf
+paper/figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf
 paper/figures/renewal_cage_real_benchmark_assimilation_gate.pdf
 paper/figures/renewal_cage_cross_observable_prediction_ledger.pdf
 paper/figures/renewal_cage_inversion_identifiability_audit.pdf
@@ -668,6 +933,50 @@ paper/figures/renewal_cage_sota_glassbench_trajectory_first_npz_inversion_readin
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_member_index.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_member_ensemble_observable.pdf
 paper/figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf
+paper/figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf
+paper/figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf
+paper/figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf
+paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf
+paper/figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf
+paper/figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf
+paper/figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf
+paper/figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf
+paper/figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf
+paper/figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_cache_request_contract.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf
+paper/figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf
+paper/figures/renewal_cage_sota_glassbench_public_window_verdict.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf
+paper/figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf
+paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
+paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf
+paper/figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf
+paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf
+paper/figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf
+paper/figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf
+paper/figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf
+paper/figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf
+paper/figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf
+paper/figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf
 paper/figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf
 paper/figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf
@@ -687,6 +996,9 @@ paper/figures/renewal_cage_raw_curve_ingestion_contract.pdf
 paper/figures/renewal_cage_raw_curve_diagnostic_readiness.pdf
 paper/figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf
 paper/figures/renewal_cage_trajectory_observable_protocol.pdf
+paper/figures/renewal_cage_trajectory_cage_jump_events.pdf
+paper/figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf
+paper/figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf
 paper/figures/renewal_cage_trajectory_uncertainty_protocol.pdf
 paper/figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf
 paper/figures/renewal_cage_trajectory_inversion_readiness.pdf

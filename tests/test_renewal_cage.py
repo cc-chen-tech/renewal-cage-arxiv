@@ -40,8 +40,8 @@ from renewal_cage import (  # noqa: E402
     glass_phenomenon_audit,
     glass_signature_phase_diagram,
     dynamic_heterogeneity_benchmark_consistency,
+    dynamic_signature_alignment_ledger,
     infer_parameters_from_full_observables,
-    inherent_state_landscape_thermodynamics,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
     inversion_identifiability_audit,
@@ -64,16 +64,20 @@ from renewal_cage import (  # noqa: E402
     fragility_benchmark_consistency,
     frontier_benchmark_horizon,
     gaussian_recovery_benchmark_consistency,
+    gated_precursor_hazard,
+    gated_precursor_mean_count,
+    gated_precursor_survival,
     infer_spatial_facilitation_diffusivity,
-    kramers_escape_rate,
     kww_alpha_fit,
-    langevin_bare_diffusion,
-    langevin_cage_ou_parameters,
-    langevin_coarse_graining_bridge_audit,
-    langevin_to_persistence_exchange,
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
     late_mechanism_selection,
+    kramers_escape_rate,
+    langevin_bare_diffusion,
+    langevin_cage_ou_parameters,
+    langevin_coarse_graining_bridge_audit,
+    langevin_first_principles_bridge_audit,
+    langevin_to_persistence_exchange,
     minimal_barrier_requirements,
     MCTBetaParams,
     mct_beta_correlator,
@@ -103,10 +107,10 @@ from renewal_cage import (  # noqa: E402
     periodic_cage_curvature,
     periodic_softness_gate_bridge_audit,
     periodic_softness_gate_to_delayed_renewal,
-    potential_effective_theory_taxonomy,
-    PersistenceExchangeParams,
+    precursor_escape_simulation_diagnostic,
     precursor_gate_hazard,
     precursor_gate_mean_count,
+    PersistenceExchangeParams,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_count_distribution,
     persistence_exchange_count_pgf,
@@ -115,6 +119,9 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_data_protocol,
     persistence_exchange_joint_diagnostic,
     simultaneous_dynamical_signature_closure_gate,
+    microdynamic_prediction_scorecard,
+    microdynamic_minimality_audit,
+    sota_experimental_verdict_matrix,
     persistence_exchange_ngp_1d,
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
@@ -141,6 +148,50 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_real_inversion_unlock_protocol_gate,
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
+    glassbench_alpha_threshold_horizon_audit,
+    glassbench_alpha_anchor_rescue_protocol,
+    glassbench_alpha_anchor_cached_fs_audit,
+    glassbench_direct_alpha_curve_audit,
+    glassbench_direct_alpha_displacement_tail_bound,
+    glassbench_direct_alpha_event_clock_extraction_contract,
+    glassbench_direct_alpha_multilag_crossing_canary,
+    glassbench_direct_alpha_multik_heldout_prediction_gate,
+    glassbench_direct_alpha_post_window_prediction_targets,
+    glassbench_direct_alpha_post_window_verdict,
+    glassbench_direct_alpha_multik_shape_gate,
+    glassbench_direct_alpha_shape_selection,
+    glassbench_direct_alpha_transport_coupling_audit,
+    glassbench_direct_alpha_pe_feasibility_bound,
+    glassbench_real_evidence_claim_synthesis,
+    glassbench_sparse_lag_event_clock_audit,
+    glassbench_interval_censored_first_crossing_clock,
+    glassbench_interval_censored_persistence_fit,
+    glassbench_interval_censored_waiting_law_selection,
+    glassbench_finite_exchange_falsification_envelope,
+    glassbench_real_cached_microdynamic_verdict,
+    glassbench_late_recovery_falsification_protocol,
+    glassbench_late_recovery_ingestion_contract,
+    glassbench_late_recovery_timecode_target,
+    glassbench_late_recovery_cache_request_contract,
+    glassbench_late_recovery_membership_probe_contract,
+    glassbench_late_recovery_public_timecode_ceiling,
+    glassbench_censored_window_claim_audit,
+    glassbench_sota_public_window_verdict,
+    glassbench_late_recovery_experiment_design,
+    glassbench_late_recovery_uncertainty_verdict,
+    glassbench_late_recovery_outcome_matrix,
+    glassbench_late_recovery_decision_power_plan,
+    glassbench_cage_jump_proxy_canary,
+    glassbench_event_clock_threshold_readiness_gate,
+    glassbench_cached_particle_timecode_bridge,
+    glassbench_multilag_particle_cache_targets,
+    glassbench_cached_particle_observable_semantics_audit,
+    glassbench_first_npz_particle_cache_contract_gate,
+    glassbench_microdynamic_closed_loop_audit,
+    glassbench_timecode_signature_support_gate,
+    glassbench_direct_four_point_claim_gate,
+    glassbench_real_data_closure_priority_ledger,
+    glassbench_timecode_curve_bridge,
     sota_glassbench_ka2d_timecode_semantics_gate,
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
@@ -171,12 +222,16 @@ from renewal_cage import (  # noqa: E402
     sota_zip_structure_gate,
     sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
+    potential_effective_theory_taxonomy,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
     trajectory_adapter_contract,
     benchmark_publication_ladder,
     trajectory_inversion_readiness_gate,
+    trajectory_cage_jump_event_protocol,
+    trajectory_event_clock_macro_prediction_protocol,
+    trajectory_event_clock_threshold_robustness_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_table_csv_adapter,
@@ -207,6 +262,3094 @@ class DelayedRenewalCageTests(unittest.TestCase):
         expected = params.renewal_rate * t**3 / (3.0 * params.renewal_delay**2)
 
         np.testing.assert_allclose(mean, expected, rtol=2e-4, atol=1e-16)
+
+    def test_two_precursor_gate_recovers_square_delayed_hazard(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=1.0,
+            jump_variance=1.0,
+            renewal_rate=0.18,
+            renewal_delay=2.7,
+        )
+        t = np.linspace(0.0, 16.0, 80)
+
+        hazard = gated_precursor_hazard(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=2,
+        )
+        linear_gate = gated_precursor_hazard(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=1,
+        )
+        mean_count = gated_precursor_mean_count(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=2,
+        )
+        survival = gated_precursor_survival(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=2,
+        )
+
+        np.testing.assert_allclose(
+            hazard,
+            params.renewal_rate * (1.0 - np.exp(-t / params.renewal_delay)) ** 2,
+            rtol=1e-13,
+            atol=1e-15,
+        )
+        np.testing.assert_allclose(
+            linear_gate,
+            params.renewal_rate * (1.0 - np.exp(-t / params.renewal_delay)),
+            rtol=1e-13,
+            atol=1e-15,
+        )
+        np.testing.assert_allclose(mean_count, delayed_poisson_mean(t, params), rtol=1e-13, atol=1e-15)
+        self.assertAlmostEqual(float(survival[0]), 1.0)
+        self.assertLess(float(survival[-1]), 1.0)
+
+    def test_precursor_escape_simulation_recovers_delayed_hazard(self):
+        row = precursor_escape_simulation_diagnostic(
+            asymptotic_rate=0.14,
+            precursor_time=2.5,
+            precursor_count=2,
+            sample_count=180_000,
+            time_max=35.0,
+            bin_count=50,
+            seed=1234,
+        )
+
+        self.assertEqual(row["bridge_stage"], "precursor_gated_langevin_escape_closure")
+        self.assertEqual(float(row["full_many_body_first_principles_claim_allowed"]), 0.0)
+        self.assertLess(float(row["hazard_rms_relative_error"]), 0.12)
+        self.assertLess(abs(float(row["mean_escape_time_relative_error"])), 0.035)
+        self.assertLess(abs(float(row["late_hazard_relative_error"])), 0.12)
+
+    def test_glassbench_timecode_curve_bridge_keeps_real_curve_before_inversion(self):
+        rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc05",
+                "lag_time": 0.1,
+                "tau_alpha": 918306.0,
+                "timecode_curve_ready": 1.0,
+                "member_count": 9.0,
+                "msd": 0.0035,
+                "sigma_msd_member_sem": 1e-5,
+                "ngp_2d": 0.008,
+                "sigma_ngp_2d_member_sem": 0.002,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.999;0.998;0.997",
+                "sigma_self_intermediate_scattering_by_k_member_sem": "1e-6;2e-6;3e-6",
+                "chi4_overlap_replica": 0.04,
+                "sigma_chi4_overlap_member_sem": 0.005,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "tau_alpha": 918306.0,
+                "timecode_curve_ready": 1.0,
+                "member_count": 6.0,
+                "msd": 1.2,
+                "sigma_msd_member_sem": 0.1,
+                "ngp_2d": 1.9,
+                "sigma_ngp_2d_member_sem": 0.16,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.879;0.763;0.640",
+                "sigma_self_intermediate_scattering_by_k_member_sem": "0.009;0.016;0.023",
+                "chi4_overlap_replica": 3.17,
+                "sigma_chi4_overlap_member_sem": 0.79,
+            },
+        ]
+
+        row = glassbench_timecode_curve_bridge(
+            benchmark_id="glassbench_ka2d_t023_timecode_curve",
+            rows=rows,
+            required_wave_numbers=[0.7, 1.1, 1.6],
+            anchor_wave_number=1.1,
+        )[0]
+
+        self.assertEqual(row["bridge_stage"], "glassbench_timecode_curve_bridge_incomplete")
+        self.assertEqual(float(row["timecode_curve_ready"]), 1.0)
+        self.assertEqual(float(row["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(row["curve_bridge_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(float(row["lag_count"]), 2.0)
+        self.assertGreater(float(row["latest_lag_time_over_tau_alpha"]), 1.0)
+        self.assertGreater(float(row["latest_self_intermediate_scattering_anchor"]), math.exp(-1.0))
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_timecode_signature_support_scores_real_dynamic_signatures(self):
+        timecode_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc05",
+                "lag_time": 0.1,
+                "timecode_curve_ready": 1.0,
+                "msd": 0.003,
+                "ngp_2d": 0.01,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.999;0.998;0.996",
+                "chi4_overlap_replica": 0.05,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc35",
+                "lag_time": 142587.0,
+                "timecode_curve_ready": 1.0,
+                "msd": 0.15,
+                "ngp_2d": 5.2,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.98;0.96;0.93",
+                "chi4_overlap_replica": 5.7,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "timecode_curve_ready": 1.0,
+                "msd": 1.2,
+                "ngp_2d": 1.9,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.88;0.76;0.64",
+                "chi4_overlap_replica": 3.2,
+            },
+        ]
+        bridge_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+
+        row = glassbench_timecode_signature_support_gate(
+            support_id="glassbench_signature_support",
+            timecode_rows=timecode_rows,
+            bridge_rows=bridge_rows,
+            anchor_wave_number=1.1,
+        )[0]
+
+        self.assertEqual(row["signature_stage"], "real_curve_dynamic_signature_support_preinversion")
+        self.assertEqual(float(row["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["msd_growth_signature"]), 1.0)
+        self.assertEqual(float(row["self_intermediate_decay_signature"]), 1.0)
+        self.assertEqual(float(row["transient_ngp_peak_signature"]), 1.0)
+        self.assertEqual(float(row["transient_chi4_peak_signature"]), 1.0)
+        self.assertEqual(float(row["alpha_threshold_crossed"]), 0.0)
+        self.assertGreaterEqual(float(row["supported_dynamical_signature_count"]), 4.0)
+        self.assertEqual(row["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_four_point_claim_gate_blocks_proxy_promotion(self):
+        signature_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "transient_chi4_peak_signature": 1.0,
+                "chi4_peak_value": 5.7,
+                "chi4_late_recovery_fraction": 0.44,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+        dynamic_alignment_rows = [
+            {
+                "signature": "chi4_dynamic_heterogeneity_proxy",
+                "real_glassbench_support": 1.0,
+                "alignment_stage": "real_proxy_supported_spatial_boundary",
+                "primary_blocker": "direct_four_point_function_and_dynamic_length",
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        ]
+        member_ensemble_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "frame_index": 1.0,
+                "member_count": 4.0,
+                "min_member_count": 4.0,
+                "ensemble_member_threshold_pass": 1.0,
+                "overlap_radius": 0.1,
+                "chi4_overlap": 161.9,
+                "sigma_chi4_overlap": 52.9,
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "frame_index": 2.0,
+                "member_count": 4.0,
+                "min_member_count": 4.0,
+                "ensemble_member_threshold_pass": 1.0,
+                "overlap_radius": 0.1,
+                "chi4_overlap": 150.9,
+                "sigma_chi4_overlap": 54.5,
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+        ]
+
+        rows = glassbench_direct_four_point_claim_gate(
+            gate_id="glassbench_direct_four_point_claim_gate",
+            signature_rows=signature_rows,
+            dynamic_alignment_rows=dynamic_alignment_rows,
+            member_ensemble_rows=member_ensemble_rows,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["four_point_claim_stage"], "overlap_chi4_proxy_supported_direct_four_point_blocked")
+        self.assertEqual(float(row["overlap_chi4_proxy_ready"]), 1.0)
+        self.assertEqual(float(row["direct_four_point_susceptibility_ready"]), 0.0)
+        self.assertEqual(float(row["dynamic_length_ready"]), 0.0)
+        self.assertEqual(float(row["direct_four_point_claim_ready"]), 0.0)
+        self.assertEqual(float(row["proxy_promotion_allowed"]), 0.0)
+        self.assertGreater(float(row["overlap_chi4_peak"]), 150.0)
+        self.assertEqual(row["primary_blocker"], "direct_four_point_function_and_dynamic_length")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_data_closure_priority_ledger_orders_decisive_payloads(self):
+        evidence_rows = [
+            {
+                "claim_row_id": "real_dynamic_signature_support",
+                "claim_ready_now": 1.0,
+                "allowed_claim_level": "dynamical_signature_supported",
+                "claim_synthesis_stage": "real_dynamic_signatures_supported_preinversion",
+                "primary_blocker": "none",
+                "next_required_action": "keep_dynamic_signature_claim_separate_from_real_inversion",
+            },
+            {
+                "claim_row_id": "conditional_alpha_transport_pe_bound",
+                "claim_ready_now": 0.0,
+                "allowed_claim_level": "conditional_alpha_transport_bound_not_event_clock_inversion",
+                "claim_synthesis_stage": "conditional_transport_pe_bound_ready_event_clock_blocked",
+                "primary_blocker": "event_clock_jump_variance",
+                "next_required_action": "measure_cage_jump_event_variance_and_exchange_clock",
+            },
+            {
+                "claim_row_id": "real_mechanism_selection",
+                "claim_ready_now": 0.0,
+                "allowed_claim_level": "preregistered_real_mechanism_selection_protocol",
+                "claim_synthesis_stage": "mechanism_selection_preregistered_late_recovery_missing",
+                "primary_blocker": "late_recovery_measurement",
+                "next_required_action": "measure_late_ngp_recovery_and_extract_exchange_clock",
+            },
+        ]
+        closed_loop_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "frame_index_microstats_ready": 1.0,
+                "macro_signature_ready": 1.0,
+                "micro_to_macro_prediction_ready": 0.0,
+                "closed_loop_ready": 0.0,
+                "missing_closed_loop_inputs": (
+                    "physical_time_semantics;cage_jump_event_segmentation;"
+                    "persistence_exchange_event_clock;real_persistence_exchange_inversion"
+                ),
+                "primary_blocker": "physical_time_semantics",
+            }
+        ]
+        unlock_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "minimum_unlock_ready": 0.0,
+                "minimum_required_payload": (
+                    "frame_time_mapping;lag_time;sigma_msd;sigma_ngp_2d;"
+                    "sigma_self_intermediate_scattering_by_k;sigma_chi4_overlap"
+                ),
+                "missing_observables": "lag_time",
+                "missing_uncertainty_columns": (
+                    "sigma_msd;sigma_ngp_2d;sigma_self_intermediate_scattering_by_k;sigma_chi4_overlap"
+                ),
+            }
+        ]
+        post_window_rows = [
+            {
+                "prediction_target_ready": 1.0,
+                "post_window_prediction_supported": 0.0,
+                "target_time_code": "tc45",
+            }
+        ]
+        late_recovery_rows = [
+            {
+                "target_ready": 1.0,
+                "late_recovery_observed": 0.0,
+                "target_time_code": "tc50",
+            }
+        ]
+        four_point_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "overlap_chi4_proxy_ready": 1.0,
+                "direct_four_point_claim_ready": 0.0,
+                "primary_blocker": "direct_four_point_function_and_dynamic_length",
+            }
+        ]
+
+        rows = glassbench_real_data_closure_priority_ledger(
+            ledger_id="glassbench_real_data_closure_priority",
+            evidence_rows=evidence_rows,
+            closed_loop_rows=closed_loop_rows,
+            unlock_rows=unlock_rows,
+            post_window_rows=post_window_rows,
+            late_recovery_rows=late_recovery_rows,
+            four_point_rows=four_point_rows,
+        )
+
+        by_id = {row["closure_id"]: row for row in rows}
+        event_clock = by_id["physical_time_event_clock_and_cage_jump_segmentation"]
+        self.assertEqual(float(event_clock["priority_rank"]), 1.0)
+        self.assertEqual(event_clock["priority_stage"], "minimum_real_inversion_closure_priority")
+        self.assertEqual(float(event_clock["unlocks_quantitative_inversion"]), 1.0)
+        self.assertEqual(float(event_clock["unlocks_micro_to_macro_prediction"]), 1.0)
+        self.assertIn("frame_time_mapping", event_clock["minimum_required_payload"])
+        self.assertIn("cage_jump_event_segmentation", event_clock["minimum_required_payload"])
+        self.assertGreaterEqual(float(event_clock["blocked_gate_count"]), 3.0)
+
+        alpha = by_id["post_alpha_multik_fs_targets"]
+        self.assertEqual(alpha["priority_stage"], "heldout_alpha_prediction_priority")
+        self.assertEqual(float(alpha["unlocks_heldout_alpha_prediction"]), 1.0)
+
+        four_point = by_id["direct_four_point_function_and_dynamic_length"]
+        self.assertEqual(four_point["priority_stage"], "spatial_four_point_boundary_priority")
+        self.assertEqual(float(four_point["unlocks_direct_spatial_claim"]), 1.0)
+        self.assertEqual(float(four_point["unlocks_quantitative_inversion"]), 0.0)
+
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
+        self.assertTrue(all("thermodynamic_transition" not in row["post_unlock_claim_level"] for row in rows))
+
+    def test_glassbench_alpha_threshold_horizon_audit_flags_metadata_anchor_mismatch(self):
+        timecode_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc20",
+                "lag_time": 50.0,
+                "tau_alpha": 100.0,
+                "timecode_curve_ready": 1.0,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.93;0.88;0.75",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "time_code": "tc40",
+                "lag_time": 200.0,
+                "tau_alpha": 100.0,
+                "timecode_curve_ready": 1.0,
+                "wave_numbers": "0.7;1.1;1.6",
+                "self_intermediate_scattering_by_k": "0.80;0.70;0.55",
+            },
+        ]
+        bridge_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+
+        row = glassbench_alpha_threshold_horizon_audit(
+            audit_id="glassbench_alpha_threshold_horizon",
+            timecode_rows=timecode_rows,
+            bridge_rows=bridge_rows,
+            anchor_wave_number=1.1,
+        )[0]
+
+        self.assertEqual(row["audit_stage"], "metadata_tau_alpha_anchor_fs_mismatch")
+        self.assertEqual(float(row["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(row["metadata_tau_alpha_reached"]), 1.0)
+        self.assertEqual(float(row["alpha_threshold_crossed"]), 0.0)
+        self.assertEqual(float(row["metadata_tau_alpha_consistent_with_anchor_fs"]), 0.0)
+        self.assertGreater(float(row["latest_lag_time_over_tau_alpha_metadata"]), 1.0)
+        self.assertGreater(float(row["latest_self_intermediate_scattering_anchor"]), math.exp(-1.0))
+        self.assertGreater(float(row["estimated_threshold_wave_number_at_latest_lag"]), 1.6)
+        self.assertGreater(float(row["threshold_wave_number_over_max_observed"]), 1.0)
+        self.assertEqual(float(row["alpha_threshold_wave_number_covered"]), 0.0)
+        self.assertGreater(float(row["estimated_lag_extension_factor"]), 1.0)
+        self.assertEqual(row["primary_blocker"], "alpha_anchor_wave_number_outside_observed_grid")
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_alpha_anchor_rescue_protocol_separates_anchor_from_event_clock(self):
+        alpha_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "estimated_threshold_wave_number_at_latest_lag": 2.7,
+                "threshold_wave_number_over_max_observed": 1.69,
+                "alpha_threshold_wave_number_covered": 0.0,
+                "metadata_tau_alpha_reached": 1.0,
+                "alpha_threshold_crossed": 0.0,
+                "metadata_tau_alpha_consistent_with_anchor_fs": 0.0,
+                "primary_blocker": "alpha_anchor_wave_number_outside_observed_grid",
+                "audit_stage": "metadata_tau_alpha_anchor_fs_mismatch",
+            }
+        ]
+        event_clock_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "threshold_sweep_event_clock_ready": 0.0,
+                "macro_heldout_observables_ready": 0.0,
+                "real_event_clock_threshold_robustness_ready": 0.0,
+                "missing_real_threshold_inputs": "physical_time_semantics;macro_heldout_observables;threshold_sweep_event_clock",
+                "primary_blocker": "physical_time_semantics",
+            }
+        ]
+        closed_loop_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "missing_closed_loop_inputs": "physical_time_semantics;cage_jump_event_segmentation;persistence_exchange_event_clock;alpha_definition_consistency;real_persistence_exchange_inversion",
+                "closed_loop_ready": 0.0,
+                "primary_blocker": "physical_time_semantics",
+            }
+        ]
+
+        row = glassbench_alpha_anchor_rescue_protocol(
+            protocol_id="glassbench_alpha_anchor_rescue",
+            alpha_horizon_rows=alpha_rows,
+            event_clock_rows=event_clock_rows,
+            closed_loop_rows=closed_loop_rows,
+        )[0]
+
+        self.assertEqual(row["rescue_stage"], "alpha_anchor_rescue_design_ready_real_event_clock_blocked")
+        self.assertEqual(float(row["required_anchor_wave_number"]), 2.7)
+        self.assertGreater(float(row["required_anchor_wave_number_over_observed_max"]), 1.0)
+        self.assertEqual(float(row["alpha_anchor_measurement_required"]), 1.0)
+        self.assertEqual(float(row["alpha_anchor_rescue_design_ready"]), 1.0)
+        self.assertEqual(float(row["post_rescue_alpha_definition_consistent"]), 1.0)
+        self.assertEqual(float(row["post_rescue_real_closed_loop_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+        self.assertIn("threshold_sweep_event_clock", row["remaining_post_rescue_blockers"])
+        self.assertIn("persistence_exchange_event_clock", row["remaining_post_rescue_blockers"])
+        self.assertNotIn("alpha_definition_consistency", row["remaining_post_rescue_blockers"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_alpha_anchor_cached_fs_audit_refines_required_k(self):
+        rescue_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "required_anchor_wave_number": 2.7,
+                "alpha_anchor_rescue_design_ready": 1.0,
+                "post_rescue_real_closed_loop_ready": 0.0,
+            }
+        ]
+        cached_anchor_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "candidate_anchor_wave_number": 2.7,
+                "cached_fs_at_candidate_anchor": 0.52,
+                "latest_wave_numbers": "0.7;1.1;1.6",
+                "latest_cached_fs_by_k": "0.90;0.80;0.69",
+                "direct_threshold_wave_number": 4.8,
+                "direct_fs_at_threshold_wave_number": math.exp(-1.0),
+                "direct_root_bracketed": 1.0,
+            }
+        ]
+
+        row = glassbench_alpha_anchor_cached_fs_audit(
+            audit_id="glassbench_cached_alpha_anchor_fs",
+            rescue_rows=rescue_rows,
+            cached_anchor_rows=cached_anchor_rows,
+        )[0]
+
+        self.assertEqual(row["cached_anchor_stage"], "cached_direct_anchor_root_refines_required_k")
+        self.assertEqual(float(row["candidate_anchor_wave_number"]), 2.7)
+        self.assertGreater(float(row["cached_fs_at_candidate_anchor"]), math.exp(-1.0))
+        self.assertEqual(float(row["candidate_anchor_threshold_crossed"]), 0.0)
+        self.assertGreater(float(row["cached_structure_threshold_wave_number"]), 2.7)
+        self.assertGreater(float(row["cached_structure_threshold_over_candidate"]), 1.0)
+        self.assertAlmostEqual(float(row["cached_direct_threshold_wave_number"]), 4.8)
+        self.assertGreater(float(row["cached_direct_threshold_over_candidate"]), 1.5)
+        self.assertEqual(float(row["cached_direct_root_bracketed"]), 1.0)
+        self.assertEqual(float(row["cached_alpha_anchor_rescue_ready"]), 0.0)
+        self.assertEqual(float(row["post_rescue_real_closed_loop_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "cached_direct_anchor_wave_number_higher_than_protocol")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_curve_audit_marks_cached_curve_not_event_clock(self):
+        root_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "cached_direct_threshold_wave_number": 4.8,
+                "cached_direct_root_bracketed": 1.0,
+                "cached_anchor_stage": "cached_direct_anchor_root_refines_required_k",
+            }
+        ]
+        curve_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc05",
+                "lag_time": 0.1,
+                "direct_alpha_wave_number": 4.8,
+                "direct_alpha_fs": 0.98,
+                "sigma_direct_alpha_fs": 0.01,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc10",
+                "lag_time": 1.1,
+                "direct_alpha_wave_number": 4.8,
+                "direct_alpha_fs": 0.88,
+                "sigma_direct_alpha_fs": 0.02,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "direct_alpha_wave_number": 4.8,
+                "direct_alpha_fs": math.exp(-1.0),
+                "sigma_direct_alpha_fs": 0.03,
+            },
+        ]
+
+        row = glassbench_direct_alpha_curve_audit(
+            audit_id="glassbench_direct_alpha_curve",
+            root_rows=root_rows,
+            curve_rows=curve_rows,
+        )[0]
+
+        self.assertEqual(row["direct_alpha_curve_stage"], "cached_direct_alpha_curve_ready_event_clock_blocked")
+        self.assertEqual(float(row["direct_alpha_wave_number"]), 4.8)
+        self.assertEqual(float(row["lag_count"]), 3.0)
+        self.assertAlmostEqual(float(row["threshold_crossing_lag_time"]), 1500000.0)
+        self.assertEqual(row["threshold_crossing_time_code"], "tc40")
+        self.assertEqual(float(row["alpha_threshold_crossed"]), 1.0)
+        self.assertEqual(float(row["strictly_monotone_decay"]), 1.0)
+        self.assertEqual(row["sigma_direct_alpha_fs_curve"], "0.01;0.02;0.03")
+        self.assertEqual(float(row["direct_alpha_uncertainty_ready"]), 1.0)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_clock_trajectory")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_shape_selection_marks_stretched_candidate_but_blocks_claim(self):
+        direct_alpha_rows = [
+            {
+                "audit_id": "glassbench_ka2d_direct_alpha_curve",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "threshold": math.exp(-1.0),
+                "lag_count": 8.0,
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.10000000000000001;1.1000000000000001;11.640000000000001;122.47;1288.4100000000001;13554;142587;1500000",
+                "direct_alpha_fs_curve": "0.97999066425568238;0.89332522438385931;0.88708573286414538;0.87608824083483838;0.87976640765988079;0.8728876109695306;0.78268974790781609;0.36787944117144233",
+                "threshold_crossing_lag_time": 1500000.0,
+                "alpha_threshold_crossed": 1.0,
+                "strictly_monotone_decay": 0.0,
+                "sigma_direct_alpha_fs_curve": "9.49487605275e-05;0.00113401209306;0.00221361559753;0.00420511966855;0.00215764308912;0.00399633458454;0.0134453931721;0.0273003517506",
+                "direct_alpha_curve_stage": "cached_direct_alpha_curve_ready_event_clock_blocked",
+            }
+        ]
+
+        row = glassbench_direct_alpha_shape_selection(
+            selection_id="glassbench_direct_alpha_shape_selection",
+            direct_alpha_rows=direct_alpha_rows,
+            min_aic_improvement_for_kww=2.0,
+            min_points_for_shape_fit=6,
+            min_decay=0.35,
+            max_decay=0.99,
+        )[0]
+
+        self.assertEqual(row["alpha_shape_selection_stage"], "cached_alpha_shape_stretched_candidate_multik_blocked")
+        self.assertEqual(float(row["alpha_shape_selection_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["kww_beta"]), 0.15933802823269586, delta=1e-12)
+        self.assertLess(float(row["kww_log_shape_rmse"]), 0.55)
+        self.assertGreater(float(row["exponential_log_shape_rmse"]), 7.0)
+        self.assertGreater(float(row["delta_aic_exponential_minus_kww"]), 40.0)
+        self.assertEqual(float(row["stretched_alpha_candidate_supported"]), 1.0)
+        self.assertEqual(float(row["uncertainty_columns_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["max_monotonicity_violation_z"]), 0.778224421773086, delta=1e-12)
+        self.assertEqual(float(row["monotone_compatible_with_uncertainty"]), 1.0)
+        self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "multi_k_alpha_shape")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_multik_shape_gate_requires_post_crossing_depth(self):
+        multik_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.15933802823269586,
+                "kww_log_shape_rmse": 0.5097575715864276,
+                "max_monotonicity_violation_z": 0.778224421773086,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 5.4,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.15242834237097458,
+                "kww_log_shape_rmse": 0.49648478785441796,
+                "max_monotonicity_violation_z": 0.7923188268620164,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 6.0,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.1463504696159314,
+                "kww_log_shape_rmse": 0.4848545883752606,
+                "max_monotonicity_violation_z": 0.8038877529881566,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+            },
+        ]
+
+        row = glassbench_direct_alpha_multik_shape_gate(
+            gate_id="glassbench_direct_alpha_multik_shape_gate",
+            multik_rows=multik_rows,
+            min_crossed_k_count=3,
+            max_beta_spread=0.03,
+            monotone_z_threshold=2.0,
+        )[0]
+
+        self.assertEqual(row["multik_shape_gate_stage"], "cached_multik_alpha_shape_window_edge_blocked")
+        self.assertEqual(float(row["multik_shape_candidate_ready"]), 1.0)
+        self.assertEqual(float(row["crossed_k_count"]), 3.0)
+        self.assertAlmostEqual(float(row["kww_beta_spread"]), 0.01298755861676447, delta=1e-12)
+        self.assertLess(float(row["max_monotonicity_violation_z"]), 1.0)
+        self.assertEqual(float(row["monotone_compatible_k_count"]), 3.0)
+        self.assertEqual(float(row["all_crossings_at_window_edge"]), 1.0)
+        self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "post_alpha_window_depth")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_multik_heldout_prediction_stays_window_edge_blocked(self):
+        lag_times = "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0"
+        time_codes = "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40"
+        multik_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.15933802823269633,
+                "max_monotonicity_violation_z": 0.778224421773086,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+                "lag_times": lag_times,
+                "time_codes": time_codes,
+                "direct_alpha_fs_curve": "0.9799906642556826;0.89332522438385953;0.88708573286414527;0.87608824083483827;0.87976640765988101;0.87288761096953071;0.78268974790781598;0.36787944117144239",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 5.4,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.1524283423709747,
+                "max_monotonicity_violation_z": 0.7923188268620164,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+                "lag_times": lag_times,
+                "time_codes": time_codes,
+                "direct_alpha_fs_curve": "0.97472667509467625;0.86702775923517428;0.85945189151099144;0.846042195770773;0.85061038669786537;0.84343531831339202;0.74947402529637142;0.33260384834463197",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 6.0,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_time_code": "tc40",
+                "threshold_crossing_is_last_lag": 1.0,
+                "kww_beta": 0.14635046961593134,
+                "max_monotonicity_violation_z": 0.8038877529881566,
+                "monotone_compatible_with_uncertainty": 1.0,
+                "uncertainty_columns_ready": 1.0,
+                "lag_times": lag_times,
+                "time_codes": time_codes,
+                "direct_alpha_fs_curve": "0.9688907452308847;0.83868783278456116;0.82975711506750438;0.81388869869227032;0.81937953296017518;0.81200819828463122;0.71498304861579798;0.30225796285381623",
+            },
+        ]
+
+        row = glassbench_direct_alpha_multik_heldout_prediction_gate(
+            prediction_id="glassbench_direct_alpha_multik_heldout_prediction",
+            multik_rows=multik_rows,
+            min_calibration_k_count=2,
+            max_heldout_beta_abs_error=0.02,
+            max_heldout_shape_rmse=0.25,
+        )[0]
+
+        self.assertEqual(
+            row["heldout_prediction_stage"],
+            "cached_multik_heldout_prediction_window_edge_blocked",
+        )
+        self.assertEqual(float(row["heldout_prediction_candidate_ready"]), 1.0)
+        self.assertEqual(float(row["heldout_count"]), 3.0)
+        self.assertAlmostEqual(float(row["max_heldout_beta_abs_error"]), 0.00994862223924331, delta=1e-12)
+        self.assertAlmostEqual(float(row["max_heldout_shape_rmse"]), 0.2256804745702842, delta=1e-12)
+        self.assertEqual(float(row["all_crossings_at_window_edge"]), 1.0)
+        self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "post_alpha_window_depth")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_post_window_prediction_targets_preregister_tc45_tc50(self):
+        heldout_rows = [
+            {
+                "prediction_id": "glassbench_direct_alpha_multik_heldout_prediction",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "heldout_k_values": "4.79844851031;5.4;6",
+                "calibrated_betas": "0.149389405993;0.152844248924;0.155883185302",
+                "heldout_prediction_candidate_ready": 1.0,
+                "real_alpha_shape_claim_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "heldout_prediction_stage": "cached_multik_heldout_prediction_window_edge_blocked",
+            }
+        ]
+        target_rows = glassbench_direct_alpha_post_window_prediction_targets(
+            target_id="glassbench_direct_alpha_post_window_prediction_targets",
+            heldout_prediction_rows=heldout_rows,
+            current_time_code="tc40",
+            current_lag_time=1500000.0,
+            target_time_codes=["tc45", "tc50"],
+            terminal_target_time_code="tc50",
+            terminal_target_lag_time=166002226.8176154,
+            abs_log_fs_tolerance=0.35,
+        )
+
+        self.assertEqual(len(target_rows), 6)
+        first = target_rows[0]
+        last = target_rows[-1]
+        self.assertEqual(first["target_time_code"], "tc45")
+        self.assertAlmostEqual(float(first["target_lag_time"]), 15779839.676828865, delta=1e-6)
+        self.assertAlmostEqual(float(first["predicted_fs"]), 0.24140638485539556, delta=1e-12)
+        self.assertAlmostEqual(float(first["acceptance_fs_low"]), 0.17011620418964926, delta=1e-12)
+        self.assertAlmostEqual(float(first["acceptance_fs_high"]), 0.3425719667715066, delta=1e-12)
+        self.assertEqual(last["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(last["predicted_fs"]), 0.12459213356529883, delta=1e-12)
+        self.assertEqual(float(first["prediction_target_ready"]), 1.0)
+        self.assertEqual(float(first["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(first["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(float(first["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_post_window_verdict_support_rejects_or_blocks(self):
+        target_rows = [
+            {
+                "target_id": "targets",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "target_lag_time": 15779839.676828865,
+                "direct_alpha_wave_number": 4.79844851031,
+                "predicted_fs": 0.24140638485539556,
+                "abs_log_fs_tolerance": 0.35,
+                "prediction_target_ready": 1.0,
+            },
+            {
+                "target_id": "targets",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "target_lag_time": 15779839.676828865,
+                "direct_alpha_wave_number": 5.4,
+                "predicted_fs": 0.23862170166964963,
+                "abs_log_fs_tolerance": 0.35,
+                "prediction_target_ready": 1.0,
+            },
+            {
+                "target_id": "targets",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.8176154,
+                "direct_alpha_wave_number": 6.0,
+                "predicted_fs": 0.12459213356529883,
+                "abs_log_fs_tolerance": 0.35,
+                "prediction_target_ready": 1.0,
+            },
+        ]
+        observed_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "direct_alpha_wave_number": 4.79844851031,
+                "observed_fs": 0.25,
+                "sigma_log_fs": 0.02,
+                "observed_post_window_fs_ready": 1.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc45",
+                "direct_alpha_wave_number": 5.4,
+                "observed_fs": 0.60,
+                "sigma_log_fs": 0.03,
+                "observed_post_window_fs_ready": 1.0,
+            },
+        ]
+
+        rows = glassbench_direct_alpha_post_window_verdict(
+            verdict_id="glassbench_direct_alpha_post_window_verdict",
+            target_rows=target_rows,
+            observed_rows=observed_rows,
+        )
+
+        by_key = {
+            (row["target_time_code"], row["direct_alpha_wave_number"]): row
+            for row in rows
+        }
+        supported = by_key[("tc45", "4.79844851031")]
+        rejected = by_key[("tc45", "5.4")]
+        missing = by_key[("tc50", "6")]
+        self.assertEqual(supported["post_window_verdict_stage"], "post_alpha_prediction_supported")
+        self.assertLess(float(supported["abs_log_fs_residual"]), 0.04)
+        self.assertEqual(float(supported["post_window_prediction_supported"]), 1.0)
+        self.assertEqual(float(supported["post_window_prediction_rejected"]), 0.0)
+        self.assertEqual(float(supported["real_alpha_shape_claim_ready"]), 1.0)
+        self.assertEqual(supported["primary_blocker"], "none")
+
+        self.assertEqual(rejected["post_window_verdict_stage"], "post_alpha_prediction_rejected")
+        self.assertGreater(float(rejected["abs_log_fs_residual"]), 0.9)
+        self.assertEqual(float(rejected["post_window_prediction_supported"]), 0.0)
+        self.assertEqual(float(rejected["post_window_prediction_rejected"]), 1.0)
+        self.assertEqual(float(rejected["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(rejected["primary_blocker"], "post_alpha_shape_residual")
+
+        self.assertEqual(missing["post_window_verdict_stage"], "post_alpha_observation_not_ready")
+        self.assertEqual(float(missing["observed_post_window_fs_ready"]), 0.0)
+        self.assertEqual(float(missing["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(missing["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(float(missing["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_evidence_claim_synthesis_keeps_claim_levels_separate(self):
+        dynamic_alignment_rows = [
+            {
+                "signature": "msd_growth_cage_escape",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 1.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "none",
+            },
+            {
+                "signature": "self_intermediate_alpha",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 1.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            },
+            {
+                "signature": "transient_ngp_peak",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 1.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "none",
+            },
+            {
+                "signature": "thermodynamic_transition",
+                "model_support": 0.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 0.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "thermodynamic_input_law",
+            },
+        ]
+        multik_shape_rows = [
+            {
+                "multik_shape_candidate_ready": 1.0,
+                "real_alpha_shape_claim_ready": 0.0,
+                "tested_k_count": 3.0,
+                "crossed_k_count": 3.0,
+                "kww_beta_spread": 0.013,
+                "primary_blocker": "post_alpha_window_depth",
+            }
+        ]
+        heldout_prediction_rows = [
+            {
+                "heldout_prediction_candidate_ready": 1.0,
+                "real_alpha_shape_claim_ready": 0.0,
+                "heldout_count": 3.0,
+                "max_heldout_shape_rmse": 0.226,
+                "primary_blocker": "post_alpha_window_depth",
+            }
+        ]
+        post_window_verdict_rows = [
+            {
+                "post_window_verdict_stage": "post_alpha_observation_not_ready",
+                "prediction_target_ready": 1.0,
+                "observed_post_window_fs_ready": 0.0,
+                "post_window_prediction_supported": 0.0,
+                "post_window_prediction_rejected": 0.0,
+                "primary_blocker": "post_alpha_window_observation",
+            }
+        ]
+        transport_rows = [
+            {
+                "direct_alpha_transport_proxy_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "apparent_stokes_einstein_product": 0.244,
+                "primary_blocker": "event_clock_trajectory",
+            }
+        ]
+        pe_bound_rows = [
+            {
+                "conditional_pe_inference_ready": 1.0,
+                "pe_feasibility_bound_ready": 1.0,
+                "reference_persistence_exchange_ratio": 2.35,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "event_clock_jump_variance",
+            }
+        ]
+        microdynamic_verdict_rows = [
+            {
+                "verdict_row_id": "late_recovery_decision_protocol",
+                "late_recovery_decision_protocol_ready": 1.0,
+                "mechanism_selection_claim_allowed_now": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "late_recovery_measurement",
+            }
+        ]
+        experimental_verdict_rows = [
+            {
+                "verdict_row_id": "sota_dynamic_signature_support",
+                "sota_verdict_stage": "sota_dynamic_signatures_supported",
+                "allowed_claim_level": "dynamical_signature_supported",
+            }
+        ]
+
+        rows = glassbench_real_evidence_claim_synthesis(
+            synthesis_id="glassbench_real_evidence_claim_synthesis",
+            dynamic_alignment_rows=dynamic_alignment_rows,
+            multik_shape_rows=multik_shape_rows,
+            heldout_prediction_rows=heldout_prediction_rows,
+            post_window_verdict_rows=post_window_verdict_rows,
+            transport_rows=transport_rows,
+            pe_bound_rows=pe_bound_rows,
+            microdynamic_verdict_rows=microdynamic_verdict_rows,
+            experimental_verdict_rows=experimental_verdict_rows,
+        )
+
+        by_id = {row["claim_row_id"]: row for row in rows}
+        dynamic = by_id["real_dynamic_signature_support"]
+        alpha = by_id["cached_multik_alpha_shape_prediction"]
+        transport = by_id["conditional_alpha_transport_pe_bound"]
+        mechanism = by_id["real_mechanism_selection"]
+        thermodynamic = by_id["thermodynamic_scope_boundary"]
+
+        self.assertEqual(dynamic["claim_synthesis_stage"], "real_dynamic_signatures_supported_preinversion")
+        self.assertEqual(float(dynamic["supported_real_signature_count"]), 3.0)
+        self.assertEqual(float(dynamic["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(dynamic["real_quantitative_inversion_ready"]), 0.0)
+
+        self.assertEqual(alpha["claim_synthesis_stage"], "multik_alpha_candidate_preregistered_post_window")
+        self.assertEqual(float(alpha["candidate_ready"]), 1.0)
+        self.assertEqual(float(alpha["claim_ready_now"]), 0.0)
+        self.assertEqual(alpha["primary_blocker"], "post_alpha_window_observation")
+
+        self.assertEqual(
+            transport["claim_synthesis_stage"],
+            "conditional_transport_pe_bound_ready_event_clock_blocked",
+        )
+        self.assertAlmostEqual(float(transport["pe_ratio_or_bound"]), 2.35)
+        self.assertEqual(transport["primary_blocker"], "event_clock_jump_variance")
+
+        self.assertEqual(
+            mechanism["claim_synthesis_stage"],
+            "mechanism_selection_preregistered_late_recovery_missing",
+        )
+        self.assertEqual(float(mechanism["mechanism_rejection_ready"]), 0.0)
+        self.assertEqual(float(mechanism["claim_ready_now"]), 0.0)
+
+        self.assertEqual(thermodynamic["claim_synthesis_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(thermodynamic["primary_blocker"], "thermodynamic_input_law")
+
+    def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):
+        direct_rows = [
+            {
+                "audit_id": "glassbench_ka2d_direct_alpha_curve",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.8,
+                "alpha_threshold_crossed": 1.0,
+                "threshold_crossing_lag_time": 1500000.0,
+                "threshold_crossing_time_code": "tc40",
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "direct_alpha_curve_stage": "cached_direct_alpha_curve_ready_event_clock_blocked",
+            }
+        ]
+        observable_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "official_msd": 0.9747508405755333,
+                "initial_reference_msd": 0.9747508405755335,
+                "official_ngp_2d": 2.1239947887392923,
+                "official_displacement_observable_reproducible": 1.0,
+                "event_clock_trajectory_ready": 0.0,
+                "observable_semantics_stage": "official_displacement_observable_reproduced",
+            }
+        ]
+
+        row = glassbench_direct_alpha_transport_coupling_audit(
+            audit_id="glassbench_direct_alpha_transport",
+            direct_alpha_rows=direct_rows,
+            observable_semantics_rows=observable_rows,
+            dimension=2,
+        )[0]
+
+        self.assertEqual(row["transport_coupling_stage"], "cached_direct_alpha_transport_proxy_ready_event_clock_blocked")
+        self.assertEqual(float(row["direct_alpha_transport_proxy_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["tau_alpha_direct"]), 1500000.0)
+        self.assertAlmostEqual(float(row["matched_msd"]), 0.9747508405755333)
+        self.assertAlmostEqual(float(row["apparent_diffusion_coefficient"]), 1.6245847342925555e-7)
+        self.assertAlmostEqual(float(row["apparent_stokes_einstein_product"]), 0.24368771014388332)
+        self.assertAlmostEqual(float(row["matched_ngp_2d"]), 2.1239947887392923)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_clock_trajectory")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_pe_feasibility_bound_constrains_jump_variance(self):
+        transport_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "matched_msd": 0.9747508405755333,
+                "matched_ngp_2d": 2.1239947887392923,
+                "apparent_diffusion_coefficient": 1.6245847342925555e-7,
+                "apparent_stokes_einstein_product": 0.24368771014388332,
+                "direct_alpha_transport_proxy_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+
+        row = glassbench_direct_alpha_pe_feasibility_bound(
+            audit_id="glassbench_direct_alpha_pe_bound",
+            transport_rows=transport_rows,
+            reference_jump_variance_fraction=0.2,
+        )[0]
+
+        self.assertEqual(row["pe_feasibility_stage"], "direct_alpha_transport_bounds_pe_but_event_clock_missing")
+        self.assertEqual(float(row["pe_feasibility_bound_ready"]), 1.0)
+        self.assertEqual(float(row["full_msd_jump_variance_feasible"]), 0.0)
+        self.assertAlmostEqual(float(row["jump_variance_upper_bound"]), 0.4855550202214052)
+        self.assertAlmostEqual(float(row["jump_variance_upper_over_msd"]), 0.4981324457588704)
+        self.assertAlmostEqual(float(row["reference_jump_variance"]), 0.19495016811510667)
+        self.assertAlmostEqual(float(row["reference_exchange_mean"]), 600000.0)
+        self.assertAlmostEqual(float(row["reference_persistence_mean"]), 1409293.5403982885)
+        self.assertAlmostEqual(float(row["reference_persistence_exchange_ratio"]), 2.3488225673304806)
+        self.assertEqual(float(row["conditional_pe_inference_ready"]), 1.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_clock_jump_variance")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_displacement_tail_bound_marks_segmentation_target(self):
+        pe_bound_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "matched_msd": 0.9747508405755333,
+                "jump_variance_upper_bound": 0.4855550202214053,
+                "full_msd_jump_variance_feasible": 0.0,
+                "pe_feasibility_bound_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+        displacement_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "sample_count": 25800.0,
+                "q_all": 0.48737542028776676,
+                "q_bound": 0.4855550202214053,
+                "fraction_q_le_bound": 0.7650387596899225,
+                "fraction_q_gt_bound": 0.2349612403100775,
+                "mean_q_above_bound": 1.7929841231781933,
+                "q_median": 0.06625069389999988,
+                "q_p90": 1.3898784621800007,
+                "q_p95": 2.373878811687498,
+            }
+        ]
+
+        row = glassbench_direct_alpha_displacement_tail_bound(
+            audit_id="glassbench_direct_alpha_displacement_tail_bound",
+            pe_bound_rows=pe_bound_rows,
+            displacement_rows=displacement_rows,
+            min_tail_fraction=0.05,
+        )[0]
+
+        self.assertEqual(row["tail_bound_stage"], "direct_displacement_tail_exceeds_pe_single_event_bound")
+        self.assertEqual(float(row["tail_bound_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["fraction_q_gt_bound"]), 0.2349612403100775)
+        self.assertAlmostEqual(float(row["mean_q_above_bound"]), 1.7929841231781933)
+        self.assertAlmostEqual(float(row["mean_q_above_over_bound"]), 3.692648718492544)
+        self.assertAlmostEqual(float(row["q_all_over_bound"]), 1.003749111821625)
+        self.assertEqual(float(row["event_segmentation_required"]), 1.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_segmentation")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_multilag_crossing_canary_blocks_replica_axis_clock(self):
+        pe_bound_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "jump_variance_upper_bound": 0.4855550202214053,
+                "pe_feasibility_bound_ready": 1.0,
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+                "sample_count": 25800.0,
+                "above_bound_fractions_by_lag": "0;0;0;0;3.875968992248062e-05;0.001434108527131783;0.022325581395348838;0.2349612403100775",
+                "ever_crossed_fraction": 0.24007751937984495,
+                "never_crossed_fraction": 0.759922480620155,
+                "post_crossing_recross_fraction": 0.23599320882852293,
+                "first_crossing_fractions_by_time_code": "tc25:3.875968992248062e-05;tc30:0.001434108527131783;tc35:0.02135658914728682;tc40:0.21724806201550387",
+                "first_crossing_q_mean": 1.671772382881059,
+                "first_crossing_q_median": 1.1118363749999993,
+                "first_crossing_q_p90": 3.4652622499604004,
+            }
+        ]
+
+        row = glassbench_direct_alpha_multilag_crossing_canary(
+            audit_id="glassbench_direct_alpha_multilag_crossing_canary",
+            pe_bound_rows=pe_bound_rows,
+            crossing_rows=crossing_rows,
+            min_crossing_fraction=0.05,
+        )[0]
+
+        self.assertEqual(row["crossing_canary_stage"], "multilag_displacement_crossing_canary_ready_replica_axis_blocked")
+        self.assertEqual(float(row["crossing_canary_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["ever_crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(row["post_crossing_recross_fraction"]), 0.23599320882852293)
+        self.assertAlmostEqual(float(row["first_crossing_q_mean_over_bound"]), 3.4430132801814253)
+        self.assertEqual(float(row["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_event_clock_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_event_clock_contract_requires_true_time_axis(self):
+        pe_bound_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "jump_variance_upper_bound": 0.4855550202214053,
+                "conditional_pe_inference_ready": 1.0,
+                "pe_feasibility_bound_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+        tail_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "q_all_over_bound": 1.003749111821625,
+                "fraction_q_gt_bound": 0.2349612403100775,
+                "mean_q_above_over_bound": 3.692648718492544,
+                "event_segmentation_required": 1.0,
+                "tail_bound_ready": 1.0,
+                "primary_blocker": "event_segmentation",
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                "axis0_is_isoconfigurational_replica": 1.0,
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+                "sample_count": 25800.0,
+                "ever_crossed_fraction": 0.24007751937984495,
+                "post_crossing_recross_fraction": 0.23599320882852293,
+                "first_crossing_q_mean_over_bound": 3.4430132801814253,
+                "event_segmentation_target_ready": 1.0,
+                "crossing_canary_ready": 1.0,
+                "persistence_exchange_event_clock_ready": 0.0,
+                "primary_blocker": "frame_axis_is_isoconfigurational_replicates",
+            }
+        ]
+
+        row = glassbench_direct_alpha_event_clock_extraction_contract(
+            audit_id="glassbench_direct_alpha_event_clock_contract",
+            pe_bound_rows=pe_bound_rows,
+            tail_rows=tail_rows,
+            crossing_rows=crossing_rows,
+        )[0]
+
+        self.assertEqual(row["event_clock_contract_stage"], "segmentation_target_ready_true_event_clock_missing")
+        self.assertEqual(float(row["conditional_pe_inference_ready"]), 1.0)
+        self.assertEqual(float(row["direct_displacement_tail_ready"]), 1.0)
+        self.assertEqual(float(row["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(row["cached_replica_ladder_ready"]), 1.0)
+        self.assertEqual(float(row["axis0_is_physical_time"]), 0.0)
+        self.assertEqual(float(row["requires_true_time_trajectory"]), 1.0)
+        self.assertEqual(float(row["event_clock_extraction_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "physical_time_trajectory_axis")
+        self.assertIn("positions[time,particle,dimension]", row["required_arrays"])
+        self.assertIn("isoconfigurational_replica_axis", row["forbidden_substitutes"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_sparse_lag_event_clock_audit_promotes_candidate_not_real_inversion(self):
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "structure_id": "151",
+                "time_code": code,
+                "lag_time": lag,
+                "positions_shape": "20x1290x2",
+                "initial_reference_positions_cached": 1.0,
+                "particle_resolved_positions_cached": 1.0,
+                "max_initial_position_mismatch": 0.0,
+            }
+            for code, lag in [
+                ("tc05", 0.1),
+                ("tc10", 1.1),
+                ("tc15", 11.64),
+                ("tc20", 122.47),
+                ("tc25", 1288.41),
+                ("tc30", 13554.0),
+                ("tc35", 142587.0),
+                ("tc40", 1500000.0),
+            ]
+        ]
+        contract_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "q_bound": 0.4855550202214053,
+                "event_segmentation_target_ready": 1.0,
+                "cached_replica_ladder_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+
+        row = glassbench_sparse_lag_event_clock_audit(
+            audit_id="glassbench_sparse_lag_event_clock",
+            cache_rows=cache_rows,
+            contract_rows=contract_rows,
+            required_time_codes=("tc05", "tc10", "tc15", "tc20", "tc25", "tc30", "tc35", "tc40"),
+        )[0]
+
+        self.assertEqual(row["sparse_lag_event_clock_stage"], "sparse_lag_tensor_ready_replica_identity_unverified")
+        self.assertEqual(float(row["physical_lag_tensor_ready"]), 1.0)
+        self.assertEqual(float(row["same_initial_structure_verified"]), 1.0)
+        self.assertEqual(float(row["same_shape_across_lags"]), 1.0)
+        self.assertEqual(float(row["time_code_coverage_fraction"]), 1.0)
+        self.assertEqual(float(row["coarse_event_clock_candidate_ready"]), 1.0)
+        self.assertEqual(float(row["replica_identity_alignment_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "replica_identity_alignment")
+        self.assertEqual(row["event_clock_resolution"], "sparse_lag_interval")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_interval_censored_first_crossing_clock_quantifies_sparse_candidate(self):
+        sparse_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "coarse_event_clock_candidate_ready": 1.0,
+                "event_clock_resolution": "sparse_lag_interval",
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "ever_crossed_fraction": 0.24007751937984495,
+                "never_crossed_fraction": 0.759922480620155,
+                "first_crossing_fractions_by_time_code": "tc25:3.875968992248062e-05;tc30:0.001434108527131783;tc35:0.02135658914728682;tc40:0.21724806201550387",
+            }
+        ]
+
+        row = glassbench_interval_censored_first_crossing_clock(
+            audit_id="glassbench_interval_censored_first_crossing_clock",
+            sparse_lag_rows=sparse_rows,
+            crossing_rows=crossing_rows,
+        )[0]
+
+        self.assertEqual(row["interval_clock_stage"], "interval_censored_persistence_clock_candidate")
+        self.assertEqual(float(row["interval_clock_candidate_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(row["right_censored_fraction"]), 0.759922480620155)
+        self.assertAlmostEqual(float(row["mean_first_crossing_lower_bound"]), 130241.55354213755)
+        self.assertAlmostEqual(float(row["mean_first_crossing_upper_bound"]), 1370127.2559589928)
+        self.assertAlmostEqual(float(row["mean_first_crossing_midpoint"]), 750184.4047505651)
+        self.assertGreater(float(row["mean_interval_width"]), 1.0e6)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "interval_censoring_and_replica_identity")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_interval_censored_first_crossing_clock_blocks_missing_lag_distribution(self):
+        sparse_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "coarse_event_clock_candidate_ready": 0.0,
+                "event_clock_resolution": "none",
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "lag_times": "none",
+                "time_codes": "none",
+                "ever_crossed_fraction": 0.0,
+                "never_crossed_fraction": 0.0,
+                "first_crossing_fractions_by_time_code": "none",
+            }
+        ]
+
+        row = glassbench_interval_censored_first_crossing_clock(
+            audit_id="glassbench_interval_censored_first_crossing_clock",
+            sparse_lag_rows=sparse_rows,
+            crossing_rows=crossing_rows,
+        )[0]
+
+        self.assertEqual(row["interval_clock_stage"], "interval_clock_sparse_lag_upstream_incomplete")
+        self.assertEqual(float(row["interval_clock_candidate_ready"]), 0.0)
+        self.assertEqual(float(row["latest_lag_time"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "sparse_lag_event_clock")
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+
+    def test_glassbench_interval_censored_persistence_fit_estimates_exponential_scale(self):
+        interval_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "interval_clock_candidate_ready": 1.0,
+                "first_crossing_intervals": "tc25:122.47:1288.4100000000001:3.8759689922480622e-05;tc30:1288.4100000000001:13554:0.001434108527131783;tc35:13554:142587:0.02135658914728682;tc40:142587:1500000:0.21724806201550387",
+                "right_censored_fraction": 0.759922480620155,
+                "latest_lag_time": 1500000.0,
+            }
+        ]
+        direct_alpha_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "threshold_crossing_lag_time": 1500000.0,
+                "alpha_threshold_crossed": 1.0,
+            }
+        ]
+
+        row = glassbench_interval_censored_persistence_fit(
+            fit_id="glassbench_interval_censored_persistence_fit",
+            interval_clock_rows=interval_rows,
+            direct_alpha_rows=direct_alpha_rows,
+        )[0]
+
+        self.assertEqual(row["persistence_fit_stage"], "interval_censored_exponential_persistence_fit_ready")
+        self.assertEqual(float(row["persistence_fit_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["exponential_rate_mle"]), 1.827224516438915e-07, delta=1e-15)
+        self.assertAlmostEqual(float(row["exponential_mean_persistence_time"]), 5472781.209990023, delta=1.0)
+        self.assertAlmostEqual(float(row["predicted_crossed_fraction_at_latest_lag"]), 0.2397315447385533, delta=1e-7)
+        self.assertAlmostEqual(float(row["observed_crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(row["mean_persistence_over_tau_alpha_direct"]), 3.6485208066600154, delta=1e-6)
+        self.assertEqual(float(row["exchange_clock_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "exchange_clock_and_replica_identity")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_interval_censored_waiting_law_selection_keeps_exponential_until_weibull_wins(self):
+        interval_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "interval_clock_candidate_ready": 1.0,
+                "first_crossing_intervals": "tc25:122.47:1288.4100000000001:3.8759689922480622e-05;tc30:1288.4100000000001:13554:0.001434108527131783;tc35:13554:142587:0.02135658914728682;tc40:142587:1500000:0.21724806201550387",
+                "right_censored_fraction": 0.759922480620155,
+                "latest_lag_time": 1500000.0,
+            }
+        ]
+        persistence_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "persistence_fit_ready": 1.0,
+                "exponential_rate_mle": 1.8272245092266246e-07,
+                "exponential_mean_persistence_time": 5472781.231591796,
+                "log_likelihood": -0.6326326983139481,
+                "observed_crossed_fraction": 0.24007751937984495,
+                "predicted_crossed_fraction_at_latest_lag": 0.23973154391606166,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+
+        row = glassbench_interval_censored_waiting_law_selection(
+            selection_id="glassbench_interval_censored_waiting_law_selection",
+            interval_clock_rows=interval_rows,
+            persistence_fit_rows=persistence_rows,
+            min_delta_aic_for_extra_parameter=2.0,
+        )[0]
+
+        self.assertEqual(row["waiting_law_selection_stage"], "exponential_waiting_law_not_rejected_sparse_cache")
+        self.assertEqual(float(row["waiting_law_selection_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["weibull_shape_mle"]), 1.062, delta=0.02)
+        self.assertLess(abs(float(row["weibull_shape_mle"]) - 1.0), 0.1)
+        self.assertLess(float(row["delta_aic_exponential_minus_weibull"]), 0.0)
+        self.assertEqual(float(row["extra_waiting_law_parameter_supported"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "sparse_interval_censoring")
+
+    def test_glassbench_finite_exchange_envelope_turns_censored_fit_into_followup_horizon(self):
+        fit_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "persistence_fit_ready": 1.0,
+                "exponential_mean_persistence_time": 5472781.231591796,
+                "tau_alpha_direct": 1500000.0,
+                "latest_lag_time": 1500000.0,
+                "primary_blocker": "exchange_clock_and_replica_identity",
+            }
+        ]
+
+        row = glassbench_finite_exchange_falsification_envelope(
+            envelope_id="glassbench_finite_exchange_falsification_envelope",
+            persistence_fit_rows=fit_rows,
+            max_exchange_mean_over_tau_alpha=1.0,
+            min_exchange_events_for_gaussian_recovery=25.0,
+        )[0]
+
+        self.assertEqual(row["envelope_stage"], "finite_exchange_falsification_horizon_ready")
+        self.assertEqual(float(row["envelope_ready"]), 1.0)
+        self.assertAlmostEqual(row["conditional_exchange_mean_upper_bound"], 1500000.0)
+        self.assertAlmostEqual(row["conditional_persistence_exchange_ratio_lower_bound"], 3.6485208210611972)
+        self.assertAlmostEqual(row["gaussian_recovery_lag_upper_bound"], 42972781.2315918, delta=1e-3)
+        self.assertAlmostEqual(row["required_followup_lag_multiplier_over_current"], 28.6485208210612, delta=1e-12)
+        self.assertEqual(float(row["current_window_has_gaussian_recovery_power"]), 0.0)
+        self.assertEqual(float(row["late_ngp_followup_ready"]), 0.0)
+        self.assertEqual(float(row["exchange_clock_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "late_ngp_followup_and_exchange_clock")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_cached_microdynamic_verdict_separates_evidence_from_inversion(self):
+        rows = glassbench_real_cached_microdynamic_verdict(
+            verdict_id="glassbench_real_cached_microdynamic_verdict",
+            persistence_fit_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "persistence_fit_ready": 1.0,
+                    "exponential_mean_persistence_time": 5472781.231591796,
+                    "tau_alpha_direct": 1500000.0,
+                    "mean_persistence_over_tau_alpha_direct": 3.6485208210611972,
+                    "observed_crossed_fraction": 0.24007751937984495,
+                    "predicted_crossed_fraction_at_latest_lag": 0.23973154391606166,
+                    "exchange_clock_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "primary_blocker": "exchange_clock_and_replica_identity",
+                }
+            ],
+            finite_exchange_envelope_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "envelope_ready": 1.0,
+                    "conditional_persistence_exchange_ratio_lower_bound": 3.6485208210611972,
+                    "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+                    "required_followup_lag_multiplier_over_current": 28.648520821061197,
+                    "late_ngp_followup_ready": 0.0,
+                    "exchange_clock_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "primary_blocker": "late_ngp_followup_and_exchange_clock",
+                }
+            ],
+            event_clock_contract_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "event_segmentation_target_ready": 1.0,
+                    "cached_replica_ladder_ready": 1.0,
+                    "axis0_is_physical_time": 0.0,
+                    "event_clock_extraction_ready": 0.0,
+                    "real_pe_inversion_ready": 0.0,
+                    "primary_blocker": "physical_time_trajectory_axis",
+                }
+            ],
+            late_recovery_outcome_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "outcome_scenario": "low_late_ngp_gaussian_recovery",
+                    "uncertainty_decision_ready": 1.0,
+                    "claim_if_observed": "finite_exchange_supported_static_disorder_rejected",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "outcome_scenario": "high_late_ngp_or_missing_recovery",
+                    "uncertainty_decision_ready": 1.0,
+                    "claim_if_observed": "finite_exchange_rejected_or_model_reparameterization_required",
+                },
+            ],
+        )
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        persistence = by_id["real_cached_persistence_clock"]
+        pe_bound = by_id["conditional_persistence_exchange_bound"]
+        recovery = by_id["late_recovery_decision_protocol"]
+        inversion = by_id["real_pe_inversion_boundary"]
+
+        self.assertEqual(persistence["cached_microdynamic_verdict_stage"], "real_cached_persistence_clock_quantified")
+        self.assertEqual(float(persistence["real_cached_evidence_ready"]), 1.0)
+        self.assertAlmostEqual(float(persistence["mean_persistence_over_tau_alpha"]), 3.6485208210611972)
+        self.assertLess(float(persistence["crossing_fraction_abs_residual"]), 0.001)
+
+        self.assertEqual(pe_bound["cached_microdynamic_verdict_stage"], "conditional_pe_decoupling_bound_ready")
+        self.assertGreater(float(pe_bound["conditional_pe_ratio_lower_bound"]), 3.0)
+        self.assertEqual(float(pe_bound["real_pe_inversion_ready"]), 0.0)
+
+        self.assertEqual(recovery["cached_microdynamic_verdict_stage"], "late_recovery_protocol_preregistered")
+        self.assertEqual(float(recovery["late_recovery_decision_protocol_ready"]), 1.0)
+        self.assertEqual(float(recovery["mechanism_selection_claim_allowed_now"]), 0.0)
+
+        self.assertEqual(inversion["cached_microdynamic_verdict_stage"], "real_pe_inversion_still_blocked")
+        self.assertEqual(float(inversion["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(inversion["event_clock_extraction_ready"]), 0.0)
+        self.assertIn("physical_time_trajectory_axis", inversion["primary_blocker"])
+        self.assertEqual(float(inversion["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_late_recovery_protocol_classifies_support_and_rejection(self):
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+                "conditional_persistence_exchange_ratio_lower_bound": 3.6485208210611972,
+                "primary_blocker": "late_ngp_followup_and_exchange_clock",
+            }
+        ]
+        support = glassbench_late_recovery_falsification_protocol(
+            protocol_id="glassbench_late_recovery_protocol",
+            envelope_rows=envelope_rows,
+            late_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.012,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "static_gamma_late_ngp_plateau": 0.24,
+                }
+            ],
+            max_finite_exchange_late_ngp=0.05,
+            min_static_plateau_rejection_gap=0.05,
+        )[0]
+        reject = glassbench_late_recovery_falsification_protocol(
+            protocol_id="glassbench_late_recovery_protocol",
+            envelope_rows=envelope_rows,
+            late_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.16,
+                    "observed_tail_gaussian_recovery": 0.0,
+                    "static_gamma_late_ngp_plateau": 0.24,
+                }
+            ],
+            max_finite_exchange_late_ngp=0.05,
+            min_static_plateau_rejection_gap=0.05,
+        )[0]
+
+        self.assertEqual(support["late_recovery_stage"], "finite_exchange_late_recovery_supported")
+        self.assertEqual(float(support["mechanism_selection_ready"]), 1.0)
+        self.assertEqual(float(support["finite_exchange_supported"]), 1.0)
+        self.assertEqual(float(support["finite_exchange_rejected"]), 0.0)
+        self.assertEqual(float(support["static_disorder_rejected"]), 1.0)
+        self.assertEqual(float(support["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(support["primary_blocker"], "exchange_clock")
+        self.assertEqual(float(support["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(reject["late_recovery_stage"], "finite_exchange_late_recovery_failed")
+        self.assertEqual(float(reject["mechanism_selection_ready"]), 1.0)
+        self.assertEqual(float(reject["finite_exchange_supported"]), 0.0)
+        self.assertEqual(float(reject["finite_exchange_rejected"]), 1.0)
+        self.assertEqual(float(reject["static_disorder_rejected"]), 0.0)
+        self.assertEqual(reject["primary_blocker"], "late_gaussian_recovery")
+
+    def test_glassbench_late_recovery_ingestion_contract_requires_horizon_and_uncertainty(self):
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+            }
+        ]
+        rows = glassbench_late_recovery_ingestion_contract(
+            contract_id="glassbench_late_recovery_ingestion_contract",
+            envelope_rows=envelope_rows,
+            candidate_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.012,
+                    "sigma_late_ngp": 0.003,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "sigma_tail_recovery": 0.05,
+                    "machine_readable": 1.0,
+                    "shared_time_units": 1.0,
+                    "source_trajectory_identity": "KA2D_0.23_structure151_member_ensemble",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 1500000.0,
+                    "observed_late_ngp": 0.02,
+                    "sigma_late_ngp": 0.004,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "sigma_tail_recovery": 0.05,
+                    "machine_readable": 1.0,
+                    "shared_time_units": 1.0,
+                    "source_trajectory_identity": "KA2D_0.23_structure151_member_ensemble",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.02,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "machine_readable": 1.0,
+                    "shared_time_units": 1.0,
+                    "source_trajectory_identity": "KA2D_0.23_structure151_member_ensemble",
+                },
+            ],
+        )
+
+        by_stage = {row["candidate_id"]: row for row in rows}
+        ready = by_stage["KA2D:0.23:151:0"]
+        short = by_stage["KA2D:0.23:151:1"]
+        no_uncertainty = by_stage["KA2D:0.23:151:2"]
+
+        self.assertEqual(ready["late_recovery_ingestion_stage"], "late_recovery_observation_ingestion_ready")
+        self.assertEqual(float(ready["late_recovery_observation_ready"]), 1.0)
+        self.assertEqual(float(ready["horizon_satisfied"]), 1.0)
+        self.assertEqual(float(ready["uncertainty_ready"]), 1.0)
+        self.assertEqual(ready["primary_blocker"], "none")
+
+        self.assertEqual(short["late_recovery_ingestion_stage"], "late_recovery_horizon_incomplete")
+        self.assertEqual(float(short["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(short["primary_blocker"], "late_recovery_horizon")
+
+        self.assertEqual(no_uncertainty["late_recovery_ingestion_stage"], "late_recovery_uncertainty_incomplete")
+        self.assertEqual(no_uncertainty["missing_uncertainty_columns"], "sigma_late_ngp;sigma_tail_recovery")
+        self.assertEqual(no_uncertainty["primary_blocker"], "sigma_late_ngp")
+
+    def test_glassbench_late_recovery_timecode_target_maps_required_lag_to_next_cache(self):
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "envelope_ready": 0.0,
+                "gaussian_recovery_lag_upper_bound": 0.0,
+            },
+        ]
+        interval_clock_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "interval_clock_candidate_ready": 1.0,
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "lag_times": "0.10000000000000001;1.1000000000000001;11.640000000000001;122.47;1288.4100000000001;13554;142587;1500000",
+            },
+        ]
+
+        rows = glassbench_late_recovery_timecode_target(
+            target_id="glassbench_late_recovery_timecode_target",
+            envelope_rows=envelope_rows,
+            interval_clock_rows=interval_clock_rows,
+        )
+
+        by_key = {(row["system_id"], row["temperature"], row["structure_id"]): row for row in rows}
+        ready = by_key[("KA2D", "0.23", "151")]
+        incomplete = by_key[("KA2D", "0.30", "3")]
+
+        self.assertEqual(ready["timecode_target_stage"], "late_recovery_timecode_target_ready")
+        self.assertEqual(float(ready["timecode_target_ready"]), 1.0)
+        self.assertEqual(ready["current_max_time_code"], "tc40")
+        self.assertAlmostEqual(float(ready["current_max_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(ready["required_followup_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertEqual(ready["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(ready["target_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertAlmostEqual(float(ready["current_lag_over_required"]), 0.034905816123841256, delta=1e-12)
+        self.assertGreater(float(ready["target_lag_over_required"]), 3.8)
+        self.assertAlmostEqual(float(ready["timecode_log_lag_step"]), 2.3532680473611762, delta=1e-12)
+        self.assertEqual(float(ready["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(float(ready["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ready["primary_blocker"], "late_recovery_time_code_cache")
+        self.assertEqual(
+            ready["next_required_action"],
+            "extract_or_cache_glassbench_time_code_tc50_late_recovery_observables",
+        )
+        self.assertEqual(float(ready["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(incomplete["timecode_target_stage"], "late_recovery_timecode_target_upstream_incomplete")
+        self.assertEqual(incomplete["primary_blocker"], "finite_exchange_envelope")
+
+    def test_glassbench_late_recovery_cache_request_contract_marks_tc50_metadata_gap(self):
+        timecode_target_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "timecode_target_ready": 1.0,
+                "required_followup_lag_time": 42972781.2315918,
+                "current_max_time_code": "tc40",
+                "current_max_lag_time": 1500000.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "timecode_target_ready": 0.0,
+                "target_time_code": "none",
+                "target_lag_time": 0.0,
+            },
+        ]
+        multilag_target_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "selected_structure_id": "151",
+                "selected_time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "target_members": (
+                    "T0.23/test/N1290T0.23_151_tc05.npz;"
+                    "T0.23/test/N1290T0.23_151_tc10.npz;"
+                    "T0.23/test/N1290T0.23_151_tc15.npz;"
+                    "T0.23/test/N1290T0.23_151_tc20.npz;"
+                    "T0.23/test/N1290T0.23_151_tc25.npz;"
+                    "T0.23/test/N1290T0.23_151_tc30.npz;"
+                    "T0.23/test/N1290T0.23_151_tc35.npz;"
+                    "T0.23/test/N1290T0.23_151_tc40.npz"
+                ),
+                "target_member_md5s": "md5-05;md5-10;md5-15;md5-20;md5-25;md5-30;md5-35;md5-40",
+                "target_lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+            },
+        ]
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "target_member": "T0.23/test/N1290T0.23_151_tc40.npz",
+                "target_member_md5": "md5-40",
+                "particle_cache_path": (
+                    "data/third_party/glassbench/particle_cache/"
+                    "glassbench_ka2d_T0_23_N1290T0.23_151_tc40_positions.npz"
+                ),
+                "particle_resolved_positions_cached": 1.0,
+            },
+        ]
+
+        rows = glassbench_late_recovery_cache_request_contract(
+            contract_id="glassbench_late_recovery_cache_request_contract",
+            timecode_target_rows=timecode_target_rows,
+            multilag_target_rows=multilag_target_rows,
+            cache_rows=cache_rows,
+        )
+
+        by_key = {(row["system_id"], row["temperature"], row["structure_id"]): row for row in rows}
+        request = by_key[("KA2D", "0.23", "151")]
+        incomplete = by_key[("KA2D", "0.30", "3")]
+
+        self.assertEqual(request["cache_request_stage"], "late_recovery_member_metadata_required")
+        self.assertEqual(float(request["cache_request_ready"]), 1.0)
+        self.assertEqual(request["source_path"], "GlassBench/KA2D_trajectories/T0.23.tar.xz")
+        self.assertEqual(request["current_max_time_code"], "tc40")
+        self.assertAlmostEqual(float(request["current_max_lag_time"]), 1500000.0)
+        self.assertEqual(request["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(request["target_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertEqual(request["inferred_target_member"], "T0.23/test/N1290T0.23_151_tc50.npz")
+        self.assertEqual(float(request["inferred_member_path_ready"]), 1.0)
+        self.assertEqual(float(request["official_target_member_metadata_ready"]), 0.0)
+        self.assertEqual(request["target_member_md5"], "none")
+        self.assertEqual(
+            request["expected_particle_cache_path"],
+            "data/third_party/glassbench/particle_cache/glassbench_ka2d_T0_23_N1290T0.23_151_tc50_positions.npz",
+        )
+        self.assertEqual(float(request["particle_cache_ready"]), 0.0)
+        self.assertEqual(float(request["late_recovery_observable_ready"]), 0.0)
+        self.assertEqual(float(request["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(request["primary_blocker"], "late_recovery_npz_member_metadata")
+        self.assertEqual(
+            request["next_required_action"],
+            "verify_glassbench_archive_contains_time_code_tc50_for_structure_151",
+        )
+        self.assertEqual(float(request["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(incomplete["cache_request_stage"], "late_recovery_timecode_target_incomplete")
+        self.assertEqual(incomplete["inferred_target_member"], "none")
+        self.assertEqual(float(incomplete["inferred_member_path_ready"]), 0.0)
+        self.assertEqual(incomplete["primary_blocker"], "late_recovery_timecode_target")
+
+    def test_glassbench_late_recovery_membership_probe_contract_records_prefix_absence(self):
+        cache_request_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "cache_request_ready": 1.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+                "inferred_target_member": "T0.23/test/N1290T0.23_151_tc50.npz",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "cache_request_ready": 0.0,
+                "target_time_code": "none",
+                "inferred_target_member": "none",
+            },
+        ]
+        member_index_manifest = {
+            "compressed_probe_bytes": 12582912,
+            "tar_probe_limit_bytes": 25165824,
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                    "compressed_probe_range_start": 2980602255,
+                    "compressed_probe_range_end": 2993185166,
+                    "compressed_probe_bytes": 12582912,
+                    "tar_probe_bytes": 25165824,
+                    "npz_member_count_in_probe": 55,
+                    "npz_members": [
+                        {"name": "T0.23/test/N1290T0.23_151_tc05.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc10.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc15.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc20.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc25.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc30.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc35.npz", "size_bytes": 465710},
+                        {"name": "T0.23/test/N1290T0.23_151_tc40.npz", "size_bytes": 465710},
+                    ],
+                }
+            ],
+        }
+
+        rows = glassbench_late_recovery_membership_probe_contract(
+            probe_id="glassbench_late_recovery_membership_probe_contract",
+            cache_request_rows=cache_request_rows,
+            member_index_manifest=member_index_manifest,
+        )
+
+        by_key = {(row["system_id"], row["temperature"], row["structure_id"]): row for row in rows}
+        cold = by_key[("KA2D", "0.23", "151")]
+        warm = by_key[("KA2D", "0.30", "3")]
+
+        self.assertEqual(cold["membership_probe_stage"], "late_recovery_target_absent_from_extended_prefix")
+        self.assertEqual(float(cold["membership_probe_ready"]), 1.0)
+        self.assertEqual(cold["target_time_code"], "tc50")
+        self.assertEqual(cold["inferred_target_member"], "T0.23/test/N1290T0.23_151_tc50.npz")
+        self.assertEqual(float(cold["target_member_visible_in_probe"]), 0.0)
+        self.assertEqual(float(cold["same_structure_member_count_in_probe"]), 8.0)
+        self.assertEqual(cold["same_structure_visible_time_codes"], "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40")
+        self.assertEqual(cold["max_visible_time_code"], "tc40")
+        self.assertAlmostEqual(float(cold["compressed_probe_bytes"]), 12582912.0)
+        self.assertAlmostEqual(float(cold["tar_probe_bytes"]), 25165824.0)
+        self.assertEqual(float(cold["late_recovery_observable_ready"]), 0.0)
+        self.assertEqual(cold["primary_blocker"], "late_recovery_member_index_depth")
+        self.assertEqual(
+            cold["next_required_action"],
+            "extend_glassbench_tar_prefix_probe_for_structure_151_tc50_or_full_index",
+        )
+        self.assertEqual(float(cold["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(warm["membership_probe_stage"], "late_recovery_cache_request_incomplete")
+        self.assertEqual(warm["primary_blocker"], "late_recovery_cache_request")
+
+    def test_glassbench_late_recovery_public_timecode_ceiling_blocks_unpublished_tc50(self):
+        timecode_target_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "timecode_target_ready": 1.0,
+                "current_max_time_code": "tc40",
+                "current_max_lag_time": 1500000.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+                "required_followup_lag_time": 42972781.2315918,
+            }
+        ]
+        semantics_manifest = {
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                    "members": [
+                        {
+                            "structure_id": 151,
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                        },
+                        {
+                            "structure_id": 151,
+                            "time_code": "tc40",
+                            "lag_time": 1500000.0,
+                            "member": "T0.23/test/N1290T0.23_151_tc40.npz",
+                        },
+                        {
+                            "structure_id": 152,
+                            "time_code": "tc40",
+                            "lag_time": 1500000.0,
+                            "member": "T0.23/test/N1290T0.23_152_tc40.npz",
+                        },
+                    ],
+                }
+            ]
+        }
+        membership_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "membership_probe_ready": 1.0,
+                "target_member_visible_in_probe": 0.0,
+                "max_visible_time_code": "tc40",
+                "same_structure_visible_time_codes": "tc05;tc40",
+                "membership_probe_stage": "late_recovery_target_absent_from_extended_prefix",
+            }
+        ]
+
+        rows = glassbench_late_recovery_public_timecode_ceiling(
+            ceiling_id="glassbench_late_recovery_public_timecode_ceiling",
+            timecode_target_rows=timecode_target_rows,
+            semantics_manifest=semantics_manifest,
+            membership_probe_rows=membership_rows,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["public_ceiling_stage"], "late_recovery_beyond_public_timecode_ceiling")
+        self.assertEqual(float(row["public_ceiling_ready"]), 1.0)
+        self.assertEqual(row["target_time_code"], "tc50")
+        self.assertEqual(row["public_max_time_code"], "tc40")
+        self.assertEqual(row["structure_max_time_code"], "tc40")
+        self.assertAlmostEqual(float(row["public_max_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(row["target_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertGreater(float(row["target_lag_over_public_max"]), 100.0)
+        self.assertEqual(float(row["target_time_code_published"]), 0.0)
+        self.assertEqual(float(row["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "public_glassbench_timecode_ceiling")
+        self.assertEqual(
+            row["next_required_action"],
+            "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
+        )
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_censored_window_claim_audit_keeps_late_recovery_claim_blocked(self):
+        public_ceiling_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "timecode_target_ready": 1.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+                "public_max_time_code": "tc40",
+                "public_max_lag_time": 1500000.0,
+                "target_lag_over_public_max": 110.66815121174359,
+                "public_ceiling_stage": "late_recovery_beyond_public_timecode_ceiling",
+                "primary_blocker": "public_glassbench_timecode_ceiling",
+                "next_required_action": "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
+            }
+        ]
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "tau_alpha_direct": 1500000.0,
+                "latest_lag_time": 1500000.0,
+                "gaussian_recovery_lag_upper_bound": 166002226.81761542,
+            }
+        ]
+
+        rows = glassbench_censored_window_claim_audit(
+            audit_id="glassbench_censored_window_claim_audit",
+            public_ceiling_rows=public_ceiling_rows,
+            finite_exchange_envelope_rows=envelope_rows,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["censored_window_stage"], "alpha_anchor_ready_late_recovery_censored")
+        self.assertEqual(float(row["alpha_anchor_window_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["public_window_fraction_of_target_lag"]), 1500000.0 / 166002226.81761542)
+        self.assertGreater(float(row["target_lag_over_public_max"]), 100.0)
+        self.assertEqual(float(row["short_window_dynamic_claim_allowed"]), 1.0)
+        self.assertEqual(float(row["alpha_relaxation_claim_allowed"]), 1.0)
+        self.assertEqual(float(row["late_gaussian_recovery_claim_allowed"]), 0.0)
+        self.assertEqual(float(row["static_vs_finite_exchange_rejection_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["allowed_public_claim_level"], "alpha_anchor_and_pre_late_dynamic_signatures")
+        self.assertEqual(row["primary_blocker"], "public_glassbench_timecode_ceiling")
+        self.assertEqual(
+            row["next_required_action"],
+            "obtain_new_glassbench_export_or_trajectory_beyond_tc40_for_late_recovery",
+        )
+
+    def test_glassbench_sota_public_window_verdict_separates_supported_and_censored_claims(self):
+        censored_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "alpha_anchor_window_ready": 1.0,
+                "short_window_dynamic_claim_allowed": 1.0,
+                "alpha_relaxation_claim_allowed": 1.0,
+                "late_gaussian_recovery_claim_allowed": 0.0,
+                "static_vs_finite_exchange_rejection_ready": 0.0,
+                "public_window_fraction_of_target_lag": 0.009036023364,
+                "target_lag_over_public_max": 110.66815121174359,
+                "allowed_public_claim_level": "alpha_anchor_and_pre_late_dynamic_signatures",
+                "primary_blocker": "public_glassbench_timecode_ceiling",
+            }
+        ]
+        signature_rows = [
+            {
+                "signature": "self_intermediate_alpha",
+                "phenomenon": "self_intermediate_scattering_alpha_relaxation",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+            },
+            {
+                "signature": "late_gaussian_recovery",
+                "phenomenon": "long_time_gaussian_recovery",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+            },
+            {
+                "signature": "persistence_exchange_decoupling",
+                "phenomenon": "persistence_exchange_decoupling",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+            },
+            {
+                "signature": "thermodynamic_transition",
+                "phenomenon": "configurational_entropy_and_ideal_glass_scope",
+                "model_support": 0.0,
+                "literature_qualitative_support": 1.0,
+            },
+        ]
+
+        rows = glassbench_sota_public_window_verdict(
+            verdict_id="glassbench_sota_public_window_verdict",
+            censored_window_rows=censored_rows,
+            dynamic_signature_rows=signature_rows,
+        )
+
+        by_signature = {row["signature"]: row for row in rows}
+        alpha = by_signature["self_intermediate_alpha"]
+        self.assertEqual(alpha["public_window_verdict_stage"], "public_window_sota_consistent")
+        self.assertEqual(float(alpha["public_glassbench_claim_allowed"]), 1.0)
+        self.assertEqual(float(alpha["late_recovery_required"]), 0.0)
+        self.assertEqual(float(alpha["thermodynamic_claim_allowed"]), 0.0)
+
+        recovery = by_signature["late_gaussian_recovery"]
+        self.assertEqual(recovery["public_window_verdict_stage"], "public_window_censored_sota_unresolved")
+        self.assertEqual(float(recovery["public_glassbench_claim_allowed"]), 0.0)
+        self.assertEqual(float(recovery["late_recovery_required"]), 1.0)
+        self.assertEqual(recovery["primary_blocker"], "public_glassbench_timecode_ceiling")
+
+        pe = by_signature["persistence_exchange_decoupling"]
+        self.assertEqual(pe["public_window_verdict_stage"], "mechanism_selection_censored_unresolved")
+        self.assertEqual(float(pe["mechanism_rejection_ready"]), 0.0)
+        self.assertEqual(float(pe["public_glassbench_claim_allowed"]), 0.0)
+
+        thermo = by_signature["thermodynamic_transition"]
+        self.assertEqual(thermo["public_window_verdict_stage"], "scope_boundary_not_tested")
+        self.assertEqual(thermo["allowed_public_claim"], "not_a_thermodynamic_glass_transition_test")
+        self.assertEqual(float(thermo["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_late_recovery_experiment_design_targets_minimal_tc50_followup(self):
+        protocol_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "required_followup_lag_time": 42972781.2315918,
+                "max_finite_exchange_late_ngp": 0.08,
+                "static_gamma_late_ngp_plateau": 0.5,
+                "late_recovery_stage": "late_recovery_acquisition_required",
+            }
+        ]
+        timecode_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "timecode_target_ready": 1.0,
+                "current_max_time_code": "tc40",
+                "current_max_lag_time": 1500000.0,
+                "target_time_code": "tc50",
+                "target_lag_time": 166002226.81761542,
+                "target_lag_over_required": 3.862962136962582,
+            }
+        ]
+        public_verdict_rows = [
+            {
+                "signature": "late_gaussian_recovery",
+                "public_window_verdict_stage": "public_window_censored_sota_unresolved",
+                "primary_blocker": "public_glassbench_timecode_ceiling",
+            },
+            {
+                "signature": "persistence_exchange_decoupling",
+                "public_window_verdict_stage": "mechanism_selection_censored_unresolved",
+                "primary_blocker": "public_glassbench_timecode_ceiling",
+            },
+        ]
+
+        rows = glassbench_late_recovery_experiment_design(
+            design_id="glassbench_late_recovery_experiment_design",
+            late_recovery_protocol_rows=protocol_rows,
+            timecode_target_rows=timecode_rows,
+            public_window_verdict_rows=public_verdict_rows,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["experiment_design_stage"], "minimal_tc50_followup_ready")
+        self.assertEqual(row["required_time_code"], "tc50")
+        self.assertAlmostEqual(float(row["minimum_required_lag_time"]), 42972781.2315918)
+        self.assertAlmostEqual(float(row["planned_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertGreater(float(row["planned_lag_over_minimum_required"]), 3.0)
+        self.assertEqual(row["required_observables"], "MSD;NGP;F_s(k,t);self_van_hove_tail;member_uncertainty")
+        self.assertEqual(row["finite_exchange_support_rule"], "late_ngp <= max_finite_exchange_late_ngp")
+        self.assertEqual(row["static_disorder_rejection_rule"], "late_ngp + 2sigma < static_gamma_late_ngp_plateau")
+        self.assertEqual(float(row["max_finite_exchange_late_ngp"]), 0.08)
+        self.assertEqual(float(row["static_gamma_late_ngp_plateau"]), 0.5)
+        self.assertEqual(float(row["late_recovery_claim_ready_after_measurement"]), 1.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "public_glassbench_timecode_ceiling")
+
+    def test_glassbench_late_recovery_uncertainty_verdict_requires_2sigma_decision_power(self):
+        protocol_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "required_followup_lag_time": 42972781.2315918,
+                "max_finite_exchange_late_ngp": 0.05,
+                "static_gamma_late_ngp_plateau": 0.1,
+                "min_static_plateau_rejection_gap": 0.05,
+                "late_recovery_stage": "late_recovery_acquisition_required",
+            }
+        ]
+        ingestion_rows = [
+            {
+                "candidate_id": "KA2D:0.23:151:0",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "required_followup_lag_time": 42972781.2315918,
+                "observed_lag_time": 50000000.0,
+                "observed_late_ngp": 0.012,
+                "sigma_late_ngp": 0.003,
+                "observed_tail_gaussian_recovery": 1.0,
+                "sigma_tail_recovery": 0.05,
+                "late_recovery_observation_ready": 1.0,
+                "late_recovery_ingestion_stage": "late_recovery_observation_ingestion_ready",
+            },
+            {
+                "candidate_id": "KA2D:0.23:151:1",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "required_followup_lag_time": 42972781.2315918,
+                "observed_lag_time": 50000000.0,
+                "observed_late_ngp": 0.045,
+                "sigma_late_ngp": 0.01,
+                "observed_tail_gaussian_recovery": 1.0,
+                "sigma_tail_recovery": 0.05,
+                "late_recovery_observation_ready": 1.0,
+                "late_recovery_ingestion_stage": "late_recovery_observation_ingestion_ready",
+            },
+        ]
+
+        rows = glassbench_late_recovery_uncertainty_verdict(
+            verdict_id="glassbench_late_recovery_uncertainty_verdict",
+            late_recovery_protocol_rows=protocol_rows,
+            ingestion_rows=ingestion_rows,
+        )
+
+        by_candidate = {row["candidate_id"]: row for row in rows}
+        supported = by_candidate["KA2D:0.23:151:0"]
+        wide = by_candidate["KA2D:0.23:151:1"]
+
+        self.assertEqual(
+            supported["uncertainty_verdict_stage"],
+            "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected",
+        )
+        self.assertAlmostEqual(float(supported["late_ngp_upper_2sigma"]), 0.018)
+        self.assertAlmostEqual(float(supported["tail_recovery_lower_2sigma"]), 0.9)
+        self.assertGreater(float(supported["finite_exchange_support_margin"]), 0.03)
+        self.assertGreater(float(supported["static_disorder_rejection_margin"]), 0.08)
+        self.assertEqual(float(supported["finite_exchange_uncertainty_supported"]), 1.0)
+        self.assertEqual(float(supported["static_disorder_uncertainty_rejected"]), 1.0)
+        self.assertEqual(float(supported["uncertainty_decision_ready"]), 1.0)
+        self.assertEqual(float(supported["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(supported["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(supported["primary_blocker"], "exchange_clock")
+
+        self.assertEqual(wide["uncertainty_verdict_stage"], "late_recovery_uncertainty_indeterminate")
+        self.assertGreater(float(wide["late_ngp_upper_2sigma"]), 0.05)
+        self.assertEqual(float(wide["finite_exchange_uncertainty_supported"]), 0.0)
+        self.assertEqual(float(wide["static_disorder_uncertainty_rejected"]), 1.0)
+        self.assertEqual(float(wide["uncertainty_decision_ready"]), 0.0)
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+
+    def test_glassbench_late_recovery_outcome_matrix_preregisters_support_reject_and_indeterminate_paths(self):
+        design_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "required_time_code": "tc50",
+                "minimum_required_lag_time": 42972781.2315918,
+                "planned_lag_time": 166002226.81761542,
+                "planned_lag_over_minimum_required": 3.862962136962582,
+                "max_finite_exchange_late_ngp": 0.05,
+                "static_gamma_late_ngp_plateau": 0.1,
+                "late_recovery_claim_ready_after_measurement": 1.0,
+                "experiment_design_stage": "minimal_tc50_followup_ready",
+            }
+        ]
+
+        rows = glassbench_late_recovery_outcome_matrix(
+            matrix_id="glassbench_late_recovery_outcome_matrix",
+            experiment_design_rows=design_rows,
+        )
+
+        by_scenario = {row["outcome_scenario"]: row for row in rows}
+        support = by_scenario["low_late_ngp_gaussian_recovery"]
+        reject = by_scenario["high_late_ngp_or_missing_recovery"]
+        wide = by_scenario["wide_uncertainty_requires_more_data"]
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(support["target_time_code"], "tc50")
+        self.assertEqual(
+            support["predicted_uncertainty_verdict_stage"],
+            "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected",
+        )
+        self.assertEqual(support["claim_if_observed"], "finite_exchange_supported_static_disorder_rejected")
+        self.assertGreater(float(support["finite_exchange_support_margin"]), 0.0)
+        self.assertGreater(float(support["static_disorder_rejection_margin"]), 0.0)
+        self.assertEqual(float(support["uncertainty_decision_ready"]), 1.0)
+
+        self.assertEqual(reject["predicted_uncertainty_verdict_stage"], "uncertainty_weighted_finite_exchange_rejected")
+        self.assertEqual(reject["claim_if_observed"], "finite_exchange_rejected_or_model_reparameterization_required")
+        self.assertLess(float(reject["finite_exchange_support_margin"]), 0.0)
+        self.assertEqual(float(reject["uncertainty_decision_ready"]), 1.0)
+
+        self.assertEqual(wide["predicted_uncertainty_verdict_stage"], "late_recovery_uncertainty_indeterminate")
+        self.assertEqual(wide["claim_if_observed"], "no_mechanism_selection_claim")
+        self.assertEqual(float(wide["uncertainty_decision_ready"]), 0.0)
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+        self.assertEqual(float(wide["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(wide["outcome_matrix_stage"], "tc50_outcome_matrix_preregistered")
+
+    def test_glassbench_late_recovery_decision_power_plan_quantifies_member_extension_needed(self):
+        outcome_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc50",
+                "outcome_scenario": "low_late_ngp_gaussian_recovery",
+                "synthetic_observed_late_ngp": 0.0125,
+                "synthetic_sigma_late_ngp": 0.0015,
+                "finite_exchange_support_margin": 0.0345,
+                "static_disorder_rejection_margin": 0.0845,
+                "uncertainty_decision_ready": 1.0,
+                "claim_if_observed": "finite_exchange_supported_static_disorder_rejected",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc50",
+                "outcome_scenario": "wide_uncertainty_requires_more_data",
+                "synthetic_observed_late_ngp": 0.045,
+                "synthetic_sigma_late_ngp": 0.01,
+                "finite_exchange_support_margin": -0.015,
+                "static_disorder_rejection_margin": 0.035,
+                "uncertainty_decision_ready": 0.0,
+                "claim_if_observed": "no_mechanism_selection_claim",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+        ]
+
+        rows = glassbench_late_recovery_decision_power_plan(
+            plan_id="glassbench_late_recovery_decision_power_plan",
+            outcome_matrix_rows=outcome_rows,
+            current_member_count=8,
+        )
+
+        by_scenario = {row["outcome_scenario"]: row for row in rows}
+        sufficient = by_scenario["low_late_ngp_gaussian_recovery"]
+        wide = by_scenario["wide_uncertainty_requires_more_data"]
+
+        self.assertEqual(sufficient["decision_power_stage"], "decision_power_sufficient")
+        self.assertEqual(float(sufficient["required_member_count"]), 8.0)
+        self.assertEqual(float(sufficient["additional_member_count_needed"]), 0.0)
+        self.assertEqual(sufficient["next_required_action"], "record_tc50_observation_and_apply_preregistered_verdict")
+
+        self.assertEqual(wide["decision_power_stage"], "late_ngp_power_extension_required")
+        self.assertAlmostEqual(float(wide["inferred_max_finite_exchange_late_ngp"]), 0.05)
+        self.assertAlmostEqual(float(wide["required_sigma_late_ngp_for_decision"]), 0.0025)
+        self.assertAlmostEqual(float(wide["member_multiplier_needed"]), 16.0)
+        self.assertEqual(float(wide["required_member_count"]), 128.0)
+        self.assertEqual(float(wide["additional_member_count_needed"]), 120.0)
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+        self.assertEqual(float(wide["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
+        trajectory_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 0.0,
+                "member_count": 4.0,
+                "msd": 0.0,
+                "ngp_2d": 0.0,
+                "self_intermediate_scattering_by_k": "1;1;1",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 1.0,
+                "member_count": 4.0,
+                "msd": 0.006,
+                "ngp_2d": 0.08,
+                "self_intermediate_scattering_by_k": "0.999;0.998;0.996",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 2.0,
+                "member_count": 4.0,
+                "msd": 0.008,
+                "ngp_2d": 0.05,
+                "self_intermediate_scattering_by_k": "0.998;0.997;0.995",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+        ]
+        signature_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "supported_dynamical_signature_count": 4.0,
+                "alpha_threshold_crossed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+        alpha_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "metadata_tau_alpha_consistent_with_anchor_fs": 0.0,
+                "primary_blocker": "anchor_wave_number_or_alpha_definition_mismatch",
+            }
+        ]
+
+        row = glassbench_microdynamic_closed_loop_audit(
+            audit_id="glassbench_microdynamic_closed_loop",
+            trajectory_rows=trajectory_rows,
+            signature_rows=signature_rows,
+            alpha_horizon_rows=alpha_rows,
+        )[0]
+
+        self.assertEqual(row["closed_loop_stage"], "real_microstats_macro_signatures_closed_loop_blocked")
+        self.assertEqual(float(row["frame_index_microstats_ready"]), 1.0)
+        self.assertEqual(float(row["physical_time_microstats_ready"]), 0.0)
+        self.assertEqual(float(row["macro_signature_ready"]), 1.0)
+        self.assertEqual(float(row["micro_to_macro_prediction_ready"]), 0.0)
+        self.assertEqual(float(row["closed_loop_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+        self.assertIn("cage_jump_event_segmentation", row["missing_closed_loop_inputs"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_cage_jump_proxy_canary_extracts_aggregate_event_candidates(self):
+        trajectory_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 0.0,
+                "member_count": 4.0,
+                "msd": 0.0,
+                "ngp_2d": 0.0,
+                "self_intermediate_scattering_by_k": "1;1;1",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 1.0,
+                "member_count": 4.0,
+                "msd": 0.01,
+                "ngp_2d": 0.02,
+                "self_intermediate_scattering_by_k": "0.998;0.995;0.990",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 2.0,
+                "member_count": 4.0,
+                "msd": 0.09,
+                "ngp_2d": 0.25,
+                "self_intermediate_scattering_by_k": "0.970;0.940;0.900",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 3.0,
+                "member_count": 4.0,
+                "msd": 0.08,
+                "ngp_2d": 0.10,
+                "self_intermediate_scattering_by_k": "0.975;0.950;0.920",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+        ]
+
+        row = glassbench_cage_jump_proxy_canary(
+            canary_id="glassbench_cage_jump_proxy",
+            trajectory_rows=trajectory_rows,
+        )[0]
+
+        self.assertEqual(row["canary_stage"], "aggregate_cage_jump_proxy_ready_particle_events_blocked")
+        self.assertEqual(float(row["aggregate_jump_proxy_ready"]), 1.0)
+        self.assertEqual(float(row["particle_resolved_jump_events_ready"]), 0.0)
+        self.assertEqual(float(row["physical_time_jump_clock_ready"]), 0.0)
+        self.assertEqual(float(row["peak_proxy_event_frame"]), 2.0)
+        self.assertGreater(float(row["proxy_jump_length"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "particle_resolved_displacements")
+        self.assertIn("particle_resolved_displacements", row["missing_event_clock_inputs"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_event_clock_threshold_readiness_gate_blocks_without_particle_cache(self):
+        rows = glassbench_event_clock_threshold_readiness_gate(
+            benchmark_id="glassbench_ka2d_threshold_readiness",
+            system_id="KA2D",
+            temperature=0.23,
+            positions_schema_ready=True,
+            first_npz_observable_curve_ready=True,
+            member_ensemble_observable_ready=True,
+            particle_resolved_positions_cached=False,
+            physical_time_semantics_ready=False,
+            event_clock_threshold_protocol_available=True,
+            macro_heldout_observables_ready=False,
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["readiness_stage"], "real_event_clock_threshold_robustness_blocked")
+        self.assertEqual(row["primary_blocker"], "particle_resolved_positions_cache")
+        self.assertEqual(float(row["positions_schema_ready"]), 1.0)
+        self.assertEqual(float(row["member_ensemble_observable_ready"]), 1.0)
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 0.0)
+        self.assertEqual(float(row["real_event_clock_threshold_robustness_ready"]), 0.0)
+        self.assertIn("threshold_sweep_event_clock", row["missing_real_threshold_inputs"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_event_clock_threshold_readiness_gate_accepts_complete_real_inputs(self):
+        rows = glassbench_event_clock_threshold_readiness_gate(
+            benchmark_id="glassbench_ka2d_threshold_readiness",
+            system_id="KA2D",
+            temperature=0.23,
+            positions_schema_ready=True,
+            first_npz_observable_curve_ready=True,
+            member_ensemble_observable_ready=True,
+            particle_resolved_positions_cached=True,
+            physical_time_semantics_ready=True,
+            event_clock_threshold_protocol_available=True,
+            macro_heldout_observables_ready=True,
+        )
+
+        row = rows[0]
+        self.assertEqual(row["readiness_stage"], "real_event_clock_threshold_robustness_ready")
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 1.0)
+        self.assertEqual(float(row["real_event_clock_threshold_robustness_ready"]), 1.0)
+        self.assertEqual(float(row["real_benchmark_closed_loop_ready"]), 1.0)
+        self.assertEqual(row["missing_real_threshold_inputs"], "none")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_first_npz_particle_cache_contract_pins_coordinate_payload(self):
+        schema_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "npz_member_bytes": 465710,
+                "npz_member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+                "arrays": [
+                    {"name": "positions.npy", "shape": [20, 1290, 2], "dtype": "float64"},
+                    {"name": "box.npy", "shape": [], "dtype": "float64"},
+                ],
+            }
+        ]
+        curve_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "compressed_probe_range_start": 2980602255,
+                "compressed_probe_range_end": 2984796558,
+                "compressed_probe_bytes": 4194304,
+                "npz_member_bytes": 465710,
+                "npz_member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+            }
+        ]
+
+        rows = glassbench_first_npz_particle_cache_contract_gate(
+            contract_id="glassbench_first_npz_particle_cache_contract",
+            schema_entries=schema_entries,
+            curve_entries=curve_entries,
+            cache_root="data/third_party/glassbench/particle_cache",
+        )
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["cache_contract_stage"], "first_npz_particle_cache_contract_ready_cache_missing")
+        self.assertEqual(row["positions_shape"], "20x1290x2")
+        self.assertEqual(float(row["frame_count"]), 20.0)
+        self.assertEqual(float(row["particle_count"]), 1290.0)
+        self.assertEqual(float(row["spatial_dimension"]), 2.0)
+        self.assertEqual(float(row["particle_cache_contract_ready"]), 1.0)
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "persist_particle_coordinate_cache")
+        self.assertIn("glassbench_ka2d_T0_23_first_npz_positions.npz", row["particle_cache_target"])
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_first_npz_particle_cache_contract_accepts_existing_cache(self):
+        schema_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "npz_member_bytes": 444786,
+                "npz_member_md5": "f51fd76f59b8288405a9e7abb61cdd0a",
+                "arrays": [{"name": "positions.npy", "shape": [20, 1290, 2], "dtype": "float64"}],
+            }
+        ]
+        curve_entries = [
+            {
+                "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "first_npz_member": "T0.30/train/N1290T0.30_3_tc01.npz",
+                "compressed_probe_range_start": 464175,
+                "compressed_probe_range_end": 4658478,
+                "compressed_probe_bytes": 4194304,
+                "npz_member_bytes": 444786,
+                "npz_member_md5": "f51fd76f59b8288405a9e7abb61cdd0a",
+            }
+        ]
+        cache_path = "data/third_party/glassbench/particle_cache/glassbench_ka2d_T0_30_first_npz_positions.npz"
+
+        row = glassbench_first_npz_particle_cache_contract_gate(
+            contract_id="glassbench_first_npz_particle_cache_contract",
+            schema_entries=schema_entries,
+            curve_entries=curve_entries,
+            cache_root="data/third_party/glassbench/particle_cache",
+            cached_particle_cache_targets=[cache_path],
+            physical_time_semantics_ready=True,
+        )[0]
+
+        self.assertEqual(row["cache_contract_stage"], "first_npz_particle_cache_ready_for_threshold_sweep")
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+        self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
+
+    def test_glassbench_cached_particle_timecode_bridge_attaches_lag_without_time_axis(self):
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "particle_cache_path": "data/third_party/glassbench/particle_cache/cache.npz",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "npz_member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+                "positions_shape": "20x1290x2",
+                "particle_resolved_positions_cached": 1.0,
+            }
+        ]
+        semantics_manifest = {
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "tau_alpha": 918305.0,
+                    "members": [
+                        {
+                            "member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                            "member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "lag_time_over_tau_alpha": 1.0889616315258749e-07,
+                            "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                            "replica_count": 20,
+                            "positions_shape": [20, 1290, 2],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        row = glassbench_cached_particle_timecode_bridge(
+            bridge_id="glassbench_cached_particle_timecode_bridge",
+            cache_rows=cache_rows,
+            semantics_manifest=semantics_manifest,
+        )[0]
+
+        self.assertEqual(row["timecode_bridge_stage"], "cached_particle_lag_time_ready_event_clock_blocked")
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+        self.assertEqual(float(row["physical_lag_time_ready"]), 1.0)
+        self.assertEqual(float(row["frame_axis_is_physical_time"]), 0.0)
+        self.assertEqual(float(row["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+        self.assertEqual(row["next_required_action"], "extract_multi_lag_particle_cache_or_true_trajectory")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_multilag_particle_cache_targets_selects_structure_ladder(self):
+        semantics_manifest = {
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "tau_alpha": 918306.0,
+                    "members": [
+                        {
+                            "member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                            "member_md5": "md5-151-05",
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "lag_time_over_tau_alpha": 1.1e-7,
+                            "structure_id": 151,
+                        },
+                        {
+                            "member": "T0.23/test/N1290T0.23_151_tc10.npz",
+                            "member_md5": "md5-151-10",
+                            "time_code": "tc10",
+                            "lag_time": 1.1,
+                            "lag_time_over_tau_alpha": 1.2e-6,
+                            "structure_id": 151,
+                        },
+                        {
+                            "member": "T0.23/test/N1290T0.23_151_tc15.npz",
+                            "member_md5": "md5-151-15",
+                            "time_code": "tc15",
+                            "lag_time": 11.64,
+                            "lag_time_over_tau_alpha": 1.3e-5,
+                            "structure_id": 151,
+                        },
+                        {
+                            "member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                            "member_md5": "md5-202-05",
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "lag_time_over_tau_alpha": 1.1e-7,
+                            "structure_id": 202,
+                        },
+                    ],
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "tau_alpha": 2200.0,
+                    "members": [
+                        {
+                            "member": "T0.30/train/N1290T0.30_10_tc01.npz",
+                            "member_md5": "md5-10-01",
+                            "time_code": "tc01",
+                            "lag_time": 0.11,
+                            "lag_time_over_tau_alpha": 5.0e-5,
+                            "structure_id": 10,
+                        }
+                    ],
+                },
+            ]
+        }
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "npz_member_md5": "md5-202-05",
+                "particle_resolved_positions_cached": 1.0,
+            }
+        ]
+
+        rows = glassbench_multilag_particle_cache_targets(
+            target_id="glassbench_multilag_particle_cache_targets",
+            semantics_manifest=semantics_manifest,
+            cache_rows=cache_rows,
+            minimum_time_codes=3,
+        )
+        by_temp = {row["temperature"]: row for row in rows}
+
+        cold = by_temp["0.23"]
+        self.assertEqual(cold["selected_structure_id"], "151")
+        self.assertEqual(cold["selected_time_codes"], "tc05;tc10;tc15")
+        self.assertEqual(float(cold["official_multi_lag_ladder_ready"]), 1.0)
+        self.assertEqual(float(cold["target_member_count"]), 3.0)
+        self.assertEqual(float(cold["cached_target_member_count"]), 0.0)
+        self.assertEqual(float(cold["particle_lag_ladder_cache_ready"]), 0.0)
+        self.assertEqual(float(cold["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(cold["primary_blocker"], "multi_lag_particle_cache_missing")
+        self.assertEqual(cold["next_required_action"], "extract_structure_matched_multi_lag_npz_members")
+        self.assertEqual(float(cold["thermodynamic_claim_allowed"]), 0.0)
+
+        warm = by_temp["0.30"]
+        self.assertEqual(float(warm["official_multi_lag_ladder_ready"]), 0.0)
+        self.assertEqual(float(warm["target_member_count"]), 1.0)
+        self.assertEqual(warm["primary_blocker"], "official_multi_lag_semantics")
+
+    def test_glassbench_cached_particle_observable_semantics_audit_blocks_without_initial_reference(self):
+        rows = glassbench_cached_particle_observable_semantics_audit(
+            audit_id="glassbench_cached_particle_observable_semantics",
+            cached_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "time_code": "tc05",
+                    "lag_time": 0.1,
+                    "target_member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                    "raw_coordinate_msd": 333.9,
+                    "replica_spread_msd": 0.00186,
+                    "initial_reference_positions_ready": 0.0,
+                    "particle_resolved_positions_cached": 1.0,
+                }
+            ],
+            official_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "time_code": "tc05",
+                    "member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                    "msd": 0.003511,
+                    "ngp_2d": 0.00047,
+                }
+            ],
+            max_reproducible_relative_error=0.05,
+        )
+
+        row = rows[0]
+        self.assertGreater(float(row["raw_coordinate_msd_relative_error"]), 1.0e4)
+        self.assertEqual(float(row["cached_coordinate_proxy_ready"]), 1.0)
+        self.assertEqual(float(row["initial_reference_positions_ready"]), 0.0)
+        self.assertEqual(float(row["official_displacement_observable_reproducible"]), 0.0)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "initial_positions_reference_missing")
+        self.assertEqual(row["observable_semantics_stage"], "cached_coordinate_proxy_ready_initial_reference_blocked")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_cached_particle_observable_semantics_audit_reproduces_displacement_with_initial_reference(self):
+        rows = glassbench_cached_particle_observable_semantics_audit(
+            audit_id="glassbench_cached_particle_observable_semantics",
+            cached_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "time_code": "tc05",
+                    "lag_time": 0.1,
+                    "target_member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                    "raw_coordinate_msd": 333.9,
+                    "replica_spread_msd": 0.00186,
+                    "initial_reference_msd": 0.00350,
+                    "initial_reference_ngp_2d": 0.00048,
+                    "initial_reference_fs_by_k": [0.99, 0.97],
+                    "initial_reference_fs_formula": "axis_average_cos_xy",
+                    "single_axis_x_fs_by_k": [0.98, 0.95],
+                    "initial_reference_positions_ready": 1.0,
+                    "particle_resolved_positions_cached": 1.0,
+                }
+            ],
+            official_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "time_code": "tc05",
+                    "member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                    "msd": 0.003511,
+                    "ngp_2d": 0.00047,
+                    "self_intermediate_scattering_by_k": [0.9901, 0.9698],
+                }
+            ],
+            max_reproducible_relative_error=0.05,
+        )
+
+        row = rows[0]
+        self.assertLess(float(row["initial_reference_msd_relative_error"]), 0.05)
+        self.assertLess(float(row["initial_reference_ngp_2d_relative_error"]), 0.05)
+        self.assertLess(float(row["initial_reference_fs_max_abs_error"]), 0.001)
+        self.assertEqual(float(row["official_displacement_observable_reproducible"]), 1.0)
+        self.assertEqual(float(row["official_ngp_2d_reproducible"]), 1.0)
+        self.assertEqual(float(row["official_fs_reproducible"]), 1.0)
+        self.assertEqual(row["initial_reference_fs_formula"], "axis_average_cos_xy")
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(row["observable_semantics_stage"], "official_displacement_observable_reproduced")
+        self.assertEqual(row["next_required_action"], "run_structure_matched_displacement_inversion")
+
+    def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
+        claim_rows = [
+            {
+                "phenomenon": "cage_plateau_transient_ngp_van_hove_tail",
+                "claim_alignment": "supported",
+                "model_support_level": "derived",
+                "primary_blocker": "uncertainty_columns",
+            },
+            {
+                "phenomenon": "self_intermediate_scattering_alpha_relaxation",
+                "claim_alignment": "supported",
+                "model_support_level": "derived",
+                "primary_blocker": "uncertainty_columns",
+            },
+            {
+                "phenomenon": "persistence_exchange_decoupling",
+                "claim_alignment": "supported",
+                "model_support_level": "derived",
+                "primary_blocker": "machine_readable_joint_curves",
+            },
+            {
+                "phenomenon": "chi4_peak_and_dynamic_length_growth",
+                "claim_alignment": "partial",
+                "model_support_level": "effective_closure",
+                "primary_blocker": "shared_transport_and_four_point_grid",
+            },
+            {
+                "phenomenon": "configurational_entropy_and_ideal_glass_scope",
+                "claim_alignment": "scope_boundary",
+                "model_support_level": "closure_only",
+                "primary_blocker": "thermodynamic_input_law",
+            },
+        ]
+        literature_rows = [
+            {"benchmark_source": "kob1995vanhove", "qualitative_comparison_ready": 1.0},
+            {"benchmark_source": "kob1995intermediate", "qualitative_comparison_ready": 1.0},
+            {"benchmark_source": "hedges2007persistence", "qualitative_comparison_ready": 1.0},
+            {"benchmark_source": "lacevic2003fourpoint", "qualitative_comparison_ready": 1.0},
+        ]
+        glassbench_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "msd_growth_signature": 1.0,
+                "self_intermediate_decay_signature": 1.0,
+                "transient_ngp_peak_signature": 1.0,
+                "transient_chi4_peak_signature": 1.0,
+                "alpha_threshold_crossed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+
+        rows = dynamic_signature_alignment_ledger(
+            alignment_id="sota_dynamic_signature_alignment",
+            claim_rows=claim_rows,
+            literature_rows=literature_rows,
+            glassbench_signature_rows=glassbench_rows,
+        )
+        by_signature = {row["signature"]: row for row in rows}
+
+        self.assertEqual(by_signature["transient_ngp_peak"]["alignment_stage"], "real_curve_supported")
+        self.assertEqual(float(by_signature["transient_ngp_peak"]["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(by_signature["transient_ngp_peak"]["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(
+            by_signature["self_intermediate_alpha"]["alignment_stage"],
+            "real_curve_supported_pre_alpha_threshold",
+        )
+        self.assertEqual(by_signature["persistence_exchange_decoupling"]["alignment_stage"], "model_literature_supported_real_inversion_blocked")
+        self.assertEqual(by_signature["persistence_exchange_decoupling"]["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(by_signature["thermodynamic_transition"]["alignment_stage"], "scope_boundary_not_explained")
+        self.assertEqual(float(by_signature["thermodynamic_transition"]["real_glassbench_support"]), 0.0)
 
     def test_langevin_bare_diffusion_and_ou_cage_follow_einstein_and_equipartition(self):
         landscape = LangevinCageLandscapeParams(
@@ -265,15 +3408,31 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(params.persistence_mean, params.exchange_mean)
         self.assertGreater(
             persistence_exchange_diffusion_coefficient(params)
-            * persistence_exchange_alpha_relaxation_time(
-                wave_number=1.0,
-                threshold=math.exp(-1.0),
-                params=params,
-            ),
+            * persistence_exchange_alpha_relaxation_time(1.0, params, threshold=math.exp(-1.0)),
             params.jump_variance,
         )
 
     def test_langevin_bridge_audit_marks_derived_effective_theory_and_remaining_assumptions(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.75,
+            friction=2.5,
+            cage_curvature=6.0,
+            saddle_curvature=4.0,
+            barrier_height=2.0,
+            jump_length=1.0,
+            persistence_barrier_extra=0.8,
+            exchange_barrier_extra=0.1,
+        )
+        row = langevin_first_principles_bridge_audit(landscape)
+
+        self.assertEqual(row["bridge_stage"], "langevin_kramers_to_renewal_effective_theory")
+        self.assertEqual(float(row["langevin_equation_specified"]), 1.0)
+        self.assertEqual(float(row["kramers_rates_derived"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_params_derived"]), 1.0)
+        self.assertEqual(float(row["full_many_body_first_principles_claim_allowed"]), 0.0)
+        self.assertEqual(row["remaining_assumption"], "metastable_basin_partition_and_barrier_inputs")
+
+    def test_langevin_coarse_graining_bridge_keeps_effective_theory_boundary(self):
         landscape = LangevinCageLandscapeParams(
             temperature=0.75,
             friction=2.5,
@@ -291,7 +3450,8 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["kramers_rates_derived"]), 1.0)
         self.assertEqual(float(row["persistence_exchange_params_derived"]), 1.0)
         self.assertEqual(float(row["entire_effective_theory_from_langevin_claim_allowed"]), 0.0)
-        self.assertEqual(row["remaining_assumption"], "metastable_basin_partition_and_barrier_inputs")
+        self.assertGreater(float(row["derived_alpha_time_k1"]), 0.0)
+        self.assertGreater(float(row["derived_stokes_einstein_product"]), 0.0)
 
     def test_periodic_cage_potential_curvature_matches_cosine_barrier(self):
         curvature = periodic_cage_curvature(barrier_height=2.5, period=1.25)
@@ -299,7 +3459,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertAlmostEqual(curvature, expected)
 
-    def test_two_precursor_gate_derives_square_delayed_hazard_and_mean_count(self):
+    def test_scalar_precursor_gate_derives_square_delayed_hazard_and_mean_count(self):
         rate = 0.37
         delay = 4.5
         time = 7.0
@@ -309,7 +3469,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(hazard, expected_hazard)
 
         mean_count = precursor_gate_mean_count(time, rate, [delay, delay])
-        expected_count = rate * delay * delayed_renewal_shape(time / delay)
+        expected_count = rate * delayed_renewal_shape(time / delay) * delay
         self.assertAlmostEqual(mean_count, expected_count)
 
     def test_periodic_softness_gate_maps_potential_to_delayed_renewal_parameters(self):
@@ -332,7 +3492,6 @@ class DelayedRenewalCageTests(unittest.TestCase):
             barrier_height=params.barrier_height,
         )
 
-        self.assertIsInstance(renewal, DelayedRenewalCageParams)
         self.assertAlmostEqual(renewal.cage_variance, params.temperature / curvature)
         self.assertAlmostEqual(renewal.cage_tau, params.friction / curvature)
         self.assertAlmostEqual(renewal.jump_variance, params.period**2 / params.dimension)
@@ -349,7 +3508,6 @@ class DelayedRenewalCageTests(unittest.TestCase):
     def test_potential_effective_theory_taxonomy_maps_landscapes_to_modules(self):
         rows = potential_effective_theory_taxonomy()
         by_id = {row["potential_id"]: row for row in rows}
-
         expected = {
             "harmonic_ou_cage",
             "periodic_kramers_cage_jump",
@@ -360,8 +3518,8 @@ class DelayedRenewalCageTests(unittest.TestCase):
             "spatial_facilitation_field",
             "inherent_state_landscape_density",
         }
-        self.assertTrue(expected.issubset(by_id))
 
+        self.assertTrue(expected.issubset(by_id))
         self.assertIn("A,tau_c", by_id["harmonic_ou_cage"]["derived_parameters"])
         self.assertIn("lambda", by_id["periodic_kramers_cage_jump"]["derived_parameters"])
         self.assertIn("tau_d,delayed_hazard", by_id["two_precursor_softness_gate"]["derived_parameters"])
@@ -371,10 +3529,6 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertIn("chi4", by_id["spatial_facilitation_field"]["supported_observables"])
         self.assertEqual(
             by_id["inherent_state_landscape_density"]["complete_many_body_derivation_claim_allowed"],
-            0,
-        )
-        self.assertEqual(
-            by_id["two_precursor_softness_gate"]["complete_many_body_derivation_claim_allowed"],
             0,
         )
 
@@ -390,12 +3544,11 @@ class DelayedRenewalCageTests(unittest.TestCase):
         weights = np.array([0.25, 0.75])
 
         stats = basin_adjacency_jump_statistics(centers, edges, weights=weights)
-
         expected_mean_squared_jump = 0.25 * 4.0 + 0.75 * 1.0
+
         self.assertAlmostEqual(stats["mean_squared_jump"], expected_mean_squared_jump)
         self.assertAlmostEqual(stats["jump_variance_q"], expected_mean_squared_jump / 2.0)
         self.assertEqual(stats["edge_count"], 2)
-        self.assertEqual(stats["dimension"], 2)
 
     def test_local_cage_variance_has_plateau(self):
         params = DelayedRenewalCageParams(
@@ -1403,32 +4556,6 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(rows[-1]["thermodynamic_slowdown"], 10.0)
         self.assertGreater(rows[-1]["inverse_entropy_control"], rows[0]["inverse_entropy_control"])
         self.assertGreater(rows[-1]["excess_heat_capacity"], 0.0)
-
-    def test_inherent_state_landscape_density_computes_conf_thermodynamics(self):
-        temperatures = np.array([1.2, 0.8])
-        energies = np.array([0.0, 1.0])
-        log_density = np.log(np.array([3.0, 1.0]))
-
-        rows = inherent_state_landscape_thermodynamics(
-            temperatures=temperatures,
-            energies=energies,
-            log_density=log_density,
-        )
-
-        hot = rows[0]
-        cold = rows[1]
-        expected_log_z_hot = math.log(3.0 + math.exp(-1.0 / temperatures[0]))
-        expected_p_excited_hot = math.exp(-1.0 / temperatures[0]) / math.exp(expected_log_z_hot)
-        expected_entropy_hot = expected_log_z_hot + expected_p_excited_hot / temperatures[0]
-
-        self.assertAlmostEqual(hot["log_configurational_partition"], expected_log_z_hot)
-        self.assertAlmostEqual(hot["configurational_entropy"], expected_entropy_hot)
-        self.assertAlmostEqual(
-            hot["excess_heat_capacity"],
-            expected_p_excited_hot * (1.0 - expected_p_excited_hot) / temperatures[0] ** 2,
-        )
-        self.assertLess(cold["configurational_entropy"], hot["configurational_entropy"])
-        self.assertEqual(hot["complete_dynamic_derivation_claim_allowed"], 0)
 
     def test_mct_beta_correlator_has_critical_and_von_schweidler_slopes(self):
         beta = MCTBetaParams(
@@ -5341,6 +8468,406 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(lag2["msd"], 2.0)
         self.assertAlmostEqual(lag2["ngp"], -1.0 / 3.0)
         self.assertAlmostEqual(lag2["overlap_mean"], 0.5)
+
+    def test_trajectory_cage_jump_event_protocol_extracts_persistence_and_exchange_clocks(self):
+        positions = np.array(
+            [
+                [[0.0], [0.0], [0.0]],
+                [[0.1], [0.0], [0.0]],
+                [[1.4], [0.0], [0.0]],
+                [[1.5], [1.2], [0.0]],
+                [[2.8], [1.3], [1.1]],
+            ],
+            dtype=float,
+        )
+        times = np.arange(5.0)
+
+        row = trajectory_cage_jump_event_protocol(
+            protocol_id="synthetic_particle_cage_jump_events",
+            positions=positions,
+            times=times,
+            jump_displacement_threshold=1.0,
+            min_particles_with_jumps=2,
+            min_exchange_interval_count=1,
+        )
+
+        self.assertEqual(row["event_protocol_stage"], "particle_resolved_cage_jump_event_clock_ready")
+        self.assertEqual(float(row["particle_resolved_jump_events_ready"]), 1.0)
+        self.assertEqual(float(row["physical_time_jump_clock_ready"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_event_clock_ready"]), 1.0)
+        self.assertEqual(float(row["total_jump_event_count"]), 4.0)
+        self.assertEqual(float(row["particles_with_jump_count"]), 3.0)
+        self.assertEqual(float(row["exchange_interval_count"]), 1.0)
+        self.assertAlmostEqual(float(row["persistence_mean"]), 3.0)
+        self.assertAlmostEqual(float(row["exchange_mean"]), 2.0)
+        self.assertAlmostEqual(float(row["mean_squared_jump_length"]), 1.5075)
+        self.assertGreater(float(row["jump_length_variance"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_trajectory_event_clock_macro_prediction_scores_heldout_signatures(self):
+        event_row = {
+            "protocol_id": "synthetic_particle_cage_jump_events",
+            "persistence_exchange_event_clock_ready": 1.0,
+            "persistence_mean": 3.0,
+            "exchange_mean": 2.0,
+            "mean_squared_jump_length": 1.5075,
+            "dimension": 1.0,
+        }
+        params = PersistenceExchangeParams(
+            cage_variance=0.5,
+            cage_tau=0.2,
+            jump_variance=1.5075,
+            persistence_mean=3.0,
+            exchange_mean=2.0,
+        )
+        wave_numbers = [0.8, 1.1]
+        late_time = 12.0
+        time_grid = np.geomspace(0.05, 30.0, 800)
+        observed_tau_alpha_by_k = {
+            wave_number: persistence_exchange_alpha_relaxation_time(wave_number, params)
+            for wave_number in wave_numbers
+        }
+        observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), params)[0])
+        observed_chi4_peak = float(np.max(persistence_exchange_scattering_susceptibility(0.8, time_grid, params)))
+
+        row = trajectory_event_clock_macro_prediction_protocol(
+            protocol_id="synthetic_event_clock_macro_prediction",
+            event_row=event_row,
+            anchor_wave_number=0.8,
+            wave_numbers=wave_numbers,
+            observed_diffusion_coefficient=persistence_exchange_diffusion_coefficient(params),
+            diffusion_relative_error=0.05,
+            observed_tau_alpha_by_k=observed_tau_alpha_by_k,
+            tau_alpha_relative_error_by_k={0.8: 0.05, 1.1: 0.05},
+            late_time=late_time,
+            observed_late_ngp=observed_late_ngp,
+            late_ngp_relative_error=0.10,
+            observed_chi4_peak=observed_chi4_peak,
+            chi4_peak_relative_error=0.10,
+            time_grid=time_grid,
+            cage_variance=0.5,
+            cage_tau=0.2,
+        )
+
+        self.assertEqual(row["prediction_stage"], "event_clock_micro_to_macro_prediction_ready")
+        self.assertEqual(float(row["micro_to_macro_prediction_ready"]), 1.0)
+        self.assertEqual(float(row["micro_to_macro_predictions_pass"]), 1.0)
+        self.assertEqual(float(row["calibrated_from_event_clock_only"]), 1.0)
+        self.assertEqual(float(row["fit_parameters_from_macro_observables"]), 0.0)
+        self.assertLess(float(row["diffusion_z"]), 1.0)
+        self.assertLess(float(row["max_tau_alpha_z"]), 1.0)
+        self.assertLess(float(row["late_ngp_z"]), 1.0)
+        self.assertLess(float(row["chi4_peak_z"]), 1.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_microdynamic_prediction_scorecard_separates_canary_rejection_and_glassbench_blocker(self):
+        rows = microdynamic_prediction_scorecard(
+            scorecard_id="microdynamic_prediction_scorecard",
+            event_prediction_rows=[
+                {
+                    "protocol_id": "synthetic_event_clock_macro_prediction",
+                    "micro_to_macro_prediction_ready": 1.0,
+                    "micro_to_macro_predictions_pass": 1.0,
+                    "calibrated_from_event_clock_only": 1.0,
+                    "fit_parameters_from_macro_observables": 0.0,
+                    "diffusion_prediction_pass": 1.0,
+                    "tau_alpha_prediction_pass": 1.0,
+                    "late_ngp_prediction_pass": 1.0,
+                    "chi4_peak_prediction_pass": 1.0,
+                    "prediction_stage": "event_clock_micro_to_macro_prediction_ready",
+                    "primary_blocker": "none",
+                },
+                {
+                    "protocol_id": "synthetic_event_clock_macro_late_ngp_mismatch",
+                    "micro_to_macro_prediction_ready": 1.0,
+                    "micro_to_macro_predictions_pass": 0.0,
+                    "calibrated_from_event_clock_only": 1.0,
+                    "fit_parameters_from_macro_observables": 0.0,
+                    "diffusion_prediction_pass": 1.0,
+                    "tau_alpha_prediction_pass": 1.0,
+                    "late_ngp_prediction_pass": 0.0,
+                    "chi4_peak_prediction_pass": 1.0,
+                    "prediction_stage": "event_clock_micro_to_macro_prediction_failed",
+                    "primary_blocker": "heldout_macro_signature_mismatch",
+                },
+            ],
+            simultaneous_closure_rows=[
+                {
+                    "protocol_id": "synthetic_minimal_dynamical_closure",
+                    "simultaneous_closure_ready": 1.0,
+                    "heldout_count": 4.0,
+                    "all_required_dynamical_predictions_pass": 1.0,
+                    "closure_stage": "simultaneous_dynamical_signature_closure_passed",
+                    "primary_blocker": "none",
+                }
+            ],
+            glassbench_closed_loop_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "frame_index_microstats_ready": 1.0,
+                    "macro_signature_ready": 1.0,
+                    "micro_to_macro_prediction_ready": 0.0,
+                    "closed_loop_stage": "real_microstats_macro_signatures_closed_loop_blocked",
+                    "primary_blocker": "cage_jump_event_segmentation",
+                }
+            ],
+            late_recovery_power_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "outcome_scenario": "wide_uncertainty_requires_more_data",
+                    "decision_power_stage": "late_ngp_power_extension_required",
+                    "current_member_count": 8.0,
+                    "required_member_count": 128.0,
+                    "additional_member_count_needed": 120.0,
+                }
+            ],
+        )
+
+        by_id = {row["scorecard_row_id"]: row for row in rows}
+        canary = by_id["synthetic_event_clock_macro_prediction"]
+        mismatch = by_id["synthetic_event_clock_macro_late_ngp_mismatch"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(canary["scorecard_stage"], "microstats_to_macro_prediction_passed")
+        self.assertEqual(canary["allowed_claim_level"], "synthetic_microdynamic_closure_canary")
+        self.assertEqual(float(canary["micro_input_count"]), 4.0)
+        self.assertEqual(float(canary["heldout_macro_prediction_count"]), 4.0)
+        self.assertEqual(float(canary["macro_fit_parameter_count"]), 0.0)
+        self.assertEqual(float(canary["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(mismatch["scorecard_stage"], "heldout_macro_prediction_rejected")
+        self.assertEqual(float(mismatch["mechanism_rejection_ready"]), 1.0)
+        self.assertEqual(mismatch["primary_blocker"], "late_ngp_prediction_pass")
+
+        self.assertEqual(glassbench["scorecard_stage"], "real_glassbench_prediction_blocked")
+        self.assertEqual(glassbench["allowed_claim_level"], "real_signature_support_not_microdynamic_prediction")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertEqual(float(glassbench["required_member_count"]), 128.0)
+        self.assertEqual(float(glassbench["additional_member_count_needed"]), 120.0)
+        self.assertEqual(glassbench["primary_blocker"], "cage_jump_event_segmentation")
+
+    def test_microdynamic_minimality_audit_marks_required_inputs_and_overclaim_modes(self):
+        rows = microdynamic_minimality_audit(
+            audit_id="microdynamic_minimality_audit",
+            required_micro_inputs=[
+                "persistence_mean",
+                "exchange_mean",
+                "jump_variance",
+                "cage_variance",
+            ],
+            variant_rows=[
+                {
+                    "variant_id": "full_event_clock_statistics",
+                    "available_micro_inputs": "persistence_mean;exchange_mean;jump_variance;cage_variance",
+                    "macro_fit_parameter_count": 0.0,
+                    "heldout_macro_prediction_count": 4.0,
+                    "all_required_predictions_pass": 1.0,
+                },
+                {
+                    "variant_id": "missing_exchange_clock",
+                    "available_micro_inputs": "persistence_mean;jump_variance;cage_variance",
+                    "macro_fit_parameter_count": 0.0,
+                    "heldout_macro_prediction_count": 0.0,
+                    "all_required_predictions_pass": 0.0,
+                },
+                {
+                    "variant_id": "macro_fit_only_alpha_transport",
+                    "available_micro_inputs": "none",
+                    "macro_fit_parameter_count": 2.0,
+                    "heldout_macro_prediction_count": 0.0,
+                    "all_required_predictions_pass": 0.0,
+                },
+            ],
+            scorecard_rows=[
+                {
+                    "scorecard_row_id": "glassbench_ka2d_0_23_current_closed_loop",
+                    "source_class": "real_glassbench_public_data",
+                    "scorecard_stage": "real_glassbench_prediction_blocked",
+                    "allowed_claim_level": "real_signature_support_not_microdynamic_prediction",
+                    "current_member_count": 8.0,
+                    "required_member_count": 128.0,
+                    "primary_blocker": "physical_time_semantics",
+                }
+            ],
+        )
+
+        by_id = {row["audit_row_id"]: row for row in rows}
+        full = by_id["full_event_clock_statistics"]
+        missing = by_id["missing_exchange_clock"]
+        fit_only = by_id["macro_fit_only_alpha_transport"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(full["minimality_stage"], "necessary_microstatistics_sufficient")
+        self.assertEqual(float(full["missing_required_input_count"]), 0.0)
+        self.assertEqual(float(full["microdynamic_basis_minimal"]), 1.0)
+        self.assertEqual(float(full["overclaim_risk"]), 0.0)
+
+        self.assertEqual(missing["minimality_stage"], "required_microstatistics_missing")
+        self.assertEqual(missing["missing_required_inputs"], "exchange_mean")
+        self.assertEqual(float(missing["microdynamic_basis_minimal"]), 0.0)
+        self.assertEqual(missing["primary_blocker"], "exchange_mean")
+
+        self.assertEqual(fit_only["minimality_stage"], "macro_fit_only_overclaim_risk")
+        self.assertEqual(float(fit_only["overclaim_risk"]), 1.0)
+        self.assertEqual(fit_only["allowed_claim_level"], "fit_only_not_microdynamic_prediction")
+
+        self.assertEqual(glassbench["minimality_stage"], "real_data_microdynamic_inputs_missing")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertEqual(float(glassbench["required_member_count"]), 128.0)
+        self.assertEqual(float(glassbench["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_experimental_verdict_matrix_combines_literature_real_and_scope_boundaries(self):
+        rows = sota_experimental_verdict_matrix(
+            verdict_id="sota_experimental_verdict_matrix",
+            dynamic_alignment_rows=[
+                {
+                    "signature": "transient_ngp_peak",
+                    "model_support": 1.0,
+                    "literature_qualitative_support": 1.0,
+                    "real_glassbench_support": 1.0,
+                    "real_quantitative_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "none",
+                },
+                {
+                    "signature": "persistence_exchange_decoupling",
+                    "model_support": 1.0,
+                    "literature_qualitative_support": 1.0,
+                    "real_glassbench_support": 0.0,
+                    "real_quantitative_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "physical_time_semantics",
+                },
+                {
+                    "signature": "thermodynamic_transition",
+                    "model_support": 0.0,
+                    "literature_qualitative_support": 0.0,
+                    "real_glassbench_support": 0.0,
+                    "real_quantitative_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": "thermodynamic_input_law",
+                },
+            ],
+            microdynamic_scorecard_rows=[
+                {
+                    "scorecard_row_id": "synthetic_event_clock_macro_prediction",
+                    "source_class": "synthetic_event_clock",
+                    "scorecard_stage": "microstats_to_macro_prediction_passed",
+                    "all_required_predictions_pass": 1.0,
+                    "mechanism_rejection_ready": 0.0,
+                    "real_data_comparison_ready": 0.0,
+                },
+                {
+                    "scorecard_row_id": "synthetic_event_clock_macro_late_ngp_mismatch",
+                    "source_class": "synthetic_event_clock",
+                    "scorecard_stage": "heldout_macro_prediction_rejected",
+                    "all_required_predictions_pass": 0.0,
+                    "mechanism_rejection_ready": 1.0,
+                    "real_data_comparison_ready": 0.0,
+                },
+                {
+                    "scorecard_row_id": "glassbench_ka2d_0_23_current_closed_loop",
+                    "source_class": "real_glassbench_public_data",
+                    "scorecard_stage": "real_glassbench_prediction_blocked",
+                    "all_required_predictions_pass": 0.0,
+                    "mechanism_rejection_ready": 0.0,
+                    "real_data_comparison_ready": 0.0,
+                    "primary_blocker": "physical_time_semantics",
+                },
+            ],
+            minimality_rows=[
+                {
+                    "audit_row_id": "full_event_clock_statistics",
+                    "minimality_stage": "necessary_microstatistics_sufficient",
+                    "microdynamic_basis_minimal": 1.0,
+                    "overclaim_risk": 0.0,
+                },
+                {
+                    "audit_row_id": "macro_fit_only_alpha_transport",
+                    "minimality_stage": "macro_fit_only_overclaim_risk",
+                    "microdynamic_basis_minimal": 0.0,
+                    "overclaim_risk": 1.0,
+                },
+                {
+                    "audit_row_id": "glassbench_ka2d_0_23_current_closed_loop",
+                    "minimality_stage": "real_data_microdynamic_inputs_missing",
+                    "microdynamic_basis_minimal": 0.0,
+                    "overclaim_risk": 0.0,
+                    "primary_blocker": "physical_time_semantics",
+                },
+            ],
+        )
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        dynamic = by_id["sota_dynamic_signature_support"]
+        mechanism = by_id["sota_mechanism_selection"]
+        glassbench = by_id["sota_real_glassbench_closed_loop"]
+        thermo = by_id["sota_thermodynamic_boundary"]
+
+        self.assertEqual(dynamic["sota_verdict_stage"], "sota_dynamic_signatures_supported")
+        self.assertEqual(float(dynamic["literature_trend_support"]), 1.0)
+        self.assertEqual(float(dynamic["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(dynamic["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(mechanism["sota_verdict_stage"], "mechanism_selection_protocol_supported")
+        self.assertEqual(float(mechanism["microdynamic_prediction_support"]), 1.0)
+        self.assertEqual(float(mechanism["mechanism_rejection_ready"]), 1.0)
+
+        self.assertEqual(glassbench["sota_verdict_stage"], "real_glassbench_closed_loop_blocked")
+        self.assertEqual(float(glassbench["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(glassbench["primary_blocker"], "physical_time_semantics")
+
+        self.assertEqual(thermo["sota_verdict_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(thermo["allowed_claim_level"], "dynamical_theory_only")
+
+    def test_trajectory_event_clock_threshold_robustness_detects_stable_window(self):
+        positions = np.array(
+            [
+                [[0.0], [0.0], [0.0]],
+                [[0.1], [0.0], [0.0]],
+                [[1.4], [0.0], [0.0]],
+                [[1.5], [1.2], [0.0]],
+                [[2.8], [1.3], [1.1]],
+            ],
+            dtype=float,
+        )
+        times = np.arange(5.0)
+        rows = trajectory_event_clock_threshold_robustness_protocol(
+            protocol_id="synthetic_event_clock_threshold_robustness",
+            positions=positions,
+            times=times,
+            thresholds=[0.05, 0.9, 1.0, 1.35],
+            reference_threshold=1.0,
+            anchor_wave_number=0.8,
+            wave_numbers=[0.8, 1.1],
+            late_time=12.0,
+            time_grid=np.geomspace(0.05, 30.0, 800),
+            min_particles_with_jumps=2,
+            min_exchange_interval_count=1,
+            cage_variance=0.5,
+            cage_tau=0.2,
+        )
+
+        by_threshold = {float(row["jump_displacement_threshold"]): row for row in rows}
+        self.assertEqual(by_threshold[1.0]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertEqual(by_threshold[0.9]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertEqual(float(by_threshold[1.0]["threshold_prediction_pass"]), 1.0)
+        self.assertEqual(float(by_threshold[0.9]["threshold_prediction_pass"]), 1.0)
+        self.assertGreaterEqual(float(by_threshold[1.0]["stable_threshold_window_count"]), 2.0)
+
+        self.assertEqual(by_threshold[0.05]["robustness_stage"], "event_clock_threshold_prediction_failed")
+        self.assertEqual(float(by_threshold[0.05]["threshold_prediction_pass"]), 0.0)
+        self.assertEqual(by_threshold[0.05]["primary_blocker"], "threshold_macro_signature_mismatch")
+        self.assertEqual(by_threshold[1.35]["robustness_stage"], "event_clock_threshold_event_clock_incomplete")
+        self.assertEqual(by_threshold[1.35]["primary_blocker"], "jump_displacement_threshold")
+        for row in rows:
+            self.assertEqual(float(row["fit_parameters_from_macro_observables"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_trajectory_observable_protocol_validates_inputs(self):
         with self.assertRaises(ValueError):

@@ -1,4 +1,5 @@
 import sys
+import math
 import tempfile
 import time
 import unittest
@@ -386,6 +387,162 @@ class ArxivPackageTests(unittest.TestCase):
         chi4_mismatch = by_id["synthetic_chi4_mismatch_closure"]
         self.assertEqual(chi4_mismatch["closure_stage"], "dynamical_heldout_prediction_failed")
         self.assertEqual(chi4_mismatch["primary_blocker"], "chi4_peak_z_consistent")
+
+    def test_microdynamic_prediction_scorecard_keeps_core_claim_and_real_blocker_together(self):
+        path = ROOT / "data" / "renewal_cage_microdynamic_prediction_scorecard.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["scorecard_row_id"]: row for row in rows}
+        canary = by_id["synthetic_event_clock_macro_prediction"]
+        mismatch = by_id["synthetic_event_clock_macro_late_ngp_mismatch"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(canary["scorecard_stage"], "microstats_to_macro_prediction_passed")
+        self.assertEqual(float(canary["heldout_macro_prediction_count"]), 4.0)
+        self.assertEqual(float(canary["macro_fit_parameter_count"]), 0.0)
+        self.assertEqual(float(canary["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(mismatch["scorecard_stage"], "heldout_macro_prediction_rejected")
+        self.assertEqual(float(mismatch["mechanism_rejection_ready"]), 1.0)
+        self.assertEqual(glassbench["scorecard_stage"], "real_glassbench_prediction_blocked")
+        self.assertEqual(glassbench["allowed_claim_level"], "real_signature_support_not_microdynamic_prediction")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertGreater(float(glassbench["required_member_count"]), float(glassbench["current_member_count"]))
+
+    def test_microdynamic_minimality_audit_requires_event_clock_inputs_before_claim(self):
+        path = ROOT / "data" / "renewal_cage_microdynamic_minimality_audit.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["audit_row_id"]: row for row in rows}
+        full = by_id["full_event_clock_statistics"]
+        missing = by_id["missing_exchange_clock"]
+        fit_only = by_id["macro_fit_only_alpha_transport"]
+        glassbench = by_id["glassbench_ka2d_0_23_current_closed_loop"]
+
+        self.assertEqual(full["minimality_stage"], "necessary_microstatistics_sufficient")
+        self.assertEqual(float(full["microdynamic_basis_minimal"]), 1.0)
+        self.assertEqual(missing["minimality_stage"], "required_microstatistics_missing")
+        self.assertEqual(missing["primary_blocker"], "exchange_mean")
+        self.assertEqual(fit_only["minimality_stage"], "macro_fit_only_overclaim_risk")
+        self.assertEqual(float(fit_only["overclaim_risk"]), 1.0)
+        self.assertEqual(glassbench["minimality_stage"], "real_data_microdynamic_inputs_missing")
+        self.assertEqual(float(glassbench["real_data_comparison_ready"]), 0.0)
+        self.assertEqual(float(glassbench["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_experimental_verdict_matrix_consolidates_final_comparison(self):
+        path = ROOT / "data" / "renewal_cage_sota_experimental_verdict_matrix.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        dynamic = by_id["sota_dynamic_signature_support"]
+        mechanism = by_id["sota_mechanism_selection"]
+        glassbench = by_id["sota_real_glassbench_closed_loop"]
+        thermodynamic = by_id["sota_thermodynamic_boundary"]
+        self.assertEqual(dynamic["sota_verdict_stage"], "sota_dynamic_signatures_supported")
+        self.assertEqual(float(dynamic["literature_trend_support"]), 1.0)
+        self.assertEqual(float(dynamic["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(mechanism["sota_verdict_stage"], "mechanism_selection_protocol_supported")
+        self.assertEqual(float(mechanism["mechanism_rejection_ready"]), 1.0)
+        self.assertEqual(glassbench["sota_verdict_stage"], "real_glassbench_closed_loop_blocked")
+        self.assertEqual(float(glassbench["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(thermodynamic["sota_verdict_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(thermodynamic["allowed_claim_level"], "dynamical_theory_only")
+
+    def test_glassbench_real_evidence_claim_synthesis_separates_ready_and_blocked_claims(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["claim_row_id"]: row for row in rows}
+        dynamic = by_id["real_dynamic_signature_support"]
+        alpha = by_id["cached_multik_alpha_shape_prediction"]
+        mechanism = by_id["real_mechanism_selection"]
+        thermodynamic = by_id["thermodynamic_scope_boundary"]
+
+        self.assertEqual(dynamic["claim_synthesis_stage"], "real_dynamic_signatures_supported_preinversion")
+        self.assertGreaterEqual(float(dynamic["supported_real_signature_count"]), 4.0)
+        self.assertEqual(float(dynamic["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(alpha["claim_synthesis_stage"], "multik_alpha_candidate_preregistered_post_window")
+        self.assertEqual(float(alpha["candidate_ready"]), 1.0)
+        self.assertEqual(float(alpha["claim_ready_now"]), 0.0)
+        self.assertEqual(alpha["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(mechanism["claim_synthesis_stage"], "mechanism_selection_preregistered_late_recovery_missing")
+        self.assertEqual(float(mechanism["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(thermodynamic["claim_synthesis_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_data_closure_priority_orders_minimum_next_payload(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_data_closure_priority.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["closure_id"]: row for row in rows}
+        event_clock = by_id["physical_time_event_clock_and_cage_jump_segmentation"]
+        self.assertEqual(float(event_clock["priority_rank"]), 1.0)
+        self.assertEqual(event_clock["priority_stage"], "minimum_real_inversion_closure_priority")
+        self.assertEqual(float(event_clock["unlocks_quantitative_inversion"]), 1.0)
+        self.assertEqual(float(event_clock["unlocks_micro_to_macro_prediction"]), 1.0)
+        self.assertIn("frame_time_mapping", event_clock["minimum_required_payload"])
+        self.assertIn("cage_jump_event_segmentation", event_clock["minimum_required_payload"])
+        self.assertGreaterEqual(float(event_clock["blocked_gate_count"]), 3.0)
+
+        alpha = by_id["post_alpha_multik_fs_targets"]
+        self.assertEqual(alpha["priority_stage"], "heldout_alpha_prediction_priority")
+        self.assertEqual(float(alpha["unlocks_heldout_alpha_prediction"]), 1.0)
+
+        four_point = by_id["direct_four_point_function_and_dynamic_length"]
+        self.assertEqual(four_point["priority_stage"], "spatial_four_point_boundary_priority")
+        self.assertEqual(float(four_point["unlocks_direct_spatial_claim"]), 1.0)
+        self.assertEqual(float(four_point["unlocks_quantitative_inversion"]), 0.0)
+
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
+        self.assertTrue(all("thermodynamic_transition" not in row["post_unlock_claim_level"] for row in rows))
+
+    def test_glassbench_real_cached_microdynamic_verdict_marks_persistence_but_blocks_inversion(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["verdict_row_id"]: row for row in rows}
+        persistence = by_id["real_cached_persistence_clock"]
+        pe_bound = by_id["conditional_persistence_exchange_bound"]
+        recovery = by_id["late_recovery_decision_protocol"]
+        inversion = by_id["real_pe_inversion_boundary"]
+        self.assertEqual(
+            persistence["cached_microdynamic_verdict_stage"],
+            "real_cached_persistence_clock_quantified",
+        )
+        self.assertEqual(float(persistence["real_cached_evidence_ready"]), 1.0)
+        self.assertGreater(float(pe_bound["conditional_pe_ratio_lower_bound"]), 3.0)
+        self.assertEqual(pe_bound["cached_microdynamic_verdict_stage"], "conditional_pe_decoupling_bound_ready")
+        self.assertEqual(recovery["cached_microdynamic_verdict_stage"], "late_recovery_protocol_preregistered")
+        self.assertEqual(float(recovery["mechanism_selection_claim_allowed_now"]), 0.0)
+        self.assertEqual(inversion["cached_microdynamic_verdict_stage"], "real_pe_inversion_still_blocked")
+        self.assertEqual(float(inversion["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(inversion["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_waiting_law_selection_rejects_unearned_stretching_claim(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_waiting_law_selection.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        row = rows[0]
+        self.assertEqual(row["waiting_law_selection_stage"], "exponential_waiting_law_not_rejected_sparse_cache")
+        self.assertEqual(float(row["waiting_law_selection_ready"]), 1.0)
+        self.assertLess(abs(float(row["weibull_shape_mle"]) - 1.0), 0.1)
+        self.assertLess(float(row["delta_aic_exponential_minus_weibull"]), 0.0)
+        self.assertEqual(float(row["extra_waiting_law_parameter_supported"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
@@ -1144,7 +1301,7 @@ class ArxivPackageTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text())
         self.assertEqual(
             manifest["source"],
-            "remote_zip_ka2d_trajectory_readme_timecode_semantics_and_corrected_member_observables",
+            "remote_zip_8mb_prefix_ka2d_trajectory_readme_timecode_semantics_and_corrected_member_observables",
         )
         self.assertIn("isoconfigurational trajectories", manifest["axis_semantics_evidence"])
 
@@ -1158,12 +1315,1161 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_023_tc05["physical_lag_time_ready"]), 1.0)
         self.assertEqual(float(ka2d_023_tc05["axis0_is_isoconfigurational_replica"]), 1.0)
         self.assertEqual(float(ka2d_023_tc05["frame_axis_is_physical_time"]), 0.0)
-        self.assertEqual(float(ka2d_023_tc05["member_count"]), 3.0)
-        self.assertEqual(float(ka2d_023_tc05["available_time_code_count"]), 2.0)
+        self.assertEqual(float(ka2d_023_tc05["member_count"]), 9.0)
+        self.assertEqual(float(ka2d_023_tc05["available_time_code_count"]), 8.0)
         self.assertEqual(float(ka2d_023_tc05["required_time_code_count"]), 8.0)
-        self.assertEqual(float(ka2d_023_tc05["timecode_curve_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023_tc05["timecode_curve_ready"]), 1.0)
         self.assertEqual(float(ka2d_023_tc05["sota_inversion_ready"]), 0.0)
-        self.assertEqual(ka2d_023_tc05["primary_blocker"], "sparse_time_code_coverage")
+        self.assertEqual(ka2d_023_tc05["primary_blocker"], "none")
+
+        ka2d_023_tc40 = by_key[("KA2D", "0.23", "tc40")]
+        self.assertEqual(float(ka2d_023_tc40["lag_time"]), 1500000.0)
+        self.assertGreater(float(ka2d_023_tc40["msd"]), float(ka2d_023_tc05["msd"]))
+        self.assertLess(
+            float(ka2d_023_tc40["self_intermediate_scattering"]),
+            float(ka2d_023_tc05["self_intermediate_scattering"]),
+        )
+
+        ka2d_030_tc01 = by_key[("KA2D", "0.30", "tc01")]
+        self.assertEqual(float(ka2d_030_tc01["member_count"]), 49.0)
+        self.assertEqual(float(ka2d_030_tc01["available_time_code_count"]), 1.0)
+        self.assertEqual(float(ka2d_030_tc01["required_time_code_count"]), 6.0)
+        self.assertEqual(float(ka2d_030_tc01["timecode_curve_ready"]), 0.0)
+        self.assertEqual(ka2d_030_tc01["primary_blocker"], "sparse_time_code_coverage")
+
+    def test_sota_glassbench_timecode_curve_bridge_marks_real_data_preinversion_blocker(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_timecode_curve_bridge.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(ka2d_023["bridge_stage"], "glassbench_timecode_curve_bridge_incomplete")
+        self.assertEqual(float(ka2d_023["timecode_curve_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["curve_bridge_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(float(ka2d_023["lag_count"]), 8.0)
+        self.assertGreater(float(ka2d_023["latest_lag_time_over_tau_alpha"]), 1.0)
+        self.assertGreater(
+            float(ka2d_023["latest_self_intermediate_scattering_anchor"]),
+            math.exp(-1.0),
+        )
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(float(ka2d_030["timecode_curve_ready"]), 0.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
+
+    def test_sota_glassbench_timecode_signature_support_scores_dynamic_signatures(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_timecode_signature_support.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(
+            ka2d_023["signature_stage"],
+            "real_curve_dynamic_signature_support_preinversion",
+        )
+        self.assertEqual(float(ka2d_023["real_time_observable_curve_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["msd_growth_signature"]), 1.0)
+        self.assertEqual(float(ka2d_023["self_intermediate_decay_signature"]), 1.0)
+        self.assertEqual(float(ka2d_023["transient_ngp_peak_signature"]), 1.0)
+        self.assertEqual(float(ka2d_023["transient_chi4_peak_signature"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_threshold_crossed"]), 0.0)
+        self.assertGreaterEqual(float(ka2d_023["supported_dynamical_signature_count"]), 4.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "alpha_threshold_crossing")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(
+            ka2d_030["signature_stage"],
+            "timecode_curve_upstream_incomplete",
+        )
+        self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
+
+    def test_sota_glassbench_alpha_threshold_horizon_audits_tau_alpha_mismatch(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_alpha_threshold_horizon.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(ka2d_023["audit_stage"], "metadata_tau_alpha_anchor_fs_mismatch")
+        self.assertEqual(float(ka2d_023["real_time_observable_curve_ready"]), 1.0)
+        self.assertGreater(float(ka2d_023["latest_lag_time_over_tau_alpha_metadata"]), 1.0)
+        self.assertEqual(float(ka2d_023["metadata_tau_alpha_reached"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_threshold_crossed"]), 0.0)
+        self.assertEqual(float(ka2d_023["metadata_tau_alpha_consistent_with_anchor_fs"]), 0.0)
+        self.assertGreater(
+            float(ka2d_023["latest_self_intermediate_scattering_anchor"]),
+            math.exp(-1.0),
+        )
+        self.assertGreater(float(ka2d_023["estimated_threshold_wave_number_at_latest_lag"]), 1.6)
+        self.assertGreater(float(ka2d_023["threshold_wave_number_over_max_observed"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_threshold_wave_number_covered"]), 0.0)
+        self.assertGreater(float(ka2d_023["estimated_lag_extension_factor"]), 1.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "alpha_anchor_wave_number_outside_observed_grid")
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["audit_stage"], "timecode_curve_upstream_incomplete")
+        self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
+
+    def test_sota_glassbench_alpha_anchor_rescue_protocol_keeps_event_clock_blocked(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(
+            ka2d_023["rescue_stage"],
+            "alpha_anchor_rescue_design_ready_real_event_clock_blocked",
+        )
+        self.assertGreater(float(ka2d_023["required_anchor_wave_number"]), 1.6)
+        self.assertGreater(float(ka2d_023["required_anchor_wave_number_over_observed_max"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_anchor_measurement_required"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_anchor_rescue_design_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["post_rescue_alpha_definition_consistent"]), 1.0)
+        self.assertEqual(float(ka2d_023["post_rescue_real_closed_loop_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "physical_time_semantics")
+        self.assertIn("threshold_sweep_event_clock", ka2d_023["remaining_post_rescue_blockers"])
+        self.assertIn("persistence_exchange_event_clock", ka2d_023["remaining_post_rescue_blockers"])
+        self.assertNotIn("alpha_definition_consistency", ka2d_023["remaining_post_rescue_blockers"])
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["rescue_stage"], "alpha_anchor_rescue_upstream_incomplete")
+        self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
+
+    def test_sota_glassbench_alpha_anchor_cached_fs_refines_rescue_k(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["cached_anchor_stage"],
+            "cached_direct_anchor_root_refines_required_k",
+        )
+        self.assertAlmostEqual(float(ka2d_023["candidate_anchor_wave_number"]), 2.696613405006454)
+        self.assertAlmostEqual(float(ka2d_023["cached_fs_at_candidate_anchor"]), 0.5283262805867766)
+        self.assertGreater(float(ka2d_023["cached_fs_at_candidate_anchor"]), math.exp(-1.0))
+        self.assertEqual(float(ka2d_023["candidate_anchor_threshold_crossed"]), 0.0)
+        self.assertAlmostEqual(float(ka2d_023["cached_structure_threshold_wave_number"]), 3.009201552318913)
+        self.assertGreater(float(ka2d_023["cached_structure_threshold_over_candidate"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_023["cached_direct_threshold_wave_number"]), 4.7984485103142)
+        self.assertAlmostEqual(float(ka2d_023["cached_direct_fs_at_threshold_wave_number"]), math.exp(-1.0))
+        self.assertGreater(float(ka2d_023["cached_direct_threshold_over_candidate"]), 1.7)
+        self.assertEqual(float(ka2d_023["cached_direct_root_bracketed"]), 1.0)
+        self.assertEqual(float(ka2d_023["cached_alpha_anchor_rescue_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "cached_direct_anchor_wave_number_higher_than_protocol")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = next(row for row in rows if row["system_id"] == "KA2D" and row["temperature"] == "0.30")
+        self.assertEqual(ka2d_030["cached_anchor_stage"], "cached_anchor_upstream_incomplete")
+        self.assertEqual(ka2d_030["primary_blocker"], "alpha_anchor_rescue_design")
+
+    def test_sota_glassbench_direct_alpha_curve_records_cached_threshold_crossing(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_curve.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["direct_alpha_curve_stage"],
+            "cached_direct_alpha_curve_ready_event_clock_blocked",
+        )
+        self.assertAlmostEqual(float(ka2d_023["direct_alpha_wave_number"]), 4.7984485103142)
+        self.assertEqual(float(ka2d_023["lag_count"]), 8.0)
+        self.assertEqual(ka2d_023["threshold_crossing_time_code"], "tc40")
+        self.assertAlmostEqual(float(ka2d_023["threshold_crossing_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(ka2d_023["latest_direct_alpha_fs"]), math.exp(-1.0))
+        self.assertEqual(float(ka2d_023["alpha_threshold_crossed"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "event_clock_trajectory")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(ka2d_023["direct_alpha_uncertainty_ready"]), 1.0)
+        self.assertIn(";", ka2d_023["sigma_direct_alpha_fs_curve"])
+        self.assertIn("0.979990664255", ka2d_023["direct_alpha_fs_curve"])
+        self.assertIn("0.367879441171", ka2d_023["direct_alpha_fs_curve"])
+
+    def test_sota_glassbench_direct_alpha_shape_selection_blocks_overclaim(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_shape_selection.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["alpha_shape_selection_stage"],
+            "cached_alpha_shape_stretched_candidate_multik_blocked",
+        )
+        self.assertEqual(float(ka2d_023["alpha_shape_selection_ready"]), 1.0)
+        self.assertLess(float(ka2d_023["kww_beta"]), 0.2)
+        self.assertGreater(float(ka2d_023["delta_aic_exponential_minus_kww"]), 40.0)
+        self.assertEqual(float(ka2d_023["stretched_alpha_candidate_supported"]), 1.0)
+        self.assertEqual(float(ka2d_023["uncertainty_columns_ready"]), 1.0)
+        self.assertLess(float(ka2d_023["max_monotonicity_violation_z"]), 2.0)
+        self.assertEqual(float(ka2d_023["monotone_compatible_with_uncertainty"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "multi_k_alpha_shape")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_multik_shape_gate_marks_window_edge_blocker(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_multik_shape.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["multik_shape_gate_stage"],
+            "cached_multik_alpha_shape_window_edge_blocked",
+        )
+        self.assertEqual(float(ka2d_023["multik_shape_candidate_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["crossed_k_count"]), 3.0)
+        self.assertLess(float(ka2d_023["kww_beta_spread"]), 0.02)
+        self.assertLess(float(ka2d_023["max_monotonicity_violation_z"]), 1.0)
+        self.assertEqual(float(ka2d_023["all_crossings_at_window_edge"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "post_alpha_window_depth")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_multik_heldout_prediction_blocks_window_edge_claim(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["heldout_prediction_stage"],
+            "cached_multik_heldout_prediction_window_edge_blocked",
+        )
+        self.assertEqual(float(ka2d_023["heldout_prediction_candidate_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["heldout_count"]), 3.0)
+        self.assertLess(float(ka2d_023["max_heldout_beta_abs_error"]), 0.011)
+        self.assertLess(float(ka2d_023["max_heldout_shape_rmse"]), 0.23)
+        self.assertEqual(float(ka2d_023["all_crossings_at_window_edge"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "post_alpha_window_depth")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_post_window_prediction_targets_preregister_tc45_tc50(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        self.assertEqual(len(ka2d_023), 6)
+        by_target = {
+            (row["target_time_code"], row["direct_alpha_wave_number"]): row
+            for row in ka2d_023
+        }
+        root_tc45 = by_target[("tc45", "4.79844851031")]
+        high_tc50 = by_target[("tc50", "6.0")]
+        self.assertAlmostEqual(float(root_tc45["predicted_fs"]), 0.24140638485539556, delta=1e-12)
+        self.assertAlmostEqual(float(high_tc50["predicted_fs"]), 0.12459213356529883, delta=1e-12)
+        self.assertLess(float(high_tc50["acceptance_fs_high"]), 0.18)
+        self.assertEqual(float(root_tc45["prediction_target_ready"]), 1.0)
+        self.assertEqual(float(root_tc45["observed_post_window_fs_ready"]), 0.0)
+        self.assertEqual(float(root_tc45["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(root_tc45["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(float(root_tc45["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_post_window_verdict_waits_for_observation(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        self.assertEqual(len(ka2d_023), 6)
+        root_tc45 = next(
+            row for row in ka2d_023
+            if row["target_time_code"] == "tc45"
+            and row["direct_alpha_wave_number"] == "4.79844851031"
+        )
+        self.assertEqual(root_tc45["post_window_verdict_stage"], "post_alpha_observation_not_ready")
+        self.assertAlmostEqual(float(root_tc45["predicted_fs"]), 0.24140638485539556, delta=1e-12)
+        self.assertEqual(float(root_tc45["observed_post_window_fs_ready"]), 0.0)
+        self.assertEqual(float(root_tc45["post_window_prediction_supported"]), 0.0)
+        self.assertEqual(float(root_tc45["post_window_prediction_rejected"]), 0.0)
+        self.assertEqual(float(root_tc45["real_alpha_shape_claim_ready"]), 0.0)
+        self.assertEqual(root_tc45["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(float(root_tc45["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_transport_records_proxy_not_inversion(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_transport.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["transport_coupling_stage"],
+            "cached_direct_alpha_transport_proxy_ready_event_clock_blocked",
+        )
+        self.assertAlmostEqual(float(ka2d_023["tau_alpha_direct"]), 1500000.0)
+        self.assertAlmostEqual(float(ka2d_023["matched_msd"]), 0.9747508405755333)
+        self.assertAlmostEqual(float(ka2d_023["apparent_diffusion_coefficient"]), 1.6245847342925555e-7)
+        self.assertAlmostEqual(float(ka2d_023["apparent_stokes_einstein_product"]), 0.24368771014388332)
+        self.assertAlmostEqual(float(ka2d_023["matched_ngp_2d"]), 2.1239947887392923)
+        self.assertEqual(float(ka2d_023["direct_alpha_transport_proxy_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_pe_bound_records_conditional_identifiability(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["pe_feasibility_stage"],
+            "direct_alpha_transport_bounds_pe_but_event_clock_missing",
+        )
+        self.assertEqual(float(ka2d_023["full_msd_jump_variance_feasible"]), 0.0)
+        self.assertAlmostEqual(float(ka2d_023["jump_variance_upper_bound"]), 0.4855550202214052)
+        self.assertAlmostEqual(float(ka2d_023["jump_variance_upper_over_msd"]), 0.4981324457588704)
+        self.assertAlmostEqual(float(ka2d_023["reference_jump_variance_fraction"]), 0.2)
+        self.assertAlmostEqual(float(ka2d_023["reference_exchange_mean"]), 600000.0)
+        self.assertAlmostEqual(float(ka2d_023["reference_persistence_mean"]), 1409293.5403982885)
+        self.assertAlmostEqual(float(ka2d_023["reference_persistence_exchange_ratio"]), 2.3488225673304806)
+        self.assertEqual(float(ka2d_023["conditional_pe_inference_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "event_clock_jump_variance")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_displacement_tail_bound_requires_segmentation(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["tail_bound_stage"],
+            "direct_displacement_tail_exceeds_pe_single_event_bound",
+        )
+        self.assertAlmostEqual(float(ka2d_023["q_bound"]), 0.4855550202214053)
+        self.assertAlmostEqual(float(ka2d_023["q_all"]), 0.48737542028776676)
+        self.assertAlmostEqual(float(ka2d_023["q_all_over_bound"]), 1.003749111821625)
+        self.assertAlmostEqual(float(ka2d_023["fraction_q_gt_bound"]), 0.2349612403100775)
+        self.assertAlmostEqual(float(ka2d_023["mean_q_above_bound"]), 1.7929841231781933)
+        self.assertAlmostEqual(float(ka2d_023["mean_q_above_over_bound"]), 3.692648718492544)
+        self.assertEqual(float(ka2d_023["event_segmentation_required"]), 1.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "event_segmentation")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_multilag_crossing_canary_blocks_replica_axis_clock(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["crossing_canary_stage"],
+            "multilag_displacement_crossing_canary_ready_replica_axis_blocked",
+        )
+        self.assertEqual(float(ka2d_023["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_023["ever_crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(ka2d_023["never_crossed_fraction"]), 0.759922480620155)
+        self.assertAlmostEqual(float(ka2d_023["post_crossing_recross_fraction"]), 0.23599320882852293)
+        self.assertAlmostEqual(float(ka2d_023["first_crossing_q_mean_over_bound"]), 3.4430132801814253)
+        self.assertIn("tc40:0.21724806201550387", ka2d_023["first_crossing_fractions_by_time_code"])
+        self.assertEqual(float(ka2d_023["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["persistence_exchange_event_clock_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_direct_alpha_event_clock_contract_records_missing_true_time_axis(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["event_clock_contract_stage"],
+            "segmentation_target_ready_true_event_clock_missing",
+        )
+        self.assertEqual(float(ka2d_023["conditional_pe_inference_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["direct_displacement_tail_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_segmentation_target_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["cached_replica_ladder_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["axis0_is_physical_time"]), 0.0)
+        self.assertEqual(float(ka2d_023["requires_true_time_trajectory"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_clock_extraction_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "physical_time_trajectory_axis")
+        self.assertIn("positions[time,particle,dimension]", ka2d_023["required_arrays"])
+        self.assertIn("isoconfigurational_replica_axis", ka2d_023["forbidden_substitutes"])
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_sparse_lag_event_clock_audit_marks_coarse_candidate(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_sparse_lag_event_clock.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["sparse_lag_event_clock_stage"],
+            "sparse_lag_tensor_ready_replica_identity_unverified",
+        )
+        self.assertEqual(float(ka2d_023["physical_lag_tensor_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["same_initial_structure_verified"]), 1.0)
+        self.assertEqual(float(ka2d_023["same_shape_across_lags"]), 1.0)
+        self.assertEqual(float(ka2d_023["time_code_coverage_fraction"]), 1.0)
+        self.assertEqual(float(ka2d_023["coarse_event_clock_candidate_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["replica_identity_alignment_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "replica_identity_alignment")
+        self.assertEqual(ka2d_023["event_clock_resolution"], "sparse_lag_interval")
+        self.assertIn("tc40", ka2d_023["observed_time_codes"])
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_interval_censored_first_crossing_clock_quantifies_candidate(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["interval_clock_stage"],
+            "interval_censored_persistence_clock_candidate",
+        )
+        self.assertEqual(float(ka2d_023["interval_clock_candidate_ready"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_023["crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(ka2d_023["right_censored_fraction"]), 0.759922480620155)
+        self.assertAlmostEqual(float(ka2d_023["mean_first_crossing_lower_bound"]), 130241.55354213755)
+        self.assertAlmostEqual(float(ka2d_023["mean_first_crossing_upper_bound"]), 1370127.2559589928)
+        self.assertAlmostEqual(float(ka2d_023["mean_first_crossing_midpoint"]), 750184.4047505651)
+        self.assertGreater(float(ka2d_023["mean_interval_width"]), 1.0e6)
+        self.assertIn("tc40:142587", ka2d_023["first_crossing_intervals"])
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "interval_censoring_and_replica_identity")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_interval_censored_persistence_fit_estimates_scale(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["persistence_fit_stage"],
+            "interval_censored_exponential_persistence_fit_ready",
+        )
+        self.assertEqual(float(ka2d_023["persistence_fit_ready"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_023["exponential_rate_mle"]), 1.827224516438915e-07, delta=1e-15)
+        self.assertAlmostEqual(float(ka2d_023["exponential_mean_persistence_time"]), 5472781.209990023, delta=1.0)
+        self.assertAlmostEqual(float(ka2d_023["predicted_crossed_fraction_at_latest_lag"]), 0.2397315447385533, delta=1e-7)
+        self.assertAlmostEqual(float(ka2d_023["observed_crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(ka2d_023["mean_persistence_over_tau_alpha_direct"]), 3.6485208066600154, delta=1e-6)
+        self.assertEqual(float(ka2d_023["exchange_clock_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "exchange_clock_and_replica_identity")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_finite_exchange_envelope_defines_late_ngp_followup_horizon(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_finite_exchange_envelope.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["envelope_stage"], "finite_exchange_falsification_horizon_ready")
+        self.assertEqual(float(ka2d_023["envelope_ready"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_023["conditional_persistence_exchange_ratio_lower_bound"]), 3.6485208210611972)
+        self.assertAlmostEqual(float(ka2d_023["gaussian_recovery_lag_upper_bound"]), 42972781.2315918, delta=1e-3)
+        self.assertAlmostEqual(float(ka2d_023["required_followup_lag_multiplier_over_current"]), 28.6485208210612, delta=1e-12)
+        self.assertEqual(float(ka2d_023["current_window_has_gaussian_recovery_power"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_ngp_followup_and_exchange_clock")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_late_recovery_protocol_keeps_followup_missing_explicit(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_protocol.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["late_recovery_stage"], "late_recovery_acquisition_required")
+        self.assertEqual(float(ka2d_023["mechanism_selection_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["finite_exchange_supported"]), 0.0)
+        self.assertEqual(float(ka2d_023["finite_exchange_rejected"]), 0.0)
+        self.assertEqual(float(ka2d_023["static_disorder_rejected"]), 0.0)
+        self.assertAlmostEqual(float(ka2d_023["required_followup_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_observation")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_late_recovery_ingestion_contract_requires_machine_readable_uncertainty(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["late_recovery_ingestion_stage"], "late_recovery_observation_missing")
+        self.assertEqual(float(ka2d_023["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["machine_readable_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["uncertainty_ready"]), 0.0)
+        self.assertAlmostEqual(float(ka2d_023["required_followup_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertEqual(ka2d_023["missing_columns"], "observed_lag_time;observed_late_ngp;observed_tail_gaussian_recovery;source_trajectory_identity")
+        self.assertEqual(ka2d_023["missing_uncertainty_columns"], "sigma_late_ngp;sigma_tail_recovery")
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_observation")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+        ka2d_030 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.30"
+            and row["structure_id"] == "3"
+        )
+        self.assertEqual(ka2d_030["late_recovery_ingestion_stage"], "late_recovery_envelope_upstream_incomplete")
+        self.assertEqual(ka2d_030["primary_blocker"], "finite_exchange_envelope")
+
+    def test_sota_glassbench_late_recovery_timecode_target_names_next_cache(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_timecode_target.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["timecode_target_stage"], "late_recovery_timecode_target_ready")
+        self.assertEqual(float(ka2d_023["timecode_target_ready"]), 1.0)
+        self.assertEqual(ka2d_023["current_max_time_code"], "tc40")
+        self.assertEqual(ka2d_023["target_time_code"], "tc50")
+        self.assertAlmostEqual(float(ka2d_023["current_max_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(ka2d_023["required_followup_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertGreater(float(ka2d_023["target_lag_over_required"]), 3.8)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_time_code_cache")
+        self.assertEqual(float(ka2d_023["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_late_recovery_cache_request_contract_marks_tc50_metadata_gap(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_cache_request_contract.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["cache_request_stage"], "late_recovery_member_metadata_required")
+        self.assertEqual(float(ka2d_023["cache_request_ready"]), 1.0)
+        self.assertEqual(ka2d_023["target_time_code"], "tc50")
+        self.assertEqual(ka2d_023["inferred_target_member"], "T0.23/test/N1290T0.23_151_tc50.npz")
+        self.assertEqual(float(ka2d_023["inferred_member_path_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["official_target_member_metadata_ready"]), 0.0)
+        self.assertEqual(ka2d_023["target_member_md5"], "none")
+        self.assertEqual(float(ka2d_023["particle_cache_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_npz_member_metadata")
+        self.assertEqual(float(ka2d_023["late_recovery_observable_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+        ka2d_030 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.30"
+            and row["structure_id"] == "3"
+        )
+        self.assertEqual(ka2d_030["cache_request_stage"], "late_recovery_timecode_target_incomplete")
+        self.assertEqual(ka2d_030["inferred_target_member"], "none")
+        self.assertEqual(float(ka2d_030["inferred_member_path_ready"]), 0.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "late_recovery_timecode_target")
+
+    def test_sota_glassbench_late_recovery_membership_probe_records_tc50_prefix_absence(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["membership_probe_stage"], "late_recovery_target_absent_from_extended_prefix")
+        self.assertEqual(float(ka2d_023["membership_probe_ready"]), 1.0)
+        self.assertEqual(ka2d_023["target_time_code"], "tc50")
+        self.assertEqual(ka2d_023["inferred_target_member"], "T0.23/test/N1290T0.23_151_tc50.npz")
+        self.assertEqual(float(ka2d_023["target_member_visible_in_probe"]), 0.0)
+        self.assertEqual(float(ka2d_023["same_structure_member_count_in_probe"]), 8.0)
+        self.assertEqual(ka2d_023["max_visible_time_code"], "tc40")
+        self.assertAlmostEqual(float(ka2d_023["compressed_probe_bytes"]), 12582912.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_member_index_depth")
+        self.assertEqual(float(ka2d_023["late_recovery_observable_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_late_recovery_public_timecode_ceiling_blocks_tc50(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["public_ceiling_stage"], "late_recovery_beyond_public_timecode_ceiling")
+        self.assertEqual(float(ka2d_023["public_ceiling_ready"]), 1.0)
+        self.assertEqual(ka2d_023["target_time_code"], "tc50")
+        self.assertEqual(ka2d_023["public_max_time_code"], "tc40")
+        self.assertEqual(ka2d_023["structure_max_time_code"], "tc40")
+        self.assertEqual(float(ka2d_023["target_time_code_published"]), 0.0)
+        self.assertGreater(float(ka2d_023["target_lag_over_public_max"]), 100.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "public_glassbench_timecode_ceiling")
+        self.assertEqual(float(ka2d_023["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_censored_window_claim_audit_limits_public_claims(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_censored_window_claim_audit.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["censored_window_stage"], "alpha_anchor_ready_late_recovery_censored")
+        self.assertEqual(ka2d_023["allowed_public_claim_level"], "alpha_anchor_and_pre_late_dynamic_signatures")
+        self.assertEqual(float(ka2d_023["alpha_anchor_window_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["short_window_dynamic_claim_allowed"]), 1.0)
+        self.assertEqual(float(ka2d_023["alpha_relaxation_claim_allowed"]), 1.0)
+        self.assertEqual(float(ka2d_023["late_gaussian_recovery_claim_allowed"]), 0.0)
+        self.assertEqual(float(ka2d_023["static_vs_finite_exchange_rejection_ready"]), 0.0)
+        self.assertLess(float(ka2d_023["public_window_fraction_of_target_lag"]), 0.01)
+        self.assertGreater(float(ka2d_023["target_lag_over_public_max"]), 100.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "public_glassbench_timecode_ceiling")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_public_window_verdict_maps_sota_claims_to_censoring(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_public_window_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_signature = {row["signature"]: row for row in rows}
+        alpha = by_signature["self_intermediate_alpha"]
+        self.assertEqual(alpha["public_window_verdict_stage"], "public_window_sota_consistent")
+        self.assertEqual(float(alpha["public_glassbench_claim_allowed"]), 1.0)
+        self.assertEqual(float(alpha["late_recovery_required"]), 0.0)
+        self.assertEqual(float(alpha["thermodynamic_claim_allowed"]), 0.0)
+
+        recovery = by_signature["late_gaussian_recovery"]
+        self.assertEqual(recovery["public_window_verdict_stage"], "public_window_censored_sota_unresolved")
+        self.assertEqual(float(recovery["public_glassbench_claim_allowed"]), 0.0)
+        self.assertEqual(float(recovery["late_recovery_required"]), 1.0)
+        self.assertEqual(recovery["primary_blocker"], "public_glassbench_timecode_ceiling")
+
+        persistence_exchange = by_signature["persistence_exchange_decoupling"]
+        self.assertEqual(
+            persistence_exchange["public_window_verdict_stage"],
+            "mechanism_selection_censored_unresolved",
+        )
+        self.assertEqual(float(persistence_exchange["mechanism_rejection_ready"]), 0.0)
+
+        thermodynamic = by_signature["thermodynamic_transition"]
+        self.assertEqual(thermodynamic["public_window_verdict_stage"], "scope_boundary_not_tested")
+        self.assertEqual(thermodynamic["allowed_public_claim"], "not_a_thermodynamic_glass_transition_test")
+        self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_late_recovery_experiment_design_names_minimal_tc50_followup(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_experiment_design.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["experiment_design_stage"], "minimal_tc50_followup_ready")
+        self.assertEqual(ka2d_023["current_max_time_code"], "tc40")
+        self.assertEqual(ka2d_023["required_time_code"], "tc50")
+        self.assertAlmostEqual(float(ka2d_023["minimum_required_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertAlmostEqual(float(ka2d_023["planned_lag_time"]), 166002226.81761542, delta=1e-3)
+        self.assertGreater(float(ka2d_023["planned_lag_over_minimum_required"]), 3.0)
+        self.assertEqual(ka2d_023["required_observables"], "MSD;NGP;F_s(k,t);self_van_hove_tail;member_uncertainty")
+        self.assertEqual(ka2d_023["finite_exchange_support_rule"], "late_ngp <= max_finite_exchange_late_ngp")
+        self.assertEqual(ka2d_023["static_disorder_rejection_rule"], "late_ngp + 2sigma < static_gamma_late_ngp_plateau")
+        self.assertEqual(float(ka2d_023["max_finite_exchange_late_ngp"]), 0.05)
+        self.assertEqual(float(ka2d_023["static_gamma_late_ngp_plateau"]), 0.1)
+        self.assertEqual(float(ka2d_023["late_recovery_claim_ready_after_measurement"]), 1.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "public_glassbench_timecode_ceiling")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_late_recovery_uncertainty_verdict_waits_for_tc50_measurement(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["uncertainty_verdict_stage"], "late_recovery_observation_not_ready")
+        self.assertEqual(ka2d_023["candidate_id"], "KA2D:0.23:151:0")
+        self.assertAlmostEqual(float(ka2d_023["minimum_required_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertEqual(float(ka2d_023["finite_exchange_uncertainty_supported"]), 0.0)
+        self.assertEqual(float(ka2d_023["static_disorder_uncertainty_rejected"]), 0.0)
+        self.assertEqual(float(ka2d_023["uncertainty_decision_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_observation")
+
+    def test_sota_glassbench_late_recovery_outcome_matrix_preregisters_tc50_paths(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        by_scenario = {row["outcome_scenario"]: row for row in ka2d_023}
+        self.assertEqual(len(ka2d_023), 3)
+        self.assertEqual(by_scenario["low_late_ngp_gaussian_recovery"]["target_time_code"], "tc50")
+        self.assertEqual(
+            by_scenario["low_late_ngp_gaussian_recovery"]["claim_if_observed"],
+            "finite_exchange_supported_static_disorder_rejected",
+        )
+        self.assertEqual(
+            by_scenario["high_late_ngp_or_missing_recovery"]["claim_if_observed"],
+            "finite_exchange_rejected_or_model_reparameterization_required",
+        )
+        self.assertEqual(
+            by_scenario["wide_uncertainty_requires_more_data"]["claim_if_observed"],
+            "no_mechanism_selection_claim",
+        )
+        self.assertEqual(
+            by_scenario["wide_uncertainty_requires_more_data"]["outcome_matrix_stage"],
+            "tc50_outcome_matrix_preregistered",
+        )
+        self.assertEqual(float(by_scenario["wide_uncertainty_requires_more_data"]["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_late_recovery_decision_power_plan_sizes_tc50_member_extension(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        by_scenario = {row["outcome_scenario"]: row for row in ka2d_023}
+        sufficient = by_scenario["low_late_ngp_gaussian_recovery"]
+        wide = by_scenario["wide_uncertainty_requires_more_data"]
+
+        self.assertEqual(sufficient["decision_power_stage"], "decision_power_sufficient")
+        self.assertEqual(float(sufficient["additional_member_count_needed"]), 0.0)
+        self.assertEqual(wide["decision_power_stage"], "late_ngp_power_extension_required")
+        self.assertGreater(float(wide["member_multiplier_needed"]), 1.0)
+        self.assertEqual(float(wide["required_member_count"]), 128.0)
+        self.assertEqual(float(wide["additional_member_count_needed"]), 120.0)
+        self.assertGreater(float(wide["required_member_count"]), float(wide["current_member_count"]))
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+        self.assertEqual(float(wide["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(
+            ka2d_023["closed_loop_stage"],
+            "real_microstats_macro_signatures_closed_loop_blocked",
+        )
+        self.assertEqual(float(ka2d_023["frame_index_microstats_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["macro_signature_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["micro_to_macro_prediction_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["closed_loop_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "physical_time_semantics")
+        self.assertIn("cage_jump_event_segmentation", ka2d_023["missing_closed_loop_inputs"])
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["closed_loop_stage"], "macro_timecode_upstream_incomplete")
+        self.assertEqual(ka2d_030["primary_blocker"], "sparse_time_code_coverage")
+
+    def test_sota_glassbench_cage_jump_proxy_canary_marks_proxy_not_event_clock(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(
+            ka2d_023["canary_stage"],
+            "aggregate_cage_jump_proxy_ready_particle_events_blocked",
+        )
+        self.assertEqual(float(ka2d_023["aggregate_jump_proxy_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["particle_resolved_jump_events_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["physical_time_jump_clock_ready"]), 0.0)
+        self.assertGreater(float(ka2d_023["proxy_jump_length"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "particle_resolved_displacements")
+        self.assertIn("persistence_exchange_event_clock", ka2d_023["missing_event_clock_inputs"])
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_event_clock_threshold_readiness_blocks_real_claim(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key in [("KA2D", "0.23"), ("KA2D", "0.30")]:
+            row = by_key[key]
+            self.assertEqual(row["readiness_stage"], "real_event_clock_threshold_robustness_blocked")
+            self.assertEqual(float(row["positions_schema_ready"]), 1.0)
+            self.assertEqual(float(row["first_npz_observable_curve_ready"]), 1.0)
+            self.assertEqual(float(row["member_ensemble_observable_ready"]), 1.0)
+            self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+            self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 0.0)
+            self.assertEqual(float(row["real_event_clock_threshold_robustness_ready"]), 0.0)
+            self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+            self.assertNotIn("particle_resolved_positions_cache", row["missing_real_threshold_inputs"])
+            self.assertIn("threshold_sweep_event_clock", row["missing_real_threshold_inputs"])
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_first_npz_particle_cache_contract_records_cached_positions(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(
+            ka2d_023["cache_contract_stage"],
+            "first_npz_particle_cache_contract_ready_time_blocked",
+        )
+        self.assertEqual(ka2d_023["first_npz_member"], "T0.23/test/N1290T0.23_202_tc05.npz")
+        self.assertEqual(ka2d_023["positions_shape"], "20x1290x2")
+        self.assertEqual(float(ka2d_023["compressed_probe_range_start"]), 2980602255.0)
+        self.assertEqual(float(ka2d_023["npz_member_bytes"]), 465710.0)
+        self.assertEqual(ka2d_023["npz_member_md5"], "26b4b9af10138fbd04a840fe8275de8e")
+        self.assertEqual(float(ka2d_023["particle_cache_contract_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["particle_resolved_positions_cached"]), 1.0)
+        self.assertEqual(float(ka2d_023["threshold_sweep_event_clock_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "physical_time_semantics")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["positions_shape"], "20x1290x2")
+        self.assertEqual(float(ka2d_030["npz_member_bytes"]), 444786.0)
+        self.assertEqual(ka2d_030["npz_member_md5"], "f51fd76f59b8288405a9e7abb61cdd0a")
+        self.assertEqual(float(ka2d_030["particle_resolved_positions_cached"]), 1.0)
+
+    def test_sota_glassbench_first_npz_particle_cache_manifest_records_real_cache(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        for key, expected_md5 in [
+            (("KA2D", "0.23"), "26b4b9af10138fbd04a840fe8275de8e"),
+            (("KA2D", "0.30"), "f51fd76f59b8288405a9e7abb61cdd0a"),
+        ]:
+            row = by_key[key]
+            cache_path = Path(row["particle_cache_path"])
+            self.assertTrue(cache_path.exists())
+            self.assertEqual(row["cache_stage"], "particle_coordinate_cache_written")
+            self.assertEqual(row["probe_encoding"], "zip_deflate_xz")
+            self.assertEqual(row["positions_shape"], "20x1290x2")
+            self.assertEqual(row["npz_member_md5"], expected_md5)
+            self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+            self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 0.0)
+            self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+
+    def test_sota_glassbench_cached_particle_timecode_bridge_keeps_replica_axis_blocker(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(ka2d_023["time_code"], "tc05")
+        self.assertAlmostEqual(float(ka2d_023["lag_time"]), 0.1)
+        self.assertEqual(float(ka2d_023["physical_lag_time_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["particle_resolved_positions_cached"]), 1.0)
+        self.assertEqual(float(ka2d_023["frame_axis_is_physical_time"]), 0.0)
+        self.assertEqual(float(ka2d_023["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["time_code"], "tc01")
+        self.assertAlmostEqual(float(ka2d_030["lag_time"]), 0.11)
+        self.assertEqual(float(ka2d_030["physical_lag_time_ready"]), 1.0)
+
+    def test_sota_glassbench_multilag_particle_cache_targets_identifies_next_members(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(ka2d_023["selected_structure_id"], "151")
+        self.assertEqual(float(ka2d_023["official_multi_lag_ladder_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["target_member_count"]), 8.0)
+        self.assertEqual(float(ka2d_023["cached_target_member_count"]), 8.0)
+        self.assertEqual(float(ka2d_023["missing_target_member_count"]), 0.0)
+        self.assertIn("T0.23/test/N1290T0.23_151_tc40.npz", ka2d_023["target_members"])
+        self.assertIn("5160feded6ec1a1f366a6e55a7d33f70", ka2d_023["target_member_md5s"])
+        self.assertEqual(float(ka2d_023["particle_lag_ladder_cache_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(float(ka2d_030["official_multi_lag_ladder_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["target_member_count"]), 1.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "official_multi_lag_semantics")
+
+    def test_sota_glassbench_multilag_particle_cache_manifest_records_prefix_extracted_targets(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        cold_rows = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        self.assertEqual(len(cold_rows), 8)
+        by_code = {row["time_code"]: row for row in cold_rows}
+        for code in ["tc05", "tc10", "tc15", "tc20", "tc25", "tc30", "tc35", "tc40"]:
+            row = by_code[code]
+            self.assertEqual(float(row["member_in_bounded_prefix_index"]), 1.0)
+            self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+            self.assertEqual(row["cache_stage"], "multi_lag_particle_coordinate_cache_written")
+            self.assertTrue((ROOT / row["particle_cache_path"]).exists())
+            self.assertEqual(row["positions_shape"], "20x1290x2")
+
+    def test_sota_glassbench_cached_particle_observable_semantics_reproduces_official_displacements(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        cold_rows = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        self.assertEqual(len(cold_rows), 8)
+        by_code = {row["time_code"]: row for row in cold_rows}
+        tc05 = by_code["tc05"]
+        self.assertGreater(float(tc05["raw_coordinate_msd_relative_error"]), 1.0e4)
+        self.assertEqual(float(tc05["cached_coordinate_proxy_ready"]), 1.0)
+        self.assertEqual(float(tc05["initial_reference_positions_ready"]), 1.0)
+        self.assertLess(float(tc05["initial_reference_msd_relative_error"]), 1.0e-12)
+        self.assertEqual(float(tc05["official_displacement_observable_reproducible"]), 1.0)
+        self.assertEqual(float(tc05["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(tc05["primary_blocker"], "none")
+        self.assertEqual(tc05["observable_semantics_stage"], "official_displacement_observable_reproduced")
+        self.assertEqual(float(tc05["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sota_glassbench_cached_particle_observable_semantics_reproduces_official_ngp_formula(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        tc30 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151" and row["time_code"] == "tc30"
+        )
+        self.assertEqual(tc30["initial_reference_ngp_2d_formula"], "mean_replica_alpha2_2d")
+        self.assertGreater(float(tc30["pooled_initial_reference_ngp_2d_relative_error"]), 0.5)
+        self.assertLess(float(tc30["initial_reference_ngp_2d_relative_error"]), 1.0e-12)
+        self.assertEqual(float(tc30["official_ngp_2d_reproducible"]), 1.0)
+
+    def test_sota_glassbench_cached_particle_observable_semantics_reproduces_official_fs_formula(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        tc40 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151" and row["time_code"] == "tc40"
+        )
+        self.assertEqual(tc40["initial_reference_fs_formula"], "axis_average_cos_xy")
+        self.assertLess(float(tc40["initial_reference_fs_max_abs_error"]), 1.0e-12)
+        self.assertGreater(float(tc40["single_axis_x_fs_max_abs_error"]), 1.0e-3)
+        self.assertEqual(float(tc40["official_fs_reproducible"]), 1.0)
+
+    def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
+        path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_signature = {row["signature"]: row for row in rows}
+        ngp = by_signature["transient_ngp_peak"]
+        self.assertEqual(ngp["alignment_stage"], "real_curve_supported")
+        self.assertEqual(float(ngp["model_support"]), 1.0)
+        self.assertEqual(float(ngp["literature_qualitative_support"]), 1.0)
+        self.assertEqual(float(ngp["real_glassbench_support"]), 1.0)
+
+        alpha = by_signature["self_intermediate_alpha"]
+        self.assertEqual(alpha["alignment_stage"], "real_curve_supported_pre_alpha_threshold")
+        self.assertEqual(float(alpha["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(alpha["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(alpha["primary_blocker"], "alpha_threshold_crossing")
+
+        pe = by_signature["persistence_exchange_decoupling"]
+        self.assertEqual(pe["alignment_stage"], "model_literature_supported_real_inversion_blocked")
+        self.assertEqual(float(pe["real_glassbench_support"]), 0.0)
+        self.assertEqual(pe["primary_blocker"], "alpha_threshold_crossing")
+
+        thermo = by_signature["thermodynamic_transition"]
+        self.assertEqual(thermo["alignment_stage"], "scope_boundary_not_explained")
+        self.assertEqual(float(thermo["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(thermo["real_glassbench_support"]), 0.0)
+
+    def test_sota_glassbench_direct_four_point_claim_gate_blocks_proxy_promotion(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+        )
+        self.assertEqual(
+            ka2d_023["four_point_claim_stage"],
+            "overlap_chi4_proxy_supported_direct_four_point_blocked",
+        )
+        self.assertEqual(float(ka2d_023["overlap_chi4_proxy_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["direct_four_point_susceptibility_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["dynamic_length_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["direct_four_point_claim_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["proxy_promotion_allowed"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "direct_four_point_function_and_dynamic_length")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
     def test_sota_glassbench_trajectory_npz_ensemble_horizon_records_prefix_member_gap(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.csv"
@@ -1574,6 +2880,68 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(float(peak["ngp"]), 0.0)
         self.assertIn("1.1", peak["wave_numbers"])
 
+    def test_trajectory_cage_jump_events_extract_particle_clock_protocol(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_cage_jump_events.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["protocol_id"]: row for row in rows}
+        ready = by_id["synthetic_particle_cage_jump_events"]
+        self.assertEqual(
+            ready["event_protocol_stage"],
+            "particle_resolved_cage_jump_event_clock_ready",
+        )
+        self.assertEqual(float(ready["particle_resolved_jump_events_ready"]), 1.0)
+        self.assertEqual(float(ready["physical_time_jump_clock_ready"]), 1.0)
+        self.assertEqual(float(ready["persistence_exchange_event_clock_ready"]), 1.0)
+        self.assertGreater(float(ready["total_jump_event_count"]), 0.0)
+        self.assertGreater(float(ready["particles_with_jump_count"]), 0.0)
+        self.assertGreater(float(ready["exchange_interval_count"]), 0.0)
+        self.assertEqual(ready["primary_blocker"], "none")
+
+    def test_trajectory_event_clock_macro_predictions_score_direct_micro_closure(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_event_clock_macro_predictions.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["protocol_id"]: row for row in rows}
+        ready = by_id["synthetic_event_clock_macro_prediction"]
+        self.assertEqual(ready["prediction_stage"], "event_clock_micro_to_macro_prediction_ready")
+        self.assertEqual(float(ready["micro_to_macro_prediction_ready"]), 1.0)
+        self.assertEqual(float(ready["micro_to_macro_predictions_pass"]), 1.0)
+        self.assertEqual(float(ready["calibrated_from_event_clock_only"]), 1.0)
+        self.assertEqual(float(ready["fit_parameters_from_macro_observables"]), 0.0)
+        self.assertLess(float(ready["diffusion_z"]), 1.0)
+        self.assertLess(float(ready["max_tau_alpha_z"]), 1.0)
+        self.assertLess(float(ready["late_ngp_z"]), 1.0)
+        self.assertLess(float(ready["chi4_peak_z"]), 1.0)
+        self.assertEqual(float(ready["thermodynamic_claim_allowed"]), 0.0)
+
+        mismatch = by_id["synthetic_event_clock_macro_late_ngp_mismatch"]
+        self.assertEqual(mismatch["prediction_stage"], "event_clock_micro_to_macro_prediction_failed")
+        self.assertEqual(float(mismatch["micro_to_macro_predictions_pass"]), 0.0)
+        self.assertEqual(mismatch["primary_blocker"], "heldout_macro_signature_mismatch")
+
+    def test_trajectory_event_clock_threshold_robustness_records_stable_window(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_event_clock_threshold_robustness.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_threshold = {float(row["jump_displacement_threshold"]): row for row in rows}
+        self.assertEqual(by_threshold[1.0]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertEqual(by_threshold[0.9]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertGreaterEqual(float(by_threshold[1.0]["stable_threshold_window_count"]), 2.0)
+        self.assertEqual(float(by_threshold[1.0]["fit_parameters_from_macro_observables"]), 0.0)
+        self.assertEqual(float(by_threshold[1.0]["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(by_threshold[0.05]["robustness_stage"], "event_clock_threshold_prediction_failed")
+        self.assertEqual(by_threshold[0.05]["primary_blocker"], "threshold_macro_signature_mismatch")
+        self.assertEqual(by_threshold[1.35]["robustness_stage"], "event_clock_threshold_event_clock_incomplete")
+        self.assertEqual(by_threshold[1.35]["primary_blocker"], "jump_displacement_threshold")
+
     def test_trajectory_adapter_demo_exports_observables_from_local_table(self):
         path = ROOT / "data" / "renewal_cage_trajectory_adapter_demo.csv"
         self.assertTrue(path.exists())
@@ -1847,6 +3215,50 @@ class ArxivPackageTests(unittest.TestCase):
                 names,
             )
             self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_cache_request_contract.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_public_window_verdict.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf", names)
@@ -1866,6 +3278,9 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_cage_jump_events.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_inversion_readiness.pdf", names)
@@ -1878,6 +3293,10 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_persistence_exchange_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_translation_rotation_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_simultaneous_closure.pdf", names)
+            self.assertIn("figures/renewal_cage_microdynamic_prediction_scorecard.pdf", names)
+            self.assertIn("figures/renewal_cage_microdynamic_minimality_audit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_experimental_verdict_matrix.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -1917,6 +3336,12 @@ class ArxivPackageTests(unittest.TestCase):
             main_tex,
         )
         self.assertIn("figures/renewal_cage_sota_glassbench_ka2d_timecode_semantics.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf", main_tex)
+        self.assertIn("figures/renewal_cage_sota_dynamic_signature_alignment.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_glassbench_trajectory_npz_ensemble_horizon.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_cache.pdf", main_tex)
         self.assertIn("figures/renewal_cage_sota_remote_result_curve_fetch_gap.pdf", main_tex)
@@ -2007,11 +3432,48 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_signed_constraints.pdf",
             "figures/renewal_cage_sota_evidence_class.pdf",
             "figures/renewal_cage_simultaneous_closure.pdf",
+            "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
+            "figures/renewal_cage_microdynamic_minimality_audit.pdf",
+            "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
+            "figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf",
+            "figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_gap_ledger.pdf",
             "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
+            "figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf",
+            "figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_shape_selection.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multik_shape.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multik_heldout_prediction.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_prediction_targets.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_post_window_verdict.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_transport.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_pe_bound.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf",
+            "figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf",
+            "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
+            "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
+            "figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf",
+            "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
+            "figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_ingestion_contract.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_timecode_target.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_cache_request_contract.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_membership_probe_contract.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_public_timecode_ceiling.pdf",
+            "figures/renewal_cage_sota_glassbench_censored_window_claim_audit.pdf",
+            "figures/renewal_cage_sota_glassbench_public_window_verdict.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
@@ -2024,6 +3486,14 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
             "figures/renewal_cage_translation_rotation_protocol.pdf",
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
+            "figures/renewal_cage_trajectory_cage_jump_events.pdf",
+            "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
+            "figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf",
+            "figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf",
+            "figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf",
+            "figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf",
+            "figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf",
+            "figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
             "figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf",
             "figures/renewal_cage_trajectory_inversion_readiness.pdf",
@@ -2215,6 +3685,15 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_trajectory_observable_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_observable_protocol.pdf"
+            ).read_bytes()
+            first_trajectory_cage_jump_events = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_cage_jump_events.pdf"
+            ).read_bytes()
+            first_trajectory_event_clock_macro_predictions = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
+            ).read_bytes()
+            first_trajectory_event_clock_threshold_robustness = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_threshold_robustness.pdf"
             ).read_bytes()
             first_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
@@ -2417,6 +3896,15 @@ class ArxivPackageTests(unittest.TestCase):
             second_trajectory_observable_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_observable_protocol.pdf"
             ).read_bytes()
+            second_trajectory_cage_jump_events = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_cage_jump_events.pdf"
+            ).read_bytes()
+            second_trajectory_event_clock_macro_predictions = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
+            ).read_bytes()
+            second_trajectory_event_clock_threshold_robustness = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_threshold_robustness.pdf"
+            ).read_bytes()
             second_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
             ).read_bytes()
@@ -2553,6 +4041,15 @@ class ArxivPackageTests(unittest.TestCase):
             second_raw_curve_persistence_exchange_protocol,
         )
         self.assertEqual(first_trajectory_observable_protocol, second_trajectory_observable_protocol)
+        self.assertEqual(first_trajectory_cage_jump_events, second_trajectory_cage_jump_events)
+        self.assertEqual(
+            first_trajectory_event_clock_macro_predictions,
+            second_trajectory_event_clock_macro_predictions,
+        )
+        self.assertEqual(
+            first_trajectory_event_clock_threshold_robustness,
+            second_trajectory_event_clock_threshold_robustness,
+        )
         self.assertEqual(first_trajectory_uncertainty_protocol, second_trajectory_uncertainty_protocol)
         self.assertEqual(
             first_trajectory_member_ensemble_uncertainty,
