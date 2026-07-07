@@ -52,6 +52,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_cached_particle_timecode_bridge,
+    glassbench_cached_particle_observable_semantics_audit,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_multilag_particle_cache_targets,
@@ -4148,6 +4149,76 @@ def write_sota_glassbench_multilag_particle_cache_targets_csv(
         semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
         cache_rows=cache_rows,
         minimum_time_codes=3,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_cached_particle_observable_semantics_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """Audit which observables cached coordinates can reproduce without initial references."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    cached_rows: list[dict[str, float | str]] = []
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            cache_path = ROOT / row["particle_cache_path"]
+            with np.load(cache_path) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+                initial_reference_ready = 1.0 if "initial_positions" in npz.files else 0.0
+            raw_coordinate_msd = float(np.mean(np.sum(positions * positions, axis=-1)))
+            replica_mean = np.mean(positions, axis=0)
+            displacements = positions - replica_mean[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                displacements = displacements - box * np.round(displacements / box)
+            r2 = np.sum(displacements * displacements, axis=-1)
+            replica_spread_msd = float(np.mean(r2))
+            r4 = float(np.mean(r2 * r2))
+            cached_ngp_2d_proxy = float(r4 / (2.0 * replica_spread_msd * replica_spread_msd) - 1.0) if replica_spread_msd > 0 else 0.0
+            cached_rows.append(
+                {
+                    "system_id": row["system_id"],
+                    "temperature": row["temperature"],
+                    "structure_id": row["structure_id"],
+                    "time_code": row["time_code"],
+                    "lag_time": float(row["lag_time"]),
+                    "target_member": row["target_member"],
+                    "raw_coordinate_msd": raw_coordinate_msd,
+                    "replica_spread_msd": replica_spread_msd,
+                    "cached_ngp_2d_proxy": cached_ngp_2d_proxy,
+                    "initial_reference_positions_ready": initial_reference_ready,
+                    "particle_resolved_positions_cached": 1.0,
+                }
+            )
+
+    semantics_manifest = json.loads(semantics_path.read_text(encoding="utf-8"))
+    official_rows: list[dict[str, float | str]] = []
+    for entry in semantics_manifest.get("entries", []):
+        if not isinstance(entry, dict):
+            continue
+        for member in entry.get("members", []):
+            if not isinstance(member, dict):
+                continue
+            official_rows.append(
+                {
+                    "system_id": str(entry.get("system_id", "unknown")),
+                    "temperature": str(entry.get("temperature", "none")),
+                    "time_code": str(member.get("time_code", "none")),
+                    "member": str(member.get("member", "none")),
+                    "msd": float(member.get("msd", 0.0) or 0.0),
+                    "ngp_2d": float(member.get("ngp_2d", 0.0) or 0.0),
+                }
+            )
+    rows = glassbench_cached_particle_observable_semantics_audit(
+        audit_id="glassbench_cached_particle_observable_semantics",
+        cached_observable_rows=cached_rows,
+        official_observable_rows=official_rows,
+        max_reproducible_relative_error=0.05,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9451,6 +9522,49 @@ def write_sota_glassbench_multilag_particle_cache_targets_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_cached_particle_observable_semantics_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1260, 430
+    left, top = 70, 120
+    row_h = 32
+    colors = {
+        "official_displacement_observable_reproduced": "#2f855a",
+        "cached_coordinate_proxy_ready_initial_reference_blocked": "#b7791f",
+        "cached_coordinate_proxy_ready_observable_mismatch": "#805ad5",
+        "cached_coordinate_proxy_incomplete": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows[:9]):
+        y = top + idx * row_h
+        stage = str(row["observable_semantics_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10">{row["system_id"]} T={row["temperature"]} {row["time_code"]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 145}" y="{y - 3}" width="330" height="22" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 153}" y="{y + 12}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:54]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">official MSD={float(row["official_msd"]):.4g}; raw rel err={float(row["raw_coordinate_msd_relative_error"]):.3g}; spread rel err={float(row["replica_spread_msd_relative_error"]):.3g}; init ref={int(float(row["initial_reference_positions_ready"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached-particle observable semantics</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Particle caches are real coordinates, but official displacement observables still require initial reference positions.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 145}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">observable semantics stage</text>
+  <text x="{left + 500}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached-coordinate audit</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 660
@@ -10930,6 +11044,15 @@ def main() -> None:
     write_sota_glassbench_multilag_particle_cache_targets_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg",
         glassbench_multilag_particle_cache_targets_rows,
+    )
+    glassbench_cached_particle_observable_semantics_rows = (
+        write_sota_glassbench_cached_particle_observable_semantics_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
+        )
+    )
+    write_sota_glassbench_cached_particle_observable_semantics_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.svg",
+        glassbench_cached_particle_observable_semantics_rows,
     )
     glassbench_event_clock_threshold_readiness_rows = (
         write_sota_glassbench_event_clock_threshold_readiness_csv(

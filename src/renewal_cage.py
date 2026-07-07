@@ -6427,6 +6427,117 @@ def glassbench_multilag_particle_cache_targets(
     return out
 
 
+def glassbench_cached_particle_observable_semantics_audit(
+    *,
+    audit_id: str,
+    cached_observable_rows: Sequence[dict[str, object]],
+    official_observable_rows: Sequence[dict[str, object]],
+    max_reproducible_relative_error: float,
+) -> list[dict[str, float | str]]:
+    """Audit whether cached coordinate observables reproduce official displacement observables."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not cached_observable_rows:
+        raise ValueError("cached_observable_rows must be nonempty")
+    if not official_observable_rows:
+        raise ValueError("official_observable_rows must be nonempty")
+    if max_reproducible_relative_error <= 0.0:
+        raise ValueError("max_reproducible_relative_error must be positive")
+
+    official_by_member: dict[tuple[str, str, str, str], dict[str, object]] = {}
+    official_by_code: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in official_observable_rows:
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        time_code = str(row.get("time_code", "none"))
+        member = str(row.get("member", row.get("target_member", "none")))
+        if member != "none":
+            official_by_member[(system_id, temperature, time_code, member)] = row
+        official_by_code[(system_id, temperature, time_code)] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        cached_observable_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            float(item.get("lag_time", 0.0) or 0.0),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        time_code = str(row.get("time_code", "none"))
+        target_member = str(row.get("target_member", "none"))
+        official = official_by_member.get(
+            (system_id, temperature, time_code, target_member),
+            official_by_code.get((system_id, temperature, time_code), {}),
+        )
+        official_msd = float(official.get("msd", 0.0) or 0.0) if official else 0.0
+        official_ngp_2d = float(official.get("ngp_2d", 0.0) or 0.0) if official else 0.0
+        raw_coordinate_msd = float(row.get("raw_coordinate_msd", 0.0) or 0.0)
+        replica_spread_msd = float(row.get("replica_spread_msd", 0.0) or 0.0)
+        denominator = max(abs(official_msd), 1.0e-12)
+        raw_rel_error = abs(raw_coordinate_msd - official_msd) / denominator
+        spread_rel_error = abs(replica_spread_msd - official_msd) / denominator
+        cached_ready = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
+        initial_ready = float(row.get("initial_reference_positions_ready", 0.0) or 0.0) == 1.0
+        official_available = official_msd > 0.0
+        reproducible = (
+            cached_ready
+            and initial_ready
+            and official_available
+            and min(raw_rel_error, spread_rel_error) <= max_reproducible_relative_error
+        )
+
+        if reproducible:
+            stage = "official_displacement_observable_reproduced"
+            blocker = "none"
+            next_action = "run_structure_matched_displacement_inversion"
+        elif cached_ready and not initial_ready:
+            stage = "cached_coordinate_proxy_ready_initial_reference_blocked"
+            blocker = "initial_positions_reference_missing"
+            next_action = "extract_initial_reference_positions_for_structure"
+        elif cached_ready:
+            stage = "cached_coordinate_proxy_ready_observable_mismatch"
+            blocker = "official_displacement_observable_mismatch"
+            next_action = "audit_displacement_reference_semantics"
+        else:
+            stage = "cached_coordinate_proxy_incomplete"
+            blocker = "particle_coordinate_cache"
+            next_action = "complete_particle_coordinate_cache"
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}_{time_code}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_code": time_code,
+                "lag_time": float(row.get("lag_time", 0.0) or 0.0),
+                "target_member": target_member,
+                "official_msd": float(official_msd),
+                "raw_coordinate_msd": float(raw_coordinate_msd),
+                "replica_spread_msd": float(replica_spread_msd),
+                "raw_coordinate_msd_relative_error": float(raw_rel_error),
+                "replica_spread_msd_relative_error": float(spread_rel_error),
+                "official_ngp_2d": float(official_ngp_2d),
+                "cached_ngp_2d_proxy": float(row.get("cached_ngp_2d_proxy", 0.0) or 0.0),
+                "cached_coordinate_proxy_ready": float(cached_ready),
+                "initial_reference_positions_ready": float(initial_ready),
+                "official_displacement_observable_available": float(official_available),
+                "official_displacement_observable_reproducible": float(reproducible),
+                "event_clock_trajectory_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "observable_semantics_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_microdynamic_closed_loop_audit(
     *,
     audit_id: str,

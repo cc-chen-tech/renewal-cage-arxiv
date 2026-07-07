@@ -4034,6 +4034,67 @@ def write_sota_glassbench_multilag_particle_cache_targets_pdf(path: Path) -> Non
     c.save()
 
 
+def write_sota_glassbench_cached_particle_observable_semantics_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cached-particle observable semantics")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cached particle coordinates are real data, but official displacement observables still require initial reference positions.",
+    )
+    left, top = 48, page_h - 86
+    row_h = 31
+    colors_by_stage = {
+        "official_displacement_observable_reproduced": colors.HexColor("#2f855a"),
+        "cached_coordinate_proxy_ready_initial_reference_blocked": colors.HexColor("#b7791f"),
+        "cached_coordinate_proxy_ready_observable_mismatch": colors.HexColor("#805ad5"),
+        "cached_coordinate_proxy_incomplete": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawString(left, top + 18, "target")
+    c.drawString(left + 115, top + 18, "semantics stage")
+    c.drawString(left + 405, top + 18, "audit values")
+    for index, row in enumerate(rows[:9]):
+        y = top - index * row_h
+        stage = row["observable_semantics_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.2)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]} {row["time_code"]}')
+        c.setFillColor(color)
+        c.rect(left + 115, y - 10, 274, 20, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.5)
+        c.drawString(left + 121, y - 1, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 405,
+            y,
+            "official MSD={:.4g}; raw rel err={:.3g}; spread rel err={:.3g}; init ref={}; event clock={}".format(
+                float(row["official_msd"]),
+                float(row["raw_coordinate_msd_relative_error"]),
+                float(row["replica_spread_msd_relative_error"]),
+                int(float(row["initial_reference_positions_ready"])),
+                int(float(row["event_clock_trajectory_ready"])),
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The audit prevents coordinate-cache readiness from being promoted to displacement-observable or event-clock readiness.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5768,6 +5829,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_multilag_particle_cache_targets_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf"
     )
+    sota_glassbench_cached_particle_observable_semantics_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf"
+    )
     sota_glassbench_first_npz_particle_cache_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf"
     )
@@ -5926,6 +5990,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_multilag_particle_cache_targets_pdf(
         sota_glassbench_multilag_particle_cache_targets_pdf
+    )
+    write_sota_glassbench_cached_particle_observable_semantics_pdf(
+        sota_glassbench_cached_particle_observable_semantics_pdf
     )
     write_sota_glassbench_first_npz_particle_cache_contract_pdf(
         sota_glassbench_first_npz_particle_cache_contract_pdf
@@ -6127,6 +6194,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_multilag_particle_cache_targets_pdf,
             "figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf",
+        )
+        archive.write(
+            sota_glassbench_cached_particle_observable_semantics_pdf,
+            "figures/renewal_cage_sota_glassbench_cached_particle_observable_semantics.pdf",
         )
         archive.write(
             sota_glassbench_first_npz_particle_cache_contract_pdf,
