@@ -6193,6 +6193,16 @@ def glassbench_direct_alpha_curve_audit(
         lag_times = [float(row.get("lag_time", 0.0) or 0.0) for row in group]
         time_codes = [str(row.get("time_code", "none")) for row in group]
         fs_values = [float(row.get("direct_alpha_fs", 0.0) or 0.0) for row in group]
+        sigma_values = [float(row.get("sigma_direct_alpha_fs", 0.0) or 0.0) for row in group]
+        uncertainty_ready = bool(group) and all(value > 0.0 for value in sigma_values)
+        uncertainty_method = next(
+            (
+                str(row.get("direct_alpha_uncertainty_method"))
+                for row in group
+                if row.get("direct_alpha_uncertainty_method") not in {None, "", "none"}
+            ),
+            "none",
+        )
         latest_fs = fs_values[-1] if fs_values else 0.0
         latest_lag = lag_times[-1] if lag_times else 0.0
         crossing_index = next((idx for idx, value in enumerate(fs_values) if value <= threshold), None)
@@ -6233,6 +6243,9 @@ def glassbench_direct_alpha_curve_audit(
                 "time_codes": ";".join(time_codes) if time_codes else "none",
                 "lag_times": ";".join(f"{value:.17g}" for value in lag_times) if lag_times else "none",
                 "direct_alpha_fs_curve": ";".join(f"{value:.17g}" for value in fs_values) if fs_values else "none",
+                "sigma_direct_alpha_fs_curve": ";".join(f"{value:.12g}" for value in sigma_values) if sigma_values else "none",
+                "direct_alpha_uncertainty_method": uncertainty_method,
+                "direct_alpha_uncertainty_ready": float(uncertainty_ready),
                 "latest_lag_time": float(latest_lag),
                 "latest_direct_alpha_fs": float(latest_fs),
                 "alpha_threshold_crossed": float(crossed),
@@ -6297,10 +6310,16 @@ def glassbench_direct_alpha_shape_selection(
         structure_id = str(direct.get("structure_id", "none"))
         time = parse_float_series(direct.get("lag_times", "none"))
         decay = parse_float_series(direct.get("direct_alpha_fs_curve", "none"))
+        sigma_decay = parse_float_series(direct.get("sigma_direct_alpha_fs_curve", "none"))
         tau_alpha = float(direct.get("threshold_crossing_lag_time", 0.0) or 0.0)
         crossed = float(direct.get("alpha_threshold_crossed", 0.0) or 0.0) == 1.0
         monotone = float(direct.get("strictly_monotone_decay", 0.0) or 0.0) == 1.0
-        uncertainty_ready = str(direct.get("sigma_direct_alpha_fs_curve", "none")) not in {"none", ""}
+        uncertainty_ready = (
+            sigma_decay.size == decay.size
+            and sigma_decay.size > 0
+            and bool(np.all(np.isfinite(sigma_decay)))
+            and bool(np.all(sigma_decay > 0.0))
+        )
         ready = (
             crossed
             and tau_alpha > 0.0
@@ -6346,12 +6365,15 @@ def glassbench_direct_alpha_shape_selection(
                 blocker = "none"
                 next_action = "predict_heldout_multi_k_alpha_shape_from_event_clock"
             elif candidate:
-                stage = "cached_alpha_shape_stretched_candidate_uncertainty_blocked"
-                blocker = (
-                    "missing_uncertainty"
-                    if monotone
-                    else "nonmonotone_sparse_curve_and_missing_uncertainty"
-                )
+                if monotone:
+                    stage = "cached_alpha_shape_stretched_candidate_uncertainty_blocked"
+                    blocker = "missing_uncertainty"
+                elif uncertainty_ready:
+                    stage = "cached_alpha_shape_stretched_candidate_monotonicity_blocked"
+                    blocker = "nonmonotone_sparse_curve"
+                else:
+                    stage = "cached_alpha_shape_stretched_candidate_uncertainty_blocked"
+                    blocker = "nonmonotone_sparse_curve_and_missing_uncertainty"
                 next_action = "measure_monotone_uncertainty_weighted_multi_k_alpha_curve"
             else:
                 stage = "cached_alpha_shape_exponential_not_rejected"

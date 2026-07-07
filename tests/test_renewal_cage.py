@@ -626,6 +626,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 "lag_time": 0.1,
                 "direct_alpha_wave_number": 4.8,
                 "direct_alpha_fs": 0.98,
+                "sigma_direct_alpha_fs": 0.01,
             },
             {
                 "system_id": "KA2D",
@@ -635,6 +636,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 "lag_time": 1.1,
                 "direct_alpha_wave_number": 4.8,
                 "direct_alpha_fs": 0.88,
+                "sigma_direct_alpha_fs": 0.02,
             },
             {
                 "system_id": "KA2D",
@@ -644,6 +646,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 "lag_time": 1500000.0,
                 "direct_alpha_wave_number": 4.8,
                 "direct_alpha_fs": math.exp(-1.0),
+                "sigma_direct_alpha_fs": 0.03,
             },
         ]
 
@@ -660,6 +663,8 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["threshold_crossing_time_code"], "tc40")
         self.assertEqual(float(row["alpha_threshold_crossed"]), 1.0)
         self.assertEqual(float(row["strictly_monotone_decay"]), 1.0)
+        self.assertEqual(row["sigma_direct_alpha_fs_curve"], "0.01;0.02;0.03")
+        self.assertEqual(float(row["direct_alpha_uncertainty_ready"]), 1.0)
         self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "event_clock_trajectory")
@@ -681,6 +686,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 "threshold_crossing_lag_time": 1500000.0,
                 "alpha_threshold_crossed": 1.0,
                 "strictly_monotone_decay": 0.0,
+                "sigma_direct_alpha_fs_curve": "0.0005;0.0006;0.0006;0.0007;0.0007;0.0008;0.001;0.0012",
                 "direct_alpha_curve_stage": "cached_direct_alpha_curve_ready_event_clock_blocked",
             }
         ]
@@ -694,15 +700,16 @@ class DelayedRenewalCageTests(unittest.TestCase):
             max_decay=0.99,
         )[0]
 
-        self.assertEqual(row["alpha_shape_selection_stage"], "cached_alpha_shape_stretched_candidate_uncertainty_blocked")
+        self.assertEqual(row["alpha_shape_selection_stage"], "cached_alpha_shape_stretched_candidate_monotonicity_blocked")
         self.assertEqual(float(row["alpha_shape_selection_ready"]), 1.0)
         self.assertAlmostEqual(float(row["kww_beta"]), 0.15933802823269586, delta=1e-12)
         self.assertLess(float(row["kww_log_shape_rmse"]), 0.55)
         self.assertGreater(float(row["exponential_log_shape_rmse"]), 7.0)
         self.assertGreater(float(row["delta_aic_exponential_minus_kww"]), 40.0)
         self.assertEqual(float(row["stretched_alpha_candidate_supported"]), 1.0)
+        self.assertEqual(float(row["uncertainty_columns_ready"]), 1.0)
         self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
-        self.assertEqual(row["primary_blocker"], "nonmonotone_sparse_curve_and_missing_uncertainty")
+        self.assertEqual(row["primary_blocker"], "nonmonotone_sparse_curve")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):

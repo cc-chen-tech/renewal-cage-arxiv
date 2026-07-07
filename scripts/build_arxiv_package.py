@@ -3985,6 +3985,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
     row_h = 62
     colors_by_stage = {
         "cached_alpha_shape_stretched_supported": colors.HexColor("#2f855a"),
+        "cached_alpha_shape_stretched_candidate_monotonicity_blocked": colors.HexColor("#7c3aed"),
         "cached_alpha_shape_stretched_candidate_uncertainty_blocked": colors.HexColor("#805ad5"),
         "cached_alpha_shape_exponential_not_rejected": colors.HexColor("#2b6cb0"),
         "cached_alpha_shape_selection_upstream_incomplete": colors.HexColor("#4a5568"),
@@ -4033,7 +4034,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
     c.drawString(
         42,
         34,
-        "The cached curve supports a stretched-alpha candidate only; nonmonotone sparse data and missing uncertainties block a real fit claim.",
+        "Frame-block sigma_Fs is now attached; nonmonotone sparse data still blocks a real stretched-alpha claim.",
     )
     c.showPage()
     c.save()

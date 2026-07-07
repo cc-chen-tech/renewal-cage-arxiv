@@ -4136,8 +4136,17 @@ def write_sota_glassbench_direct_alpha_curve_csv(
                 reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
             dx = reference_displacements[:, :, 0]
             dy = reference_displacements[:, :, 1]
+            frame_direct_alpha = 0.5 * (
+                np.mean(np.cos(direct_k * dx), axis=1)
+                + np.mean(np.cos(direct_k * dy), axis=1)
+            )
             direct_alpha_fs = float(
                 0.5 * (np.mean(np.cos(direct_k * dx)) + np.mean(np.cos(direct_k * dy)))
+            )
+            sigma_direct_alpha_fs = float(
+                np.std(frame_direct_alpha, ddof=1) / math.sqrt(frame_direct_alpha.size)
+                if frame_direct_alpha.size > 1
+                else 0.0
             )
             curve_rows.append(
                 {
@@ -4148,6 +4157,8 @@ def write_sota_glassbench_direct_alpha_curve_csv(
                     "lag_time": float(row["lag_time"]),
                     "direct_alpha_wave_number": float(direct_k),
                     "direct_alpha_fs": float(direct_alpha_fs),
+                    "sigma_direct_alpha_fs": sigma_direct_alpha_fs,
+                    "direct_alpha_uncertainty_method": "frame_block_standard_error",
                 }
             )
     rows = glassbench_direct_alpha_curve_audit(
@@ -9382,6 +9393,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_svg(
     row_h = 88
     colors = {
         "cached_alpha_shape_stretched_supported": "#2f855a",
+        "cached_alpha_shape_stretched_candidate_monotonicity_blocked": "#7c3aed",
         "cached_alpha_shape_stretched_candidate_uncertainty_blocked": "#805ad5",
         "cached_alpha_shape_exponential_not_rejected": "#2b6cb0",
         "cached_alpha_shape_selection_upstream_incomplete": "#4a5568",

@@ -1340,6 +1340,8 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(ka2d_023["primary_blocker"], "event_clock_trajectory")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(ka2d_023["direct_alpha_uncertainty_ready"]), 1.0)
+        self.assertIn(";", ka2d_023["sigma_direct_alpha_fs_curve"])
         self.assertIn("0.979990664255", ka2d_023["direct_alpha_fs_curve"])
         self.assertIn("0.367879441171", ka2d_023["direct_alpha_fs_curve"])
 
@@ -1356,14 +1358,15 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(
             ka2d_023["alpha_shape_selection_stage"],
-            "cached_alpha_shape_stretched_candidate_uncertainty_blocked",
+            "cached_alpha_shape_stretched_candidate_monotonicity_blocked",
         )
         self.assertEqual(float(ka2d_023["alpha_shape_selection_ready"]), 1.0)
         self.assertLess(float(ka2d_023["kww_beta"]), 0.2)
         self.assertGreater(float(ka2d_023["delta_aic_exponential_minus_kww"]), 40.0)
         self.assertEqual(float(ka2d_023["stretched_alpha_candidate_supported"]), 1.0)
+        self.assertEqual(float(ka2d_023["uncertainty_columns_ready"]), 1.0)
         self.assertEqual(float(ka2d_023["real_alpha_shape_claim_ready"]), 0.0)
-        self.assertEqual(ka2d_023["primary_blocker"], "nonmonotone_sparse_curve_and_missing_uncertainty")
+        self.assertEqual(ka2d_023["primary_blocker"], "nonmonotone_sparse_curve")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
     def test_sota_glassbench_direct_alpha_transport_records_proxy_not_inversion(self):
