@@ -182,6 +182,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
     glassbench_direct_four_point_claim_gate,
+    glassbench_real_data_closure_priority_ledger,
     glassbench_timecode_curve_bridge,
     sota_glassbench_ka2d_timecode_semantics_gate,
     sota_glassbench_observable_coverage_audit_gate,
@@ -520,6 +521,119 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(float(row["overlap_chi4_peak"]), 150.0)
         self.assertEqual(row["primary_blocker"], "direct_four_point_function_and_dynamic_length")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_data_closure_priority_ledger_orders_decisive_payloads(self):
+        evidence_rows = [
+            {
+                "claim_row_id": "real_dynamic_signature_support",
+                "claim_ready_now": 1.0,
+                "allowed_claim_level": "dynamical_signature_supported",
+                "claim_synthesis_stage": "real_dynamic_signatures_supported_preinversion",
+                "primary_blocker": "none",
+                "next_required_action": "keep_dynamic_signature_claim_separate_from_real_inversion",
+            },
+            {
+                "claim_row_id": "conditional_alpha_transport_pe_bound",
+                "claim_ready_now": 0.0,
+                "allowed_claim_level": "conditional_alpha_transport_bound_not_event_clock_inversion",
+                "claim_synthesis_stage": "conditional_transport_pe_bound_ready_event_clock_blocked",
+                "primary_blocker": "event_clock_jump_variance",
+                "next_required_action": "measure_cage_jump_event_variance_and_exchange_clock",
+            },
+            {
+                "claim_row_id": "real_mechanism_selection",
+                "claim_ready_now": 0.0,
+                "allowed_claim_level": "preregistered_real_mechanism_selection_protocol",
+                "claim_synthesis_stage": "mechanism_selection_preregistered_late_recovery_missing",
+                "primary_blocker": "late_recovery_measurement",
+                "next_required_action": "measure_late_ngp_recovery_and_extract_exchange_clock",
+            },
+        ]
+        closed_loop_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "frame_index_microstats_ready": 1.0,
+                "macro_signature_ready": 1.0,
+                "micro_to_macro_prediction_ready": 0.0,
+                "closed_loop_ready": 0.0,
+                "missing_closed_loop_inputs": (
+                    "physical_time_semantics;cage_jump_event_segmentation;"
+                    "persistence_exchange_event_clock;real_persistence_exchange_inversion"
+                ),
+                "primary_blocker": "physical_time_semantics",
+            }
+        ]
+        unlock_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "minimum_unlock_ready": 0.0,
+                "minimum_required_payload": (
+                    "frame_time_mapping;lag_time;sigma_msd;sigma_ngp_2d;"
+                    "sigma_self_intermediate_scattering_by_k;sigma_chi4_overlap"
+                ),
+                "missing_observables": "lag_time",
+                "missing_uncertainty_columns": (
+                    "sigma_msd;sigma_ngp_2d;sigma_self_intermediate_scattering_by_k;sigma_chi4_overlap"
+                ),
+            }
+        ]
+        post_window_rows = [
+            {
+                "prediction_target_ready": 1.0,
+                "post_window_prediction_supported": 0.0,
+                "target_time_code": "tc45",
+            }
+        ]
+        late_recovery_rows = [
+            {
+                "target_ready": 1.0,
+                "late_recovery_observed": 0.0,
+                "target_time_code": "tc50",
+            }
+        ]
+        four_point_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "overlap_chi4_proxy_ready": 1.0,
+                "direct_four_point_claim_ready": 0.0,
+                "primary_blocker": "direct_four_point_function_and_dynamic_length",
+            }
+        ]
+
+        rows = glassbench_real_data_closure_priority_ledger(
+            ledger_id="glassbench_real_data_closure_priority",
+            evidence_rows=evidence_rows,
+            closed_loop_rows=closed_loop_rows,
+            unlock_rows=unlock_rows,
+            post_window_rows=post_window_rows,
+            late_recovery_rows=late_recovery_rows,
+            four_point_rows=four_point_rows,
+        )
+
+        by_id = {row["closure_id"]: row for row in rows}
+        event_clock = by_id["physical_time_event_clock_and_cage_jump_segmentation"]
+        self.assertEqual(float(event_clock["priority_rank"]), 1.0)
+        self.assertEqual(event_clock["priority_stage"], "minimum_real_inversion_closure_priority")
+        self.assertEqual(float(event_clock["unlocks_quantitative_inversion"]), 1.0)
+        self.assertEqual(float(event_clock["unlocks_micro_to_macro_prediction"]), 1.0)
+        self.assertIn("frame_time_mapping", event_clock["minimum_required_payload"])
+        self.assertIn("cage_jump_event_segmentation", event_clock["minimum_required_payload"])
+        self.assertGreaterEqual(float(event_clock["blocked_gate_count"]), 3.0)
+
+        alpha = by_id["post_alpha_multik_fs_targets"]
+        self.assertEqual(alpha["priority_stage"], "heldout_alpha_prediction_priority")
+        self.assertEqual(float(alpha["unlocks_heldout_alpha_prediction"]), 1.0)
+
+        four_point = by_id["direct_four_point_function_and_dynamic_length"]
+        self.assertEqual(four_point["priority_stage"], "spatial_four_point_boundary_priority")
+        self.assertEqual(float(four_point["unlocks_direct_spatial_claim"]), 1.0)
+        self.assertEqual(float(four_point["unlocks_quantitative_inversion"]), 0.0)
+
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
+        self.assertTrue(all("thermodynamic_transition" not in row["post_unlock_claim_level"] for row in rows))
 
     def test_glassbench_alpha_threshold_horizon_audit_flags_metadata_anchor_mismatch(self):
         timecode_rows = [

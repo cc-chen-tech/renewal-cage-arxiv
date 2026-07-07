@@ -11175,6 +11175,186 @@ def glassbench_direct_four_point_claim_gate(
     return out
 
 
+def glassbench_real_data_closure_priority_ledger(
+    *,
+    ledger_id: str,
+    evidence_rows: Sequence[dict[str, object]],
+    closed_loop_rows: Sequence[dict[str, object]],
+    unlock_rows: Sequence[dict[str, object]],
+    post_window_rows: Sequence[dict[str, object]],
+    late_recovery_rows: Sequence[dict[str, object]],
+    four_point_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Rank the minimum real-data payloads needed to close GlassBench claims."""
+
+    if not ledger_id:
+        raise ValueError("ledger_id must be nonempty")
+    for name, rows in {
+        "evidence_rows": evidence_rows,
+        "closed_loop_rows": closed_loop_rows,
+        "unlock_rows": unlock_rows,
+        "post_window_rows": post_window_rows,
+        "late_recovery_rows": late_recovery_rows,
+        "four_point_rows": four_point_rows,
+    }.items():
+        if not rows:
+            raise ValueError(f"{name} must be nonempty")
+
+    def split_tokens(value: object) -> list[str]:
+        return [token for token in str(value or "").split(";") if token and token != "none"]
+
+    def join_tokens(values: Sequence[str]) -> str:
+        seen: set[str] = set()
+        out: list[str] = []
+        for value in values:
+            if value and value not in seen:
+                out.append(value)
+                seen.add(value)
+        return ";".join(out) if out else "none"
+
+    evidence_by_id = {str(row.get("claim_row_id", "")): row for row in evidence_rows}
+    dynamic = evidence_by_id.get("real_dynamic_signature_support", {})
+    pe_bound = evidence_by_id.get("conditional_alpha_transport_pe_bound", {})
+    mechanism = evidence_by_id.get("real_mechanism_selection", {})
+    closed = closed_loop_rows[0]
+    unlock = unlock_rows[0]
+    four_point = four_point_rows[0]
+
+    closed_missing = split_tokens(closed.get("missing_closed_loop_inputs", ""))
+    unlock_payload = split_tokens(unlock.get("minimum_required_payload", ""))
+    event_payload = join_tokens(
+        unlock_payload
+        + closed_missing
+        + [
+            "particle_resolved_cage_jump_events",
+            "persistence_exchange_event_clock",
+            "uncertainty_weighted_macro_observables",
+        ]
+    )
+    event_blocked_count = float(
+        sum(
+            [
+                float(closed.get("closed_loop_ready", 0.0) or 0.0) == 0.0,
+                float(unlock.get("minimum_unlock_ready", 0.0) or 0.0) == 0.0,
+                float(pe_bound.get("claim_ready_now", 0.0) or 0.0) == 0.0,
+                float(mechanism.get("claim_ready_now", 0.0) or 0.0) == 0.0,
+            ]
+        )
+    )
+    post_targets = sorted(
+        {
+            str(row.get("target_time_code", "post_alpha"))
+            for row in post_window_rows
+            if float(row.get("prediction_target_ready", 0.0) or 0.0) == 1.0
+        }
+    )
+    late_targets = sorted(
+        {
+            str(row.get("target_time_code", "late_recovery"))
+            for row in late_recovery_rows
+            if float(row.get("target_ready", row.get("timecode_target_ready", 0.0)) or 0.0) == 1.0
+        }
+    )
+    four_point_blocked = float(four_point.get("direct_four_point_claim_ready", 0.0) or 0.0) == 0.0
+
+    rows = [
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "physical_time_event_clock_and_cage_jump_segmentation",
+            "priority_rank": 1.0,
+            "current_evidence_level": "real_signatures_and_frame_microstats_cached",
+            "current_claim_level": str(dynamic.get("allowed_claim_level", "dynamical_signature_supported")),
+            "post_unlock_claim_level": "uncertainty_weighted_real_microdynamic_inversion_and_heldout_macro_prediction",
+            "minimum_required_payload": event_payload,
+            "blocked_gate_count": event_blocked_count,
+            "primary_blocker": str(closed.get("primary_blocker", "physical_time_semantics")),
+            "next_required_action": "attach_frame_time_mapping_segment_cage_jumps_and_fit_persistence_exchange_clock",
+            "unlocks_quantitative_inversion": 1.0,
+            "unlocks_micro_to_macro_prediction": 1.0,
+            "unlocks_heldout_alpha_prediction": 0.0,
+            "unlocks_mechanism_selection": 0.0,
+            "unlocks_direct_spatial_claim": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "minimum_real_inversion_closure_priority",
+        },
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "post_alpha_multik_fs_targets",
+            "priority_rank": 2.0,
+            "current_evidence_level": "cached_multik_alpha_shape_candidate",
+            "current_claim_level": "cached_alpha_shape_consistency",
+            "post_unlock_claim_level": "heldout_multik_alpha_shape_prediction_test",
+            "minimum_required_payload": join_tokens(
+                [f"observe_{target}_Fs_multik" for target in post_targets]
+                + ["sigma_self_intermediate_scattering_by_k", "post_alpha_threshold_crossing"]
+            ),
+            "blocked_gate_count": float(
+                sum(float(row.get("post_window_prediction_supported", 0.0) or 0.0) == 0.0 for row in post_window_rows)
+            ),
+            "primary_blocker": "post_alpha_window_observation",
+            "next_required_action": "measure_preregistered_post_alpha_fs_targets",
+            "unlocks_quantitative_inversion": 0.0,
+            "unlocks_micro_to_macro_prediction": 0.0,
+            "unlocks_heldout_alpha_prediction": 1.0,
+            "unlocks_mechanism_selection": 0.0,
+            "unlocks_direct_spatial_claim": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "heldout_alpha_prediction_priority",
+        },
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "late_ngp_recovery_and_exchange_horizon",
+            "priority_rank": 3.0,
+            "current_evidence_level": "late_recovery_protocol_preregistered",
+            "current_claim_level": str(mechanism.get("allowed_claim_level", "preregistered_real_mechanism_selection_protocol")),
+            "post_unlock_claim_level": "finite_exchange_vs_static_disorder_real_mechanism_selection",
+            "minimum_required_payload": join_tokens(
+                [f"observe_{target}_late_ngp" for target in late_targets]
+                + ["sigma_late_ngp", "late_self_van_hove_tail", "exchange_clock_fit"]
+            ),
+            "blocked_gate_count": float(
+                sum(
+                    float(
+                        row.get("late_recovery_observed", row.get("late_recovery_observation_ready", 0.0))
+                        or 0.0
+                    )
+                    == 0.0
+                    for row in late_recovery_rows
+                )
+            ),
+            "primary_blocker": str(mechanism.get("primary_blocker", "late_recovery_measurement")),
+            "next_required_action": "measure_late_ngp_recovery_and_extract_exchange_clock",
+            "unlocks_quantitative_inversion": 0.0,
+            "unlocks_micro_to_macro_prediction": 0.0,
+            "unlocks_heldout_alpha_prediction": 0.0,
+            "unlocks_mechanism_selection": 1.0,
+            "unlocks_direct_spatial_claim": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "mechanism_selection_priority",
+        },
+        {
+            "ledger_id": ledger_id,
+            "closure_id": "direct_four_point_function_and_dynamic_length",
+            "priority_rank": 4.0,
+            "current_evidence_level": "overlap_chi4_proxy_supported",
+            "current_claim_level": "dynamic_heterogeneity_proxy_only",
+            "post_unlock_claim_level": "direct_four_point_susceptibility_and_dynamic_length_claim",
+            "minimum_required_payload": "direct_four_point_susceptibility;dynamic_correlation_length;physical_time_chi4_uncertainty",
+            "blocked_gate_count": float(four_point_blocked),
+            "primary_blocker": str(four_point.get("primary_blocker", "direct_four_point_function_and_dynamic_length")),
+            "next_required_action": "compute_direct_four_point_function_and_dynamic_length",
+            "unlocks_quantitative_inversion": 0.0,
+            "unlocks_micro_to_macro_prediction": 0.0,
+            "unlocks_heldout_alpha_prediction": 0.0,
+            "unlocks_mechanism_selection": 0.0,
+            "unlocks_direct_spatial_claim": 1.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "priority_stage": "spatial_four_point_boundary_priority",
+        },
+    ]
+    return rows
+
+
 def dynamic_signature_alignment_ledger(
     *,
     alignment_id: str,

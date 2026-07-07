@@ -360,6 +360,34 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermodynamic["claim_synthesis_stage"], "thermodynamic_transition_out_of_scope")
         self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_glassbench_real_data_closure_priority_orders_minimum_next_payload(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_data_closure_priority.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["closure_id"]: row for row in rows}
+        event_clock = by_id["physical_time_event_clock_and_cage_jump_segmentation"]
+        self.assertEqual(float(event_clock["priority_rank"]), 1.0)
+        self.assertEqual(event_clock["priority_stage"], "minimum_real_inversion_closure_priority")
+        self.assertEqual(float(event_clock["unlocks_quantitative_inversion"]), 1.0)
+        self.assertEqual(float(event_clock["unlocks_micro_to_macro_prediction"]), 1.0)
+        self.assertIn("frame_time_mapping", event_clock["minimum_required_payload"])
+        self.assertIn("cage_jump_event_segmentation", event_clock["minimum_required_payload"])
+        self.assertGreaterEqual(float(event_clock["blocked_gate_count"]), 3.0)
+
+        alpha = by_id["post_alpha_multik_fs_targets"]
+        self.assertEqual(alpha["priority_stage"], "heldout_alpha_prediction_priority")
+        self.assertEqual(float(alpha["unlocks_heldout_alpha_prediction"]), 1.0)
+
+        four_point = by_id["direct_four_point_function_and_dynamic_length"]
+        self.assertEqual(four_point["priority_stage"], "spatial_four_point_boundary_priority")
+        self.assertEqual(float(four_point["unlocks_direct_spatial_claim"]), 1.0)
+        self.assertEqual(float(four_point["unlocks_quantitative_inversion"]), 0.0)
+
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
+        self.assertTrue(all("thermodynamic_transition" not in row["post_unlock_claim_level"] for row in rows))
+
     def test_glassbench_real_cached_microdynamic_verdict_marks_persistence_but_blocks_inversion(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv"
         self.assertTrue(path.exists())
@@ -3073,6 +3101,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)
@@ -3291,6 +3320,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
             "figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf",
             "figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf",
+            "figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",

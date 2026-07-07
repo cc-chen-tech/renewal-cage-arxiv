@@ -92,6 +92,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
     glassbench_direct_four_point_claim_gate,
+    glassbench_real_data_closure_priority_ledger,
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
@@ -4991,6 +4992,31 @@ def write_sota_glassbench_direct_four_point_claim_gate_csv(
         signature_rows=signature_rows,
         dynamic_alignment_rows=dynamic_alignment_rows,
         member_ensemble_rows=member_ensemble_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_data_closure_priority_csv(
+    path: Path,
+    *,
+    evidence_rows: list[dict[str, float | str]],
+    closed_loop_rows: list[dict[str, float | str]],
+    unlock_rows: list[dict[str, float | str]],
+    post_window_rows: list[dict[str, float | str]],
+    late_recovery_rows: list[dict[str, float | str]],
+    four_point_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Rank the minimum real-data payloads needed to close GlassBench claims."""
+
+    rows = glassbench_real_data_closure_priority_ledger(
+        ledger_id="glassbench_real_data_closure_priority",
+        evidence_rows=evidence_rows,
+        closed_loop_rows=closed_loop_rows,
+        unlock_rows=unlock_rows,
+        post_window_rows=post_window_rows,
+        late_recovery_rows=late_recovery_rows,
+        four_point_rows=four_point_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -12165,6 +12191,56 @@ def write_sota_glassbench_direct_four_point_claim_gate_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_data_closure_priority_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 500
+    left, top = 70, 118
+    row_h = 82
+    colors = {
+        "minimum_real_inversion_closure_priority": "#9f1239",
+        "heldout_alpha_prediction_priority": "#2b6cb0",
+        "mechanism_selection_priority": "#805ad5",
+        "spatial_four_point_boundary_priority": "#2f855a",
+    }
+    marks = []
+    for row in rows:
+        rank = int(float(row["priority_rank"]))
+        y = top + (rank - 1) * row_h
+        stage = str(row["priority_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="18" font-weight="700">#{rank}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 52}" y="{y - 8}" width="360" height="29" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 62}" y="{y + 11}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{str(row["closure_id"]).replace("_", " ")[:52]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 438}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">stage={stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 438}" y="{y + 34}" font-family="Arial, sans-serif" font-size="10" fill="#555">unlocks: inversion={int(float(row["unlocks_quantitative_inversion"]))}; micro-macro={int(float(row["unlocks_micro_to_macro_prediction"]))}; alpha={int(float(row["unlocks_heldout_alpha_prediction"]))}; mechanism={int(float(row["unlocks_mechanism_selection"]))}; spatial={int(float(row["unlocks_direct_spatial_claim"]))}; thermo={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 438}" y="{y + 55}" font-family="Arial, sans-serif" font-size="10" fill="#555">payload={str(row["minimum_required_payload"]).replace("_", " ")[:96]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-data closure priority ledger</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The ledger ranks the smallest real payloads that would turn current dynamical-signature evidence into quantitative, falsifiable tests without thermodynamic overclaim.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">rank</text>
+  <text x="{left + 52}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">closure payload</text>
+  <text x="{left + 438}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim unlocked and required data</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_microdynamic_closed_loop_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -15069,6 +15145,21 @@ def main() -> None:
     write_sota_glassbench_real_evidence_claim_synthesis_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.svg",
         glassbench_real_evidence_claim_synthesis_rows,
+    )
+    glassbench_real_data_closure_priority_rows = (
+        write_sota_glassbench_real_data_closure_priority_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.csv",
+            evidence_rows=glassbench_real_evidence_claim_synthesis_rows,
+            closed_loop_rows=microdynamic_closed_loop_rows,
+            unlock_rows=glassbench_real_inversion_unlock_protocol_rows,
+            post_window_rows=glassbench_direct_alpha_post_window_prediction_target_rows,
+            late_recovery_rows=glassbench_late_recovery_timecode_target_rows,
+            four_point_rows=glassbench_direct_four_point_claim_gate_rows,
+        )
+    )
+    write_sota_glassbench_real_data_closure_priority_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.svg",
+        glassbench_real_data_closure_priority_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"
