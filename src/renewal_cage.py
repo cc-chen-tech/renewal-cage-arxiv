@@ -7450,6 +7450,133 @@ def glassbench_late_recovery_falsification_protocol(
     return rows
 
 
+def glassbench_late_recovery_ingestion_contract(
+    *,
+    contract_id: str,
+    envelope_rows: Sequence[dict[str, object]],
+    candidate_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Validate late-recovery observations before mechanism falsification."""
+
+    if not contract_id:
+        raise ValueError("contract_id must be nonempty")
+    if not envelope_rows:
+        raise ValueError("envelope_rows must be nonempty")
+
+    required_columns = [
+        "observed_lag_time",
+        "observed_late_ngp",
+        "observed_tail_gaussian_recovery",
+        "source_trajectory_identity",
+    ]
+    uncertainty_columns = ["sigma_late_ngp", "sigma_tail_recovery"]
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def present(row: dict[str, object], column: str) -> bool:
+        value = row.get(column)
+        return value is not None and str(value) not in {"", "none", "nan"}
+
+    candidates_by_key: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in candidate_rows:
+        candidates_by_key.setdefault(key_for(row), []).append(row)
+
+    rows: list[dict[str, float | str]] = []
+    for envelope in sorted(envelope_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(envelope)
+        required_lag = float(envelope.get("gaussian_recovery_lag_upper_bound", 0.0) or 0.0)
+        envelope_ready = float(
+            envelope.get("envelope_ready", 1.0 if required_lag > 0.0 else 0.0) or 0.0
+        ) == 1.0
+        group = candidates_by_key.get((system_id, temperature, structure_id), [])
+        if not group:
+            group = [{}]
+
+        for index, candidate in enumerate(group):
+            missing_columns = [column for column in required_columns if not present(candidate, column)]
+            missing_uncertainty = [column for column in uncertainty_columns if not present(candidate, column)]
+            machine_readable = float(candidate.get("machine_readable", 0.0) or 0.0) == 1.0
+            shared_units = float(candidate.get("shared_time_units", 0.0) or 0.0) == 1.0
+            observed_lag = float(candidate.get("observed_lag_time", 0.0) or 0.0)
+            horizon_satisfied = observed_lag >= required_lag and required_lag > 0.0
+            structural_ready = bool(machine_readable and shared_units and not missing_columns)
+            uncertainty_ready = not missing_uncertainty
+            ready = structural_ready and uncertainty_ready and horizon_satisfied
+
+            if not envelope_ready:
+                stage = "late_recovery_envelope_upstream_incomplete"
+                blocker = "finite_exchange_envelope"
+                next_action = "complete_finite_exchange_falsification_envelope"
+            elif candidate == {}:
+                stage = "late_recovery_observation_missing"
+                blocker = "late_recovery_observation"
+                next_action = "provide_machine_readable_late_recovery_observation_with_uncertainty"
+            elif not machine_readable:
+                stage = "late_recovery_machine_readable_incomplete"
+                blocker = "machine_readable_data"
+                next_action = "provide_machine_readable_late_recovery_table"
+            elif not shared_units:
+                stage = "late_recovery_time_units_incomplete"
+                blocker = "shared_time_units"
+                next_action = "map_late_recovery_time_units_to_glassbench_lag_time"
+            elif missing_columns:
+                stage = "late_recovery_columns_incomplete"
+                blocker = missing_columns[0]
+                next_action = "provide_required_late_recovery_columns"
+            elif not horizon_satisfied:
+                stage = "late_recovery_horizon_incomplete"
+                blocker = "late_recovery_horizon"
+                next_action = "extend_late_recovery_measurement_to_required_followup_lag"
+            elif missing_uncertainty:
+                stage = "late_recovery_uncertainty_incomplete"
+                blocker = missing_uncertainty[0]
+                next_action = "provide_uncertainty_columns_for_late_recovery_observation"
+            else:
+                stage = "late_recovery_observation_ingestion_ready"
+                blocker = "none"
+                next_action = "run_late_recovery_falsification_protocol"
+
+            rows.append(
+                {
+                    "contract_id": contract_id,
+                    "candidate_id": f"{system_id}:{temperature}:{structure_id}:{index}",
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "required_followup_lag_time": float(required_lag),
+                    "observed_lag_time": float(observed_lag),
+                    "observed_late_ngp": float(candidate.get("observed_late_ngp", 0.0) or 0.0),
+                    "sigma_late_ngp": float(candidate.get("sigma_late_ngp", 0.0) or 0.0),
+                    "observed_tail_gaussian_recovery": float(
+                        candidate.get("observed_tail_gaussian_recovery", 0.0) or 0.0
+                    ),
+                    "sigma_tail_recovery": float(candidate.get("sigma_tail_recovery", 0.0) or 0.0),
+                    "machine_readable_ready": float(machine_readable),
+                    "shared_time_units_ready": float(shared_units),
+                    "source_trajectory_identity": str(candidate.get("source_trajectory_identity", "none")),
+                    "horizon_satisfied": float(horizon_satisfied),
+                    "structural_ingestion_ready": float(structural_ready),
+                    "uncertainty_ready": float(uncertainty_ready),
+                    "late_recovery_observation_ready": float(ready),
+                    "missing_columns": ";".join(missing_columns) if missing_columns else "none",
+                    "missing_uncertainty_columns": ";".join(missing_uncertainty)
+                    if missing_uncertainty
+                    else "none",
+                    "real_pe_inversion_ready": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                    "primary_blocker": blocker,
+                    "next_required_action": next_action,
+                    "late_recovery_ingestion_stage": stage,
+                }
+            )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

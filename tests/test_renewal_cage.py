@@ -147,6 +147,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_interval_censored_persistence_fit,
     glassbench_finite_exchange_falsification_envelope,
     glassbench_late_recovery_falsification_protocol,
+    glassbench_late_recovery_ingestion_contract,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1101,6 +1102,79 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(reject["finite_exchange_rejected"]), 1.0)
         self.assertEqual(float(reject["static_disorder_rejected"]), 0.0)
         self.assertEqual(reject["primary_blocker"], "late_gaussian_recovery")
+
+    def test_glassbench_late_recovery_ingestion_contract_requires_horizon_and_uncertainty(self):
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+            }
+        ]
+        rows = glassbench_late_recovery_ingestion_contract(
+            contract_id="glassbench_late_recovery_ingestion_contract",
+            envelope_rows=envelope_rows,
+            candidate_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.012,
+                    "sigma_late_ngp": 0.003,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "sigma_tail_recovery": 0.05,
+                    "machine_readable": 1.0,
+                    "shared_time_units": 1.0,
+                    "source_trajectory_identity": "KA2D_0.23_structure151_member_ensemble",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 1500000.0,
+                    "observed_late_ngp": 0.02,
+                    "sigma_late_ngp": 0.004,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "sigma_tail_recovery": 0.05,
+                    "machine_readable": 1.0,
+                    "shared_time_units": 1.0,
+                    "source_trajectory_identity": "KA2D_0.23_structure151_member_ensemble",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.02,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "machine_readable": 1.0,
+                    "shared_time_units": 1.0,
+                    "source_trajectory_identity": "KA2D_0.23_structure151_member_ensemble",
+                },
+            ],
+        )
+
+        by_stage = {row["candidate_id"]: row for row in rows}
+        ready = by_stage["KA2D:0.23:151:0"]
+        short = by_stage["KA2D:0.23:151:1"]
+        no_uncertainty = by_stage["KA2D:0.23:151:2"]
+
+        self.assertEqual(ready["late_recovery_ingestion_stage"], "late_recovery_observation_ingestion_ready")
+        self.assertEqual(float(ready["late_recovery_observation_ready"]), 1.0)
+        self.assertEqual(float(ready["horizon_satisfied"]), 1.0)
+        self.assertEqual(float(ready["uncertainty_ready"]), 1.0)
+        self.assertEqual(ready["primary_blocker"], "none")
+
+        self.assertEqual(short["late_recovery_ingestion_stage"], "late_recovery_horizon_incomplete")
+        self.assertEqual(float(short["late_recovery_observation_ready"]), 0.0)
+        self.assertEqual(short["primary_blocker"], "late_recovery_horizon")
+
+        self.assertEqual(no_uncertainty["late_recovery_ingestion_stage"], "late_recovery_uncertainty_incomplete")
+        self.assertEqual(no_uncertainty["missing_uncertainty_columns"], "sigma_late_ngp;sigma_tail_recovery")
+        self.assertEqual(no_uncertainty["primary_blocker"], "sigma_late_ngp")
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

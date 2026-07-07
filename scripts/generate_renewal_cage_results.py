@@ -69,6 +69,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_interval_censored_persistence_fit,
     glassbench_finite_exchange_falsification_envelope,
     glassbench_late_recovery_falsification_protocol,
+    glassbench_late_recovery_ingestion_contract,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4480,6 +4481,22 @@ def write_sota_glassbench_late_recovery_protocol_csv(
         late_observable_rows=[],
         max_finite_exchange_late_ngp=0.05,
         min_static_plateau_rejection_gap=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_ingestion_contract_csv(
+    path: Path,
+    *,
+    envelope_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the machine-readable late-recovery observation ingestion contract."""
+
+    rows = glassbench_late_recovery_ingestion_contract(
+        contract_id="glassbench_ka2d_late_recovery_ingestion_contract",
+        envelope_rows=envelope_rows,
+        candidate_rows=[],
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9577,6 +9594,67 @@ def write_sota_glassbench_late_recovery_protocol_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_late_recovery_ingestion_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 400
+    left, top = 76, 126
+    row_h = 108
+    colors = {
+        "late_recovery_observation_ingestion_ready": "#2f855a",
+        "late_recovery_observation_missing": "#b7791f",
+        "late_recovery_horizon_incomplete": "#805ad5",
+        "late_recovery_uncertainty_incomplete": "#c05621",
+        "late_recovery_machine_readable_incomplete": "#c53030",
+        "late_recovery_columns_incomplete": "#c53030",
+        "late_recovery_time_units_incomplete": "#c53030",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["late_recovery_ingestion_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        required_lag = float(row["required_followup_lag_time"])
+        observed_lag = float(row["observed_lag_time"])
+        ready = int(float(row["late_recovery_observation_ready"]))
+        uncertainty_ready = int(float(row["uncertainty_ready"]))
+        horizon = int(float(row["horizon_satisfied"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="438" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; required lag={required_lag:.3g}; observed lag={observed_lag:.3g}; ingest ready={ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">machine readable={int(float(row["machine_readable_ready"]))}; shared time={int(float(row["shared_time_units_ready"]))}; horizon={horizon}; uncertainty={uncertainty_ready}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing columns={str(row["missing_columns"]).replace("_", " ")}; missing sigma={str(row["missing_uncertainty_columns"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench late recovery ingestion contract</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">A late-NGP or van-Hove observation must be machine-readable, uncertainty-weighted, in shared lag units, and beyond the finite-exchange horizon.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">ingestion stage</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">required observation schema</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -12503,6 +12581,16 @@ def main() -> None:
     write_sota_glassbench_late_recovery_protocol_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.svg",
         glassbench_late_recovery_protocol_rows,
+    )
+    glassbench_late_recovery_ingestion_contract_rows = (
+        write_sota_glassbench_late_recovery_ingestion_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.csv",
+            envelope_rows=glassbench_finite_exchange_envelope_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_ingestion_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_ingestion_contract.svg",
+        glassbench_late_recovery_ingestion_contract_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",
