@@ -56,6 +56,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_timecode_bridge,
     glassbench_cached_particle_observable_semantics_audit,
     glassbench_direct_alpha_curve_audit,
+    glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_first_npz_particle_cache_contract_gate,
@@ -4146,6 +4147,22 @@ def write_sota_glassbench_direct_alpha_transport_csv(
         direct_alpha_rows=direct_alpha_rows,
         observable_semantics_rows=observable_semantics_rows,
         dimension=2,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_pe_bound_csv(
+    path: Path,
+    *,
+    transport_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute conditional PE identifiability bounds from direct-alpha transport."""
+
+    rows = glassbench_direct_alpha_pe_feasibility_bound(
+        audit_id="glassbench_ka2d_direct_alpha_pe_bound",
+        transport_rows=transport_rows,
+        reference_jump_variance_fraction=0.2,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8741,6 +8758,60 @@ def write_sota_glassbench_direct_alpha_transport_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_pe_bound_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "direct_alpha_transport_bounds_pe_but_event_clock_missing": "#854d0e",
+        "direct_alpha_transport_pe_bound_infeasible": "#c05621",
+        "direct_alpha_transport_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["pe_feasibility_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        q_upper = float(row["jump_variance_upper_bound"])
+        q_over_msd = float(row["jump_variance_upper_over_msd"])
+        ratio = float(row["reference_persistence_exchange_ratio"])
+        exchange = float(row["reference_exchange_mean"])
+        persistence = float(row["reference_persistence_mean"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; q_max={q_upper:.3g}; q_max/MSD={q_over_msd:.3g}; full-MSD feasible={int(float(row["full_msd_jump_variance_feasible"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">at q={float(row["reference_jump_variance_fraction"]):.2g} MSD: tau_x={exchange:.3g}; tau_p={persistence:.3g}; tau_p/tau_x={ratio:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha PE feasibility bound</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Direct-alpha transport constrains the per-event jump variance needed for persistence/exchange inversion; the event-clock jump variance is still missing.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">PE feasibility stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">conditional identifiability bound</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11576,6 +11647,14 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_transport_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_transport.svg",
         glassbench_direct_alpha_transport_rows,
+    )
+    glassbench_direct_alpha_pe_bound_rows = write_sota_glassbench_direct_alpha_pe_bound_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.csv",
+        transport_rows=glassbench_direct_alpha_transport_rows,
+    )
+    write_sota_glassbench_direct_alpha_pe_bound_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_pe_bound.svg",
+        glassbench_direct_alpha_pe_bound_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

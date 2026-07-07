@@ -138,6 +138,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_anchor_cached_fs_audit,
     glassbench_direct_alpha_curve_audit,
     glassbench_direct_alpha_transport_coupling_audit,
+    glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -616,6 +617,43 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "event_clock_trajectory")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_pe_feasibility_bound_constrains_jump_variance(self):
+        transport_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "direct_alpha_wave_number": 4.7984485103142,
+                "tau_alpha_direct": 1500000.0,
+                "matched_msd": 0.9747508405755333,
+                "matched_ngp_2d": 2.1239947887392923,
+                "apparent_diffusion_coefficient": 1.6245847342925555e-7,
+                "apparent_stokes_einstein_product": 0.24368771014388332,
+                "direct_alpha_transport_proxy_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+
+        row = glassbench_direct_alpha_pe_feasibility_bound(
+            audit_id="glassbench_direct_alpha_pe_bound",
+            transport_rows=transport_rows,
+            reference_jump_variance_fraction=0.2,
+        )[0]
+
+        self.assertEqual(row["pe_feasibility_stage"], "direct_alpha_transport_bounds_pe_but_event_clock_missing")
+        self.assertEqual(float(row["pe_feasibility_bound_ready"]), 1.0)
+        self.assertEqual(float(row["full_msd_jump_variance_feasible"]), 0.0)
+        self.assertAlmostEqual(float(row["jump_variance_upper_bound"]), 0.4855550202214052)
+        self.assertAlmostEqual(float(row["jump_variance_upper_over_msd"]), 0.4981324457588704)
+        self.assertAlmostEqual(float(row["reference_jump_variance"]), 0.19495016811510667)
+        self.assertAlmostEqual(float(row["reference_exchange_mean"]), 600000.0)
+        self.assertAlmostEqual(float(row["reference_persistence_mean"]), 1409293.5403982885)
+        self.assertAlmostEqual(float(row["reference_persistence_exchange_ratio"]), 2.3488225673304806)
+        self.assertEqual(float(row["conditional_pe_inference_ready"]), 1.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_clock_jump_variance")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):

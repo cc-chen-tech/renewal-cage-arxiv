@@ -6350,6 +6350,158 @@ def glassbench_direct_alpha_transport_coupling_audit(
     return out
 
 
+def glassbench_direct_alpha_pe_feasibility_bound(
+    *,
+    audit_id: str,
+    transport_rows: Sequence[dict[str, object]],
+    reference_jump_variance_fraction: float = 0.2,
+) -> list[dict[str, float | str]]:
+    """Bound PE identifiability from a direct-alpha/transport proxy.
+
+    The direct-alpha transport row fixes ``D tau_alpha`` but not the per-event
+    jump variance. This gate computes the largest jump variance for which the
+    Poisson exchange baseline remains no slower than the observed alpha time,
+    then reports a conditional PE inference at a stated reference fraction of
+    the matched MSD.
+    """
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not transport_rows:
+        raise ValueError("transport_rows must be nonempty")
+    if reference_jump_variance_fraction <= 0.0:
+        raise ValueError("reference_jump_variance_fraction must be positive")
+
+    def poisson_tau(
+        wave_number: float,
+        jump_variance: float,
+        diffusion_coefficient: float,
+    ) -> float:
+        exchange_mean = jump_variance / (2.0 * diffusion_coefficient)
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.2,
+            jump_variance=jump_variance,
+            persistence_mean=exchange_mean,
+            exchange_mean=exchange_mean,
+        )
+        return persistence_exchange_alpha_relaxation_time(wave_number, params)
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        transport_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            str(item.get("temperature", "none")),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        wave_number = float(row.get("direct_alpha_wave_number", 0.0) or 0.0)
+        tau_alpha = float(row.get("tau_alpha_direct", 0.0) or 0.0)
+        diffusion = float(row.get("apparent_diffusion_coefficient", 0.0) or 0.0)
+        matched_msd = float(row.get("matched_msd", 0.0) or 0.0)
+        proxy_ready = float(row.get("direct_alpha_transport_proxy_ready", 0.0) or 0.0) == 1.0
+
+        full_feasible = False
+        q_upper = 0.0
+        reference_q = 0.0
+        reference_exchange = 0.0
+        reference_persistence = 0.0
+        reference_ratio = 0.0
+        reference_poisson_tau = 0.0
+        conditional_ready = False
+
+        if proxy_ready and wave_number > 0.0 and tau_alpha > 0.0 and diffusion > 0.0 and matched_msd > 0.0:
+            full_poisson_tau = poisson_tau(wave_number, matched_msd, diffusion)
+            full_feasible = full_poisson_tau <= tau_alpha or math.isclose(
+                full_poisson_tau,
+                tau_alpha,
+                rel_tol=1e-12,
+                abs_tol=1e-12,
+            )
+            if full_feasible:
+                q_upper = matched_msd
+            else:
+                lower = max(matched_msd * 1.0e-9, 1.0e-12)
+                upper = matched_msd
+                if poisson_tau(wave_number, lower, diffusion) > tau_alpha:
+                    q_upper = 0.0
+                else:
+                    for _ in range(80):
+                        mid = 0.5 * (lower + upper)
+                        if poisson_tau(wave_number, mid, diffusion) <= tau_alpha:
+                            lower = mid
+                        else:
+                            upper = mid
+                    q_upper = 0.5 * (lower + upper)
+
+            candidate_q = reference_jump_variance_fraction * matched_msd
+            if q_upper > 0.0:
+                reference_q = min(candidate_q, 0.99 * q_upper)
+            if reference_q > 0.0:
+                inferred = infer_persistence_exchange_from_alpha_transport(
+                    wave_number=wave_number,
+                    jump_variance=reference_q,
+                    diffusion_coefficient=diffusion,
+                    observed_tau_alpha=tau_alpha,
+                )
+                reference_exchange = inferred["exchange_mean"]
+                reference_persistence = inferred["persistence_mean"]
+                reference_ratio = inferred["persistence_exchange_ratio"]
+                reference_poisson_tau = inferred["poisson_tau_alpha"]
+                conditional_ready = True
+
+        if conditional_ready:
+            stage = "direct_alpha_transport_bounds_pe_but_event_clock_missing"
+            blocker = "event_clock_jump_variance"
+            next_action = "measure_cage_jump_event_variance_from_particle_event_clock"
+        elif proxy_ready:
+            stage = "direct_alpha_transport_pe_bound_infeasible"
+            blocker = "jump_variance_identifiability"
+            next_action = "measure_event_jump_variance_before_pe_inversion"
+        else:
+            stage = "direct_alpha_transport_upstream_incomplete"
+            blocker = "direct_alpha_transport_proxy"
+            next_action = "complete_direct_alpha_transport_proxy"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(wave_number),
+                "tau_alpha_direct": float(tau_alpha),
+                "apparent_diffusion_coefficient": float(diffusion),
+                "matched_msd": float(matched_msd),
+                "apparent_stokes_einstein_product": float(
+                    row.get("apparent_stokes_einstein_product", 0.0) or 0.0
+                ),
+                "full_msd_jump_variance_feasible": float(full_feasible),
+                "jump_variance_upper_bound": float(q_upper),
+                "jump_variance_upper_over_msd": float(q_upper / matched_msd) if matched_msd > 0.0 else 0.0,
+                "reference_jump_variance_fraction": float(reference_jump_variance_fraction),
+                "reference_jump_variance": float(reference_q),
+                "reference_exchange_mean": float(reference_exchange),
+                "reference_persistence_mean": float(reference_persistence),
+                "reference_persistence_exchange_ratio": float(reference_ratio),
+                "reference_poisson_tau_alpha": float(reference_poisson_tau),
+                "conditional_pe_inference_ready": float(conditional_ready),
+                "pe_feasibility_bound_ready": float(conditional_ready),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "pe_feasibility_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
