@@ -119,6 +119,50 @@ class ActivatedBarrierParams:
 
 
 @dataclass(frozen=True)
+class LangevinCageLandscapeParams:
+    """Local Langevin landscape used to derive an effective renewal cage.
+
+    The microscopic starting point is an overdamped Langevin/Smoluchowski
+    dynamics in a metastable basin. ``cage_curvature`` is the harmonic basin
+    curvature, ``saddle_curvature`` is the magnitude of the unstable saddle
+    curvature, and ``barrier_height`` is the basin-to-saddle free-energy gap.
+    The two extra barriers encode the coarse-grained fact that the first cage
+    escape and later exchanges can cross different effective barriers.
+    """
+
+    temperature: float
+    friction: float
+    cage_curvature: float
+    saddle_curvature: float
+    barrier_height: float
+    jump_length: float
+    persistence_barrier_extra: float = 0.0
+    exchange_barrier_extra: float = 0.0
+    dimension: int = 3
+
+
+@dataclass(frozen=True)
+class PeriodicSoftnessGateParams:
+    """Periodic cage potential with two slow precursor gates.
+
+    The effective potential is a Vorselaars-style periodic cage landscape,
+    ``U(x)=DeltaU[1-cos(2*pi*x/L)]/2``, augmented by two coarse-grained
+    softness/precursor modes. Each precursor becomes ready with probability
+    ``1-exp(-t/precursor_relaxation_time)`` after entering a cage. Escape
+    requires both gates, so the Kramers rate is multiplied by the product of
+    their readiness probabilities.
+    """
+
+    temperature: float
+    friction: float
+    barrier_height: float
+    period: float
+    precursor_relaxation_time: float
+    precursor_count: int = 2
+    dimension: int = 3
+
+
+@dataclass(frozen=True)
 class FacilitatedExchangeLawParams:
     """Activated facilitation law for finite-exchange heterogeneity.
 
@@ -234,6 +278,43 @@ def _validate_mct_beta_params(params: MCTBetaParams) -> None:
         raise ValueError("beta_time must be positive")
 
 
+def _validate_langevin_cage_landscape(params: LangevinCageLandscapeParams) -> None:
+    for name in (
+        "temperature",
+        "friction",
+        "cage_curvature",
+        "saddle_curvature",
+        "barrier_height",
+        "jump_length",
+    ):
+        value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    for name in ("persistence_barrier_extra", "exchange_barrier_extra"):
+        value = getattr(params, name)
+        if value < 0.0:
+            raise ValueError(f"{name} must be nonnegative")
+    if params.dimension <= 0:
+        raise ValueError("dimension must be positive")
+
+
+def _validate_periodic_softness_gate(params: PeriodicSoftnessGateParams) -> None:
+    for name in (
+        "temperature",
+        "friction",
+        "barrier_height",
+        "period",
+        "precursor_relaxation_time",
+    ):
+        value = getattr(params, name)
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    if params.precursor_count != 2:
+        raise ValueError("precursor_count must be 2 for the square delayed hazard bridge")
+    if params.dimension <= 0:
+        raise ValueError("dimension must be positive")
+
+
 def _validate_facilitated_exchange_law(law: FacilitatedExchangeLawParams) -> None:
     for name in ("reference_temperature", "shape_ref", "exchange_renewal_count_ref"):
         value = getattr(law, name)
@@ -294,6 +375,382 @@ def activated_barrier_temperature_law(barrier: ActivatedBarrierParams) -> Temper
     return law
 
 
+def langevin_bare_diffusion(params: LangevinCageLandscapeParams) -> float:
+    """Einstein diffusion scale of the overdamped Langevin equation."""
+
+    _validate_langevin_cage_landscape(params)
+    return params.temperature / params.friction
+
+
+def langevin_cage_ou_parameters(params: LangevinCageLandscapeParams) -> dict[str, float]:
+    """Harmonic-basin OU variance and relaxation time from Langevin dynamics."""
+
+    _validate_langevin_cage_landscape(params)
+    return {
+        "bare_diffusion": langevin_bare_diffusion(params),
+        "cage_variance": params.temperature / params.cage_curvature,
+        "cage_tau": params.friction / params.cage_curvature,
+    }
+
+
+def kramers_escape_rate(
+    *,
+    temperature: float,
+    friction: float,
+    basin_curvature: float,
+    saddle_curvature: float,
+    barrier_height: float,
+) -> float:
+    """Overdamped Kramers escape rate for a harmonic basin and saddle.
+
+    The formula is the local-quadratic Smoluchowski limit
+    sqrt(k_min |k_s|) / (2 pi gamma) * exp(-Delta F / T). Temperatures and
+    barriers use reduced units with k_B = 1.
+    """
+
+    for name, value in (
+        ("temperature", temperature),
+        ("friction", friction),
+        ("basin_curvature", basin_curvature),
+        ("saddle_curvature", saddle_curvature),
+        ("barrier_height", barrier_height),
+    ):
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+    prefactor = math.sqrt(basin_curvature * saddle_curvature) / (2.0 * math.pi * friction)
+    return prefactor * math.exp(-barrier_height / temperature)
+
+
+def periodic_cage_curvature(barrier_height: float, period: float) -> float:
+    """Curvature of U(x)=DeltaU[1-cos(2*pi*x/L)]/2 at a minimum or saddle."""
+
+    if barrier_height <= 0.0:
+        raise ValueError("barrier_height must be positive")
+    if period <= 0.0:
+        raise ValueError("period must be positive")
+    return 2.0 * math.pi**2 * barrier_height / period**2
+
+
+def precursor_gate_hazard(time: float, long_time_rate: float, precursor_times: list[float] | tuple[float, ...]) -> float:
+    """Escape hazard from independent precursor readiness gates.
+
+    Each precursor becomes ready with probability ``1-exp(-t/tau_i)``. Escape
+    requires all gates, so the Kramers rate is multiplied by their product.
+    """
+
+    if time < 0.0:
+        raise ValueError("time must be nonnegative")
+    if long_time_rate <= 0.0:
+        raise ValueError("long_time_rate must be positive")
+    if not precursor_times:
+        raise ValueError("precursor_times must not be empty")
+    readiness = 1.0
+    for tau in precursor_times:
+        if tau <= 0.0:
+            raise ValueError("precursor times must be positive")
+        readiness *= 1.0 - math.exp(-time / tau)
+    return long_time_rate * readiness
+
+
+def precursor_gate_mean_count(
+    time: float,
+    long_time_rate: float,
+    precursor_times: list[float] | tuple[float, ...],
+) -> float:
+    """Integrated renewal count for one or two independent precursor gates."""
+
+    if time < 0.0:
+        raise ValueError("time must be nonnegative")
+    if long_time_rate <= 0.0:
+        raise ValueError("long_time_rate must be positive")
+    if len(precursor_times) == 1:
+        tau = precursor_times[0]
+        if tau <= 0.0:
+            raise ValueError("precursor times must be positive")
+        return long_time_rate * (time - tau * (1.0 - math.exp(-time / tau)))
+    if len(precursor_times) == 2:
+        tau1, tau2 = precursor_times
+        if tau1 <= 0.0 or tau2 <= 0.0:
+            raise ValueError("precursor times must be positive")
+        tau12 = tau1 * tau2 / (tau1 + tau2)
+        return long_time_rate * (
+            time
+            - tau1 * (1.0 - math.exp(-time / tau1))
+            - tau2 * (1.0 - math.exp(-time / tau2))
+            + tau12 * (1.0 - math.exp(-time / tau12))
+        )
+    raise ValueError("closed-form precursor_gate_mean_count supports one or two gates")
+
+
+def periodic_softness_gate_to_delayed_renewal(params: PeriodicSoftnessGateParams) -> DelayedRenewalCageParams:
+    """Map a periodic cage potential plus two precursor gates to renewal parameters."""
+
+    _validate_periodic_softness_gate(params)
+    curvature = periodic_cage_curvature(params.barrier_height, params.period)
+    rate = kramers_escape_rate(
+        temperature=params.temperature,
+        friction=params.friction,
+        basin_curvature=curvature,
+        saddle_curvature=curvature,
+        barrier_height=params.barrier_height,
+    )
+    return DelayedRenewalCageParams(
+        cage_variance=params.temperature / curvature,
+        cage_tau=params.friction / curvature,
+        jump_variance=params.period**2 / params.dimension,
+        renewal_rate=rate,
+        renewal_delay=params.precursor_relaxation_time,
+    )
+
+
+def periodic_softness_gate_bridge_audit(params: PeriodicSoftnessGateParams) -> dict[str, float | str]:
+    """Audit the periodic-potential extension of the delayed-renewal hazard."""
+
+    _validate_periodic_softness_gate(params)
+    renewal = periodic_softness_gate_to_delayed_renewal(params)
+    curvature = periodic_cage_curvature(params.barrier_height, params.period)
+    sample_time = params.precursor_relaxation_time
+    hazard = precursor_gate_hazard(
+        sample_time,
+        renewal.renewal_rate,
+        [params.precursor_relaxation_time, params.precursor_relaxation_time],
+    )
+    mean_count = precursor_gate_mean_count(
+        sample_time,
+        renewal.renewal_rate,
+        [params.precursor_relaxation_time, params.precursor_relaxation_time],
+    )
+    return {
+        "bridge_stage": "periodic_softness_gate_to_delayed_hazard",
+        "effective_periodic_potential_specified": 1.0,
+        "vorselaars_style_periodic_baseline": 1.0,
+        "precursor_gate_count": float(params.precursor_count),
+        "delayed_hazard_from_precursors": 1.0,
+        "matches_square_delayed_hazard": 1.0,
+        "complete_many_body_derivation_claim_allowed": 0.0,
+        "temperature": params.temperature,
+        "friction": params.friction,
+        "barrier_height": params.barrier_height,
+        "period": params.period,
+        "periodic_curvature": curvature,
+        "precursor_relaxation_time": params.precursor_relaxation_time,
+        "cage_variance": renewal.cage_variance,
+        "cage_tau": renewal.cage_tau,
+        "jump_variance": renewal.jump_variance,
+        "long_time_kramers_rate": renewal.renewal_rate,
+        "sample_hazard_at_tau_d": hazard,
+        "sample_mean_count_at_tau_d": mean_count,
+        "remaining_assumption": "collective_softness_precursors_and_effective_periodic_potential",
+    }
+
+
+def potential_effective_theory_taxonomy() -> list[dict[str, int | str]]:
+    """Map coarse-grained landscape choices to effective-theory modules.
+
+    The rows are a claim-boundary ledger, not a new dynamical solver. They
+    record which pieces of the renewal-cage effective theory can be derived
+    from a specified potential or free-energy projection, and which pieces
+    remain coarse-grained assumptions.
+    """
+
+    return [
+        {
+            "potential_id": "harmonic_ou_cage",
+            "potential_form": "U=(kappa/2)|x-C|^2",
+            "microscopic_status": "local_quadratic_langevin_limit",
+            "derived_parameters": "A,tau_c",
+            "effective_modules": "local_ou_cage",
+            "supported_observables": "MSD_plateau,Debye_Waller_factor",
+            "missing_assumption": "metastable_basin_center_C",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+        {
+            "potential_id": "periodic_kramers_cage_jump",
+            "potential_form": "U=DeltaU[1-cos(2*pi*x/L)]/2",
+            "microscopic_status": "effective_periodic_cage_potential",
+            "derived_parameters": "lambda,A,tau_c,q",
+            "effective_modules": "cage_to_cage_random_walk",
+            "supported_observables": "MSD_growth,NGP_peak_baseline,Gaussian_recovery",
+            "missing_assumption": "one_dimensional_effective_field_and_neighboring_basin_geometry",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+        {
+            "potential_id": "two_precursor_softness_gate",
+            "potential_form": "U=(kappa/2)|x-C|^2+[DeltaF0-eps*s1*s2]B(x-C)+W1(s1)+W2(s2)",
+            "microscopic_status": "coarse_grained_collective_coordinate",
+            "derived_parameters": "tau_d,delayed_hazard",
+            "effective_modules": "delayed_renewal",
+            "supported_observables": "NGP_peak_timing,alpha_relaxation_shape,TTS_breakdown",
+            "missing_assumption": "collective_precursor_dynamics_and_readiness_thresholds",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+        {
+            "potential_id": "dynamic_barrier_environment",
+            "potential_form": "U=U_cage+[DeltaF0+chi*zeta]B(x-C)+Wzeta(zeta)",
+            "microscopic_status": "finite_exchange_barrier_environment",
+            "derived_parameters": "mobility_shape,exchange_scale",
+            "effective_modules": "finite_exchange,static_disorder_null",
+            "supported_observables": "late_NGP_recovery,stretched_alpha,mechanism_selection",
+            "missing_assumption": "zeta_exchange_law_from_many_body_environment",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+        {
+            "potential_id": "persistence_exchange_barrier_split",
+            "potential_form": "DeltaF_p=DeltaF+DeltaF_p_extra; DeltaF_x=DeltaF+DeltaF_x_extra",
+            "microscopic_status": "coarse_grained_first_escape_exchange_split",
+            "derived_parameters": "tau_p/tau_x,D*tau_alpha",
+            "effective_modules": "persistence_exchange_decoupling",
+            "supported_observables": "SE_violation,multi_k_alpha,late_NGP_prediction",
+            "missing_assumption": "different_first_and_later_escape_barrier_statistics",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+        {
+            "potential_id": "basin_adjacency_graph",
+            "potential_form": "U_graph(C) with neighboring inherent-structure centers",
+            "microscopic_status": "inherent_structure_network_geometry",
+            "derived_parameters": "q,jump_length_distribution",
+            "effective_modules": "jump_variance_closure",
+            "supported_observables": "long_time_diffusion,van_Hove_tail_width",
+            "missing_assumption": "basin_graph_sampling_and_transition_weights",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+        {
+            "potential_id": "spatial_facilitation_field",
+            "potential_form": "DeltaF_eff(r)=DeltaF0-J*m_near(r)+F_m[m]",
+            "microscopic_status": "effective_spatial_mobility_field",
+            "derived_parameters": "xi4,N_corr,facilitation_front_rate",
+            "effective_modules": "spatial_facilitation_chi4_proxy",
+            "supported_observables": "chi4,dynamic_correlation_length,heterogeneous_domains",
+            "missing_assumption": "mobility_field_kernel_from_many_body_dynamics",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+        {
+            "potential_id": "inherent_state_landscape_density",
+            "potential_form": "Omega(e) with Z_conf=int de Omega(e) exp(-e/T)",
+            "microscopic_status": "thermodynamic_landscape_closure",
+            "derived_parameters": "s_c,Delta_c_p,T_K,Adam_Gibbs_tau",
+            "effective_modules": "thermodynamic_entropy_closure",
+            "supported_observables": "fragility_proxy,entropy_extrapolation,heat_capacity_proxy",
+            "missing_assumption": "density_of_basins_and_entropy_barrier_coupling",
+            "complete_many_body_derivation_claim_allowed": 0,
+        },
+    ]
+
+
+def basin_adjacency_jump_statistics(
+    centers: np.ndarray,
+    edges: list[tuple[int, int]] | tuple[tuple[int, int], ...],
+    *,
+    weights: np.ndarray | None = None,
+) -> dict[str, float | int]:
+    """Derive the renewal jump variance from neighboring basin centers."""
+
+    centers = np.asarray(centers, dtype=float)
+    if centers.ndim != 2:
+        raise ValueError("centers must be a two-dimensional array")
+    if len(edges) == 0:
+        raise ValueError("edges must not be empty")
+    dimension = centers.shape[1]
+    squared_lengths = []
+    for i, j in edges:
+        if i < 0 or j < 0 or i >= centers.shape[0] or j >= centers.shape[0]:
+            raise ValueError("edge index out of range")
+        delta = centers[j] - centers[i]
+        squared_lengths.append(float(np.dot(delta, delta)))
+    squared = np.asarray(squared_lengths, dtype=float)
+    if weights is None:
+        normalized_weights = np.full(len(edges), 1.0 / len(edges))
+    else:
+        normalized_weights = np.asarray(weights, dtype=float)
+        if normalized_weights.shape != (len(edges),):
+            raise ValueError("weights must match the number of edges")
+        if np.any(normalized_weights < 0.0):
+            raise ValueError("weights must be nonnegative")
+        total = float(np.sum(normalized_weights))
+        if total <= 0.0:
+            raise ValueError("weights must have positive total")
+        normalized_weights = normalized_weights / total
+    mean_squared_jump = float(np.sum(normalized_weights * squared))
+    return {
+        "edge_count": len(edges),
+        "dimension": dimension,
+        "mean_squared_jump": mean_squared_jump,
+        "jump_variance_q": mean_squared_jump / dimension,
+        "mean_jump_length": float(np.sum(normalized_weights * np.sqrt(squared))),
+        "jump_length_variance": float(np.sum(normalized_weights * (squared - mean_squared_jump) ** 2)),
+        "complete_dynamic_derivation_claim_allowed": 0,
+    }
+
+
+def langevin_to_persistence_exchange(params: LangevinCageLandscapeParams) -> PersistenceExchangeParams:
+    """Coarse-grain a local Langevin landscape into persistence/exchange clocks."""
+
+    _validate_langevin_cage_landscape(params)
+    ou = langevin_cage_ou_parameters(params)
+    persistence_rate = kramers_escape_rate(
+        temperature=params.temperature,
+        friction=params.friction,
+        basin_curvature=params.cage_curvature,
+        saddle_curvature=params.saddle_curvature,
+        barrier_height=params.barrier_height + params.persistence_barrier_extra,
+    )
+    exchange_rate = kramers_escape_rate(
+        temperature=params.temperature,
+        friction=params.friction,
+        basin_curvature=params.cage_curvature,
+        saddle_curvature=params.saddle_curvature,
+        barrier_height=params.barrier_height + params.exchange_barrier_extra,
+    )
+    return PersistenceExchangeParams(
+        cage_variance=ou["cage_variance"],
+        cage_tau=ou["cage_tau"],
+        jump_variance=params.jump_length**2 / params.dimension,
+        persistence_mean=1.0 / persistence_rate,
+        exchange_mean=1.0 / exchange_rate,
+    )
+
+
+def langevin_coarse_graining_bridge_audit(
+    params: LangevinCageLandscapeParams,
+) -> dict[str, float | str]:
+    """Summarize what is derived from Langevin input and what remains assumed."""
+
+    _validate_langevin_cage_landscape(params)
+    effective = langevin_to_persistence_exchange(params)
+    alpha_time = persistence_exchange_alpha_relaxation_time(
+        wave_number=1.0,
+        threshold=math.exp(-1.0),
+        params=effective,
+    )
+    diffusion = persistence_exchange_diffusion_coefficient(effective)
+    return {
+        "bridge_stage": "langevin_kramers_to_effective_clock_bridge",
+        "langevin_equation_specified": 1.0,
+        "smoluchowski_limit_used": 1.0,
+        "harmonic_cage_ou_derived": 1.0,
+        "kramers_rates_derived": 1.0,
+        "persistence_exchange_params_derived": 1.0,
+        "temperature": params.temperature,
+        "friction": params.friction,
+        "cage_curvature": params.cage_curvature,
+        "saddle_curvature": params.saddle_curvature,
+        "barrier_height": params.barrier_height,
+        "persistence_barrier": params.barrier_height + params.persistence_barrier_extra,
+        "exchange_barrier": params.barrier_height + params.exchange_barrier_extra,
+        "cage_variance": effective.cage_variance,
+        "cage_tau": effective.cage_tau,
+        "jump_variance": effective.jump_variance,
+        "persistence_mean": effective.persistence_mean,
+        "exchange_mean": effective.exchange_mean,
+        "persistence_exchange_ratio": effective.persistence_mean / effective.exchange_mean,
+        "derived_diffusion_coefficient": diffusion,
+        "derived_alpha_time_k1": alpha_time,
+        "derived_stokes_einstein_product": diffusion * alpha_time,
+        "entire_effective_theory_from_langevin_claim_allowed": 0.0,
+        "remaining_assumption": "metastable_basin_partition_and_barrier_inputs",
+    }
+
+
 def temperature_dependent_params(temperature: float, law: TemperatureLawParams) -> DelayedRenewalCageParams:
     """Map reduced temperature to delayed-renewal cage parameters."""
 
@@ -334,6 +791,63 @@ def excess_heat_capacity(temperature: np.ndarray, law: ConfigurationalEntropyPar
         raise ValueError("temperatures must be positive")
     slope = law.entropy_ref / (law.reference_temperature - law.kauzmann_temperature)
     return temperature * slope
+
+
+def inherent_state_landscape_thermodynamics(
+    *,
+    temperatures: np.ndarray,
+    energies: np.ndarray,
+    log_density: np.ndarray,
+) -> list[dict[str, float | int]]:
+    """Compute configurational thermodynamics from a discrete basin density.
+
+    ``log_density`` represents ``log Omega(e_i)`` for each inherent-state energy
+    bin. The calculation is the discrete version of
+    ``Z_conf = int de Omega(e) exp(-e/T)`` in reduced units with ``k_B=1``.
+    """
+
+    temperatures = np.asarray(temperatures, dtype=float)
+    energies = np.asarray(energies, dtype=float)
+    log_density = np.asarray(log_density, dtype=float)
+    if temperatures.ndim != 1 or np.any(temperatures <= 0.0):
+        raise ValueError("temperatures must be a one-dimensional positive array")
+    if energies.ndim != 1 or log_density.ndim != 1:
+        raise ValueError("energies and log_density must be one-dimensional arrays")
+    if energies.shape != log_density.shape:
+        raise ValueError("energies and log_density must have matching shapes")
+    if energies.size == 0:
+        raise ValueError("at least one inherent-state energy bin is required")
+    if not np.all(np.isfinite(energies)) or not np.all(np.isfinite(log_density)):
+        raise ValueError("energies and log_density must be finite")
+
+    rows: list[dict[str, float | int]] = []
+    for temperature in temperatures:
+        log_weights = log_density - energies / temperature
+        max_log_weight = float(np.max(log_weights))
+        shifted = np.exp(log_weights - max_log_weight)
+        partition = float(np.sum(shifted))
+        probabilities = shifted / partition
+        log_z = max_log_weight + math.log(partition)
+        mean_energy = float(np.sum(probabilities * energies))
+        mean_energy_squared = float(np.sum(probabilities * energies**2))
+        energy_variance = max(mean_energy_squared - mean_energy**2, 0.0)
+        free_energy = -temperature * log_z
+        entropy = log_z + mean_energy / temperature
+        heat_capacity = energy_variance / temperature**2
+        rows.append(
+            {
+                "temperature": float(temperature),
+                "log_configurational_partition": float(log_z),
+                "configurational_free_energy": float(free_energy),
+                "mean_inherent_energy": mean_energy,
+                "configurational_entropy": float(entropy),
+                "excess_heat_capacity": float(heat_capacity),
+                "energy_variance": float(energy_variance),
+                "energy_bin_count": int(energies.size),
+                "complete_dynamic_derivation_claim_allowed": 0,
+            }
+        )
+    return rows
 
 
 def adam_gibbs_relaxation_time(

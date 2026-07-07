@@ -16,6 +16,8 @@ from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
     FacilitatedExchangeLawParams,
     GammaExchangeParams,
+    LangevinCageLandscapeParams,
+    PeriodicSoftnessGateParams,
     TemperatureLawParams,
     alpha_relaxation_time,
     apparent_alpha_activation_energies,
@@ -24,6 +26,7 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_shape_curve,
     alpha_shape_superposition_residual,
     barrier_amplification_laws,
+    basin_adjacency_jump_statistics,
     benchmark_fusion_readiness,
     cage_localization_benchmark_consistency,
     cage_localization_diagnostics,
@@ -38,6 +41,7 @@ from renewal_cage import (  # noqa: E402
     glass_signature_phase_diagram,
     dynamic_heterogeneity_benchmark_consistency,
     infer_parameters_from_full_observables,
+    inherent_state_landscape_thermodynamics,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
     inversion_identifiability_audit,
@@ -61,7 +65,12 @@ from renewal_cage import (  # noqa: E402
     frontier_benchmark_horizon,
     gaussian_recovery_benchmark_consistency,
     infer_spatial_facilitation_diffusivity,
+    kramers_escape_rate,
     kww_alpha_fit,
+    langevin_bare_diffusion,
+    langevin_cage_ou_parameters,
+    langevin_coarse_graining_bridge_audit,
+    langevin_to_persistence_exchange,
     long_time_diffusion_coefficient,
     local_alpha_stretching_exponent,
     late_mechanism_selection,
@@ -91,7 +100,13 @@ from renewal_cage import (  # noqa: E402
     plateau_ngp_branches,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
+    periodic_cage_curvature,
+    periodic_softness_gate_bridge_audit,
+    periodic_softness_gate_to_delayed_renewal,
+    potential_effective_theory_taxonomy,
     PersistenceExchangeParams,
+    precursor_gate_hazard,
+    precursor_gate_mean_count,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_count_distribution,
     persistence_exchange_count_pgf,
@@ -192,6 +207,195 @@ class DelayedRenewalCageTests(unittest.TestCase):
         expected = params.renewal_rate * t**3 / (3.0 * params.renewal_delay**2)
 
         np.testing.assert_allclose(mean, expected, rtol=2e-4, atol=1e-16)
+
+    def test_langevin_bare_diffusion_and_ou_cage_follow_einstein_and_equipartition(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.8,
+            friction=4.0,
+            cage_curvature=10.0,
+            saddle_curvature=6.0,
+            barrier_height=3.2,
+            jump_length=1.5,
+        )
+
+        self.assertAlmostEqual(langevin_bare_diffusion(landscape), 0.2)
+        ou = langevin_cage_ou_parameters(landscape)
+
+        self.assertAlmostEqual(ou["cage_variance"], 0.08)
+        self.assertAlmostEqual(ou["cage_tau"], 0.4)
+
+    def test_kramers_escape_rate_has_overdamped_arrhenius_barrier_scaling(self):
+        fast = kramers_escape_rate(
+            temperature=1.0,
+            friction=2.0,
+            basin_curvature=8.0,
+            saddle_curvature=4.0,
+            barrier_height=2.0,
+        )
+        slow = kramers_escape_rate(
+            temperature=1.0,
+            friction=2.0,
+            basin_curvature=8.0,
+            saddle_curvature=4.0,
+            barrier_height=3.0,
+        )
+        expected_ratio = math.exp(1.0)
+
+        self.assertGreater(fast, slow)
+        self.assertAlmostEqual(fast / slow, expected_ratio)
+
+    def test_langevin_landscape_coarse_grains_to_persistence_exchange_parameters(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.7,
+            friction=3.0,
+            cage_curvature=7.0,
+            saddle_curvature=5.0,
+            barrier_height=2.4,
+            jump_length=1.2,
+            persistence_barrier_extra=1.4,
+            exchange_barrier_extra=0.2,
+            dimension=3,
+        )
+        params = langevin_to_persistence_exchange(landscape)
+
+        self.assertIsInstance(params, PersistenceExchangeParams)
+        self.assertAlmostEqual(params.cage_variance, landscape.temperature / landscape.cage_curvature)
+        self.assertAlmostEqual(params.cage_tau, landscape.friction / landscape.cage_curvature)
+        self.assertAlmostEqual(params.jump_variance, landscape.jump_length**2 / landscape.dimension)
+        self.assertGreater(params.persistence_mean, params.exchange_mean)
+        self.assertGreater(
+            persistence_exchange_diffusion_coefficient(params)
+            * persistence_exchange_alpha_relaxation_time(
+                wave_number=1.0,
+                threshold=math.exp(-1.0),
+                params=params,
+            ),
+            params.jump_variance,
+        )
+
+    def test_langevin_bridge_audit_marks_derived_effective_theory_and_remaining_assumptions(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.75,
+            friction=2.5,
+            cage_curvature=6.0,
+            saddle_curvature=4.0,
+            barrier_height=2.0,
+            jump_length=1.0,
+            persistence_barrier_extra=0.8,
+            exchange_barrier_extra=0.1,
+        )
+        row = langevin_coarse_graining_bridge_audit(landscape)
+
+        self.assertEqual(row["bridge_stage"], "langevin_kramers_to_effective_clock_bridge")
+        self.assertEqual(float(row["langevin_equation_specified"]), 1.0)
+        self.assertEqual(float(row["kramers_rates_derived"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_params_derived"]), 1.0)
+        self.assertEqual(float(row["entire_effective_theory_from_langevin_claim_allowed"]), 0.0)
+        self.assertEqual(row["remaining_assumption"], "metastable_basin_partition_and_barrier_inputs")
+
+    def test_periodic_cage_potential_curvature_matches_cosine_barrier(self):
+        curvature = periodic_cage_curvature(barrier_height=2.5, period=1.25)
+        expected = 2.0 * math.pi**2 * 2.5 / (1.25**2)
+
+        self.assertAlmostEqual(curvature, expected)
+
+    def test_two_precursor_gate_derives_square_delayed_hazard_and_mean_count(self):
+        rate = 0.37
+        delay = 4.5
+        time = 7.0
+
+        hazard = precursor_gate_hazard(time, rate, [delay, delay])
+        expected_hazard = rate * (1.0 - math.exp(-time / delay)) ** 2
+        self.assertAlmostEqual(hazard, expected_hazard)
+
+        mean_count = precursor_gate_mean_count(time, rate, [delay, delay])
+        expected_count = rate * delay * delayed_renewal_shape(time / delay)
+        self.assertAlmostEqual(mean_count, expected_count)
+
+    def test_periodic_softness_gate_maps_potential_to_delayed_renewal_parameters(self):
+        params = PeriodicSoftnessGateParams(
+            temperature=0.72,
+            friction=2.8,
+            barrier_height=2.4,
+            period=1.3,
+            precursor_relaxation_time=5.0,
+            dimension=3,
+        )
+
+        renewal = periodic_softness_gate_to_delayed_renewal(params)
+        curvature = periodic_cage_curvature(params.barrier_height, params.period)
+        expected_rate = kramers_escape_rate(
+            temperature=params.temperature,
+            friction=params.friction,
+            basin_curvature=curvature,
+            saddle_curvature=curvature,
+            barrier_height=params.barrier_height,
+        )
+
+        self.assertIsInstance(renewal, DelayedRenewalCageParams)
+        self.assertAlmostEqual(renewal.cage_variance, params.temperature / curvature)
+        self.assertAlmostEqual(renewal.cage_tau, params.friction / curvature)
+        self.assertAlmostEqual(renewal.jump_variance, params.period**2 / params.dimension)
+        self.assertAlmostEqual(renewal.renewal_delay, params.precursor_relaxation_time)
+        self.assertAlmostEqual(renewal.renewal_rate, expected_rate)
+
+        audit = periodic_softness_gate_bridge_audit(params)
+        self.assertEqual(audit["bridge_stage"], "periodic_softness_gate_to_delayed_hazard")
+        self.assertEqual(float(audit["precursor_gate_count"]), 2.0)
+        self.assertEqual(float(audit["delayed_hazard_from_precursors"]), 1.0)
+        self.assertEqual(float(audit["matches_square_delayed_hazard"]), 1.0)
+        self.assertEqual(float(audit["complete_many_body_derivation_claim_allowed"]), 0.0)
+
+    def test_potential_effective_theory_taxonomy_maps_landscapes_to_modules(self):
+        rows = potential_effective_theory_taxonomy()
+        by_id = {row["potential_id"]: row for row in rows}
+
+        expected = {
+            "harmonic_ou_cage",
+            "periodic_kramers_cage_jump",
+            "two_precursor_softness_gate",
+            "dynamic_barrier_environment",
+            "persistence_exchange_barrier_split",
+            "basin_adjacency_graph",
+            "spatial_facilitation_field",
+            "inherent_state_landscape_density",
+        }
+        self.assertTrue(expected.issubset(by_id))
+
+        self.assertIn("A,tau_c", by_id["harmonic_ou_cage"]["derived_parameters"])
+        self.assertIn("lambda", by_id["periodic_kramers_cage_jump"]["derived_parameters"])
+        self.assertIn("tau_d,delayed_hazard", by_id["two_precursor_softness_gate"]["derived_parameters"])
+        self.assertIn("finite_exchange", by_id["dynamic_barrier_environment"]["effective_modules"])
+        self.assertIn("tau_p/tau_x", by_id["persistence_exchange_barrier_split"]["derived_parameters"])
+        self.assertIn("q", by_id["basin_adjacency_graph"]["derived_parameters"])
+        self.assertIn("chi4", by_id["spatial_facilitation_field"]["supported_observables"])
+        self.assertEqual(
+            by_id["inherent_state_landscape_density"]["complete_many_body_derivation_claim_allowed"],
+            0,
+        )
+        self.assertEqual(
+            by_id["two_precursor_softness_gate"]["complete_many_body_derivation_claim_allowed"],
+            0,
+        )
+
+    def test_basin_adjacency_graph_derives_jump_variance_q(self):
+        centers = np.array(
+            [
+                [0.0, 0.0],
+                [2.0, 0.0],
+                [0.0, 1.0],
+            ]
+        )
+        edges = [(0, 1), (0, 2)]
+        weights = np.array([0.25, 0.75])
+
+        stats = basin_adjacency_jump_statistics(centers, edges, weights=weights)
+
+        expected_mean_squared_jump = 0.25 * 4.0 + 0.75 * 1.0
+        self.assertAlmostEqual(stats["mean_squared_jump"], expected_mean_squared_jump)
+        self.assertAlmostEqual(stats["jump_variance_q"], expected_mean_squared_jump / 2.0)
+        self.assertEqual(stats["edge_count"], 2)
+        self.assertEqual(stats["dimension"], 2)
 
     def test_local_cage_variance_has_plateau(self):
         params = DelayedRenewalCageParams(
@@ -1199,6 +1403,32 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(rows[-1]["thermodynamic_slowdown"], 10.0)
         self.assertGreater(rows[-1]["inverse_entropy_control"], rows[0]["inverse_entropy_control"])
         self.assertGreater(rows[-1]["excess_heat_capacity"], 0.0)
+
+    def test_inherent_state_landscape_density_computes_conf_thermodynamics(self):
+        temperatures = np.array([1.2, 0.8])
+        energies = np.array([0.0, 1.0])
+        log_density = np.log(np.array([3.0, 1.0]))
+
+        rows = inherent_state_landscape_thermodynamics(
+            temperatures=temperatures,
+            energies=energies,
+            log_density=log_density,
+        )
+
+        hot = rows[0]
+        cold = rows[1]
+        expected_log_z_hot = math.log(3.0 + math.exp(-1.0 / temperatures[0]))
+        expected_p_excited_hot = math.exp(-1.0 / temperatures[0]) / math.exp(expected_log_z_hot)
+        expected_entropy_hot = expected_log_z_hot + expected_p_excited_hot / temperatures[0]
+
+        self.assertAlmostEqual(hot["log_configurational_partition"], expected_log_z_hot)
+        self.assertAlmostEqual(hot["configurational_entropy"], expected_entropy_hot)
+        self.assertAlmostEqual(
+            hot["excess_heat_capacity"],
+            expected_p_excited_hot * (1.0 - expected_p_excited_hot) / temperatures[0] ** 2,
+        )
+        self.assertLess(cold["configurational_entropy"], hot["configurational_entropy"])
+        self.assertEqual(hot["complete_dynamic_derivation_claim_allowed"], 0)
 
     def test_mct_beta_correlator_has_critical_and_von_schweidler_slopes(self):
         beta = MCTBetaParams(

@@ -44,6 +44,73 @@ all three qualitative features:
 3. long-time Gaussian recovery
 ```
 
+The newer Langevin bridge moves the model one level closer to microscopic
+dynamics. Starting from overdamped Langevin/Smoluchowski dynamics in a local
+metastable basin, equipartition gives `A=T/kappa_c`, the OU relaxation gives
+`tau_c=gamma/kappa_c`, and Kramers theory gives
+`k=sqrt(kappa_c kappa_s)/(2 pi gamma) exp(-Delta F/T)`. Persistence and
+exchange barriers then map to `tau_p=1/k_p` and `tau_x=1/k_x`, which feed the
+existing persistence/exchange renewal formulas. This is a conditional
+coarse-graining bridge for the local cage and escape-rate layers. It does not
+derive the whole delayed-renewal effective theory from the Langevin equation:
+the basin partition, curvatures, barriers, jump length, and renewal law are
+explicit inputs.
+This is close to existing work only in pieces: Langevin exit theory supports
+Kramers-to-jump coarse graining, and glass simulations have used cage-jump or
+CTRW descriptions. The current delayed hazard
+`r(t)=lambda[1-exp(-t/tau_d)]^2` is the extra coarse-grained compression used to
+keep closed-form NGP, `F_s(k,t)`, and SE diagnostics; it is not a standard
+automatic output of ordinary Kramers theory.
+The periodic-softness bridge makes this compression more microscopic. Start
+from a periodic cage potential
+`U(x)=DeltaU[1-cos(2*pi*x/L)]/2`, giving
+`kappa=2*pi^2*DeltaU/L^2` and a long-time Kramers rate. Add two slow collective
+precursor gates with `p_i(t)=1-exp(-t/tau_d)`. If escape requires both gates,
+the two precursor readiness probabilities multiply:
+
+```text
+r(t)=lambda p_1(t)p_2(t)
+    =lambda[1-exp(-t/tau_d)]^2.
+```
+
+This is still not a complete many-body derivation, but it does derive the
+delayed hazard from an explicit effective Langevin/Kramers landscape plus two
+collective softness coordinates.
+The correct scope is therefore an extended coarse-grained landscape, not one
+static one-dimensional potential:
+
+```text
+U(x,C,s1,s2,zeta)
+  = (kappa/2)|x-C|^2
+    + [DeltaU0 + chi zeta - eps s1 s2] B(x-C)
+    + W1(s1) + W2(s2) + Wzeta(zeta).
+```
+
+The harmonic projection gives the OU cage, the periodic projection gives the
+Vorselaars-type cage-to-cage baseline, the softness-gate projection gives the
+delayed hazard, and the mobility-environment projection gives finite-exchange
+heterogeneity. The thermodynamic configurational-entropy layer would require a
+separate basin-counting landscape.
+The machine-readable potential taxonomy is exported as
+`data/renewal_cage_potential_taxonomy.csv`. It records which potential
+projection supplies `A`, `tau_c`, `lambda`, `tau_d`, `q`, `tau_p/tau_x`,
+`chi4` proxies, or entropy closures, and it marks every many-body closure that
+still cannot be claimed as a complete first-principles derivation.
+The companion `data/renewal_cage_landscape_parameterization.csv` makes two
+rows concrete: basin adjacency computes `q`, and a discrete inherent-state
+density `Omega(e)` computes `Z_conf`, `F_conf`, `s_c`, and `Delta c_p`.
+Cage rearrangement is also not inserted as an ordinary Langevin drift. A useful
+stochastic-process shorthand is
+
+```text
+dy_t = -(1/tau_c) y_t dt + sqrt(2D_c) dW_t
+dC_t = eta_t dN_t
+x_t = y_t + C_t
+```
+
+where `y_t` is the local OU-like cage vibration and `C_t` is the cage-center
+jump process.
+
 ## 2. Model
 
 The displacement is decomposed into local cage motion plus cage-center jumps:
