@@ -4808,6 +4808,78 @@ def write_sota_glassbench_direct_alpha_multilag_crossing_canary_pdf(path: Path) 
     c.save()
 
 
+def write_sota_glassbench_real_threshold_sweep_canary_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_threshold_sweep_canary.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real threshold-sweep canary")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The fixed-lag crossing candidate is swept over jump thresholds before event-clock promotion.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "real_threshold_sweep_sensitive_replica_axis_blocked": colors.HexColor("#c05621"),
+        "real_threshold_sweep_stable_replica_axis_blocked": colors.HexColor("#805ad5"),
+        "real_threshold_sweep_event_clock_ready": colors.HexColor("#2f855a"),
+        "real_threshold_sweep_sensitive": colors.HexColor("#d69e2e"),
+        "real_threshold_sweep_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "threshold stage")
+    c.drawString(left + 390, top + 24, "threshold-sensitivity diagnostics")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["threshold_sweep_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "thresholds={}; crossed={:.3g}-{:.3g}; mean ratio={:.3g}".format(
+                row["threshold_multipliers"],
+                float(row["min_crossed_fraction"]),
+                float(row["max_crossed_fraction"]),
+                float(row["mean_persistence_sensitivity_ratio"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "anchor tau_p/tau_alpha={:.3g}; max recross={:.3g}; axis0 replica={}".format(
+                float(row["anchor_mean_persistence_over_tau_alpha"]),
+                float(row["max_post_crossing_recross_fraction"]),
+                int(float(row["axis0_is_isoconfigurational_replica"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:42]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Threshold sensitivity and recrossing block promotion from fixed-lag crossing target to robust event clock.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8713,6 +8785,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_direct_alpha_multilag_crossing_canary_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf"
     )
+    sota_glassbench_real_threshold_sweep_canary_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf"
+    )
     sota_glassbench_direct_alpha_event_clock_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
     )
@@ -8984,6 +9059,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_direct_alpha_multilag_crossing_canary_pdf(
         sota_glassbench_direct_alpha_multilag_crossing_canary_pdf
+    )
+    write_sota_glassbench_real_threshold_sweep_canary_pdf(
+        sota_glassbench_real_threshold_sweep_canary_pdf
     )
     write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
         sota_glassbench_direct_alpha_event_clock_contract_pdf
@@ -9320,6 +9398,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_direct_alpha_multilag_crossing_canary_pdf,
             "figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_threshold_sweep_canary_pdf,
+            "figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_event_clock_contract_pdf,

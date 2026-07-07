@@ -7535,6 +7535,166 @@ def glassbench_direct_alpha_multilag_crossing_canary(
     return out
 
 
+def glassbench_real_threshold_sweep_canary(
+    *,
+    audit_id: str,
+    threshold_rows: Sequence[dict[str, object]],
+    stable_threshold_min_multiplier: float,
+    stable_threshold_max_multiplier: float,
+    max_mean_persistence_ratio_for_stability: float,
+    max_recross_fraction_for_stability: float,
+) -> list[dict[str, float | str]]:
+    """Audit threshold sensitivity of a real fixed-lag cage-jump crossing candidate."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not threshold_rows:
+        raise ValueError("threshold_rows must be nonempty")
+    if stable_threshold_min_multiplier <= 0.0:
+        raise ValueError("stable_threshold_min_multiplier must be positive")
+    if stable_threshold_max_multiplier < stable_threshold_min_multiplier:
+        raise ValueError("stable_threshold_max_multiplier must be >= stable_threshold_min_multiplier")
+    if max_mean_persistence_ratio_for_stability <= 1.0:
+        raise ValueError("max_mean_persistence_ratio_for_stability must be > 1")
+    if max_recross_fraction_for_stability < 0.0:
+        raise ValueError("max_recross_fraction_for_stability must be nonnegative")
+
+    grouped: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in threshold_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        grouped.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature, structure_id), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1]), item[0][2]),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("threshold_multiplier", 0.0) or 0.0))
+        window = [
+            row
+            for row in sorted_group
+            if stable_threshold_min_multiplier
+            <= float(row.get("threshold_multiplier", 0.0) or 0.0)
+            <= stable_threshold_max_multiplier
+            and float(row.get("exponential_mean_persistence_time", 0.0) or 0.0) > 0.0
+        ]
+        candidate_ready = len(window) >= 2
+        means = [float(row.get("exponential_mean_persistence_time", 0.0) or 0.0) for row in window]
+        recross = [float(row.get("post_crossing_recross_fraction", 0.0) or 0.0) for row in window]
+        crossed = [float(row.get("crossed_fraction", 0.0) or 0.0) for row in window]
+        multipliers = [float(row.get("threshold_multiplier", 0.0) or 0.0) for row in window]
+        tau_alpha_values = [
+            float(row.get("tau_alpha_direct", 0.0) or 0.0)
+            for row in window
+            if float(row.get("tau_alpha_direct", 0.0) or 0.0) > 0.0
+        ]
+        tau_alpha = tau_alpha_values[0] if tau_alpha_values else 0.0
+        axis0_semantics = str(sorted_group[0].get("axis0_semantics", "unknown"))
+        axis0_replica = axis0_semantics == "isoconfigurational_trajectory_replicates"
+
+        if means:
+            mean_ratio = float(max(means) / max(min(means), 1.0e-300))
+            mean_min = float(min(means))
+            mean_max = float(max(means))
+        else:
+            mean_ratio = 0.0
+            mean_min = 0.0
+            mean_max = 0.0
+        max_recross = float(max(recross)) if recross else 0.0
+        min_crossed = float(min(crossed)) if crossed else 0.0
+        max_crossed = float(max(crossed)) if crossed else 0.0
+
+        anchor = min(
+            window,
+            key=lambda row: abs(float(row.get("threshold_multiplier", 0.0) or 0.0) - 1.0),
+        ) if window else {}
+        anchor_mean = float(anchor.get("exponential_mean_persistence_time", 0.0) or 0.0) if anchor else 0.0
+        anchor_over_tau = float(anchor_mean / tau_alpha) if tau_alpha > 0.0 else 0.0
+        robust = (
+            candidate_ready
+            and mean_ratio <= max_mean_persistence_ratio_for_stability
+            and max_recross <= max_recross_fraction_for_stability
+            and not axis0_replica
+        )
+
+        if robust:
+            stage = "real_threshold_sweep_event_clock_ready"
+            blocker = "none"
+            next_action = "run_threshold_robust_persistence_exchange_inversion"
+        elif (
+            candidate_ready
+            and axis0_replica
+            and mean_ratio > max_mean_persistence_ratio_for_stability
+            and max_recross > max_recross_fraction_for_stability
+        ):
+            stage = "real_threshold_sweep_sensitive_replica_axis_blocked"
+            blocker = "threshold_sensitivity_recrossing_and_replica_identity"
+            next_action = "extract_true_time_axis_and_preregister_stable_nonrecrossing_jump_threshold"
+        elif candidate_ready and axis0_replica and mean_ratio > max_mean_persistence_ratio_for_stability:
+            stage = "real_threshold_sweep_sensitive_replica_axis_blocked"
+            blocker = "threshold_sensitivity_and_replica_identity"
+            next_action = "extract_true_time_axis_and_preregister_stable_jump_threshold"
+        elif candidate_ready and mean_ratio > max_mean_persistence_ratio_for_stability:
+            stage = "real_threshold_sweep_sensitive"
+            blocker = "threshold_sensitivity"
+            next_action = "preregister_stable_jump_threshold_or_event_segmentation_rule"
+        elif candidate_ready and axis0_replica:
+            stage = "real_threshold_sweep_stable_replica_axis_blocked"
+            blocker = "replica_identity"
+            next_action = "extract_true_time_axis_for_threshold_robust_event_clock"
+        elif candidate_ready:
+            stage = "real_threshold_sweep_recross_blocked"
+            blocker = "post_crossing_recrossing"
+            next_action = "refine_cage_jump_definition_to_reduce_recrossing"
+        else:
+            stage = "real_threshold_sweep_incomplete"
+            blocker = "threshold_sweep_rows"
+            next_action = "compute_crossing_statistics_for_multiple_jump_thresholds"
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}_s{structure_id}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "threshold_multipliers": ";".join(f"{value:.6g}" for value in multipliers)
+                if multipliers
+                else "none",
+                "stable_threshold_min_multiplier": float(stable_threshold_min_multiplier),
+                "stable_threshold_max_multiplier": float(stable_threshold_max_multiplier),
+                "threshold_sweep_count": float(len(window)),
+                "min_crossed_fraction": float(min_crossed),
+                "max_crossed_fraction": float(max_crossed),
+                "mean_persistence_min": float(mean_min),
+                "mean_persistence_max": float(mean_max),
+                "mean_persistence_sensitivity_ratio": float(mean_ratio),
+                "anchor_mean_persistence_time": float(anchor_mean),
+                "anchor_mean_persistence_over_tau_alpha": float(anchor_over_tau),
+                "max_post_crossing_recross_fraction": float(max_recross),
+                "threshold_sweep_candidate_ready": float(candidate_ready),
+                "threshold_mean_stable": float(
+                    candidate_ready and mean_ratio <= max_mean_persistence_ratio_for_stability
+                ),
+                "recross_stable": float(
+                    candidate_ready and max_recross <= max_recross_fraction_for_stability
+                ),
+                "axis0_semantics": axis0_semantics,
+                "axis0_is_isoconfigurational_replica": float(axis0_replica),
+                "threshold_robust_event_clock_ready": float(robust),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "threshold_sweep_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_direct_alpha_event_clock_extraction_contract(
     *,
     audit_id: str,

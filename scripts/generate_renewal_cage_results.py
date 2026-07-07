@@ -77,6 +77,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_finite_exchange_falsification_envelope,
     glassbench_real_evidence_claim_synthesis,
     glassbench_real_cached_microdynamic_verdict,
+    glassbench_real_threshold_sweep_canary,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
@@ -4644,6 +4645,100 @@ def write_sota_glassbench_direct_alpha_multilag_crossing_canary_csv(
         pe_bound_rows=pe_bound_rows,
         crossing_rows=crossing_rows,
         min_crossing_fraction=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_threshold_sweep_canary_csv(
+    path: Path,
+    *,
+    pe_bound_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Sweep real fixed-lag displacement thresholds before promoting an event clock."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    manifest_by_key: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            manifest_by_key.setdefault(key, []).append(row)
+
+    threshold_rows: list[dict[str, float | str]] = []
+    threshold_multipliers = [0.5, 0.75, 1.0, 1.25, 1.5]
+    for bound in pe_bound_rows:
+        if float(bound.get("pe_feasibility_bound_ready", 0.0) or 0.0) != 1.0:
+            continue
+        system_id = str(bound["system_id"])
+        temperature = str(bound["temperature"])
+        structure_id = str(bound["structure_id"])
+        q_bound = float(bound.get("jump_variance_upper_bound", 0.0) or 0.0)
+        tau_alpha = float(bound.get("tau_alpha_direct", 0.0) or 0.0)
+        rows = sorted(
+            manifest_by_key.get((system_id, temperature, structure_id), []),
+            key=lambda item: float(item.get("lag_time", 0.0) or 0.0),
+        )
+        if q_bound <= 0.0 or tau_alpha <= 0.0 or len(rows) < 2:
+            continue
+        q_by_lag: list[np.ndarray] = []
+        for row in rows:
+            with np.load(ROOT / row["particle_cache_path"]) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+            displacement = positions - initial_positions[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                displacement = displacement - box * np.round(displacement / box)
+            q_by_lag.append(np.sum(displacement * displacement, axis=2) / float(displacement.shape[-1]))
+        q = np.stack(q_by_lag, axis=0)
+        latest_lag = float(rows[-1]["lag_time"])
+        for multiplier in threshold_multipliers:
+            threshold = q_bound * multiplier
+            above = q > threshold
+            ever = np.any(above, axis=0)
+            first_index = np.argmax(above, axis=0)
+            first_index[~ever] = -1
+            post_recross_count = 0
+            post_crossable_count = 0
+            for replica_index in range(above.shape[1]):
+                for particle_index in range(above.shape[2]):
+                    idx = int(first_index[replica_index, particle_index])
+                    if 0 <= idx < above.shape[0] - 1:
+                        post_crossable_count += 1
+                        if np.any(~above[idx + 1 :, replica_index, particle_index]):
+                            post_recross_count += 1
+            crossed_fraction = float(np.mean(ever))
+            mean_persistence = (
+                float(-latest_lag / math.log(max(1.0e-12, 1.0 - crossed_fraction)))
+                if 0.0 < crossed_fraction < 1.0
+                else 0.0
+            )
+            threshold_rows.append(
+                {
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "threshold_multiplier": float(multiplier),
+                    "threshold_q": float(threshold),
+                    "crossed_fraction": crossed_fraction,
+                    "post_crossing_recross_fraction": float(post_recross_count / post_crossable_count)
+                    if post_crossable_count > 0
+                    else 0.0,
+                    "exponential_mean_persistence_time": mean_persistence,
+                    "tau_alpha_direct": tau_alpha,
+                    "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                }
+            )
+
+    rows = glassbench_real_threshold_sweep_canary(
+        audit_id="glassbench_real_threshold_sweep_canary",
+        threshold_rows=threshold_rows,
+        stable_threshold_min_multiplier=0.5,
+        stable_threshold_max_multiplier=1.5,
+        max_mean_persistence_ratio_for_stability=1.5,
+        max_recross_fraction_for_stability=0.05,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10276,6 +10371,54 @@ def write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_threshold_sweep_canary_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "real_threshold_sweep_sensitive_replica_axis_blocked": "#c05621",
+        "real_threshold_sweep_stable_replica_axis_blocked": "#805ad5",
+        "real_threshold_sweep_event_clock_ready": "#2f855a",
+        "real_threshold_sweep_sensitive": "#d69e2e",
+        "real_threshold_sweep_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["threshold_sweep_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{row["system_id"]} T={row["temperature"]}</text>'
+        )
+        marks.append(f'<rect x="{left + 130}" y="{y - 6}" width="420" height="27" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:58]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">thresholds={row["threshold_multipliers"]}; crossed={float(row["min_crossed_fraction"]):.3g}-{float(row["max_crossed_fraction"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">mean persistence ratio={float(row["mean_persistence_sensitivity_ratio"]):.3g}; anchor tau_p/tau_alpha={float(row["anchor_mean_persistence_over_tau_alpha"]):.3g}; max recross={float(row["max_post_crossing_recross_fraction"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real threshold-sweep canary</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The fixed-lag crossing candidate is swept over jump thresholds before it is promoted to a persistence/exchange event clock.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">threshold verdict</text>
+  <text x="{left + 575}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">threshold-sensitivity diagnostics</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -14631,6 +14774,14 @@ def main() -> None:
     write_sota_glassbench_direct_alpha_multilag_crossing_canary_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.svg",
         glassbench_direct_alpha_multilag_crossing_canary_rows,
+    )
+    glassbench_real_threshold_sweep_canary_rows = write_sota_glassbench_real_threshold_sweep_canary_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_real_threshold_sweep_canary.csv",
+        pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+    )
+    write_sota_glassbench_real_threshold_sweep_canary_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_threshold_sweep_canary.svg",
+        glassbench_real_threshold_sweep_canary_rows,
     )
     glassbench_direct_alpha_event_clock_contract_rows = (
         write_sota_glassbench_direct_alpha_event_clock_contract_csv(

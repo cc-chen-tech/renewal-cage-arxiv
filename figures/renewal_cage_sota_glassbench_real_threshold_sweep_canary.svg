@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="350" viewBox="0 0 1160 350">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real threshold-sweep canary</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The fixed-lag crossing candidate is swept over jump thresholds before it is promoted to a persistence/exchange event clock.</text>
+  <text x="75" y="96" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="205" y="96" font-family="Arial, sans-serif" font-size="12" font-weight="700">threshold verdict</text>
+  <text x="650" y="96" font-family="Arial, sans-serif" font-size="12" font-weight="700">threshold-sensitivity diagnostics</text>
+  <text x="75" y="136" font-family="Arial, sans-serif" font-size="12" font-weight="700">KA2D T=0.23</text><rect x="205" y="114" width="420" height="27" fill="#c05621" opacity="0.92" /><text x="215" y="132" font-family="Arial, sans-serif" font-size="10" fill="#fff">real threshold sweep sensitive replica axis blocked</text><text x="650" y="134" font-family="Arial, sans-serif" font-size="11">thresholds=0.5;0.75;1;1.25;1.5; crossed=0.181-0.333</text><text x="650" y="156" font-family="Arial, sans-serif" font-size="10" fill="#555">mean persistence ratio=2.03; anchor tau_p/tau_alpha=3.64; max recross=0.256</text><text x="650" y="176" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker=threshold sensitivity recrossing and replica identity; next=extract true time axis and preregister stable nonrecrossin</text>
+</svg>

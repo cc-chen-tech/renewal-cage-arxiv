@@ -180,6 +180,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_multilag_particle_cache_targets,
     glassbench_cached_particle_observable_semantics_audit,
     glassbench_structure_matched_observable_renewal_canary,
+    glassbench_real_threshold_sweep_canary,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -1518,6 +1519,62 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["persistence_exchange_event_clock_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_threshold_sweep_canary_blocks_unstable_threshold_clock(self):
+        row = glassbench_real_threshold_sweep_canary(
+            audit_id="glassbench_real_threshold_sweep_canary",
+            threshold_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "threshold_multiplier": 0.5,
+                    "crossed_fraction": 0.3333333333333333,
+                    "post_crossing_recross_fraction": 0.02372093023255814,
+                    "exponential_mean_persistence_time": 3699455.1935646487,
+                    "tau_alpha_direct": 1500000.0,
+                    "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "threshold_multiplier": 1.0,
+                    "crossed_fraction": 0.24007751937984495,
+                    "post_crossing_recross_fraction": 0.02244107200516629,
+                    "exponential_mean_persistence_time": 5463707.59373032,
+                    "tau_alpha_direct": 1500000.0,
+                    "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "threshold_multiplier": 1.5,
+                    "crossed_fraction": 0.1812015503875969,
+                    "post_crossing_recross_fraction": 0.01818181818181818,
+                    "exponential_mean_persistence_time": 7503101.8316550795,
+                    "tau_alpha_direct": 1500000.0,
+                    "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                },
+            ],
+            stable_threshold_min_multiplier=0.5,
+            stable_threshold_max_multiplier=1.5,
+            max_mean_persistence_ratio_for_stability=1.5,
+            max_recross_fraction_for_stability=0.05,
+        )[0]
+
+        self.assertEqual(row["system_id"], "KA2D")
+        self.assertEqual(float(row["threshold_sweep_candidate_ready"]), 1.0)
+        self.assertEqual(float(row["threshold_robust_event_clock_ready"]), 0.0)
+        self.assertEqual(float(row["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertGreater(float(row["mean_persistence_sensitivity_ratio"]), 2.0)
+        self.assertLess(float(row["max_post_crossing_recross_fraction"]), 0.05)
+        self.assertAlmostEqual(float(row["anchor_mean_persistence_over_tau_alpha"]), 3.642471729153547)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "threshold_sensitivity_and_replica_identity")
+        self.assertEqual(row["threshold_sweep_stage"], "real_threshold_sweep_sensitive_replica_axis_blocked")
 
     def test_glassbench_direct_alpha_event_clock_contract_requires_true_time_axis(self):
         pe_bound_rows = [
