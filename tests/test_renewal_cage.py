@@ -154,6 +154,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_shape_selection,
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
+    glassbench_real_evidence_claim_synthesis,
     glassbench_sparse_lag_event_clock_audit,
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
@@ -993,6 +994,155 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(missing["real_alpha_shape_claim_ready"]), 0.0)
         self.assertEqual(missing["primary_blocker"], "post_alpha_window_observation")
         self.assertEqual(float(missing["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_evidence_claim_synthesis_keeps_claim_levels_separate(self):
+        dynamic_alignment_rows = [
+            {
+                "signature": "msd_growth_cage_escape",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 1.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "none",
+            },
+            {
+                "signature": "self_intermediate_alpha",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 1.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            },
+            {
+                "signature": "transient_ngp_peak",
+                "model_support": 1.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 1.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "none",
+            },
+            {
+                "signature": "thermodynamic_transition",
+                "model_support": 0.0,
+                "literature_qualitative_support": 1.0,
+                "real_glassbench_support": 0.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "thermodynamic_input_law",
+            },
+        ]
+        multik_shape_rows = [
+            {
+                "multik_shape_candidate_ready": 1.0,
+                "real_alpha_shape_claim_ready": 0.0,
+                "tested_k_count": 3.0,
+                "crossed_k_count": 3.0,
+                "kww_beta_spread": 0.013,
+                "primary_blocker": "post_alpha_window_depth",
+            }
+        ]
+        heldout_prediction_rows = [
+            {
+                "heldout_prediction_candidate_ready": 1.0,
+                "real_alpha_shape_claim_ready": 0.0,
+                "heldout_count": 3.0,
+                "max_heldout_shape_rmse": 0.226,
+                "primary_blocker": "post_alpha_window_depth",
+            }
+        ]
+        post_window_verdict_rows = [
+            {
+                "post_window_verdict_stage": "post_alpha_observation_not_ready",
+                "prediction_target_ready": 1.0,
+                "observed_post_window_fs_ready": 0.0,
+                "post_window_prediction_supported": 0.0,
+                "post_window_prediction_rejected": 0.0,
+                "primary_blocker": "post_alpha_window_observation",
+            }
+        ]
+        transport_rows = [
+            {
+                "direct_alpha_transport_proxy_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "apparent_stokes_einstein_product": 0.244,
+                "primary_blocker": "event_clock_trajectory",
+            }
+        ]
+        pe_bound_rows = [
+            {
+                "conditional_pe_inference_ready": 1.0,
+                "pe_feasibility_bound_ready": 1.0,
+                "reference_persistence_exchange_ratio": 2.35,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "event_clock_jump_variance",
+            }
+        ]
+        microdynamic_verdict_rows = [
+            {
+                "verdict_row_id": "late_recovery_decision_protocol",
+                "late_recovery_decision_protocol_ready": 1.0,
+                "mechanism_selection_claim_allowed_now": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "primary_blocker": "late_recovery_measurement",
+            }
+        ]
+        experimental_verdict_rows = [
+            {
+                "verdict_row_id": "sota_dynamic_signature_support",
+                "sota_verdict_stage": "sota_dynamic_signatures_supported",
+                "allowed_claim_level": "dynamical_signature_supported",
+            }
+        ]
+
+        rows = glassbench_real_evidence_claim_synthesis(
+            synthesis_id="glassbench_real_evidence_claim_synthesis",
+            dynamic_alignment_rows=dynamic_alignment_rows,
+            multik_shape_rows=multik_shape_rows,
+            heldout_prediction_rows=heldout_prediction_rows,
+            post_window_verdict_rows=post_window_verdict_rows,
+            transport_rows=transport_rows,
+            pe_bound_rows=pe_bound_rows,
+            microdynamic_verdict_rows=microdynamic_verdict_rows,
+            experimental_verdict_rows=experimental_verdict_rows,
+        )
+
+        by_id = {row["claim_row_id"]: row for row in rows}
+        dynamic = by_id["real_dynamic_signature_support"]
+        alpha = by_id["cached_multik_alpha_shape_prediction"]
+        transport = by_id["conditional_alpha_transport_pe_bound"]
+        mechanism = by_id["real_mechanism_selection"]
+        thermodynamic = by_id["thermodynamic_scope_boundary"]
+
+        self.assertEqual(dynamic["claim_synthesis_stage"], "real_dynamic_signatures_supported_preinversion")
+        self.assertEqual(float(dynamic["supported_real_signature_count"]), 3.0)
+        self.assertEqual(float(dynamic["real_glassbench_support"]), 1.0)
+        self.assertEqual(float(dynamic["real_quantitative_inversion_ready"]), 0.0)
+
+        self.assertEqual(alpha["claim_synthesis_stage"], "multik_alpha_candidate_preregistered_post_window")
+        self.assertEqual(float(alpha["candidate_ready"]), 1.0)
+        self.assertEqual(float(alpha["claim_ready_now"]), 0.0)
+        self.assertEqual(alpha["primary_blocker"], "post_alpha_window_observation")
+
+        self.assertEqual(
+            transport["claim_synthesis_stage"],
+            "conditional_transport_pe_bound_ready_event_clock_blocked",
+        )
+        self.assertAlmostEqual(float(transport["pe_ratio_or_bound"]), 2.35)
+        self.assertEqual(transport["primary_blocker"], "event_clock_jump_variance")
+
+        self.assertEqual(
+            mechanism["claim_synthesis_stage"],
+            "mechanism_selection_preregistered_late_recovery_missing",
+        )
+        self.assertEqual(float(mechanism["mechanism_rejection_ready"]), 0.0)
+        self.assertEqual(float(mechanism["claim_ready_now"]), 0.0)
+
+        self.assertEqual(thermodynamic["claim_synthesis_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(thermodynamic["primary_blocker"], "thermodynamic_input_law")
 
     def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):
         direct_rows = [

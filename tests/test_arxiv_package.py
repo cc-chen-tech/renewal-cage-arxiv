@@ -336,6 +336,30 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(thermodynamic["sota_verdict_stage"], "thermodynamic_transition_out_of_scope")
         self.assertEqual(thermodynamic["allowed_claim_level"], "dynamical_theory_only")
 
+    def test_glassbench_real_evidence_claim_synthesis_separates_ready_and_blocked_claims(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["claim_row_id"]: row for row in rows}
+        dynamic = by_id["real_dynamic_signature_support"]
+        alpha = by_id["cached_multik_alpha_shape_prediction"]
+        mechanism = by_id["real_mechanism_selection"]
+        thermodynamic = by_id["thermodynamic_scope_boundary"]
+
+        self.assertEqual(dynamic["claim_synthesis_stage"], "real_dynamic_signatures_supported_preinversion")
+        self.assertGreaterEqual(float(dynamic["supported_real_signature_count"]), 4.0)
+        self.assertEqual(float(dynamic["real_quantitative_inversion_ready"]), 0.0)
+        self.assertEqual(alpha["claim_synthesis_stage"], "multik_alpha_candidate_preregistered_post_window")
+        self.assertEqual(float(alpha["candidate_ready"]), 1.0)
+        self.assertEqual(float(alpha["claim_ready_now"]), 0.0)
+        self.assertEqual(alpha["primary_blocker"], "post_alpha_window_observation")
+        self.assertEqual(mechanism["claim_synthesis_stage"], "mechanism_selection_preregistered_late_recovery_missing")
+        self.assertEqual(float(mechanism["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(thermodynamic["claim_synthesis_stage"], "thermodynamic_transition_out_of_scope")
+        self.assertEqual(float(thermodynamic["thermodynamic_claim_allowed"]), 0.0)
+
     def test_glassbench_real_cached_microdynamic_verdict_marks_persistence_but_blocks_inversion(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv"
         self.assertTrue(path.exists())
@@ -3103,6 +3127,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_microdynamic_prediction_scorecard.pdf", names)
             self.assertIn("figures/renewal_cage_microdynamic_minimality_audit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_experimental_verdict_matrix.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf", names)
             self.assertIn("figures/renewal_cage_inversion.pdf", names)
 
     def test_main_tex_uses_arxiv_safe_pdf_figures(self):
@@ -3241,6 +3266,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_microdynamic_prediction_scorecard.pdf",
             "figures/renewal_cage_microdynamic_minimality_audit.pdf",
             "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
+            "figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",

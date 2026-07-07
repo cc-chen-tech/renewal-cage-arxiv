@@ -1937,6 +1937,73 @@ def write_sota_experimental_verdict_matrix_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_real_evidence_claim_synthesis_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real evidence claim synthesis")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real cached evidence, direct-alpha predictions, mechanism selection, and scope boundaries are reduced to manuscript-safe claim levels.",
+    )
+    left, top = 42, page_h - 88
+    c.setFont("Helvetica-Bold", 7.4)
+    c.drawString(left, top, "claim row")
+    c.drawString(left + 210, top, "stage")
+    c.drawString(left + 520, top, "claim flags")
+    c.drawString(left + 660, top, "allowed claim / blocker")
+    palette = {
+        "real_dynamic_signatures_supported_preinversion": colors.HexColor("#2f855a"),
+        "real_dynamic_signatures_supported_and_inversion_ready": colors.HexColor("#276749"),
+        "real_dynamic_signatures_not_supported": colors.HexColor("#c05621"),
+        "multik_alpha_candidate_preregistered_post_window": colors.HexColor("#2b6cb0"),
+        "multik_alpha_shape_prediction_supported": colors.HexColor("#2f855a"),
+        "multik_alpha_prediction_rejected": colors.HexColor("#c05621"),
+        "conditional_transport_pe_bound_ready_event_clock_blocked": colors.HexColor("#805ad5"),
+        "mechanism_selection_preregistered_late_recovery_missing": colors.HexColor("#b7791f"),
+        "real_mechanism_selection_ready": colors.HexColor("#276749"),
+        "thermodynamic_transition_out_of_scope": colors.HexColor("#718096"),
+    }
+    c.setFont("Helvetica", 6.5)
+    for idx, row in enumerate(rows):
+        y = top - 22 - idx * 42
+        stage = row["claim_synthesis_stage"]
+        color = palette.get(stage, colors.HexColor("#718096"))
+        c.setFillColor(colors.black)
+        c.drawString(left, y, row["claim_row_id"].replace("_", " ")[:34])
+        c.setFillColor(color)
+        c.rect(left + 210, y - 4, 290, 12, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.drawString(left + 215, y, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 520,
+            y,
+            "cand={:.0f}; claim={:.0f}; real={:.0f}; PE={:.0f}; thermo={:.0f}".format(
+                float(row["candidate_ready"]),
+                float(row["claim_ready_now"]),
+                float(row["real_glassbench_support"]),
+                float(row["real_pe_inversion_ready"]),
+                float(row["thermodynamic_claim_allowed"]),
+            ),
+        )
+        c.drawString(left + 660, y, row["allowed_claim_level"].replace("_", " ")[:43])
+        c.drawString(left + 660, y - 10, f"blocker={row['primary_blocker'].replace('_', ' ')[:40]}")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This synthesis is a claim-level ledger: it supports dynamical signatures while keeping PE inversion and thermodynamics blocked.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_real_benchmark_assimilation_gate_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_real_benchmark_assimilation_gate.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8177,6 +8244,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_experimental_verdict_matrix_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_experimental_verdict_matrix.pdf"
     )
+    sota_glassbench_real_evidence_claim_synthesis_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf"
+    )
     real_benchmark_assimilation_gate_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_real_benchmark_assimilation_gate.pdf"
     )
@@ -8456,6 +8526,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_microdynamic_prediction_scorecard_pdf(microdynamic_prediction_scorecard_pdf)
     write_microdynamic_minimality_audit_pdf(microdynamic_minimality_audit_pdf)
     write_sota_experimental_verdict_matrix_pdf(sota_experimental_verdict_matrix_pdf)
+    write_sota_glassbench_real_evidence_claim_synthesis_pdf(
+        sota_glassbench_real_evidence_claim_synthesis_pdf
+    )
     write_real_benchmark_assimilation_gate_pdf(real_benchmark_assimilation_gate_pdf)
     write_cross_observable_prediction_ledger_pdf(cross_observable_prediction_ledger_pdf)
     write_inversion_identifiability_audit_pdf(inversion_identifiability_audit_pdf)
@@ -8716,6 +8789,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_experimental_verdict_matrix_pdf,
             "figures/renewal_cage_sota_experimental_verdict_matrix.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_evidence_claim_synthesis_pdf,
+            "figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf",
         )
         archive.write(
             real_benchmark_assimilation_gate_pdf,

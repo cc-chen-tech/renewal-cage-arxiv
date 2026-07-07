@@ -74,6 +74,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_interval_censored_persistence_fit,
     glassbench_interval_censored_waiting_law_selection,
     glassbench_finite_exchange_falsification_envelope,
+    glassbench_real_evidence_claim_synthesis,
     glassbench_real_cached_microdynamic_verdict,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
@@ -6489,6 +6490,35 @@ def write_sota_experimental_verdict_matrix_csv(
         dynamic_alignment_rows=dynamic_alignment_rows,
         microdynamic_scorecard_rows=microdynamic_scorecard_rows,
         minimality_rows=minimality_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_evidence_claim_synthesis_csv(
+    path: Path,
+    *,
+    dynamic_alignment_rows: list[dict[str, float | str]],
+    multik_shape_rows: list[dict[str, float | str]],
+    heldout_prediction_rows: list[dict[str, float | str]],
+    post_window_verdict_rows: list[dict[str, float | str]],
+    transport_rows: list[dict[str, float | str]],
+    pe_bound_rows: list[dict[str, float | str]],
+    microdynamic_verdict_rows: list[dict[str, float | str]],
+    experimental_verdict_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the manuscript-safe synthesis of real GlassBench evidence."""
+
+    rows = glassbench_real_evidence_claim_synthesis(
+        synthesis_id="glassbench_real_evidence_claim_synthesis",
+        dynamic_alignment_rows=dynamic_alignment_rows,
+        multik_shape_rows=multik_shape_rows,
+        heldout_prediction_rows=heldout_prediction_rows,
+        post_window_verdict_rows=post_window_verdict_rows,
+        transport_rows=transport_rows,
+        pe_bound_rows=pe_bound_rows,
+        microdynamic_verdict_rows=microdynamic_verdict_rows,
+        experimental_verdict_rows=experimental_verdict_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -13286,6 +13316,67 @@ def write_sota_experimental_verdict_matrix_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_evidence_claim_synthesis_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1180, 420
+    left, top = 72, 112
+    row_h = 60
+    colors_by_stage = {
+        "real_dynamic_signatures_supported_preinversion": "#2f855a",
+        "real_dynamic_signatures_supported_and_inversion_ready": "#276749",
+        "real_dynamic_signatures_not_supported": "#c05621",
+        "multik_alpha_candidate_preregistered_post_window": "#2b6cb0",
+        "multik_alpha_shape_prediction_supported": "#2f855a",
+        "multik_alpha_prediction_rejected": "#c05621",
+        "multik_alpha_claim_incomplete": "#4a5568",
+        "conditional_transport_pe_bound_ready_event_clock_blocked": "#805ad5",
+        "real_alpha_transport_pe_inversion_ready": "#276749",
+        "alpha_transport_pe_bound_incomplete": "#4a5568",
+        "mechanism_selection_preregistered_late_recovery_missing": "#b7791f",
+        "real_mechanism_selection_ready": "#276749",
+        "mechanism_selection_protocol_incomplete": "#4a5568",
+        "thermodynamic_transition_out_of_scope": "#718096",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["claim_synthesis_stage"])
+        color = colors_by_stage.get(stage, "#718096")
+        marks.append(
+            f'<text x="{left}" y="{y + 17}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{str(row["claim_row_id"]).replace("_", " ")[:38]}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 290}" y="{y}" width="330" height="24" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 300}" y="{y + 16}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 645}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">cand={int(float(row["candidate_ready"]))}; claim={int(float(row["claim_ready_now"]))}; real={int(float(row["real_glassbench_support"]))}; thermo={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 900}" y="{y + 17}" font-family="Arial, sans-serif" font-size="11">PE={int(float(row["real_pe_inversion_ready"]))}; sig={float(row["supported_real_signature_count"]):.0f}; ratio={float(row["pe_ratio_or_bound"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 290}" y="{y + 43}" font-family="Arial, sans-serif" font-size="10" fill="#555">claim: {str(row["allowed_claim_level"]).replace("_", " ")[:62]}; blocker: {str(row["primary_blocker"]).replace("_", " ")[:34]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="72" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real evidence claim synthesis</text>
+  <text x="72" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Real cached evidence, direct-alpha predictions, mechanism selection, and scope boundaries are reduced to manuscript-safe claim levels.</text>
+  <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim row</text>
+  <text x="{left + 290}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">synthesis stage</text>
+  <text x="{left + 645}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim flags</text>
+  <text x="{left + 900}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">quantitative anchors</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_barrier_svg(
     path: Path,
     time: np.ndarray,
@@ -14880,6 +14971,23 @@ def main() -> None:
     write_sota_experimental_verdict_matrix_svg(
         FIGURE_DIR / "renewal_cage_sota_experimental_verdict_matrix.svg",
         sota_experimental_verdict_rows,
+    )
+    glassbench_real_evidence_claim_synthesis_rows = (
+        write_sota_glassbench_real_evidence_claim_synthesis_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv",
+            dynamic_alignment_rows=dynamic_signature_alignment_rows,
+            multik_shape_rows=glassbench_direct_alpha_multik_shape_rows,
+            heldout_prediction_rows=glassbench_direct_alpha_multik_heldout_prediction_rows,
+            post_window_verdict_rows=glassbench_direct_alpha_post_window_verdict_rows,
+            transport_rows=glassbench_direct_alpha_transport_rows,
+            pe_bound_rows=glassbench_direct_alpha_pe_bound_rows,
+            microdynamic_verdict_rows=glassbench_real_cached_microdynamic_verdict_rows,
+            experimental_verdict_rows=sota_experimental_verdict_rows,
+        )
+    )
+    write_sota_glassbench_real_evidence_claim_synthesis_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_evidence_claim_synthesis.svg",
+        glassbench_real_evidence_claim_synthesis_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

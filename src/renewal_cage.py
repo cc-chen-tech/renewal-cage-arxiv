@@ -16445,6 +16445,278 @@ def sota_experimental_verdict_matrix(
     ]
 
 
+def glassbench_real_evidence_claim_synthesis(
+    *,
+    synthesis_id: str,
+    dynamic_alignment_rows: Sequence[dict[str, object]],
+    multik_shape_rows: Sequence[dict[str, object]],
+    heldout_prediction_rows: Sequence[dict[str, object]],
+    post_window_verdict_rows: Sequence[dict[str, object]],
+    transport_rows: Sequence[dict[str, object]],
+    pe_bound_rows: Sequence[dict[str, object]],
+    microdynamic_verdict_rows: Sequence[dict[str, object]],
+    experimental_verdict_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Collapse real GlassBench evidence into manuscript-safe claim levels."""
+
+    if not synthesis_id:
+        raise ValueError("synthesis_id must be nonempty")
+    required_inputs = {
+        "dynamic_alignment_rows": dynamic_alignment_rows,
+        "multik_shape_rows": multik_shape_rows,
+        "heldout_prediction_rows": heldout_prediction_rows,
+        "post_window_verdict_rows": post_window_verdict_rows,
+        "transport_rows": transport_rows,
+        "pe_bound_rows": pe_bound_rows,
+        "microdynamic_verdict_rows": microdynamic_verdict_rows,
+        "experimental_verdict_rows": experimental_verdict_rows,
+    }
+    for name, rows in required_inputs.items():
+        if not rows:
+            raise ValueError(f"{name} must be nonempty")
+
+    def number(row: dict[str, object], key: str) -> float:
+        return float(row.get(key, 0.0) or 0.0)
+
+    def max_flag(rows: Sequence[dict[str, object]], key: str) -> float:
+        return max((number(row, key) for row in rows), default=0.0)
+
+    def first_by_key(rows: Sequence[dict[str, object]], key: str, value: str) -> dict[str, object]:
+        for row in rows:
+            if str(row.get(key, "")) == value:
+                return row
+        return {}
+
+    def first_blocker(rows: Sequence[dict[str, object]], default: str) -> str:
+        for row in rows:
+            blocker = str(row.get("primary_blocker", "none"))
+            if blocker and blocker != "none":
+                return blocker
+        return default
+
+    dynamic_rows = [
+        row
+        for row in dynamic_alignment_rows
+        if str(row.get("signature", "")) not in {"thermodynamic_transition", "persistence_exchange_decoupling"}
+    ]
+    supported_dynamic_count = float(
+        sum(
+            1
+            for row in dynamic_rows
+            if number(row, "model_support") > 0.0
+            and number(row, "literature_qualitative_support") > 0.0
+            and number(row, "real_glassbench_support") > 0.0
+        )
+    )
+    dynamic_ready = supported_dynamic_count > 0.0
+    dynamic_inversion_ready = max_flag(dynamic_rows, "real_quantitative_inversion_ready")
+    if dynamic_ready and dynamic_inversion_ready == 1.0:
+        dynamic_stage = "real_dynamic_signatures_supported_and_inversion_ready"
+        dynamic_blocker = "none"
+        dynamic_action = "run_real_microdynamic_inversion"
+        dynamic_claim_ready = 1.0
+    elif dynamic_ready:
+        dynamic_stage = "real_dynamic_signatures_supported_preinversion"
+        dynamic_blocker = "none"
+        dynamic_action = "keep_dynamic_signature_claim_separate_from_real_inversion"
+        dynamic_claim_ready = 1.0
+    else:
+        dynamic_stage = "real_dynamic_signatures_not_supported"
+        dynamic_blocker = first_blocker(dynamic_rows, "real_dynamic_signature_support")
+        dynamic_action = "complete_real_dynamic_signature_support"
+        dynamic_claim_ready = 0.0
+
+    multik_ready = max_flag(multik_shape_rows, "multik_shape_candidate_ready")
+    heldout_ready = max_flag(heldout_prediction_rows, "heldout_prediction_candidate_ready")
+    supported_post = max_flag(post_window_verdict_rows, "post_window_prediction_supported")
+    rejected_post = max_flag(post_window_verdict_rows, "post_window_prediction_rejected")
+    observed_post_ready = min((number(row, "observed_post_window_fs_ready") for row in post_window_verdict_rows), default=0.0)
+    alpha_candidate_ready = float(multik_ready == 1.0 and heldout_ready == 1.0)
+    alpha_claim_ready = float(
+        alpha_candidate_ready == 1.0
+        and supported_post == 1.0
+        and rejected_post == 0.0
+        and observed_post_ready == 1.0
+    )
+    if alpha_claim_ready == 1.0:
+        alpha_stage = "multik_alpha_shape_prediction_supported"
+        alpha_blocker = "none"
+        alpha_action = "promote_to_real_alpha_shape_claim"
+    elif alpha_candidate_ready == 1.0 and rejected_post == 0.0:
+        alpha_stage = "multik_alpha_candidate_preregistered_post_window"
+        alpha_blocker = first_blocker(post_window_verdict_rows, first_blocker(multik_shape_rows, "post_alpha_window_depth"))
+        alpha_action = "measure_preregistered_post_alpha_fs_targets"
+    elif rejected_post == 1.0:
+        alpha_stage = "multik_alpha_prediction_rejected"
+        alpha_blocker = "post_alpha_shape_residual"
+        alpha_action = "reject_shared_alpha_shape_extrapolation"
+    else:
+        alpha_stage = "multik_alpha_claim_incomplete"
+        alpha_blocker = first_blocker(multik_shape_rows, "multik_alpha_shape")
+        alpha_action = "complete_multik_alpha_shape_and_heldout_prediction"
+
+    transport_ready = max_flag(transport_rows, "direct_alpha_transport_proxy_ready")
+    pe_bound_ready = max_flag(pe_bound_rows, "pe_feasibility_bound_ready")
+    conditional_pe_ready = max_flag(pe_bound_rows, "conditional_pe_inference_ready")
+    transport_pe_ready = float(transport_ready == 1.0 and pe_bound_ready == 1.0 and conditional_pe_ready == 1.0)
+    transport_real_pe_ready = max(max_flag(transport_rows, "real_pe_inversion_ready"), max_flag(pe_bound_rows, "real_pe_inversion_ready"))
+    pe_ratio = max((number(row, "reference_persistence_exchange_ratio") for row in pe_bound_rows), default=0.0)
+    if transport_pe_ready == 1.0 and transport_real_pe_ready == 1.0:
+        transport_stage = "real_alpha_transport_pe_inversion_ready"
+        transport_blocker = "none"
+        transport_action = "run_real_persistence_exchange_inversion"
+        transport_claim_ready = 1.0
+    elif transport_pe_ready == 1.0:
+        transport_stage = "conditional_transport_pe_bound_ready_event_clock_blocked"
+        transport_blocker = first_blocker(pe_bound_rows, first_blocker(transport_rows, "event_clock_trajectory"))
+        transport_action = "measure_cage_jump_event_variance_and_exchange_clock"
+        transport_claim_ready = 0.0
+    else:
+        transport_stage = "alpha_transport_pe_bound_incomplete"
+        transport_blocker = first_blocker(transport_rows, "direct_alpha_transport_proxy")
+        transport_action = "complete_direct_alpha_transport_and_pe_bound"
+        transport_claim_ready = 0.0
+
+    mechanism_protocol = first_by_key(
+        microdynamic_verdict_rows,
+        "verdict_row_id",
+        "late_recovery_decision_protocol",
+    )
+    protocol_ready = number(mechanism_protocol, "late_recovery_decision_protocol_ready")
+    mechanism_now = number(mechanism_protocol, "mechanism_selection_claim_allowed_now")
+    real_pe_ready = number(mechanism_protocol, "real_pe_inversion_ready")
+    if mechanism_now == 1.0 and real_pe_ready == 1.0:
+        mechanism_stage = "real_mechanism_selection_ready"
+        mechanism_blocker = "none"
+        mechanism_action = "promote_real_mechanism_selection_claim"
+        mechanism_rejection_ready = 1.0
+    elif protocol_ready == 1.0:
+        mechanism_stage = "mechanism_selection_preregistered_late_recovery_missing"
+        mechanism_blocker = str(mechanism_protocol.get("primary_blocker", "late_recovery_measurement"))
+        mechanism_action = "measure_late_ngp_recovery_and_extract_exchange_clock"
+        mechanism_rejection_ready = 0.0
+    else:
+        mechanism_stage = "mechanism_selection_protocol_incomplete"
+        mechanism_blocker = str(mechanism_protocol.get("primary_blocker", "late_recovery_protocol"))
+        mechanism_action = "complete_late_recovery_decision_protocol"
+        mechanism_rejection_ready = 0.0
+
+    thermodynamic = first_by_key(dynamic_alignment_rows, "signature", "thermodynamic_transition")
+    experimental_dynamic = first_by_key(
+        experimental_verdict_rows,
+        "verdict_row_id",
+        "sota_dynamic_signature_support",
+    )
+
+    def row(
+        *,
+        claim_row_id: str,
+        family: str,
+        stage: str,
+        allowed_claim: str,
+        candidate_ready: float,
+        claim_ready_now: float,
+        real_glassbench_support: float,
+        supported_real_signature_count: float = 0.0,
+        real_quantitative_inversion_ready: float = 0.0,
+        real_pe_inversion_ready: float = 0.0,
+        mechanism_rejection_ready: float = 0.0,
+        pe_ratio_or_bound: float = 0.0,
+        thermodynamic_claim_allowed: float = 0.0,
+        primary_blocker: str = "none",
+        next_required_action: str = "none",
+    ) -> dict[str, float | str]:
+        return {
+            "synthesis_id": synthesis_id,
+            "claim_row_id": claim_row_id,
+            "claim_family": family,
+            "allowed_claim_level": allowed_claim,
+            "candidate_ready": float(candidate_ready),
+            "claim_ready_now": float(claim_ready_now),
+            "real_glassbench_support": float(real_glassbench_support),
+            "supported_real_signature_count": float(supported_real_signature_count),
+            "real_quantitative_inversion_ready": float(real_quantitative_inversion_ready),
+            "real_pe_inversion_ready": float(real_pe_inversion_ready),
+            "mechanism_rejection_ready": float(mechanism_rejection_ready),
+            "pe_ratio_or_bound": float(pe_ratio_or_bound),
+            "thermodynamic_claim_allowed": float(thermodynamic_claim_allowed),
+            "primary_blocker": primary_blocker,
+            "next_required_action": next_required_action,
+            "claim_synthesis_stage": stage,
+        }
+
+    return [
+        row(
+            claim_row_id="real_dynamic_signature_support",
+            family="dynamical_signatures",
+            stage=dynamic_stage,
+            allowed_claim=str(
+                experimental_dynamic.get("allowed_claim_level", "real_dynamical_signature_support")
+            ),
+            candidate_ready=float(dynamic_ready),
+            claim_ready_now=dynamic_claim_ready,
+            real_glassbench_support=float(dynamic_ready),
+            supported_real_signature_count=supported_dynamic_count,
+            real_quantitative_inversion_ready=dynamic_inversion_ready,
+            primary_blocker=dynamic_blocker,
+            next_required_action=dynamic_action,
+        ),
+        row(
+            claim_row_id="cached_multik_alpha_shape_prediction",
+            family="alpha_shape_prediction",
+            stage=alpha_stage,
+            allowed_claim="cached_multik_alpha_candidate_with_preregistered_post_window_test",
+            candidate_ready=alpha_candidate_ready,
+            claim_ready_now=alpha_claim_ready,
+            real_glassbench_support=alpha_candidate_ready,
+            supported_real_signature_count=1.0 if alpha_candidate_ready == 1.0 else 0.0,
+            real_quantitative_inversion_ready=0.0,
+            primary_blocker=alpha_blocker,
+            next_required_action=alpha_action,
+        ),
+        row(
+            claim_row_id="conditional_alpha_transport_pe_bound",
+            family="alpha_transport_pe",
+            stage=transport_stage,
+            allowed_claim="conditional_alpha_transport_bound_not_event_clock_inversion",
+            candidate_ready=transport_pe_ready,
+            claim_ready_now=transport_claim_ready,
+            real_glassbench_support=transport_pe_ready,
+            real_quantitative_inversion_ready=transport_real_pe_ready,
+            real_pe_inversion_ready=transport_real_pe_ready,
+            pe_ratio_or_bound=pe_ratio,
+            primary_blocker=transport_blocker,
+            next_required_action=transport_action,
+        ),
+        row(
+            claim_row_id="real_mechanism_selection",
+            family="mechanism_selection",
+            stage=mechanism_stage,
+            allowed_claim="preregistered_real_mechanism_selection_protocol",
+            candidate_ready=protocol_ready,
+            claim_ready_now=mechanism_now,
+            real_glassbench_support=0.0,
+            real_pe_inversion_ready=real_pe_ready,
+            mechanism_rejection_ready=mechanism_rejection_ready,
+            primary_blocker=mechanism_blocker,
+            next_required_action=mechanism_action,
+        ),
+        row(
+            claim_row_id="thermodynamic_scope_boundary",
+            family="scope_boundary",
+            stage="thermodynamic_transition_out_of_scope",
+            allowed_claim="dynamical_glass_signatures_only",
+            candidate_ready=0.0,
+            claim_ready_now=0.0,
+            real_glassbench_support=number(thermodynamic, "real_glassbench_support"),
+            real_quantitative_inversion_ready=number(thermodynamic, "real_quantitative_inversion_ready"),
+            thermodynamic_claim_allowed=0.0,
+            primary_blocker=str(thermodynamic.get("primary_blocker", "thermodynamic_input_law")),
+            next_required_action="do_not_promote_to_thermodynamic_glass_transition_claim",
+        ),
+    ]
+
+
 def persistence_exchange_scan(
     *,
     ratios: list[float],

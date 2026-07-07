@@ -147,6 +147,13 @@ scale are all required before a micro-to-macro prediction claim is allowed.
 The SOTA experimental verdict matrix consolidates the literature trend checks,
 GlassBench evidence, microdynamic prediction scorecard, and thermodynamic
 scope boundary into final manuscript-safe claim levels.
+The GlassBench real-evidence claim synthesis then compresses the real-data
+chain into five manuscript-facing rows: real dynamical signatures, cached
+multi-k alpha-shape prediction, conditional alpha/transport PE bound, real
+mechanism-selection readiness, and the thermodynamic scope boundary. It
+therefore makes the current claim boundary explicit: real dynamic signatures
+are supported, post-alpha and mechanism-selection checks are preregistered but
+not observed, and thermodynamic glass-transition claims remain disallowed.
 The inversion-identifiability audit then checks fit-rank margins, held-out
 predictions, closure dependence, and parameter degeneracy before any real-data
 fit is claimed.
@@ -544,6 +551,7 @@ figures/renewal_cage_simultaneous_closure.svg
 figures/renewal_cage_microdynamic_prediction_scorecard.svg
 figures/renewal_cage_microdynamic_minimality_audit.svg
 figures/renewal_cage_sota_experimental_verdict_matrix.svg
+figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.svg
 figures/renewal_cage_real_benchmark_assimilation_gate.svg
 figures/renewal_cage_cross_observable_prediction_ledger.svg
 figures/renewal_cage_inversion_identifiability_audit.svg
@@ -677,6 +685,7 @@ data/renewal_cage_simultaneous_closure.csv
 data/renewal_cage_microdynamic_prediction_scorecard.csv
 data/renewal_cage_microdynamic_minimality_audit.csv
 data/renewal_cage_sota_experimental_verdict_matrix.csv
+data/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.csv
 data/renewal_cage_real_benchmark_assimilation_gate.csv
 data/renewal_cage_cross_observable_prediction_ledger.csv
 data/renewal_cage_inversion_identifiability_audit.csv
@@ -833,6 +842,7 @@ paper/figures/renewal_cage_simultaneous_closure.pdf
 paper/figures/renewal_cage_microdynamic_prediction_scorecard.pdf
 paper/figures/renewal_cage_microdynamic_minimality_audit.pdf
 paper/figures/renewal_cage_sota_experimental_verdict_matrix.pdf
+paper/figures/renewal_cage_sota_glassbench_real_evidence_claim_synthesis.pdf
 paper/figures/renewal_cage_real_benchmark_assimilation_gate.pdf
 paper/figures/renewal_cage_cross_observable_prediction_ledger.pdf
 paper/figures/renewal_cage_inversion_identifiability_audit.pdf
