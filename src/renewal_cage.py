@@ -8991,6 +8991,150 @@ def trajectory_event_clock_macro_prediction_protocol(
     }
 
 
+def trajectory_event_clock_threshold_robustness_protocol(
+    *,
+    protocol_id: str,
+    positions: np.ndarray,
+    times: np.ndarray,
+    thresholds: Sequence[float],
+    reference_threshold: float,
+    anchor_wave_number: float,
+    wave_numbers: Sequence[float],
+    late_time: float,
+    time_grid: np.ndarray,
+    min_particles_with_jumps: int = 1,
+    min_exchange_interval_count: int = 0,
+    cage_variance: float = 1.0,
+    cage_tau: float = 0.2,
+    diffusion_relative_error: float = 0.10,
+    tau_alpha_relative_error: float = 0.10,
+    late_ngp_relative_error: float = 0.20,
+    chi4_peak_relative_error: float = 0.20,
+    z_threshold: float = 2.0,
+) -> list[dict[str, float | str]]:
+    """Audit whether event-clock macro predictions are robust to jump threshold."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not thresholds:
+        raise ValueError("thresholds must be nonempty")
+    unique_thresholds = list(dict.fromkeys(float(threshold) for threshold in thresholds))
+    if reference_threshold not in unique_thresholds:
+        unique_thresholds.append(float(reference_threshold))
+    reference_event = trajectory_cage_jump_event_protocol(
+        protocol_id=f"{protocol_id}_reference_event_clock",
+        positions=positions,
+        times=times,
+        jump_displacement_threshold=float(reference_threshold),
+        min_particles_with_jumps=min_particles_with_jumps,
+        min_exchange_interval_count=min_exchange_interval_count,
+    )
+    if float(reference_event.get("persistence_exchange_event_clock_ready", 0.0)) != 1.0:
+        raise ValueError("reference_threshold must yield a ready event clock")
+
+    reference_params = PersistenceExchangeParams(
+        cage_variance=cage_variance,
+        cage_tau=cage_tau,
+        jump_variance=float(reference_event["mean_squared_jump_length"]) / float(reference_event["dimension"]),
+        persistence_mean=float(reference_event["persistence_mean"]),
+        exchange_mean=float(reference_event["exchange_mean"]),
+    )
+    wave_list = list(dict.fromkeys(float(wave_number) for wave_number in wave_numbers))
+    if anchor_wave_number not in wave_list:
+        wave_list.insert(0, float(anchor_wave_number))
+    observed_tau_alpha_by_k = {
+        wave_number: persistence_exchange_alpha_relaxation_time(wave_number, reference_params)
+        for wave_number in wave_list
+    }
+    observed_late_ngp = float(persistence_exchange_ngp_1d(np.array([late_time]), reference_params)[0])
+    observed_chi4_peak = float(
+        np.max(persistence_exchange_scattering_susceptibility(anchor_wave_number, time_grid, reference_params))
+    )
+    observed_diffusion = persistence_exchange_diffusion_coefficient(reference_params)
+    tau_errors = {wave_number: tau_alpha_relative_error for wave_number in wave_list}
+
+    rows: list[dict[str, float | str]] = []
+    pass_count = 0
+    pending_pass_rows: list[dict[str, float | str]] = []
+    for threshold in unique_thresholds:
+        event = trajectory_cage_jump_event_protocol(
+            protocol_id=f"{protocol_id}_threshold_{threshold:g}",
+            positions=positions,
+            times=times,
+            jump_displacement_threshold=threshold,
+            min_particles_with_jumps=min_particles_with_jumps,
+            min_exchange_interval_count=min_exchange_interval_count,
+        )
+        row: dict[str, float | str]
+        if float(event.get("persistence_exchange_event_clock_ready", 0.0)) != 1.0:
+            row = {
+                "protocol_id": protocol_id,
+                "jump_displacement_threshold": float(threshold),
+                "reference_threshold": float(reference_threshold),
+                "event_clock_ready": 0.0,
+                "threshold_prediction_pass": 0.0,
+                "stable_threshold_window_count": 0.0,
+                "fit_parameters_from_macro_observables": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": str(event.get("primary_blocker", "event_clock_ready")),
+                "robustness_stage": "event_clock_threshold_event_clock_incomplete",
+            }
+        else:
+            prediction = trajectory_event_clock_macro_prediction_protocol(
+                protocol_id=f"{protocol_id}_threshold_{threshold:g}",
+                event_row=event,
+                anchor_wave_number=anchor_wave_number,
+                wave_numbers=wave_list,
+                observed_diffusion_coefficient=observed_diffusion,
+                diffusion_relative_error=diffusion_relative_error,
+                observed_tau_alpha_by_k=observed_tau_alpha_by_k,
+                tau_alpha_relative_error_by_k=tau_errors,
+                late_time=late_time,
+                observed_late_ngp=observed_late_ngp,
+                late_ngp_relative_error=late_ngp_relative_error,
+                observed_chi4_peak=observed_chi4_peak,
+                chi4_peak_relative_error=chi4_peak_relative_error,
+                time_grid=time_grid,
+                cage_variance=cage_variance,
+                cage_tau=cage_tau,
+                z_threshold=z_threshold,
+            )
+            pass_flag = float(prediction["micro_to_macro_predictions_pass"]) == 1.0
+            if pass_flag:
+                pass_count += 1
+            row = {
+                "protocol_id": protocol_id,
+                "jump_displacement_threshold": float(threshold),
+                "reference_threshold": float(reference_threshold),
+                "event_clock_ready": 1.0,
+                "threshold_prediction_pass": float(pass_flag),
+                "stable_threshold_window_count": 0.0,
+                "total_jump_event_count": float(event["total_jump_event_count"]),
+                "particles_with_jump_count": float(event["particles_with_jump_count"]),
+                "exchange_interval_count": float(event["exchange_interval_count"]),
+                "persistence_mean": float(event["persistence_mean"]),
+                "exchange_mean": float(event["exchange_mean"]),
+                "jump_variance_from_event_clock": float(prediction["jump_variance_from_event_clock"]),
+                "diffusion_z": float(prediction["diffusion_z"]),
+                "max_tau_alpha_z": float(prediction["max_tau_alpha_z"]),
+                "late_ngp_z": float(prediction["late_ngp_z"]),
+                "chi4_peak_z": float(prediction["chi4_peak_z"]),
+                "fit_parameters_from_macro_observables": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "none" if pass_flag else "threshold_macro_signature_mismatch",
+                "robustness_stage": "event_clock_threshold_prediction_passed"
+                if pass_flag
+                else "event_clock_threshold_prediction_failed",
+            }
+            if pass_flag:
+                pending_pass_rows.append(row)
+        rows.append(row)
+
+    for row in pending_pass_rows:
+        row["stable_threshold_window_count"] = float(pass_count)
+    return rows
+
+
 def trajectory_curve_persistence_exchange_gate(
     *,
     bridge_row: dict[str, object],

@@ -159,6 +159,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_adapter_contract,
     trajectory_cage_jump_event_protocol,
     trajectory_event_clock_macro_prediction_protocol,
+    trajectory_event_clock_threshold_robustness_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_observable_curve_bridge,
@@ -4728,6 +4729,47 @@ def write_trajectory_event_clock_macro_predictions_csv(
             }
         )
     rows = [ready, mismatch]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_trajectory_event_clock_threshold_robustness_csv(path: Path) -> list[dict[str, float | str]]:
+    """Audit cage-jump threshold robustness for event-clock macro prediction."""
+
+    positions = np.array(
+        [
+            [[0.0], [0.0], [0.0]],
+            [[0.1], [0.0], [0.0]],
+            [[1.4], [0.0], [0.0]],
+            [[1.5], [1.2], [0.0]],
+            [[2.8], [1.3], [1.1]],
+        ],
+        dtype=float,
+    )
+    rows = trajectory_event_clock_threshold_robustness_protocol(
+        protocol_id="synthetic_event_clock_threshold_robustness",
+        positions=positions,
+        times=np.arange(5.0),
+        thresholds=[0.05, 0.9, 1.0, 1.35],
+        reference_threshold=1.0,
+        anchor_wave_number=0.8,
+        wave_numbers=[0.8, 1.1],
+        late_time=12.0,
+        time_grid=np.geomspace(0.05, 30.0, 800),
+        min_particles_with_jumps=2,
+        min_exchange_interval_count=1,
+        cage_variance=0.5,
+        cage_tau=0.2,
+    )
+    for row in rows:
+        row.update(
+            {
+                "benchmark_id": "synthetic_particle_cage_jump_events",
+                "target_protocol": "event_clock_threshold_robustness",
+                "real_benchmark_closed_loop_ready": 0.0,
+                "scope_note": "synthetic_threshold_robustness_canary_not_glassbench_claim",
+            }
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -9448,6 +9490,66 @@ def write_trajectory_event_clock_macro_predictions_svg(
     path.write_text(svg)
 
 
+def write_trajectory_event_clock_threshold_robustness_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1040, 450
+    left, top, right, bottom = 90, 86, 940, 330
+    thresholds = np.array([float(row["jump_displacement_threshold"]) for row in rows])
+    z_values = []
+    for row in rows:
+        if float(row["event_clock_ready"]) == 1.0:
+            z_values.append(
+                max(
+                    float(row["diffusion_z"]),
+                    float(row["max_tau_alpha_z"]),
+                    float(row["late_ngp_z"]),
+                    float(row["chi4_peak_z"]),
+                )
+            )
+        else:
+            z_values.append(2.5)
+    z = np.array(z_values)
+    zmax = max(3.0, float(np.max(z)))
+
+    def x(values: np.ndarray) -> np.ndarray:
+        return left + (values - np.min(thresholds)) * (right - left) / max(float(np.max(thresholds) - np.min(thresholds)), 1e-12)
+
+    def y(values: np.ndarray) -> np.ndarray:
+        return bottom - values * (bottom - top) / zmax
+
+    marks = []
+    for row, xx, yy, value in zip(rows, x(thresholds), y(z), z):
+        passed = float(row["threshold_prediction_pass"]) == 1.0
+        ready = float(row["event_clock_ready"]) == 1.0
+        color = "#2f855a" if passed else ("#c05621" if ready else "#718096")
+        marks.append(f'<circle cx="{xx:.1f}" cy="{yy:.1f}" r="6" fill="{color}" />')
+        marks.append(
+            f'<text x="{xx - 16:.1f}" y="{bottom + 24}" font-family="Arial, sans-serif" font-size="11">{float(row["jump_displacement_threshold"]):.2g}</text>'
+        )
+        marks.append(
+            f'<text x="{xx - 35:.1f}" y="{yy - 12:.1f}" font-family="Arial, sans-serif" font-size="10" fill="{color}">{row["primary_blocker"]}</text>'
+        )
+    threshold_y = y(np.array([2.0]))[0]
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Event-clock threshold robustness</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The same micro-to-macro prediction must pass across a stable cage-jump threshold window and fail outside it.</text>
+  <line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#222" />
+  <line x1="{left}" y1="{bottom}" x2="{left}" y2="{top}" stroke="#222" />
+  <line x1="{left}" y1="{threshold_y:.1f}" x2="{right}" y2="{threshold_y:.1f}" stroke="#718096" stroke-dasharray="5 4" />
+  <text x="{right - 48}" y="{threshold_y - 6:.1f}" font-family="Arial, sans-serif" font-size="11" fill="#718096">z=2</text>
+  {"".join(marks)}
+  <text x="{(left + right) / 2 - 80}" y="{bottom + 50}" font-family="Arial, sans-serif" font-size="13">jump displacement threshold</text>
+  <text x="38" y="255" font-family="Arial, sans-serif" font-size="13" transform="rotate(-90 38 255)">max signature z score</text>
+  <text x="90" y="405" font-family="Arial, sans-serif" font-size="11">stable threshold window count = {int(max(float(row["stable_threshold_window_count"]) for row in rows))}; thermodynamic claim allowed = 0</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_trajectory_uncertainty_protocol_svg(
     path: Path,
     rows: list[dict[str, float | str]],
@@ -10861,6 +10963,13 @@ def main() -> None:
     write_trajectory_event_clock_macro_predictions_svg(
         FIGURE_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.svg",
         trajectory_event_clock_macro_prediction_rows,
+    )
+    trajectory_event_clock_threshold_robustness_rows = write_trajectory_event_clock_threshold_robustness_csv(
+        DATA_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.csv"
+    )
+    write_trajectory_event_clock_threshold_robustness_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.svg",
+        trajectory_event_clock_threshold_robustness_rows,
     )
     write_trajectory_adapter_demo_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_demo.csv"

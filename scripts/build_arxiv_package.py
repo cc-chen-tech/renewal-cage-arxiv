@@ -5072,6 +5072,72 @@ def write_trajectory_event_clock_macro_predictions_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_event_clock_threshold_robustness_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Event-clock threshold robustness")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Micro-to-macro predictions must pass across a stable cage-jump threshold window and fail outside it.",
+    )
+    left, bottom = 78, 108
+    plot_w, plot_h = 640, 290
+    thresholds = np.array([float(row["jump_displacement_threshold"]) for row in rows])
+    z_values = []
+    for row in rows:
+        if float(row["event_clock_ready"]) == 1.0:
+            z_values.append(
+                max(
+                    float(row["diffusion_z"]),
+                    float(row["max_tau_alpha_z"]),
+                    float(row["late_ngp_z"]),
+                    float(row["chi4_peak_z"]),
+                )
+            )
+        else:
+            z_values.append(2.5)
+    z = np.array(z_values)
+    zmax = max(3.0, float(np.max(z)))
+
+    def sx(value: float) -> float:
+        return left + (value - float(np.min(thresholds))) * plot_w / max(float(np.max(thresholds) - np.min(thresholds)), 1e-12)
+
+    def sy(value: float) -> float:
+        return bottom + plot_h - value * plot_h / zmax
+
+    c.setStrokeColor(colors.black)
+    c.line(left, bottom, left + plot_w, bottom)
+    c.line(left, bottom, left, bottom + plot_h)
+    c.setStrokeColor(colors.HexColor("#718096"))
+    c.setDash(3, 3)
+    c.line(left, sy(2.0), left + plot_w, sy(2.0))
+    c.setDash()
+    c.setFont("Helvetica", 7)
+    c.setFillColor(colors.HexColor("#718096"))
+    c.drawString(left + plot_w - 26, sy(2.0) + 4, "z=2")
+    for row, value in zip(rows, z):
+        passed = float(row["threshold_prediction_pass"]) == 1.0
+        ready = float(row["event_clock_ready"]) == 1.0
+        color = colors.HexColor("#2f855a" if passed else ("#c05621" if ready else "#718096"))
+        x0 = sx(float(row["jump_displacement_threshold"]))
+        y0 = sy(float(value))
+        c.setFillColor(color)
+        c.circle(x0, y0, 4, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.drawString(x0 - 8, bottom - 18, f"{float(row['jump_displacement_threshold']):.2g}")
+    c.setFillColor(colors.black)
+    c.drawString(left, 70, f"stable threshold window count={int(max(float(row['stable_threshold_window_count']) for row in rows))}")
+    c.drawString(left, 56, "thermodynamic_claim_allowed=0; real_benchmark_closed_loop_ready=0")
+    c.showPage()
+    c.save()
+
+
 def write_trajectory_uncertainty_protocol_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5466,6 +5532,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     trajectory_event_clock_macro_predictions_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
     )
+    trajectory_event_clock_threshold_robustness_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_trajectory_event_clock_threshold_robustness.pdf"
+    )
     trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
     trajectory_member_ensemble_uncertainty_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.pdf"
@@ -5597,6 +5666,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
     write_trajectory_cage_jump_events_pdf(trajectory_cage_jump_events_pdf)
     write_trajectory_event_clock_macro_predictions_pdf(trajectory_event_clock_macro_predictions_pdf)
+    write_trajectory_event_clock_threshold_robustness_pdf(trajectory_event_clock_threshold_robustness_pdf)
     write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
     write_trajectory_member_ensemble_uncertainty_pdf(trajectory_member_ensemble_uncertainty_pdf)
     write_trajectory_inversion_readiness_pdf(trajectory_inversion_readiness_pdf)
@@ -5812,6 +5882,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             trajectory_event_clock_macro_predictions_pdf,
             "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
+        )
+        archive.write(
+            trajectory_event_clock_threshold_robustness_pdf,
+            "figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf",
         )
         archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
         archive.write(

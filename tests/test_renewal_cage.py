@@ -176,6 +176,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_inversion_readiness_gate,
     trajectory_cage_jump_event_protocol,
     trajectory_event_clock_macro_prediction_protocol,
+    trajectory_event_clock_threshold_robustness_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_table_csv_adapter,
@@ -5701,6 +5702,50 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertLess(float(row["chi4_peak_z"]), 1.0)
         self.assertEqual(row["primary_blocker"], "none")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_trajectory_event_clock_threshold_robustness_detects_stable_window(self):
+        positions = np.array(
+            [
+                [[0.0], [0.0], [0.0]],
+                [[0.1], [0.0], [0.0]],
+                [[1.4], [0.0], [0.0]],
+                [[1.5], [1.2], [0.0]],
+                [[2.8], [1.3], [1.1]],
+            ],
+            dtype=float,
+        )
+        times = np.arange(5.0)
+        rows = trajectory_event_clock_threshold_robustness_protocol(
+            protocol_id="synthetic_event_clock_threshold_robustness",
+            positions=positions,
+            times=times,
+            thresholds=[0.05, 0.9, 1.0, 1.35],
+            reference_threshold=1.0,
+            anchor_wave_number=0.8,
+            wave_numbers=[0.8, 1.1],
+            late_time=12.0,
+            time_grid=np.geomspace(0.05, 30.0, 800),
+            min_particles_with_jumps=2,
+            min_exchange_interval_count=1,
+            cage_variance=0.5,
+            cage_tau=0.2,
+        )
+
+        by_threshold = {float(row["jump_displacement_threshold"]): row for row in rows}
+        self.assertEqual(by_threshold[1.0]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertEqual(by_threshold[0.9]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertEqual(float(by_threshold[1.0]["threshold_prediction_pass"]), 1.0)
+        self.assertEqual(float(by_threshold[0.9]["threshold_prediction_pass"]), 1.0)
+        self.assertGreaterEqual(float(by_threshold[1.0]["stable_threshold_window_count"]), 2.0)
+
+        self.assertEqual(by_threshold[0.05]["robustness_stage"], "event_clock_threshold_prediction_failed")
+        self.assertEqual(float(by_threshold[0.05]["threshold_prediction_pass"]), 0.0)
+        self.assertEqual(by_threshold[0.05]["primary_blocker"], "threshold_macro_signature_mismatch")
+        self.assertEqual(by_threshold[1.35]["robustness_stage"], "event_clock_threshold_event_clock_incomplete")
+        self.assertEqual(by_threshold[1.35]["primary_blocker"], "jump_displacement_threshold")
+        for row in rows:
+            self.assertEqual(float(row["fit_parameters_from_macro_observables"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_trajectory_observable_protocol_validates_inputs(self):
         with self.assertRaises(ValueError):

@@ -1673,6 +1673,24 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(mismatch["micro_to_macro_predictions_pass"]), 0.0)
         self.assertEqual(mismatch["primary_blocker"], "heldout_macro_signature_mismatch")
 
+    def test_trajectory_event_clock_threshold_robustness_records_stable_window(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_event_clock_threshold_robustness.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_threshold = {float(row["jump_displacement_threshold"]): row for row in rows}
+        self.assertEqual(by_threshold[1.0]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertEqual(by_threshold[0.9]["robustness_stage"], "event_clock_threshold_prediction_passed")
+        self.assertGreaterEqual(float(by_threshold[1.0]["stable_threshold_window_count"]), 2.0)
+        self.assertEqual(float(by_threshold[1.0]["fit_parameters_from_macro_observables"]), 0.0)
+        self.assertEqual(float(by_threshold[1.0]["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(by_threshold[0.05]["robustness_stage"], "event_clock_threshold_prediction_failed")
+        self.assertEqual(by_threshold[0.05]["primary_blocker"], "threshold_macro_signature_mismatch")
+        self.assertEqual(by_threshold[1.35]["robustness_stage"], "event_clock_threshold_event_clock_incomplete")
+        self.assertEqual(by_threshold[1.35]["primary_blocker"], "jump_displacement_threshold")
+
     def test_trajectory_adapter_demo_exports_observables_from_local_table(self):
         path = ROOT / "data" / "renewal_cage_trajectory_adapter_demo.csv"
         self.assertTrue(path.exists())
@@ -1973,6 +1991,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_cage_jump_events.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_inversion_readiness.pdf", names)
@@ -2139,6 +2158,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_trajectory_observable_protocol.pdf",
             "figures/renewal_cage_trajectory_cage_jump_events.pdf",
             "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
+            "figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",
             "figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf",
             "figures/renewal_cage_trajectory_inversion_readiness.pdf",
@@ -2336,6 +2356,9 @@ class ArxivPackageTests(unittest.TestCase):
             ).read_bytes()
             first_trajectory_event_clock_macro_predictions = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
+            ).read_bytes()
+            first_trajectory_event_clock_threshold_robustness = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_threshold_robustness.pdf"
             ).read_bytes()
             first_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
@@ -2544,6 +2567,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_trajectory_event_clock_macro_predictions = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_macro_predictions.pdf"
             ).read_bytes()
+            second_trajectory_event_clock_threshold_robustness = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_event_clock_threshold_robustness.pdf"
+            ).read_bytes()
             second_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
             ).read_bytes()
@@ -2684,6 +2710,10 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(
             first_trajectory_event_clock_macro_predictions,
             second_trajectory_event_clock_macro_predictions,
+        )
+        self.assertEqual(
+            first_trajectory_event_clock_threshold_robustness,
+            second_trajectory_event_clock_threshold_robustness,
         )
         self.assertEqual(first_trajectory_uncertainty_protocol, second_trajectory_uncertainty_protocol)
         self.assertEqual(
