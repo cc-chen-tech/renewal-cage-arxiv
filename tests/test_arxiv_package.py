@@ -1398,6 +1398,33 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("tc40", ka2d_023["observed_time_codes"])
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_interval_censored_first_crossing_clock_quantifies_candidate(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["interval_clock_stage"],
+            "interval_censored_persistence_clock_candidate",
+        )
+        self.assertEqual(float(ka2d_023["interval_clock_candidate_ready"]), 1.0)
+        self.assertAlmostEqual(float(ka2d_023["crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(ka2d_023["right_censored_fraction"]), 0.759922480620155)
+        self.assertAlmostEqual(float(ka2d_023["mean_first_crossing_lower_bound"]), 130241.55354213755)
+        self.assertAlmostEqual(float(ka2d_023["mean_first_crossing_upper_bound"]), 1370127.2559589928)
+        self.assertAlmostEqual(float(ka2d_023["mean_first_crossing_midpoint"]), 750184.4047505651)
+        self.assertGreater(float(ka2d_023["mean_interval_width"]), 1.0e6)
+        self.assertIn("tc40:142587", ka2d_023["first_crossing_intervals"])
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "interval_censoring_and_replica_identity")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2423,6 +2450,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2614,6 +2642,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf",
             "figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf",
+            "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

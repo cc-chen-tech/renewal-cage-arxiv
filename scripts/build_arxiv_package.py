@@ -4213,6 +4213,77 @@ def write_sota_glassbench_sparse_lag_event_clock_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_interval_censored_first_crossing_clock_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench interval-censored first-crossing clock")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Sparse-lag crossings are converted into lower/upper clock bounds, not a full persistence/exchange inversion.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "interval_censored_persistence_clock_candidate": colors.HexColor("#2b6cb0"),
+        "interval_clock_crossing_distribution_missing": colors.HexColor("#c05621"),
+        "interval_clock_sparse_lag_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "interval-clock stage")
+    c.drawString(left + 395, top + 24, "first-crossing clock bounds")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["interval_clock_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; crossed={:.3g}; right-censored={:.3g}; ready={}".format(
+                row["structure_id"],
+                float(row["crossed_fraction"]),
+                float(row["right_censored_fraction"]),
+                int(float(row["interval_clock_candidate_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "mean interval=[{:.3g}, {:.3g}], midpoint={:.3g}, width={:.3g}".format(
+                float(row["mean_first_crossing_lower_bound"]),
+                float(row["mean_first_crossing_upper_bound"]),
+                float(row["mean_first_crossing_midpoint"]),
+                float(row["mean_interval_width"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:34]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The result is a quantitative persistence-clock bound with right censoring and interval censoring explicitly retained.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6494,6 +6565,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_sparse_lag_event_clock_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf"
     )
+    sota_glassbench_interval_censored_first_crossing_clock_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6682,6 +6756,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_sparse_lag_event_clock_pdf(
         sota_glassbench_sparse_lag_event_clock_pdf
+    )
+    write_sota_glassbench_interval_censored_first_crossing_clock_pdf(
+        sota_glassbench_interval_censored_first_crossing_clock_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -6916,6 +6993,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_sparse_lag_event_clock_pdf,
             "figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf",
+        )
+        archive.write(
+            sota_glassbench_interval_censored_first_crossing_clock_pdf,
+            "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

@@ -143,6 +143,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_alpha_transport_coupling_audit,
     glassbench_direct_alpha_pe_feasibility_bound,
     glassbench_sparse_lag_event_clock_audit,
+    glassbench_interval_censored_first_crossing_clock,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -883,6 +884,83 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["primary_blocker"], "replica_identity_alignment")
         self.assertEqual(row["event_clock_resolution"], "sparse_lag_interval")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_interval_censored_first_crossing_clock_quantifies_sparse_candidate(self):
+        sparse_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "coarse_event_clock_candidate_ready": 1.0,
+                "event_clock_resolution": "sparse_lag_interval",
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "lag_times": "0.1;1.1;11.64;122.47;1288.41;13554.0;142587.0;1500000.0",
+                "time_codes": "tc05;tc10;tc15;tc20;tc25;tc30;tc35;tc40",
+                "ever_crossed_fraction": 0.24007751937984495,
+                "never_crossed_fraction": 0.759922480620155,
+                "first_crossing_fractions_by_time_code": "tc25:3.875968992248062e-05;tc30:0.001434108527131783;tc35:0.02135658914728682;tc40:0.21724806201550387",
+            }
+        ]
+
+        row = glassbench_interval_censored_first_crossing_clock(
+            audit_id="glassbench_interval_censored_first_crossing_clock",
+            sparse_lag_rows=sparse_rows,
+            crossing_rows=crossing_rows,
+        )[0]
+
+        self.assertEqual(row["interval_clock_stage"], "interval_censored_persistence_clock_candidate")
+        self.assertEqual(float(row["interval_clock_candidate_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["crossed_fraction"]), 0.24007751937984495)
+        self.assertAlmostEqual(float(row["right_censored_fraction"]), 0.759922480620155)
+        self.assertAlmostEqual(float(row["mean_first_crossing_lower_bound"]), 130241.55354213755)
+        self.assertAlmostEqual(float(row["mean_first_crossing_upper_bound"]), 1370127.2559589928)
+        self.assertAlmostEqual(float(row["mean_first_crossing_midpoint"]), 750184.4047505651)
+        self.assertGreater(float(row["mean_interval_width"]), 1.0e6)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "interval_censoring_and_replica_identity")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_interval_censored_first_crossing_clock_blocks_missing_lag_distribution(self):
+        sparse_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "coarse_event_clock_candidate_ready": 0.0,
+                "event_clock_resolution": "none",
+            }
+        ]
+        crossing_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "structure_id": "3",
+                "lag_times": "none",
+                "time_codes": "none",
+                "ever_crossed_fraction": 0.0,
+                "never_crossed_fraction": 0.0,
+                "first_crossing_fractions_by_time_code": "none",
+            }
+        ]
+
+        row = glassbench_interval_censored_first_crossing_clock(
+            audit_id="glassbench_interval_censored_first_crossing_clock",
+            sparse_lag_rows=sparse_rows,
+            crossing_rows=crossing_rows,
+        )[0]
+
+        self.assertEqual(row["interval_clock_stage"], "interval_clock_sparse_lag_upstream_incomplete")
+        self.assertEqual(float(row["interval_clock_candidate_ready"]), 0.0)
+        self.assertEqual(float(row["latest_lag_time"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "sparse_lag_event_clock")
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

@@ -65,6 +65,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_multilag_particle_cache_targets,
     glassbench_sparse_lag_event_clock_audit,
+    glassbench_interval_censored_first_crossing_clock,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4407,6 +4408,23 @@ def write_sota_glassbench_sparse_lag_event_clock_csv(
         contract_rows=contract_rows,
         required_time_codes=("tc05", "tc10", "tc15", "tc20", "tc25", "tc30", "tc35", "tc40"),
         max_initial_mismatch_tolerance=1e-10,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_interval_censored_first_crossing_clock_csv(
+    path: Path,
+    *,
+    sparse_lag_rows: list[dict[str, float | str]],
+    crossing_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Estimate interval-censored first-crossing clock bounds from sparse lag crossings."""
+
+    rows = glassbench_interval_censored_first_crossing_clock(
+        audit_id="glassbench_ka2d_interval_censored_first_crossing_clock",
+        sparse_lag_rows=sparse_lag_rows,
+        crossing_rows=crossing_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9275,6 +9293,64 @@ def write_sota_glassbench_sparse_lag_event_clock_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_interval_censored_first_crossing_clock_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 395
+    left, top = 75, 125
+    row_h = 108
+    colors = {
+        "interval_censored_persistence_clock_candidate": "#2b6cb0",
+        "interval_clock_crossing_distribution_missing": "#c05621",
+        "interval_clock_sparse_lag_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["interval_clock_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        crossed = float(row["crossed_fraction"])
+        censored = float(row["right_censored_fraction"])
+        lower = float(row["mean_first_crossing_lower_bound"])
+        upper = float(row["mean_first_crossing_upper_bound"])
+        midpoint = float(row["mean_first_crossing_midpoint"])
+        width_value = float(row["mean_interval_width"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; crossed={crossed:.3g}; right-censored={censored:.3g}; ready={int(float(row["interval_clock_candidate_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">mean first crossing interval: [{lower:.3g}, {upper:.3g}], midpoint={midpoint:.3g}, width={width_value:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">interval bins={str(row["first_crossing_intervals"])[:90]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:50]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench interval-censored first-crossing clock</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Sparse-lag threshold crossings are converted into lower/upper persistence-clock bounds without claiming a full PE inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">interval-clock stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">first-crossing bounds</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -12159,6 +12235,17 @@ def main() -> None:
     write_sota_glassbench_sparse_lag_event_clock_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_sparse_lag_event_clock.svg",
         glassbench_sparse_lag_event_clock_rows,
+    )
+    glassbench_interval_censored_first_crossing_clock_rows = (
+        write_sota_glassbench_interval_censored_first_crossing_clock_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv",
+            sparse_lag_rows=glassbench_sparse_lag_event_clock_rows,
+            crossing_rows=glassbench_direct_alpha_multilag_crossing_canary_rows,
+        )
+    )
+    write_sota_glassbench_interval_censored_first_crossing_clock_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg",
+        glassbench_interval_censored_first_crossing_clock_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

@@ -6974,6 +6974,133 @@ def glassbench_sparse_lag_event_clock_audit(
     return out
 
 
+def glassbench_interval_censored_first_crossing_clock(
+    *,
+    audit_id: str,
+    sparse_lag_rows: Sequence[dict[str, object]],
+    crossing_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Convert sparse-lag threshold crossings into interval-censored clock bounds."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not sparse_lag_rows:
+        raise ValueError("sparse_lag_rows must be nonempty")
+    if not crossing_rows:
+        raise ValueError("crossing_rows must be nonempty")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_first_crossing_terms(text: str) -> dict[str, float]:
+        if not text or text == "none":
+            return {}
+        out: dict[str, float] = {}
+        for term in text.split(";"):
+            if not term:
+                continue
+            if ":" not in term:
+                raise ValueError("first-crossing terms must use code:fraction format")
+            code, value = term.split(":", 1)
+            out[str(code)] = float(value)
+        return out
+
+    def parse_semicolon_floats(text: str) -> list[float]:
+        if not text or text == "none":
+            return []
+        return [float(value) for value in text.split(";") if value and value != "none"]
+
+    def parse_semicolon_text(text: str) -> list[str]:
+        if not text or text == "none":
+            return []
+        return [value for value in text.split(";") if value and value != "none"]
+
+    crossing_by_key = {key_for(row): row for row in crossing_rows}
+    rows: list[dict[str, float | str]] = []
+    for sparse in sorted(sparse_lag_rows, key=key_for):
+        key = key_for(sparse)
+        system_id, temperature, structure_id = key
+        crossing = crossing_by_key.get(key, {})
+        candidate_ready = float(sparse.get("coarse_event_clock_candidate_ready", 0.0) or 0.0) == 1.0
+        time_codes = parse_semicolon_text(str(crossing.get("time_codes", "")))
+        lag_times = parse_semicolon_floats(str(crossing.get("lag_times", "")))
+        fractions = parse_first_crossing_terms(str(crossing.get("first_crossing_fractions_by_time_code", "none")))
+        paired = len(time_codes) == len(lag_times) and len(time_codes) > 0
+        lag_by_code = dict(zip(time_codes, lag_times)) if paired else {}
+        crossed_fraction = float(crossing.get("ever_crossed_fraction", 0.0) or 0.0)
+        right_censored = float(crossing.get("never_crossed_fraction", 0.0) or 0.0)
+
+        lower_weighted = 0.0
+        upper_weighted = 0.0
+        midpoint_weighted = 0.0
+        width_weighted = 0.0
+        fraction_sum = 0.0
+        first_interval_terms: list[str] = []
+        for code in time_codes:
+            fraction = float(fractions.get(code, 0.0))
+            if fraction <= 0.0:
+                continue
+            idx = time_codes.index(code)
+            lower = 0.0 if idx == 0 else float(lag_by_code[time_codes[idx - 1]])
+            upper = float(lag_by_code[code])
+            midpoint = 0.5 * (lower + upper)
+            width = upper - lower
+            fraction_sum += fraction
+            lower_weighted += fraction * lower
+            upper_weighted += fraction * upper
+            midpoint_weighted += fraction * midpoint
+            width_weighted += fraction * width
+            first_interval_terms.append(f"{code}:{lower:.17g}:{upper:.17g}:{fraction:.17g}")
+
+        interval_ready = bool(candidate_ready and paired and fraction_sum > 0.0)
+        if interval_ready:
+            stage = "interval_censored_persistence_clock_candidate"
+            blocker = "interval_censoring_and_replica_identity"
+            next_action = "fit_interval_censored_persistence_distribution_and_verify_replica_identity"
+        elif candidate_ready:
+            stage = "interval_clock_crossing_distribution_missing"
+            blocker = "first_crossing_distribution"
+            next_action = "compute_first_crossing_fractions_by_time_code"
+        else:
+            stage = "interval_clock_sparse_lag_upstream_incomplete"
+            blocker = "sparse_lag_event_clock"
+            next_action = "complete_sparse_lag_event_clock_audit"
+
+        denom = fraction_sum if fraction_sum > 0.0 else 1.0
+        rows.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "time_codes": ";".join(time_codes) if time_codes else "none",
+                "lag_times": ";".join(f"{value:.17g}" for value in lag_times) if lag_times else "none",
+                "first_crossing_intervals": ";".join(first_interval_terms) if first_interval_terms else "none",
+                "coarse_event_clock_candidate_ready": float(candidate_ready),
+                "interval_clock_candidate_ready": float(interval_ready),
+                "crossed_fraction": float(crossed_fraction),
+                "first_crossing_fraction_sum": float(fraction_sum),
+                "right_censored_fraction": float(right_censored),
+                "mean_first_crossing_lower_bound": float(lower_weighted / denom),
+                "mean_first_crossing_upper_bound": float(upper_weighted / denom),
+                "mean_first_crossing_midpoint": float(midpoint_weighted / denom),
+                "mean_interval_width": float(width_weighted / denom),
+                "latest_lag_time": float(max(lag_times) if lag_times else 0.0),
+                "event_clock_resolution": str(sparse.get("event_clock_resolution", "none")),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "interval_clock_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
