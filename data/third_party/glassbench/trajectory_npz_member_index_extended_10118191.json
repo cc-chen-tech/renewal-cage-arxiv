@@ -1,0 +1,309 @@
+{
+  "archive_url": "https://zenodo.org/api/records/10118191/files/GlassBench.zip/content",
+  "compressed_probe_bytes": 12582912,
+  "entries": [
+    {
+      "compressed_probe_bytes": 12582912,
+      "compressed_probe_md5": "2c0a9f93961f80a01aff63dc69bb7b15",
+      "compressed_probe_range_end": 2993185166,
+      "compressed_probe_range_start": 2980602255,
+      "npz_member_count_in_probe": 55,
+      "npz_members": [
+        {
+          "name": "T0.23/.npz",
+          "size_bytes": 554
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_202_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_228_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_299_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_299_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc15.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc20.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc25.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc30.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc35.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_151_tc40.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_152_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_152_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_152_tc15.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_152_tc20.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_152_tc25.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_152_tc30.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_152_tc40.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_153_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_153_tc15.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_153_tc20.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_153_tc25.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_153_tc30.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_153_tc35.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_153_tc40.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc15.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc20.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc25.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc30.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc35.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_154_tc40.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_155_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_155_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_155_tc25.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_155_tc30.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_155_tc35.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_155_tc40.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_156_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_156_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_156_tc20.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_156_tc25.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_156_tc30.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_156_tc35.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_156_tc40.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_157_tc05.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_157_tc10.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_157_tc15.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_157_tc20.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_157_tc25.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_157_tc35.npz",
+          "size_bytes": 465710
+        },
+        {
+          "name": "T0.23/test/N1290T0.23_157_tc40.npz",
+          "size_bytes": 465710
+        }
+      ],
+      "path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+      "required_member_count": 8,
+      "required_members": [
+        "T0.23/test/N1290T0.23_151_tc05.npz",
+        "T0.23/test/N1290T0.23_151_tc10.npz",
+        "T0.23/test/N1290T0.23_151_tc15.npz",
+        "T0.23/test/N1290T0.23_151_tc20.npz",
+        "T0.23/test/N1290T0.23_151_tc25.npz",
+        "T0.23/test/N1290T0.23_151_tc30.npz",
+        "T0.23/test/N1290T0.23_151_tc35.npz",
+        "T0.23/test/N1290T0.23_151_tc40.npz"
+      ],
+      "required_members_visible": true,
+      "system_id": "KA2D",
+      "tar_probe_bytes": 25165824,
+      "temperature": "0.23",
+      "xz_prefix_bytes": 12579072
+    },
+    {
+      "compressed_probe_bytes": 8388608,
+      "compressed_probe_md5": "45c2227b84dafabac50db441d5361daf",
+      "compressed_probe_range_end": 8852782,
+      "compressed_probe_range_start": 464175,
+      "member_index_complete_for_probe": true,
+      "npz_member_count_in_probe": 10,
+      "npz_members": [
+        {
+          "name": "T0.30/train/N1290T0.30_3_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_10_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_19_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_28_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_30_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_32_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_61_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_73_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_82_tc01.npz",
+          "size_bytes": 444786
+        },
+        {
+          "name": "T0.30/train/N1290T0.30_85_tc01.npz",
+          "size_bytes": 444786
+        }
+      ],
+      "path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+      "system_id": "KA2D",
+      "tar_probe_bytes": 4194304,
+      "temperature": "0.30",
+      "xz_prefix_bytes": 8386048
+    }
+  ],
+  "source": "bounded 12MB compressed-prefix probe for structure-matched KA2D T0.23 multi-lag cache extraction",
+  "tar_probe_limit_bytes": 25165824
+}

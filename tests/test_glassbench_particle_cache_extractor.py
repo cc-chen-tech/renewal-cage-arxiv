@@ -177,6 +177,56 @@ class GlassBenchParticleCacheExtractorTests(unittest.TestCase):
             self.assertEqual(by_code["tc10"]["primary_blocker"], "member_not_in_bounded_prefix_index")
             self.assertTrue(output_manifest.exists())
 
+    def test_build_real_multilag_particle_caches_can_extract_required_members_beyond_index(self):
+        xz_bytes, md5s = self._multi_member_fixture_xz_bytes()
+        deflater = zlib.compressobj(wbits=-15)
+        payload = deflater.compress(xz_bytes) + deflater.flush()
+        visible_member = "T0.99/test/N1290T0.99_151_tc05.npz"
+        deeper_member = "T0.99/test/N1290T0.99_151_tc10.npz"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            target_csv = root / "targets.csv"
+            target_csv.write_text(
+                "target_id,system_id,temperature,source_path,selected_structure_id,"
+                "selected_time_codes,target_members,target_member_md5s,target_lag_times\n"
+                "fixture,KA2D,0.99,GlassBench/fixture.tar.xz,151,"
+                f"tc05;tc10,{visible_member};{deeper_member},"
+                f"{md5s[visible_member]};{md5s[deeper_member]},0.1;1.1\n"
+            )
+            member_index = root / "member_index.json"
+            member_index.write_text(
+                """{
+  "archive_url": "https://example.invalid/archive.zip",
+  "entries": [
+    {
+      "path": "GlassBench/fixture.tar.xz",
+      "compressed_probe_range_start": 10,
+      "compressed_probe_range_end": 20,
+      "compressed_probe_bytes": 11,
+      "required_members": [
+        "T0.99/test/N1290T0.99_151_tc05.npz",
+        "T0.99/test/N1290T0.99_151_tc10.npz"
+      ],
+      "npz_members": [{"name": "T0.99/test/N1290T0.99_151_tc05.npz", "size_bytes": 1}]
+    }
+  ]
+}"""
+            )
+
+            rows = build_real_multilag_particle_caches(
+                target_csv=target_csv,
+                member_index_manifest_path=member_index,
+                output_manifest_path=root / "manifest.csv",
+                output_root=root,
+                range_fetcher=lambda url, start, end: payload,
+            )
+
+            by_code = {row["time_code"]: row for row in rows}
+            self.assertEqual(by_code["tc10"]["cache_stage"], "multi_lag_particle_coordinate_cache_written")
+            self.assertEqual(float(by_code["tc10"]["member_in_bounded_prefix_index"]), 1.0)
+            self.assertEqual(float(by_code["tc10"]["particle_resolved_positions_cached"]), 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

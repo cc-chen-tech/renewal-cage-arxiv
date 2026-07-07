@@ -1297,12 +1297,13 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_023["selected_structure_id"], "151")
         self.assertEqual(float(ka2d_023["official_multi_lag_ladder_ready"]), 1.0)
         self.assertEqual(float(ka2d_023["target_member_count"]), 8.0)
-        self.assertEqual(float(ka2d_023["cached_target_member_count"]), 5.0)
+        self.assertEqual(float(ka2d_023["cached_target_member_count"]), 8.0)
+        self.assertEqual(float(ka2d_023["missing_target_member_count"]), 0.0)
         self.assertIn("T0.23/test/N1290T0.23_151_tc40.npz", ka2d_023["target_members"])
         self.assertIn("5160feded6ec1a1f366a6e55a7d33f70", ka2d_023["target_member_md5s"])
-        self.assertEqual(float(ka2d_023["particle_lag_ladder_cache_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["particle_lag_ladder_cache_ready"]), 1.0)
         self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
-        self.assertEqual(ka2d_023["primary_blocker"], "multi_lag_particle_cache_missing")
+        self.assertEqual(ka2d_023["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
 
         ka2d_030 = by_key[("KA2D", "0.30")]
         self.assertEqual(float(ka2d_030["official_multi_lag_ladder_ready"]), 0.0)
@@ -1322,18 +1323,13 @@ class ArxivPackageTests(unittest.TestCase):
         ]
         self.assertEqual(len(cold_rows), 8)
         by_code = {row["time_code"]: row for row in cold_rows}
-        for code in ["tc05", "tc10", "tc15", "tc20", "tc25"]:
+        for code in ["tc05", "tc10", "tc15", "tc20", "tc25", "tc30", "tc35", "tc40"]:
             row = by_code[code]
             self.assertEqual(float(row["member_in_bounded_prefix_index"]), 1.0)
             self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
             self.assertEqual(row["cache_stage"], "multi_lag_particle_coordinate_cache_written")
             self.assertTrue((ROOT / row["particle_cache_path"]).exists())
             self.assertEqual(row["positions_shape"], "20x1290x2")
-        for code in ["tc30", "tc35", "tc40"]:
-            row = by_code[code]
-            self.assertEqual(float(row["member_in_bounded_prefix_index"]), 0.0)
-            self.assertEqual(float(row["particle_resolved_positions_cached"]), 0.0)
-            self.assertEqual(row["primary_blocker"], "member_not_in_bounded_prefix_index")
 
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"

@@ -180,6 +180,11 @@ def build_real_multilag_particle_caches(
             for member in index.get("npz_members", [])
             if isinstance(member, dict)
         }
+        indexed_members.update(
+            str(member)
+            for member in index.get("required_members", [])
+            if str(member) and str(member) != "none"
+        )
         start = int(index.get("compressed_probe_range_start", 0) or 0)
         end = int(index.get("compressed_probe_range_end", -1) or -1)
 
@@ -271,7 +276,7 @@ def fetch_range_bytes(url: str, start: int, end: int) -> bytes:
 def write_cache_manifest(rows: list[dict[str, float | str]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
