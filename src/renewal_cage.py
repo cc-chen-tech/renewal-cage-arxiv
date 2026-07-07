@@ -6177,6 +6177,111 @@ def glassbench_first_npz_particle_cache_contract_gate(
     return out
 
 
+def glassbench_cached_particle_timecode_bridge(
+    *,
+    bridge_id: str,
+    cache_rows: Sequence[dict[str, object]],
+    semantics_manifest: dict[str, object],
+) -> list[dict[str, float | str]]:
+    """Attach official KA2D lag-time semantics to cached first-NPZ coordinates."""
+
+    if not bridge_id:
+        raise ValueError("bridge_id must be nonempty")
+    if not cache_rows:
+        raise ValueError("cache_rows must be nonempty")
+    entries = semantics_manifest.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("semantics_manifest entries must be nonempty")
+
+    member_lookup: dict[tuple[str, str, str], dict[str, object]] = {}
+    tau_lookup: dict[tuple[str, str], float] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        tau_lookup[(system_id, temperature)] = float(entry.get("tau_alpha", 0.0) or 0.0)
+        for member in entry.get("members", []):
+            if isinstance(member, dict):
+                member_lookup[(system_id, temperature, str(member.get("member", "none")))] = member
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        cache_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        first_npz_member = str(row.get("first_npz_member", "none"))
+        key = (system_id, temperature, first_npz_member)
+        semantics = member_lookup.get(key, {})
+
+        cached = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
+        md5_matches = (
+            bool(semantics)
+            and str(row.get("npz_member_md5", "none")) == str(semantics.get("member_md5", "none"))
+        )
+        lag_time = float(semantics.get("lag_time", 0.0) or 0.0) if semantics else 0.0
+        tau_alpha = tau_lookup.get((system_id, temperature), 0.0)
+        lag_time_over_tau_alpha = (
+            float(semantics.get("lag_time_over_tau_alpha", 0.0) or 0.0)
+            if semantics
+            else 0.0
+        )
+        axis0_semantics = str(semantics.get("axis0_semantics", "none")) if semantics else "none"
+        axis0_replica = axis0_semantics == "isoconfigurational_trajectory_replicates"
+        physical_lag_ready = cached and md5_matches and lag_time > 0.0
+        frame_axis_is_time = False
+        event_clock_ready = physical_lag_ready and frame_axis_is_time
+
+        if event_clock_ready:
+            stage = "cached_particle_event_clock_ready"
+            blocker = "none"
+            next_action = "run_particle_event_clock_threshold_sweep"
+        elif physical_lag_ready and axis0_replica:
+            stage = "cached_particle_lag_time_ready_event_clock_blocked"
+            blocker = "frame_axis_is_isoconfigurational_replicates"
+            next_action = "extract_multi_lag_particle_cache_or_true_trajectory"
+        elif physical_lag_ready:
+            stage = "cached_particle_lag_time_ready_frame_axis_unknown"
+            blocker = "frame_axis_time_semantics"
+            next_action = "verify_cached_particle_axis_semantics"
+        else:
+            stage = "cached_particle_timecode_semantics_incomplete"
+            blocker = "timecode_member_identity" if cached else "particle_coordinate_cache"
+            next_action = "match_cached_npz_member_to_official_timecode_semantics"
+
+        out.append(
+            {
+                "bridge_id": bridge_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "particle_cache_path": str(row.get("particle_cache_path", "none")),
+                "first_npz_member": first_npz_member,
+                "npz_member_md5": str(row.get("npz_member_md5", "none")),
+                "time_code": str(semantics.get("time_code", "none")) if semantics else "none",
+                "lag_time": float(lag_time),
+                "tau_alpha": float(tau_alpha),
+                "lag_time_over_tau_alpha": float(lag_time_over_tau_alpha),
+                "positions_shape": str(row.get("positions_shape", "none")),
+                "axis0_semantics": axis0_semantics,
+                "replica_count": float(semantics.get("replica_count", 0.0) or 0.0) if semantics else 0.0,
+                "particle_resolved_positions_cached": float(cached),
+                "npz_identity_matches_timecode_semantics": float(md5_matches),
+                "physical_lag_time_ready": float(physical_lag_ready),
+                "axis0_is_isoconfigurational_replica": float(axis0_replica),
+                "frame_axis_is_physical_time": 0.0,
+                "event_clock_trajectory_ready": float(event_clock_ready),
+                "threshold_sweep_event_clock_ready": float(event_clock_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "timecode_bridge_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_microdynamic_closed_loop_audit(
     *,
     audit_id: str,

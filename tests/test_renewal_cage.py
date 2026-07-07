@@ -136,6 +136,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
+    glassbench_cached_particle_timecode_bridge,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -675,6 +676,56 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
         self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 1.0)
         self.assertEqual(row["primary_blocker"], "none")
+
+    def test_glassbench_cached_particle_timecode_bridge_attaches_lag_without_time_axis(self):
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "particle_cache_path": "data/third_party/glassbench/particle_cache/cache.npz",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "npz_member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+                "positions_shape": "20x1290x2",
+                "particle_resolved_positions_cached": 1.0,
+            }
+        ]
+        semantics_manifest = {
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "tau_alpha": 918305.0,
+                    "members": [
+                        {
+                            "member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                            "member_md5": "26b4b9af10138fbd04a840fe8275de8e",
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "lag_time_over_tau_alpha": 1.0889616315258749e-07,
+                            "axis0_semantics": "isoconfigurational_trajectory_replicates",
+                            "replica_count": 20,
+                            "positions_shape": [20, 1290, 2],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        row = glassbench_cached_particle_timecode_bridge(
+            bridge_id="glassbench_cached_particle_timecode_bridge",
+            cache_rows=cache_rows,
+            semantics_manifest=semantics_manifest,
+        )[0]
+
+        self.assertEqual(row["timecode_bridge_stage"], "cached_particle_lag_time_ready_event_clock_blocked")
+        self.assertEqual(float(row["particle_resolved_positions_cached"]), 1.0)
+        self.assertEqual(float(row["physical_lag_time_ready"]), 1.0)
+        self.assertEqual(float(row["frame_axis_is_physical_time"]), 0.0)
+        self.assertEqual(float(row["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+        self.assertEqual(row["next_required_action"], "extract_multi_lag_particle_cache_or_true_trajectory")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
         claim_rows = [

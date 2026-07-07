@@ -1541,8 +1541,13 @@ member-ensemble observables. The companion first-NPZ particle-cache manifest
 uses bounded HTTP range reads to persist the two first-NPZ coordinate caches and
 verifies their NPZ MD5 hashes and coordinate shape \(20\times1290\times2\).
 The real threshold-robustness claim remains blocked, however, because those
-cached coordinates still lack physical time semantics, threshold-sweep event
-clocks, and held-out macro observables.
+cached coordinates still lack a physical-time trajectory axis,
+threshold-sweep event clocks, and held-out macro observables.
+The cached-particle time-code bridge narrows this statement: the cached first
+NPZ files now have official physical lag times attached, but their leading
+coordinate axis is an isoconfigurational-replica axis rather than a physical
+time axis. Hence they support fixed-lag particle observables, not yet a
+particle event-clock trajectory.
 
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out

@@ -51,6 +51,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_temperature_scan,
     glassbench_alpha_threshold_horizon_audit,
     glassbench_cage_jump_proxy_canary,
+    glassbench_cached_particle_timecode_bridge,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
@@ -4105,6 +4106,24 @@ def write_sota_glassbench_first_npz_particle_cache_contract_csv(
             str(path.relative_to(ROOT))
             for path in (DATA_DIR / "third_party" / "glassbench" / "particle_cache").glob("*.npz")
         ],
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_cached_particle_timecode_bridge_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """Attach official time-code lag semantics to cached first-NPZ coordinates."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    with cache_manifest_path.open() as f:
+        cache_rows = list(csv.DictReader(f))
+    rows = glassbench_cached_particle_timecode_bridge(
+        bridge_id="glassbench_cached_particle_timecode_bridge",
+        cache_rows=cache_rows,
+        semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9308,6 +9327,56 @@ def write_sota_glassbench_first_npz_particle_cache_contract_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_cached_particle_timecode_bridge_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_particle_event_clock_ready": "#2f855a",
+        "cached_particle_lag_time_ready_event_clock_blocked": "#b7791f",
+        "cached_particle_lag_time_ready_frame_axis_unknown": "#805ad5",
+        "cached_particle_timecode_semantics_incomplete": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["timecode_bridge_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">time code={row["time_code"]}; lag={float(row["lag_time"]):.3g}; cache={int(float(row["particle_resolved_positions_cached"]))}; lag ready={int(float(row["physical_lag_time_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">axis0={str(row["axis0_semantics"]).replace("_", " ")}; frame-axis time={int(float(row["frame_axis_is_physical_time"]))}; event clock={int(float(row["event_clock_trajectory_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={row["primary_blocker"]}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached-particle time-code bridge</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached first-NPZ coordinates have official lag times, but their axis 0 is isoconfigurational replicas rather than a physical-time trajectory.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">time-code bridge stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">lag-time and axis semantics</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 660
@@ -10769,6 +10838,15 @@ def main() -> None:
     write_sota_glassbench_first_npz_particle_cache_contract_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.svg",
         glassbench_first_npz_particle_cache_contract_rows,
+    )
+    glassbench_cached_particle_timecode_bridge_rows = (
+        write_sota_glassbench_cached_particle_timecode_bridge_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv"
+        )
+    )
+    write_sota_glassbench_cached_particle_timecode_bridge_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg",
+        glassbench_cached_particle_timecode_bridge_rows,
     )
     glassbench_event_clock_threshold_readiness_rows = (
         write_sota_glassbench_event_clock_threshold_readiness_csv(

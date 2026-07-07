@@ -1263,6 +1263,29 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(row["threshold_sweep_event_clock_ready"]), 0.0)
             self.assertEqual(row["primary_blocker"], "physical_time_semantics")
 
+    def test_sota_glassbench_cached_particle_timecode_bridge_keeps_replica_axis_blocker(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(ka2d_023["time_code"], "tc05")
+        self.assertAlmostEqual(float(ka2d_023["lag_time"]), 0.1)
+        self.assertEqual(float(ka2d_023["physical_lag_time_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["particle_resolved_positions_cached"]), 1.0)
+        self.assertEqual(float(ka2d_023["frame_axis_is_physical_time"]), 0.0)
+        self.assertEqual(float(ka2d_023["axis0_is_isoconfigurational_replica"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(ka2d_030["time_code"], "tc01")
+        self.assertAlmostEqual(float(ka2d_030["lag_time"]), 0.11)
+        self.assertEqual(float(ka2d_030["physical_lag_time_ready"]), 1.0)
+
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
         self.assertTrue(path.exists())
@@ -2040,6 +2063,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf", names)
@@ -2233,6 +2257,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_trajectory_cage_jump_events.pdf",
             "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
             "figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf",
+            "figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",

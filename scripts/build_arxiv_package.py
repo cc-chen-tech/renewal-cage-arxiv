@@ -3898,6 +3898,74 @@ def write_sota_glassbench_first_npz_particle_cache_contract_pdf(path: Path) -> N
     c.save()
 
 
+def write_sota_glassbench_cached_particle_timecode_bridge_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench cached-particle time-code bridge")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cached first-NPZ coordinates have official lag times, but axis 0 is isoconfigurational replicas rather than physical time.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 64
+    colors_by_stage = {
+        "cached_particle_event_clock_ready": colors.HexColor("#2f855a"),
+        "cached_particle_lag_time_ready_event_clock_blocked": colors.HexColor("#b7791f"),
+        "cached_particle_lag_time_ready_frame_axis_unknown": colors.HexColor("#805ad5"),
+        "cached_particle_timecode_semantics_incomplete": colors.HexColor("#9f1239"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "bridge stage")
+    c.drawString(left + 395, top + 24, "lag-time and axis semantics")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["timecode_bridge_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 395,
+            y,
+            "code={}; lag={:.3g}; cache={}; lag ready={}; frame-axis time={}; event clock={}".format(
+                row["time_code"],
+                float(row["lag_time"]),
+                int(float(row["particle_resolved_positions_cached"])),
+                int(float(row["physical_lag_time_ready"])),
+                int(float(row["frame_axis_is_physical_time"])),
+                int(float(row["event_clock_trajectory_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            f'axis0={row["axis0_semantics"][:46]}; blocker={row["primary_blocker"]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The bridge upgrades lag-time semantics but explicitly blocks event-clock claims from fixed-lag replica axes.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5626,6 +5694,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_event_clock_threshold_readiness_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf"
     )
+    sota_glassbench_cached_particle_timecode_bridge_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf"
+    )
     sota_glassbench_first_npz_particle_cache_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf"
     )
@@ -5778,6 +5849,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_event_clock_threshold_readiness_pdf(
         sota_glassbench_event_clock_threshold_readiness_pdf
+    )
+    write_sota_glassbench_cached_particle_timecode_bridge_pdf(
+        sota_glassbench_cached_particle_timecode_bridge_pdf
     )
     write_sota_glassbench_first_npz_particle_cache_contract_pdf(
         sota_glassbench_first_npz_particle_cache_contract_pdf
@@ -5971,6 +6045,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_event_clock_threshold_readiness_pdf,
             "figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf",
+        )
+        archive.write(
+            sota_glassbench_cached_particle_timecode_bridge_pdf,
+            "figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf",
         )
         archive.write(
             sota_glassbench_first_npz_particle_cache_contract_pdf,
