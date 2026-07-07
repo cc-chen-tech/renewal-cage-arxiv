@@ -8546,6 +8546,112 @@ def trajectory_observable_protocol(
     return rows
 
 
+def trajectory_cage_jump_event_protocol(
+    *,
+    protocol_id: str,
+    positions: np.ndarray,
+    times: np.ndarray,
+    jump_displacement_threshold: float,
+    min_particles_with_jumps: int = 1,
+    min_exchange_interval_count: int = 0,
+) -> dict[str, float | str]:
+    """Segment particle-resolved cage jumps into persistence and exchange clocks."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    position_array = np.asarray(positions, dtype=float)
+    time_array = np.asarray(times, dtype=float)
+    if position_array.ndim != 3:
+        raise ValueError("positions must have shape (frames, particles, dimensions)")
+    if time_array.ndim != 1:
+        raise ValueError("times must be one-dimensional")
+    if position_array.shape[0] != time_array.size:
+        raise ValueError("times length must match the number of trajectory frames")
+    if position_array.shape[0] < 2:
+        raise ValueError("at least two frames are required")
+    if position_array.shape[1] < 1 or position_array.shape[2] < 1:
+        raise ValueError("positions must include particles and dimensions")
+    if np.any(np.diff(time_array) <= 0.0):
+        raise ValueError("times must be strictly increasing")
+    if jump_displacement_threshold <= 0.0:
+        raise ValueError("jump_displacement_threshold must be positive")
+    if int(min_particles_with_jumps) != min_particles_with_jumps or min_particles_with_jumps < 1:
+        raise ValueError("min_particles_with_jumps must be a positive integer")
+    if int(min_exchange_interval_count) != min_exchange_interval_count or min_exchange_interval_count < 0:
+        raise ValueError("min_exchange_interval_count must be a nonnegative integer")
+
+    step_displacements = position_array[1:, :, :] - position_array[:-1, :, :]
+    step_lengths = np.sqrt(np.sum(step_displacements * step_displacements, axis=2))
+    jump_mask = step_lengths >= float(jump_displacement_threshold)
+    jump_step_indices, jump_particle_indices = np.nonzero(jump_mask)
+    jump_lengths = step_lengths[jump_mask]
+    jump_times = time_array[jump_step_indices + 1]
+
+    persistence_intervals: list[float] = []
+    exchange_intervals: list[float] = []
+    particles_with_exchange = 0
+    for particle_idx in range(position_array.shape[1]):
+        particle_jump_times = jump_times[jump_particle_indices == particle_idx]
+        if particle_jump_times.size == 0:
+            continue
+        particle_jump_times = np.sort(particle_jump_times)
+        persistence_intervals.append(float(particle_jump_times[0] - time_array[0]))
+        if particle_jump_times.size >= 2:
+            particles_with_exchange += 1
+            exchange_intervals.extend(float(value) for value in np.diff(particle_jump_times))
+
+    total_jump_event_count = int(jump_times.size)
+    particles_with_jump_count = len(persistence_intervals)
+    exchange_interval_count = len(exchange_intervals)
+    particle_ready = particles_with_jump_count >= int(min_particles_with_jumps)
+    exchange_ready = exchange_interval_count >= int(min_exchange_interval_count)
+    event_clock_ready = particle_ready and exchange_ready
+
+    if event_clock_ready:
+        stage = "particle_resolved_cage_jump_event_clock_ready"
+        blocker = "none"
+    elif total_jump_event_count == 0:
+        stage = "particle_resolved_cage_jump_events_incomplete"
+        blocker = "jump_displacement_threshold"
+    elif not particle_ready:
+        stage = "particle_resolved_cage_jump_events_incomplete"
+        blocker = "particles_with_jump_count"
+    else:
+        stage = "persistence_exchange_event_clock_incomplete"
+        blocker = "exchange_intervals"
+
+    first_jump_time = float(np.min(jump_times)) if total_jump_event_count else math.nan
+    last_jump_time = float(np.max(jump_times)) if total_jump_event_count else math.nan
+    mean_jump_length = float(np.mean(jump_lengths)) if total_jump_event_count else math.nan
+    jump_length_variance = float(np.var(jump_lengths)) if total_jump_event_count else math.nan
+    persistence_mean = float(np.mean(persistence_intervals)) if persistence_intervals else math.nan
+    exchange_mean = float(np.mean(exchange_intervals)) if exchange_intervals else math.nan
+
+    return {
+        "protocol_id": protocol_id,
+        "frame_count": float(position_array.shape[0]),
+        "particle_count": float(position_array.shape[1]),
+        "dimension": float(position_array.shape[2]),
+        "jump_displacement_threshold": float(jump_displacement_threshold),
+        "total_jump_event_count": float(total_jump_event_count),
+        "particles_with_jump_count": float(particles_with_jump_count),
+        "particles_with_exchange_count": float(particles_with_exchange),
+        "exchange_interval_count": float(exchange_interval_count),
+        "first_jump_time_min": first_jump_time,
+        "last_jump_time_max": last_jump_time,
+        "mean_jump_length": mean_jump_length,
+        "jump_length_variance": jump_length_variance,
+        "persistence_mean": persistence_mean,
+        "exchange_mean": exchange_mean,
+        "particle_resolved_jump_events_ready": float(particle_ready),
+        "physical_time_jump_clock_ready": float(particle_ready),
+        "persistence_exchange_event_clock_ready": float(event_clock_ready),
+        "thermodynamic_claim_allowed": 0.0,
+        "primary_blocker": blocker,
+        "event_protocol_stage": stage,
+    }
+
+
 def _parse_semicolon_float_values(value: object, *, name: str) -> list[float]:
     parts = str(value).split(";")
     if not parts or any(part == "" for part in parts):

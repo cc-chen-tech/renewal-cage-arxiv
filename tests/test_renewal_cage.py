@@ -174,6 +174,7 @@ from renewal_cage import (  # noqa: E402
     trajectory_adapter_contract,
     benchmark_publication_ladder,
     trajectory_inversion_readiness_gate,
+    trajectory_cage_jump_event_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_table_csv_adapter,
@@ -5606,6 +5607,41 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertAlmostEqual(lag2["msd"], 2.0)
         self.assertAlmostEqual(lag2["ngp"], -1.0 / 3.0)
         self.assertAlmostEqual(lag2["overlap_mean"], 0.5)
+
+    def test_trajectory_cage_jump_event_protocol_extracts_persistence_and_exchange_clocks(self):
+        positions = np.array(
+            [
+                [[0.0], [0.0], [0.0]],
+                [[0.1], [0.0], [0.0]],
+                [[1.4], [0.0], [0.0]],
+                [[1.5], [1.2], [0.0]],
+                [[2.8], [1.3], [1.1]],
+            ],
+            dtype=float,
+        )
+        times = np.arange(5.0)
+
+        row = trajectory_cage_jump_event_protocol(
+            protocol_id="synthetic_particle_cage_jump_events",
+            positions=positions,
+            times=times,
+            jump_displacement_threshold=1.0,
+            min_particles_with_jumps=2,
+            min_exchange_interval_count=1,
+        )
+
+        self.assertEqual(row["event_protocol_stage"], "particle_resolved_cage_jump_event_clock_ready")
+        self.assertEqual(float(row["particle_resolved_jump_events_ready"]), 1.0)
+        self.assertEqual(float(row["physical_time_jump_clock_ready"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_event_clock_ready"]), 1.0)
+        self.assertEqual(float(row["total_jump_event_count"]), 4.0)
+        self.assertEqual(float(row["particles_with_jump_count"]), 3.0)
+        self.assertEqual(float(row["exchange_interval_count"]), 1.0)
+        self.assertAlmostEqual(float(row["persistence_mean"]), 3.0)
+        self.assertAlmostEqual(float(row["exchange_mean"]), 2.0)
+        self.assertGreater(float(row["jump_length_variance"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "none")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_trajectory_observable_protocol_validates_inputs(self):
         with self.assertRaises(ValueError):

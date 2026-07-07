@@ -1629,6 +1629,26 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(float(peak["ngp"]), 0.0)
         self.assertIn("1.1", peak["wave_numbers"])
 
+    def test_trajectory_cage_jump_events_extract_particle_clock_protocol(self):
+        path = ROOT / "data" / "renewal_cage_trajectory_cage_jump_events.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["protocol_id"]: row for row in rows}
+        ready = by_id["synthetic_particle_cage_jump_events"]
+        self.assertEqual(
+            ready["event_protocol_stage"],
+            "particle_resolved_cage_jump_event_clock_ready",
+        )
+        self.assertEqual(float(ready["particle_resolved_jump_events_ready"]), 1.0)
+        self.assertEqual(float(ready["physical_time_jump_clock_ready"]), 1.0)
+        self.assertEqual(float(ready["persistence_exchange_event_clock_ready"]), 1.0)
+        self.assertGreater(float(ready["total_jump_event_count"]), 0.0)
+        self.assertGreater(float(ready["particles_with_jump_count"]), 0.0)
+        self.assertGreater(float(ready["exchange_interval_count"]), 0.0)
+        self.assertEqual(ready["primary_blocker"], "none")
+
     def test_trajectory_adapter_demo_exports_observables_from_local_table(self):
         path = ROOT / "data" / "renewal_cage_trajectory_adapter_demo.csv"
         self.assertTrue(path.exists())
@@ -1927,6 +1947,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_raw_curve_diagnostic_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_observable_protocol.pdf", names)
+            self.assertIn("figures/renewal_cage_trajectory_cage_jump_events.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_uncertainty_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_member_ensemble_uncertainty.pdf", names)
             self.assertIn("figures/renewal_cage_trajectory_inversion_readiness.pdf", names)
@@ -2283,6 +2304,9 @@ class ArxivPackageTests(unittest.TestCase):
             first_trajectory_observable_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_observable_protocol.pdf"
             ).read_bytes()
+            first_trajectory_cage_jump_events = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_cage_jump_events.pdf"
+            ).read_bytes()
             first_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
             ).read_bytes()
@@ -2484,6 +2508,9 @@ class ArxivPackageTests(unittest.TestCase):
             second_trajectory_observable_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_observable_protocol.pdf"
             ).read_bytes()
+            second_trajectory_cage_jump_events = (
+                ROOT / "paper" / "figures" / "renewal_cage_trajectory_cage_jump_events.pdf"
+            ).read_bytes()
             second_trajectory_uncertainty_protocol = (
                 ROOT / "paper" / "figures" / "renewal_cage_trajectory_uncertainty_protocol.pdf"
             ).read_bytes()
@@ -2620,6 +2647,7 @@ class ArxivPackageTests(unittest.TestCase):
             second_raw_curve_persistence_exchange_protocol,
         )
         self.assertEqual(first_trajectory_observable_protocol, second_trajectory_observable_protocol)
+        self.assertEqual(first_trajectory_cage_jump_events, second_trajectory_cage_jump_events)
         self.assertEqual(first_trajectory_uncertainty_protocol, second_trajectory_uncertainty_protocol)
         self.assertEqual(
             first_trajectory_member_ensemble_uncertainty,

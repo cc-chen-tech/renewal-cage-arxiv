@@ -4975,6 +4975,51 @@ def write_trajectory_observable_protocol_pdf(path: Path) -> None:
     c.save()
 
 
+def write_trajectory_cage_jump_events_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_trajectory_cage_jump_events.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    row = rows[0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Particle-resolved cage-jump event clock")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Synthetic trajectory canary: threshold jumps define persistence and exchange intervals before real-benchmark inversion.",
+    )
+    left, top = 80, page_h - 105
+    labels = [
+        ("jump events", float(row["total_jump_event_count"]), colors.HexColor("#2b6cb0")),
+        ("particles with jumps", float(row["particles_with_jump_count"]), colors.HexColor("#2f855a")),
+        ("exchange intervals", float(row["exchange_interval_count"]), colors.HexColor("#805ad5")),
+        ("mean persistence", float(row["persistence_mean"]), colors.HexColor("#c05621")),
+        ("mean exchange", float(row["exchange_mean"]), colors.HexColor("#718096")),
+    ]
+    max_value = max(value for _, value, _ in labels)
+    c.setFont("Helvetica", 8)
+    for idx, (label, value, color) in enumerate(labels):
+        y0 = top - idx * 42
+        bar_w = 470 * value / max(max_value, 1e-12)
+        c.setFillColor(colors.black)
+        c.drawString(left, y0 + 7, label)
+        c.setFillColor(color)
+        c.rect(left + 135, y0, bar_w, 18, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.drawString(left + 145 + bar_w, y0 + 5, f"{value:.3g}")
+    c.setFont("Helvetica", 7.5)
+    c.drawString(
+        left,
+        94,
+        f"stage={row['event_protocol_stage']}; blocker={row['primary_blocker']}; thermodynamic_claim_allowed={int(float(row['thermodynamic_claim_allowed']))}",
+    )
+    c.drawString(left, 78, f"scope={row['scope_note']}")
+    c.showPage()
+    c.save()
+
+
 def write_trajectory_uncertainty_protocol_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5365,6 +5410,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         PAPER_FIGURE_DIR / "renewal_cage_raw_curve_persistence_exchange_protocol.pdf"
     )
     trajectory_observable_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.pdf"
+    trajectory_cage_jump_events_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_cage_jump_events.pdf"
     trajectory_uncertainty_protocol_pdf = PAPER_FIGURE_DIR / "renewal_cage_trajectory_uncertainty_protocol.pdf"
     trajectory_member_ensemble_uncertainty_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_trajectory_member_ensemble_uncertainty.pdf"
@@ -5494,6 +5540,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_raw_curve_diagnostic_readiness_pdf(raw_curve_diagnostic_readiness_pdf)
     write_raw_curve_persistence_exchange_protocol_pdf(raw_curve_persistence_exchange_protocol_pdf)
     write_trajectory_observable_protocol_pdf(trajectory_observable_protocol_pdf)
+    write_trajectory_cage_jump_events_pdf(trajectory_cage_jump_events_pdf)
     write_trajectory_uncertainty_protocol_pdf(trajectory_uncertainty_protocol_pdf)
     write_trajectory_member_ensemble_uncertainty_pdf(trajectory_member_ensemble_uncertainty_pdf)
     write_trajectory_inversion_readiness_pdf(trajectory_inversion_readiness_pdf)
@@ -5705,6 +5752,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_raw_curve_persistence_exchange_protocol.pdf",
         )
         archive.write(trajectory_observable_protocol_pdf, "figures/renewal_cage_trajectory_observable_protocol.pdf")
+        archive.write(trajectory_cage_jump_events_pdf, "figures/renewal_cage_trajectory_cage_jump_events.pdf")
         archive.write(trajectory_uncertainty_protocol_pdf, "figures/renewal_cage_trajectory_uncertainty_protocol.pdf")
         archive.write(
             trajectory_member_ensemble_uncertainty_pdf,

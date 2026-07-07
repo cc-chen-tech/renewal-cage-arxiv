@@ -157,6 +157,7 @@ from renewal_cage import (  # noqa: E402
     temperature_dependent_gamma_exchange,
     temperature_scan,
     trajectory_adapter_contract,
+    trajectory_cage_jump_event_protocol,
     trajectory_observable_protocol,
     trajectory_observable_uncertainty_protocol,
     trajectory_observable_curve_bridge,
@@ -4625,6 +4626,42 @@ def write_trajectory_observable_protocol_csv(path: Path) -> list[dict[str, float
         row["machine_readable_trajectory"] = 1.0
         row["uncertainty_estimates"] = 0.0
         row["primary_blocker"] = "uncertainty_estimates"
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_trajectory_cage_jump_events_csv(path: Path) -> list[dict[str, float | str]]:
+    """Extract a particle-resolved cage-jump event clock from local trajectories."""
+
+    positions = np.array(
+        [
+            [[0.0], [0.0], [0.0]],
+            [[0.1], [0.0], [0.0]],
+            [[1.4], [0.0], [0.0]],
+            [[1.5], [1.2], [0.0]],
+            [[2.8], [1.3], [1.1]],
+        ],
+        dtype=float,
+    )
+    times = np.arange(5.0)
+    row = trajectory_cage_jump_event_protocol(
+        protocol_id="synthetic_particle_cage_jump_events",
+        positions=positions,
+        times=times,
+        jump_displacement_threshold=1.0,
+        min_particles_with_jumps=2,
+        min_exchange_interval_count=1,
+    )
+    row.update(
+        {
+            "benchmark_id": "synthetic_particle_cage_jump_events",
+            "target_protocol": "trajectory_to_persistence_exchange_event_clock",
+            "machine_readable_trajectory": 1.0,
+            "real_benchmark_closed_loop_ready": 0.0,
+            "scope_note": "synthetic_api_canary_not_glassbench_claim",
+        }
+    )
+    rows = [row]
     write_sweep_csv(path, rows)
     return rows
 
@@ -9253,6 +9290,47 @@ def write_trajectory_observable_protocol_svg(
     path.write_text(svg)
 
 
+def write_trajectory_cage_jump_events_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    row = rows[0]
+    width, height = 980, 430
+    left, top = 90, 92
+    labels = [
+        ("jump events", float(row["total_jump_event_count"]), "#2b6cb0"),
+        ("particles", float(row["particles_with_jump_count"]), "#2f855a"),
+        ("exchange intervals", float(row["exchange_interval_count"]), "#805ad5"),
+        ("tau_p mean", float(row["persistence_mean"]), "#c05621"),
+        ("tau_x mean", float(row["exchange_mean"]), "#718096"),
+    ]
+    max_value = max(value for _, value, _ in labels)
+    marks = []
+    for idx, (label, value, color) in enumerate(labels):
+        y0 = top + idx * 52
+        bar_w = 560 * value / max(max_value, 1e-12)
+        marks.append(
+            f'<text x="{left}" y="{y0 + 18}" font-family="Arial, sans-serif" font-size="13">{label}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 165}" y="{y0}" width="{bar_w:.1f}" height="24" fill="{color}" opacity="0.88" />'
+        )
+        marks.append(
+            f'<text x="{left + 178 + bar_w:.1f}" y="{y0 + 17}" font-family="Arial, sans-serif" font-size="12" fill="#222">{value:.3g}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Particle-resolved cage-jump event clock</text>
+  <text x="90" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Synthetic local trajectory canary: threshold jumps define first-persistence and exchange intervals before real-benchmark inversion.</text>
+  {"".join(marks)}
+  <text x="90" y="365" font-family="Arial, sans-serif" font-size="11">stage: {row["event_protocol_stage"]}; blocker: {row["primary_blocker"]}; thermodynamic claim allowed: {int(float(row["thermodynamic_claim_allowed"]))}</text>
+  <text x="90" y="383" font-family="Arial, sans-serif" font-size="11">scope: {row["scope_note"]}</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_trajectory_uncertainty_protocol_svg(
     path: Path,
     rows: list[dict[str, float | str]],
@@ -10651,6 +10729,13 @@ def main() -> None:
     write_trajectory_observable_protocol_svg(
         FIGURE_DIR / "renewal_cage_trajectory_observable_protocol.svg",
         trajectory_observable_rows,
+    )
+    trajectory_cage_jump_event_rows = write_trajectory_cage_jump_events_csv(
+        DATA_DIR / "renewal_cage_trajectory_cage_jump_events.csv"
+    )
+    write_trajectory_cage_jump_events_svg(
+        FIGURE_DIR / "renewal_cage_trajectory_cage_jump_events.svg",
+        trajectory_cage_jump_event_rows,
     )
     write_trajectory_adapter_demo_csv(
         DATA_DIR / "renewal_cage_trajectory_adapter_demo.csv"

@@ -1682,6 +1682,15 @@ repository now has a direct trajectory-to-diagnostic bridge before any
 machine-readable simulation or experimental trajectory is promoted to an
 uncertainty-weighted benchmark.
 The companion
+\texttt{renewal\_cage\_trajectory\_cage\_jump\_events.csv} adds the event-clock
+layer required by the same trajectory bridge. Particle-resolved threshold
+displacements define first-persistence intervals and subsequent exchange
+intervals, giving the \(\tau_p/\tau_x\) statistics needed by the renewal
+diagnostic. This is still a synthetic API canary rather than a GlassBench
+microdynamic closure: the row keeps
+\texttt{real\_benchmark\_closed\_loop\_ready=0} and
+\texttt{thermodynamic\_claim\_allowed=0}.
+The separate
 \texttt{renewal\_cage\_trajectory\_uncertainty\_protocol.csv} supplies that
 missing uncertainty layer by applying a time-origin block jackknife to the same
 trajectory-derived observables. Its columns
