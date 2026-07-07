@@ -62,6 +62,9 @@ from renewal_cage import (  # noqa: E402
     fragility_benchmark_consistency,
     frontier_benchmark_horizon,
     gaussian_recovery_benchmark_consistency,
+    gated_precursor_hazard,
+    gated_precursor_mean_count,
+    gated_precursor_survival,
     infer_spatial_facilitation_diffusivity,
     kww_alpha_fit,
     long_time_diffusion_coefficient,
@@ -98,6 +101,7 @@ from renewal_cage import (  # noqa: E402
     plateau_ngp_branches,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
+    precursor_escape_simulation_diagnostic,
     PersistenceExchangeParams,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_count_distribution,
@@ -148,6 +152,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_sparse_lag_event_clock_audit,
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
+    glassbench_interval_censored_waiting_law_selection,
     glassbench_finite_exchange_falsification_envelope,
     glassbench_real_cached_microdynamic_verdict,
     glassbench_late_recovery_falsification_protocol,
@@ -240,6 +245,74 @@ class DelayedRenewalCageTests(unittest.TestCase):
         expected = params.renewal_rate * t**3 / (3.0 * params.renewal_delay**2)
 
         np.testing.assert_allclose(mean, expected, rtol=2e-4, atol=1e-16)
+
+    def test_two_precursor_gate_recovers_square_delayed_hazard(self):
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=1.0,
+            jump_variance=1.0,
+            renewal_rate=0.18,
+            renewal_delay=2.7,
+        )
+        t = np.linspace(0.0, 16.0, 80)
+
+        hazard = gated_precursor_hazard(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=2,
+        )
+        linear_gate = gated_precursor_hazard(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=1,
+        )
+        mean_count = gated_precursor_mean_count(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=2,
+        )
+        survival = gated_precursor_survival(
+            t,
+            asymptotic_rate=params.renewal_rate,
+            precursor_time=params.renewal_delay,
+            precursor_count=2,
+        )
+
+        np.testing.assert_allclose(
+            hazard,
+            params.renewal_rate * (1.0 - np.exp(-t / params.renewal_delay)) ** 2,
+            rtol=1e-13,
+            atol=1e-15,
+        )
+        np.testing.assert_allclose(
+            linear_gate,
+            params.renewal_rate * (1.0 - np.exp(-t / params.renewal_delay)),
+            rtol=1e-13,
+            atol=1e-15,
+        )
+        np.testing.assert_allclose(mean_count, delayed_poisson_mean(t, params), rtol=1e-13, atol=1e-15)
+        self.assertAlmostEqual(float(survival[0]), 1.0)
+        self.assertLess(float(survival[-1]), 1.0)
+
+    def test_precursor_escape_simulation_recovers_delayed_hazard(self):
+        row = precursor_escape_simulation_diagnostic(
+            asymptotic_rate=0.14,
+            precursor_time=2.5,
+            precursor_count=2,
+            sample_count=180_000,
+            time_max=35.0,
+            bin_count=50,
+            seed=1234,
+        )
+
+        self.assertEqual(row["bridge_stage"], "precursor_gated_langevin_escape_closure")
+        self.assertEqual(float(row["full_many_body_first_principles_claim_allowed"]), 0.0)
+        self.assertLess(float(row["hazard_rms_relative_error"]), 0.12)
+        self.assertLess(abs(float(row["mean_escape_time_relative_error"])), 0.035)
+        self.assertLess(abs(float(row["late_hazard_relative_error"])), 0.12)
 
     def test_glassbench_timecode_curve_bridge_keeps_real_curve_before_inversion(self):
         rows = [
@@ -1019,6 +1092,50 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "exchange_clock_and_replica_identity")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_interval_censored_waiting_law_selection_keeps_exponential_until_weibull_wins(self):
+        interval_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "interval_clock_candidate_ready": 1.0,
+                "first_crossing_intervals": "tc25:122.47:1288.4100000000001:3.8759689922480622e-05;tc30:1288.4100000000001:13554:0.001434108527131783;tc35:13554:142587:0.02135658914728682;tc40:142587:1500000:0.21724806201550387",
+                "right_censored_fraction": 0.759922480620155,
+                "latest_lag_time": 1500000.0,
+            }
+        ]
+        persistence_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "persistence_fit_ready": 1.0,
+                "exponential_rate_mle": 1.8272245092266246e-07,
+                "exponential_mean_persistence_time": 5472781.231591796,
+                "log_likelihood": -0.6326326983139481,
+                "observed_crossed_fraction": 0.24007751937984495,
+                "predicted_crossed_fraction_at_latest_lag": 0.23973154391606166,
+                "real_pe_inversion_ready": 0.0,
+            }
+        ]
+
+        row = glassbench_interval_censored_waiting_law_selection(
+            selection_id="glassbench_interval_censored_waiting_law_selection",
+            interval_clock_rows=interval_rows,
+            persistence_fit_rows=persistence_rows,
+            min_delta_aic_for_extra_parameter=2.0,
+        )[0]
+
+        self.assertEqual(row["waiting_law_selection_stage"], "exponential_waiting_law_not_rejected_sparse_cache")
+        self.assertEqual(float(row["waiting_law_selection_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["weibull_shape_mle"]), 1.062, delta=0.02)
+        self.assertLess(abs(float(row["weibull_shape_mle"]) - 1.0), 0.1)
+        self.assertLess(float(row["delta_aic_exponential_minus_weibull"]), 0.0)
+        self.assertEqual(float(row["extra_waiting_law_parameter_supported"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "sparse_interval_censoring")
 
     def test_glassbench_finite_exchange_envelope_turns_censored_fit_into_followup_horizon(self):
         fit_rows = [

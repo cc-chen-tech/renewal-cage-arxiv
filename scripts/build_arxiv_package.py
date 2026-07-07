@@ -4540,6 +4540,75 @@ def write_sota_glassbench_interval_censored_persistence_fit_pdf(path: Path) -> N
     c.save()
 
 
+def write_sota_glassbench_waiting_law_selection_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench interval-censored waiting-law selection")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Exponential and Weibull persistence laws are compared with an AIC penalty before claiming stretched waiting times.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "exponential_waiting_law_not_rejected_sparse_cache": colors.HexColor("#2b6cb0"),
+        "weibull_waiting_law_preferred": colors.HexColor("#805ad5"),
+        "waiting_law_selection_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "selection stage")
+    c.drawString(left + 395, top + 24, "waiting-law comparison")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["waiting_law_selection_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; Weibull shape={:.3g}; extra parameter supported={:.0f}".format(
+                row["structure_id"],
+                float(row["weibull_shape_mle"]),
+                float(row["extra_waiting_law_parameter_supported"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "AIC exponential={:.3g}; AIC Weibull={:.3g}; delta exp-minus-Weibull={:.3g}".format(
+                float(row["exponential_aic"]),
+                float(row["weibull_aic"]),
+                float(row["delta_aic_exponential_minus_weibull"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The current cached GlassBench row constrains the waiting-time law but does not justify an extra stretched-law parameter.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_finite_exchange_envelope_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7865,6 +7934,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_interval_censored_persistence_fit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf"
     )
+    sota_glassbench_waiting_law_selection_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.pdf"
+    )
     sota_glassbench_finite_exchange_envelope_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.pdf"
     )
@@ -8104,6 +8176,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_interval_censored_persistence_fit_pdf(
         sota_glassbench_interval_censored_persistence_fit_pdf
+    )
+    write_sota_glassbench_waiting_law_selection_pdf(
+        sota_glassbench_waiting_law_selection_pdf
     )
     write_sota_glassbench_finite_exchange_envelope_pdf(
         sota_glassbench_finite_exchange_envelope_pdf
@@ -8400,6 +8475,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_interval_censored_persistence_fit_pdf,
             "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
+        )
+        archive.write(
+            sota_glassbench_waiting_law_selection_pdf,
+            "figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf",
         )
         archive.write(
             sota_glassbench_finite_exchange_envelope_pdf,

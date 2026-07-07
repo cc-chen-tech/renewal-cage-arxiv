@@ -360,6 +360,21 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(inversion["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(float(inversion["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_glassbench_waiting_law_selection_rejects_unearned_stretching_claim(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_waiting_law_selection.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        row = rows[0]
+        self.assertEqual(row["waiting_law_selection_stage"], "exponential_waiting_law_not_rejected_sparse_cache")
+        self.assertEqual(float(row["waiting_law_selection_ready"]), 1.0)
+        self.assertLess(abs(float(row["weibull_shape_mle"]) - 1.0), 0.1)
+        self.assertLess(float(row["delta_aic_exponential_minus_weibull"]), 0.0)
+        self.assertEqual(float(row["extra_waiting_law_parameter_supported"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
     def test_real_benchmark_assimilation_gate_marks_fit_readiness_and_blockers(self):
         path = ROOT / "data" / "renewal_cage_real_benchmark_assimilation_gate.csv"
         self.assertTrue(path.exists())
@@ -2894,6 +2909,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf", names)
@@ -3107,6 +3123,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf",
             "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
             "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
+            "figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf",
             "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
             "figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf",

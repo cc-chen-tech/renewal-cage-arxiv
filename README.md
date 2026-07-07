@@ -365,6 +365,12 @@ residual below `10^-3`, while the conditional finite-exchange envelope gives a
 `tau_p/tau_x` lower bound under the explicit exchange-clock assumption. It still
 blocks full persistence/exchange inversion because the exchange clock, true
 physical-time trajectory axis, and late-recovery measurement are not present.
+The interval-censored waiting-law selection then asks whether the real cached
+first-crossing ladder justifies adding a stretched/Weibull persistence law. It
+does not: the fitted Weibull shape is near exponential (`shape=1.06`), and the
+AIC penalty favors retaining the one-parameter exponential law for the current
+sparse cache. This constrains the phenomenological waiting-time law without
+claiming a stretched waiting distribution or thermodynamic glass transition.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve
@@ -544,6 +550,7 @@ figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.svg
 figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.svg
 figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg
 figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.svg
+figures/renewal_cage_sota_glassbench_waiting_law_selection.svg
 figures/renewal_cage_sota_glassbench_finite_exchange_envelope.svg
 figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.svg
 figures/renewal_cage_sota_glassbench_late_recovery_protocol.svg
@@ -672,6 +679,7 @@ data/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv
 data/renewal_cage_sota_glassbench_sparse_lag_event_clock.csv
 data/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv
 data/renewal_cage_sota_glassbench_interval_censored_persistence_fit.csv
+data/renewal_cage_sota_glassbench_waiting_law_selection.csv
 data/renewal_cage_sota_glassbench_finite_exchange_envelope.csv
 data/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv
 data/renewal_cage_sota_glassbench_late_recovery_protocol.csv
@@ -821,6 +829,7 @@ paper/figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf
 paper/figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf
 paper/figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf
 paper/figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf
+paper/figures/renewal_cage_sota_glassbench_waiting_law_selection.pdf
 paper/figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf
 paper/figures/renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.pdf
 paper/figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf

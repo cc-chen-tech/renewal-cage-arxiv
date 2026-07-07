@@ -67,6 +67,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_sparse_lag_event_clock_audit,
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
+    glassbench_interval_censored_waiting_law_selection,
     glassbench_finite_exchange_falsification_envelope,
     glassbench_real_cached_microdynamic_verdict,
     glassbench_late_recovery_falsification_protocol,
@@ -4460,6 +4461,24 @@ def write_sota_glassbench_interval_censored_persistence_fit_csv(
         fit_id="glassbench_ka2d_interval_censored_persistence_fit",
         interval_clock_rows=interval_clock_rows,
         direct_alpha_rows=direct_alpha_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_waiting_law_selection_csv(
+    path: Path,
+    *,
+    interval_clock_rows: list[dict[str, float | str]],
+    persistence_fit_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compare one-parameter exponential and two-parameter Weibull persistence laws."""
+
+    rows = glassbench_interval_censored_waiting_law_selection(
+        selection_id="glassbench_ka2d_interval_censored_waiting_law_selection",
+        interval_clock_rows=interval_clock_rows,
+        persistence_fit_rows=persistence_fit_rows,
+        min_delta_aic_for_extra_parameter=2.0,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9774,6 +9793,63 @@ def write_sota_glassbench_interval_censored_persistence_fit_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_waiting_law_selection_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 395
+    left, top = 75, 125
+    row_h = 108
+    colors = {
+        "exponential_waiting_law_not_rejected_sparse_cache": "#2b6cb0",
+        "weibull_waiting_law_preferred": "#805ad5",
+        "waiting_law_selection_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["waiting_law_selection_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        exp_aic = float(row["exponential_aic"])
+        weibull_aic = float(row["weibull_aic"])
+        delta = float(row["delta_aic_exponential_minus_weibull"])
+        shape = float(row["weibull_shape_mle"])
+        supported = int(float(row["extra_waiting_law_parameter_supported"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="455" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; Weibull shape={shape:.3g}; extra parameter supported={supported}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">AIC exponential={exp_aic:.3g}; AIC Weibull={weibull_aic:.3g}; delta AIC exp-minus-Weibull={delta:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 58}" font-family="Arial, sans-serif" font-size="10" fill="#555">crossed={float(row["observed_crossed_fraction"]):.3g}; latest lag={float(row["latest_lag_time"]):.3g}; inversion={int(float(row["real_pe_inversion_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 610}" y="{y + 80}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:60]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench interval-censored waiting-law selection</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Sparse real crossings compare exponential and Weibull persistence laws; the extra stretched-law parameter is accepted only if it beats the AIC penalty.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">selection stage</text>
+  <text x="{left + 610}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">waiting-law evidence</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_real_cached_microdynamic_verdict_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13632,6 +13708,15 @@ def main() -> None:
     write_sota_glassbench_interval_censored_persistence_fit_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_interval_censored_persistence_fit.svg",
         glassbench_interval_censored_persistence_fit_rows,
+    )
+    glassbench_waiting_law_selection_rows = write_sota_glassbench_waiting_law_selection_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.csv",
+        interval_clock_rows=glassbench_interval_censored_first_crossing_clock_rows,
+        persistence_fit_rows=glassbench_interval_censored_persistence_fit_rows,
+    )
+    write_sota_glassbench_waiting_law_selection_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_waiting_law_selection.svg",
+        glassbench_waiting_law_selection_rows,
     )
     glassbench_finite_exchange_envelope_rows = (
         write_sota_glassbench_finite_exchange_envelope_csv(

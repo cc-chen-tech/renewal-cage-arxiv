@@ -7237,6 +7237,200 @@ def glassbench_interval_censored_persistence_fit(
     return rows
 
 
+def glassbench_interval_censored_waiting_law_selection(
+    *,
+    selection_id: str,
+    interval_clock_rows: Sequence[dict[str, object]],
+    persistence_fit_rows: Sequence[dict[str, object]],
+    min_delta_aic_for_extra_parameter: float,
+) -> list[dict[str, float | str]]:
+    """Compare exponential and Weibull persistence laws on interval-censored crossings."""
+
+    if not selection_id:
+        raise ValueError("selection_id must be nonempty")
+    if not interval_clock_rows:
+        raise ValueError("interval_clock_rows must be nonempty")
+    if not persistence_fit_rows:
+        raise ValueError("persistence_fit_rows must be nonempty")
+    if min_delta_aic_for_extra_parameter < 0.0:
+        raise ValueError("min_delta_aic_for_extra_parameter must be nonnegative")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    def parse_intervals(text: str) -> list[tuple[float, float, float]]:
+        if not text or text == "none":
+            return []
+        out: list[tuple[float, float, float]] = []
+        for term in text.split(";"):
+            if not term:
+                continue
+            parts = term.split(":")
+            if len(parts) != 4:
+                raise ValueError("first-crossing interval terms must be code:lower:upper:fraction")
+            _, lower, upper, fraction = parts
+            out.append((float(lower), float(upper), float(fraction)))
+        return out
+
+    def weibull_log_likelihood(
+        shape: float,
+        scale: float,
+        intervals: Sequence[tuple[float, float, float]],
+        censored: float,
+        latest: float,
+    ) -> float:
+        if shape <= 0.0 or scale <= 0.0:
+            return -math.inf
+        total = 0.0
+        for lower, upper, weight in intervals:
+            if upper <= lower or weight <= 0.0:
+                continue
+            lower_power = (lower / scale) ** shape
+            upper_power = (upper / scale) ** shape
+            probability = math.exp(-lower_power) * (-math.expm1(-(upper_power - lower_power)))
+            if probability <= 0.0 or not math.isfinite(probability):
+                return -math.inf
+            total += weight * math.log(probability)
+        if censored > 0.0 and latest > 0.0:
+            total += censored * (-(latest / scale) ** shape)
+        return total
+
+    def fit_weibull(
+        intervals: Sequence[tuple[float, float, float]],
+        censored: float,
+        latest: float,
+    ) -> tuple[float, float, float]:
+        best_ll = -math.inf
+        best_shape = 1.0
+        best_scale = max(latest, 1.0)
+        min_scale = max(latest * 1.0e-3, 1.0e-6)
+        max_scale = max(latest * 1.0e4, min_scale * 10.0)
+        for shape_index in range(181):
+            shape = 0.2 + 0.01 * shape_index
+            for scale_index in range(361):
+                log_scale = math.log(min_scale) + (math.log(max_scale) - math.log(min_scale)) * scale_index / 360.0
+                scale = math.exp(log_scale)
+                ll = weibull_log_likelihood(shape, scale, intervals, censored, latest)
+                if ll > best_ll:
+                    best_ll = ll
+                    best_shape = shape
+                    best_scale = scale
+
+        ll = best_ll
+        shape = best_shape
+        scale = best_scale
+        for step in [0.08, 0.04, 0.02, 0.01, 0.005, 0.002, 0.001]:
+            improved = True
+            while improved:
+                improved = False
+                for d_shape in (-step, 0.0, step):
+                    for d_log_scale in (-step, 0.0, step):
+                        candidate_shape = shape + d_shape
+                        candidate_scale = scale * math.exp(d_log_scale)
+                        candidate_ll = weibull_log_likelihood(
+                            candidate_shape,
+                            candidate_scale,
+                            intervals,
+                            censored,
+                            latest,
+                        )
+                        if candidate_ll > ll:
+                            ll = candidate_ll
+                            shape = candidate_shape
+                            scale = candidate_scale
+                            improved = True
+        return shape, scale, ll
+
+    persistence_by_key = {key_for(row): row for row in persistence_fit_rows}
+    rows: list[dict[str, float | str]] = []
+    for interval in sorted(interval_clock_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(interval)
+        persistence = persistence_by_key.get((system_id, temperature, structure_id), {})
+        ready = (
+            float(interval.get("interval_clock_candidate_ready", 0.0) or 0.0) == 1.0
+            and float(persistence.get("persistence_fit_ready", 0.0) or 0.0) == 1.0
+        )
+        intervals = parse_intervals(str(interval.get("first_crossing_intervals", "none")))
+        latest = float(interval.get("latest_lag_time", 0.0) or 0.0)
+        censored = float(interval.get("right_censored_fraction", 0.0) or 0.0)
+        observed_crossed = max(0.0, sum(weight for _, _, weight in intervals))
+        if ready and intervals and latest > 0.0:
+            exp_log_likelihood = float(persistence.get("log_likelihood", 0.0) or 0.0)
+            exp_rate = float(persistence.get("exponential_rate_mle", 0.0) or 0.0)
+            exp_mean = float(persistence.get("exponential_mean_persistence_time", 0.0) or 0.0)
+            shape, scale, weibull_ll = fit_weibull(intervals, censored, latest)
+            weibull_mean = scale * math.gamma(1.0 + 1.0 / shape)
+            aic_exp = 2.0 - 2.0 * exp_log_likelihood
+            aic_weibull = 4.0 - 2.0 * weibull_ll
+            delta_aic = aic_exp - aic_weibull
+            extra_supported = delta_aic >= min_delta_aic_for_extra_parameter
+            stage = (
+                "weibull_waiting_law_preferred"
+                if extra_supported
+                else "exponential_waiting_law_not_rejected_sparse_cache"
+            )
+            blocker = "none" if extra_supported else "sparse_interval_censoring"
+            next_required_action = (
+                "use_weibull_waiting_law_in_heldout_pe_prediction"
+                if extra_supported
+                else "extend_interval_censored_event_clock_before_claiming_stretched_waiting_law"
+            )
+            selection_ready = True
+        else:
+            exp_log_likelihood = 0.0
+            exp_rate = 0.0
+            exp_mean = 0.0
+            shape = 0.0
+            scale = 0.0
+            weibull_ll = 0.0
+            weibull_mean = 0.0
+            aic_exp = 0.0
+            aic_weibull = 0.0
+            delta_aic = 0.0
+            extra_supported = False
+            stage = "waiting_law_selection_upstream_incomplete"
+            blocker = "interval_censored_persistence_fit"
+            next_required_action = "complete_interval_censored_persistence_fit"
+            selection_ready = False
+
+        rows.append(
+            {
+                "selection_id": selection_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "interval_clock_candidate_ready": float(interval.get("interval_clock_candidate_ready", 0.0) or 0.0),
+                "persistence_fit_ready": float(persistence.get("persistence_fit_ready", 0.0) or 0.0),
+                "waiting_law_selection_ready": float(selection_ready),
+                "exponential_rate_mle": float(exp_rate),
+                "exponential_mean_persistence_time": float(exp_mean),
+                "exponential_log_likelihood": float(exp_log_likelihood),
+                "exponential_aic": float(aic_exp),
+                "weibull_shape_mle": float(shape),
+                "weibull_scale_mle": float(scale),
+                "weibull_mean_persistence_time": float(weibull_mean),
+                "weibull_log_likelihood": float(weibull_ll),
+                "weibull_aic": float(aic_weibull),
+                "delta_aic_exponential_minus_weibull": float(delta_aic),
+                "min_delta_aic_for_extra_parameter": float(min_delta_aic_for_extra_parameter),
+                "extra_waiting_law_parameter_supported": float(extra_supported),
+                "observed_crossed_fraction": float(observed_crossed),
+                "right_censored_fraction": float(censored),
+                "latest_lag_time": float(latest),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_required_action,
+                "waiting_law_selection_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_finite_exchange_falsification_envelope(
     *,
     envelope_id: str,
@@ -13945,6 +14139,170 @@ def delayed_poisson_mean(t: np.ndarray, params: DelayedRenewalCageParams) -> np.
         (x**3) / 3.0 - (x**4) / 4.0 + 7.0 * (x**5) / 60.0
     )
     return np.where(x < 1e-3, series, direct)
+
+
+def gated_precursor_hazard(
+    t: np.ndarray,
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+) -> np.ndarray:
+    """Renewal hazard generated by independent exponential precursor gates."""
+
+    if asymptotic_rate <= 0.0:
+        raise ValueError("asymptotic_rate must be positive")
+    if precursor_time <= 0.0:
+        raise ValueError("precursor_time must be positive")
+    if int(precursor_count) != precursor_count or precursor_count < 1:
+        raise ValueError("precursor_count must be a positive integer")
+    t = np.asarray(t, dtype=float)
+    if np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative")
+    gate_probability = 1.0 - np.exp(-t / precursor_time)
+    return asymptotic_rate * gate_probability ** int(precursor_count)
+
+
+def gated_precursor_mean_count(
+    t: np.ndarray,
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+) -> np.ndarray:
+    """Integrated renewal hazard for an independent precursor-gated escape clock."""
+
+    t = np.asarray(t, dtype=float)
+    hazard = gated_precursor_hazard(
+        t,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    if int(precursor_count) == 1:
+        return asymptotic_rate * (t - precursor_time * (1.0 - np.exp(-t / precursor_time)))
+    if int(precursor_count) == 2:
+        params = DelayedRenewalCageParams(
+            cage_variance=1.0,
+            cage_tau=1.0,
+            jump_variance=1.0,
+            renewal_rate=asymptotic_rate,
+            renewal_delay=precursor_time,
+        )
+        return delayed_poisson_mean(t, params)
+
+    order = np.argsort(t)
+    sorted_t = t[order]
+    sorted_hazard = hazard[order]
+    cumulative = np.zeros_like(sorted_t)
+    if len(sorted_t) > 1:
+        dt = np.diff(sorted_t)
+        cumulative[1:] = np.cumsum(0.5 * (sorted_hazard[1:] + sorted_hazard[:-1]) * dt)
+    out = np.zeros_like(cumulative)
+    out[order] = cumulative
+    return out
+
+
+def gated_precursor_survival(
+    t: np.ndarray,
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+) -> np.ndarray:
+    """Survival probability for the first escape under a precursor-gated hazard."""
+
+    mean_count = gated_precursor_mean_count(
+        t,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    return np.exp(-mean_count)
+
+
+def precursor_escape_simulation_diagnostic(
+    *,
+    asymptotic_rate: float,
+    precursor_time: float,
+    precursor_count: int,
+    sample_count: int,
+    time_max: float,
+    bin_count: int,
+    seed: int,
+) -> dict[str, float | str]:
+    """Simulate first escapes from the precursor-gated hazard and compare to theory."""
+
+    if sample_count <= 0:
+        raise ValueError("sample_count must be positive")
+    if time_max <= 0.0:
+        raise ValueError("time_max must be positive")
+    if bin_count < 2:
+        raise ValueError("bin_count must be at least 2")
+
+    rng = np.random.default_rng(seed)
+    grid = np.linspace(0.0, time_max, max(5000, 80 * bin_count))
+    cumulative = gated_precursor_mean_count(
+        grid,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    survival = np.exp(-cumulative)
+    max_cdf = 1.0 - survival[-1]
+    uniforms = rng.random(sample_count)
+    finite_mask = uniforms < max_cdf
+    targets = -np.log1p(-uniforms[finite_mask])
+    samples = np.full(sample_count, time_max)
+    samples[finite_mask] = np.interp(targets, cumulative, grid)
+
+    edges = np.linspace(0.0, time_max, bin_count + 1)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    counts, _ = np.histogram(samples[finite_mask], bins=edges)
+    at_risk = np.array([np.count_nonzero(samples >= edge) for edge in edges[:-1]], dtype=float)
+    dt = edges[1] - edges[0]
+    empirical_hazard = np.divide(counts, at_risk * dt, out=np.zeros_like(at_risk), where=at_risk > 0.0)
+    theoretical_hazard = gated_precursor_hazard(
+        centers,
+        asymptotic_rate=asymptotic_rate,
+        precursor_time=precursor_time,
+        precursor_count=precursor_count,
+    )
+    mask = (at_risk > 0.1 * sample_count) & (theoretical_hazard > 0.05 * asymptotic_rate)
+    relative_errors = np.divide(
+        empirical_hazard[mask] - theoretical_hazard[mask],
+        theoretical_hazard[mask],
+        out=np.zeros(np.count_nonzero(mask)),
+        where=theoretical_hazard[mask] > 0.0,
+    )
+    hazard_rms = float(np.sqrt(np.mean(relative_errors**2))) if relative_errors.size else 0.0
+
+    analytic_mean = float(np.trapezoid(survival, grid))
+    sample_mean = float(np.mean(samples))
+    late_theoretical = float(theoretical_hazard[mask][-1]) if np.any(mask) else float(theoretical_hazard[-1])
+    late_empirical = float(empirical_hazard[mask][-1]) if np.any(mask) else float(empirical_hazard[-1])
+    late_relative = (
+        (late_empirical - late_theoretical) / late_theoretical
+        if late_theoretical > 0.0
+        else 0.0
+    )
+    return {
+        "asymptotic_rate": float(asymptotic_rate),
+        "precursor_time": float(precursor_time),
+        "precursor_count": float(precursor_count),
+        "sample_count": float(sample_count),
+        "time_max": float(time_max),
+        "bin_count": float(bin_count),
+        "hazard_rms_relative_error": hazard_rms,
+        "mean_escape_time": sample_mean,
+        "analytic_mean_escape_time": analytic_mean,
+        "mean_escape_time_relative_error": (sample_mean - analytic_mean) / analytic_mean
+        if analytic_mean > 0.0
+        else 0.0,
+        "late_hazard_relative_error": float(late_relative),
+        "full_many_body_first_principles_claim_allowed": 0.0,
+        "bridge_stage": "precursor_gated_langevin_escape_closure",
+    }
 
 
 def moments_1d(t: np.ndarray, params: DelayedRenewalCageParams) -> dict[str, np.ndarray]:
