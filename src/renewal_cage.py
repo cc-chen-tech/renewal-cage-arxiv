@@ -6144,6 +6144,112 @@ def glassbench_alpha_anchor_cached_fs_audit(
     return out
 
 
+def glassbench_direct_alpha_curve_audit(
+    *,
+    audit_id: str,
+    root_rows: Sequence[dict[str, object]],
+    curve_rows: Sequence[dict[str, object]],
+    threshold: float = math.exp(-1.0),
+) -> list[dict[str, float | str]]:
+    """Audit a cached structure-matched alpha curve at the direct k-root."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not root_rows:
+        raise ValueError("root_rows must be nonempty")
+    if threshold <= 0.0 or threshold >= 1.0:
+        raise ValueError("threshold must lie between zero and one")
+
+    curve_by_key: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for row in curve_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        curve_by_key.setdefault(key, []).append(row)
+
+    out: list[dict[str, float | str]] = []
+    for root in sorted(
+        root_rows,
+        key=lambda item: (
+            str(item.get("system_id", "unknown")),
+            float(item.get("temperature", 0.0)),
+            str(item.get("structure_id", "none")),
+        ),
+    ):
+        system_id = str(root.get("system_id", "unknown"))
+        temperature = str(root.get("temperature", "none"))
+        structure_id = str(root.get("structure_id", "none"))
+        direct_k = float(root.get("cached_direct_threshold_wave_number", 0.0) or 0.0)
+        root_ready = (
+            float(root.get("cached_direct_root_bracketed", 0.0) or 0.0) == 1.0
+            and direct_k > 0.0
+        )
+        group = sorted(
+            curve_by_key.get((system_id, temperature, structure_id), []),
+            key=lambda item: float(item.get("lag_time", 0.0) or 0.0),
+        )
+        lag_times = [float(row.get("lag_time", 0.0) or 0.0) for row in group]
+        time_codes = [str(row.get("time_code", "none")) for row in group]
+        fs_values = [float(row.get("direct_alpha_fs", 0.0) or 0.0) for row in group]
+        latest_fs = fs_values[-1] if fs_values else 0.0
+        latest_lag = lag_times[-1] if lag_times else 0.0
+        crossing_index = next((idx for idx, value in enumerate(fs_values) if value <= threshold), None)
+        crossed = crossing_index is not None
+        crossing_lag = lag_times[crossing_index] if crossing_index is not None else 0.0
+        crossing_code = time_codes[crossing_index] if crossing_index is not None else "none"
+        strictly_monotone = all(
+            fs_values[idx + 1] <= fs_values[idx] for idx in range(len(fs_values) - 1)
+        ) if len(fs_values) >= 2 else False
+        curve_ready = root_ready and len(group) >= 2 and crossed
+
+        if curve_ready:
+            stage = "cached_direct_alpha_curve_ready_event_clock_blocked"
+            blocker = "event_clock_trajectory"
+            next_action = "extract_particle_event_clock_at_direct_alpha_anchor"
+        elif root_ready and len(group) >= 2:
+            stage = "cached_direct_alpha_curve_prethreshold"
+            blocker = "alpha_threshold_crossing"
+            next_action = "extend_structure_matched_lag_window_at_direct_alpha_anchor"
+        elif root_ready:
+            stage = "cached_direct_alpha_curve_missing"
+            blocker = "cached_direct_alpha_curve"
+            next_action = "compute_structure_matched_direct_alpha_curve"
+        else:
+            stage = "cached_direct_alpha_root_upstream_incomplete"
+            blocker = "cached_direct_alpha_root"
+            next_action = "solve_cached_direct_alpha_anchor_before_curve_audit"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "direct_alpha_wave_number": float(direct_k),
+                "threshold": float(threshold),
+                "lag_count": float(len(group)),
+                "time_codes": ";".join(time_codes) if time_codes else "none",
+                "lag_times": ";".join(f"{value:.17g}" for value in lag_times) if lag_times else "none",
+                "direct_alpha_fs_curve": ";".join(f"{value:.17g}" for value in fs_values) if fs_values else "none",
+                "latest_lag_time": float(latest_lag),
+                "latest_direct_alpha_fs": float(latest_fs),
+                "alpha_threshold_crossed": float(crossed),
+                "threshold_crossing_lag_time": float(crossing_lag),
+                "threshold_crossing_time_code": crossing_code,
+                "strictly_monotone_decay": float(strictly_monotone),
+                "event_clock_trajectory_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "direct_alpha_curve_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,

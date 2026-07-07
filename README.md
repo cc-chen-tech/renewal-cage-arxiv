@@ -314,6 +314,12 @@ latest-lag `F_s(k)` grid gives a structure-specific estimate `k*=3.01`, but a
 direct bisection solve on the cached displacement tensor gives the stricter
 root `k_root=4.80`. This refines the next measurement target without promoting
 the result to an event-clock or thermodynamic claim.
+The direct-alpha curve audit then evaluates all eight cached structure-151 lag
+targets at this `k_root`: `F_s` decreases from `0.980` at `tc05` to `e^-1` at
+`tc40`, so the cached coordinate ladder now contains a real structure-matched
+alpha-threshold crossing. The audit still keeps `event_clock_trajectory_ready=0`
+and `real_pe_inversion_ready=0`, because the NPZ axis is an isoconfigurational
+replica axis rather than a physical event-clock trajectory.
 The SOTA dynamic-signature alignment ledger then joins model diagnostics,
 literature-level benchmarks, and the current GlassBench real curve. It marks
 MSD growth/cage escape and transient NGP as model+literature+real-curve
@@ -481,6 +487,7 @@ figures/renewal_cage_sota_glassbench_timecode_curve_bridge.svg
 figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.svg
 figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg
+figures/renewal_cage_sota_glassbench_direct_alpha_curve.svg
 figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
 figures/renewal_cage_sota_dynamic_signature_alignment.svg
 figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
@@ -583,6 +590,7 @@ data/renewal_cage_sota_glassbench_timecode_curve_bridge.csv
 data/renewal_cage_sota_glassbench_alpha_threshold_horizon.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.csv
 data/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.csv
+data/renewal_cage_sota_glassbench_direct_alpha_curve.csv
 data/renewal_cage_sota_glassbench_timecode_signature_support.csv
 data/renewal_cage_sota_dynamic_signature_alignment.csv
 data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
@@ -706,6 +714,7 @@ paper/figures/renewal_cage_sota_glassbench_timecode_curve_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf
 paper/figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf
+paper/figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf
 paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
 paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
 paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf

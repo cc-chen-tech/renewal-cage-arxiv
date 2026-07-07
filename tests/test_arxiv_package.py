@@ -1211,6 +1211,34 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_030["cached_anchor_stage"], "cached_anchor_upstream_incomplete")
         self.assertEqual(ka2d_030["primary_blocker"], "alpha_anchor_rescue_design")
 
+    def test_sota_glassbench_direct_alpha_curve_records_cached_threshold_crossing(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_direct_alpha_curve.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(
+            ka2d_023["direct_alpha_curve_stage"],
+            "cached_direct_alpha_curve_ready_event_clock_blocked",
+        )
+        self.assertAlmostEqual(float(ka2d_023["direct_alpha_wave_number"]), 4.7984485103142)
+        self.assertEqual(float(ka2d_023["lag_count"]), 8.0)
+        self.assertEqual(ka2d_023["threshold_crossing_time_code"], "tc40")
+        self.assertAlmostEqual(float(ka2d_023["threshold_crossing_lag_time"]), 1500000.0)
+        self.assertAlmostEqual(float(ka2d_023["latest_direct_alpha_fs"]), math.exp(-1.0))
+        self.assertEqual(float(ka2d_023["alpha_threshold_crossed"]), 1.0)
+        self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "event_clock_trajectory")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+        self.assertIn("0.979990664255", ka2d_023["direct_alpha_fs_curve"])
+        self.assertIn("0.367879441171", ka2d_023["direct_alpha_fs_curve"])
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2229,6 +2257,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2413,6 +2442,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_real_inversion_unlock_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf",
+            "figures/renewal_cage_sota_glassbench_direct_alpha_curve.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

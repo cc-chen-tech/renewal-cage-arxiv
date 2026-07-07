@@ -55,6 +55,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cage_jump_proxy_canary,
     glassbench_cached_particle_timecode_bridge,
     glassbench_cached_particle_observable_semantics_audit,
+    glassbench_direct_alpha_curve_audit,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_multilag_particle_cache_targets,
@@ -4068,6 +4069,64 @@ def write_sota_glassbench_alpha_anchor_cached_fs_csv(
         audit_id="glassbench_ka2d_alpha_anchor_cached_fs",
         rescue_rows=rescue_rows,
         cached_anchor_rows=cached_anchor_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_direct_alpha_curve_csv(
+    path: Path,
+    *,
+    root_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Compute the cached structure-matched alpha curve at the direct k-root."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    root_by_key = {
+        (str(row["system_id"]), str(row["temperature"]), str(row["structure_id"])): row
+        for row in root_rows
+        if float(row.get("cached_direct_root_bracketed", 0.0) or 0.0) == 1.0
+    }
+    curve_rows: list[dict[str, float | str]] = []
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            root = root_by_key.get(key)
+            if root is None:
+                continue
+            direct_k = float(root.get("cached_direct_threshold_wave_number", 0.0) or 0.0)
+            if direct_k <= 0.0:
+                continue
+            cache_path = ROOT / row["particle_cache_path"]
+            with np.load(cache_path) as npz:
+                positions = np.asarray(npz["positions"], dtype=float)
+                initial_positions = np.asarray(npz["initial_positions"], dtype=float)
+                box = float(np.asarray(npz["box"]))
+            reference_displacements = positions - initial_positions[None, :, :]
+            if math.isfinite(box) and box > 0.0:
+                reference_displacements = reference_displacements - box * np.round(reference_displacements / box)
+            dx = reference_displacements[:, :, 0]
+            dy = reference_displacements[:, :, 1]
+            direct_alpha_fs = float(
+                0.5 * (np.mean(np.cos(direct_k * dx)) + np.mean(np.cos(direct_k * dy)))
+            )
+            curve_rows.append(
+                {
+                    "system_id": row["system_id"],
+                    "temperature": row["temperature"],
+                    "structure_id": row["structure_id"],
+                    "time_code": row["time_code"],
+                    "lag_time": float(row["lag_time"]),
+                    "direct_alpha_wave_number": float(direct_k),
+                    "direct_alpha_fs": float(direct_alpha_fs),
+                }
+            )
+    rows = glassbench_direct_alpha_curve_audit(
+        audit_id="glassbench_ka2d_direct_alpha_curve",
+        root_rows=root_rows,
+        curve_rows=curve_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8557,6 +8616,59 @@ def write_sota_glassbench_alpha_anchor_cached_fs_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_direct_alpha_curve_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "cached_direct_alpha_curve_ready_event_clock_blocked": "#9f1239",
+        "cached_direct_alpha_curve_prethreshold": "#c05621",
+        "cached_direct_alpha_curve_missing": "#4a5568",
+        "cached_direct_alpha_root_upstream_incomplete": "#2b6cb0",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["direct_alpha_curve_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        k_root = float(row["direct_alpha_wave_number"])
+        latest_fs = float(row["latest_direct_alpha_fs"])
+        crossing_lag = float(row["threshold_crossing_lag_time"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; k_root={k_root:.3g}; lags={float(row["lag_count"]):.0f}; latest Fs={latest_fs:.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">crossed={int(float(row["alpha_threshold_crossed"]))}; crossing={row["threshold_crossing_time_code"]} at {crossing_lag:.3g}; monotone={int(float(row["strictly_monotone_decay"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha cached curve</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached structure-matched displacement ladder is evaluated at the direct k-root, separating alpha crossing from event-clock inversion.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">direct-alpha stage</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached alpha curve status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -11375,6 +11487,14 @@ def main() -> None:
     write_sota_glassbench_alpha_anchor_cached_fs_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_alpha_anchor_cached_fs.svg",
         glassbench_alpha_anchor_cached_fs_rows,
+    )
+    glassbench_direct_alpha_curve_rows = write_sota_glassbench_direct_alpha_curve_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.csv",
+        root_rows=glassbench_alpha_anchor_cached_fs_rows,
+    )
+    write_sota_glassbench_direct_alpha_curve_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_curve.svg",
+        glassbench_direct_alpha_curve_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

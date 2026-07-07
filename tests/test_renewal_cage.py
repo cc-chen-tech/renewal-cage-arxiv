@@ -136,6 +136,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_alpha_threshold_horizon_audit,
     glassbench_alpha_anchor_rescue_protocol,
     glassbench_alpha_anchor_cached_fs_audit,
+    glassbench_direct_alpha_curve_audit,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -504,6 +505,65 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["cached_alpha_anchor_rescue_ready"]), 0.0)
         self.assertEqual(float(row["post_rescue_real_closed_loop_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "cached_direct_anchor_wave_number_higher_than_protocol")
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_direct_alpha_curve_audit_marks_cached_curve_not_event_clock(self):
+        root_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "cached_direct_threshold_wave_number": 4.8,
+                "cached_direct_root_bracketed": 1.0,
+                "cached_anchor_stage": "cached_direct_anchor_root_refines_required_k",
+            }
+        ]
+        curve_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc05",
+                "lag_time": 0.1,
+                "direct_alpha_wave_number": 4.8,
+                "direct_alpha_fs": 0.98,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc10",
+                "lag_time": 1.1,
+                "direct_alpha_wave_number": 4.8,
+                "direct_alpha_fs": 0.88,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "time_code": "tc40",
+                "lag_time": 1500000.0,
+                "direct_alpha_wave_number": 4.8,
+                "direct_alpha_fs": math.exp(-1.0),
+            },
+        ]
+
+        row = glassbench_direct_alpha_curve_audit(
+            audit_id="glassbench_direct_alpha_curve",
+            root_rows=root_rows,
+            curve_rows=curve_rows,
+        )[0]
+
+        self.assertEqual(row["direct_alpha_curve_stage"], "cached_direct_alpha_curve_ready_event_clock_blocked")
+        self.assertEqual(float(row["direct_alpha_wave_number"]), 4.8)
+        self.assertEqual(float(row["lag_count"]), 3.0)
+        self.assertAlmostEqual(float(row["threshold_crossing_lag_time"]), 1500000.0)
+        self.assertEqual(row["threshold_crossing_time_code"], "tc40")
+        self.assertEqual(float(row["alpha_threshold_crossed"]), 1.0)
+        self.assertEqual(float(row["strictly_monotone_decay"]), 1.0)
+        self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "event_clock_trajectory")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
