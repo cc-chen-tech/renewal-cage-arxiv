@@ -157,6 +157,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_experiment_design,
     glassbench_late_recovery_uncertainty_verdict,
     glassbench_late_recovery_outcome_matrix,
+    glassbench_late_recovery_decision_power_plan,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1819,6 +1820,62 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
         self.assertEqual(float(wide["thermodynamic_claim_allowed"]), 0.0)
         self.assertEqual(wide["outcome_matrix_stage"], "tc50_outcome_matrix_preregistered")
+
+    def test_glassbench_late_recovery_decision_power_plan_quantifies_member_extension_needed(self):
+        outcome_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc50",
+                "outcome_scenario": "low_late_ngp_gaussian_recovery",
+                "synthetic_observed_late_ngp": 0.0125,
+                "synthetic_sigma_late_ngp": 0.0015,
+                "finite_exchange_support_margin": 0.0345,
+                "static_disorder_rejection_margin": 0.0845,
+                "uncertainty_decision_ready": 1.0,
+                "claim_if_observed": "finite_exchange_supported_static_disorder_rejected",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "target_time_code": "tc50",
+                "outcome_scenario": "wide_uncertainty_requires_more_data",
+                "synthetic_observed_late_ngp": 0.045,
+                "synthetic_sigma_late_ngp": 0.01,
+                "finite_exchange_support_margin": -0.015,
+                "static_disorder_rejection_margin": 0.035,
+                "uncertainty_decision_ready": 0.0,
+                "claim_if_observed": "no_mechanism_selection_claim",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+        ]
+
+        rows = glassbench_late_recovery_decision_power_plan(
+            plan_id="glassbench_late_recovery_decision_power_plan",
+            outcome_matrix_rows=outcome_rows,
+            current_member_count=8,
+        )
+
+        by_scenario = {row["outcome_scenario"]: row for row in rows}
+        sufficient = by_scenario["low_late_ngp_gaussian_recovery"]
+        wide = by_scenario["wide_uncertainty_requires_more_data"]
+
+        self.assertEqual(sufficient["decision_power_stage"], "decision_power_sufficient")
+        self.assertEqual(float(sufficient["required_member_count"]), 8.0)
+        self.assertEqual(float(sufficient["additional_member_count_needed"]), 0.0)
+        self.assertEqual(sufficient["next_required_action"], "record_tc50_observation_and_apply_preregistered_verdict")
+
+        self.assertEqual(wide["decision_power_stage"], "late_ngp_power_extension_required")
+        self.assertAlmostEqual(float(wide["inferred_max_finite_exchange_late_ngp"]), 0.05)
+        self.assertAlmostEqual(float(wide["required_sigma_late_ngp_for_decision"]), 0.0025)
+        self.assertAlmostEqual(float(wide["member_multiplier_needed"]), 16.0)
+        self.assertEqual(float(wide["required_member_count"]), 128.0)
+        self.assertEqual(float(wide["additional_member_count_needed"]), 120.0)
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+        self.assertEqual(float(wide["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

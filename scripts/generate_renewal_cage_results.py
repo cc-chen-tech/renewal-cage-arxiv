@@ -79,6 +79,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_late_recovery_experiment_design,
     glassbench_late_recovery_uncertainty_verdict,
     glassbench_late_recovery_outcome_matrix,
+    glassbench_late_recovery_decision_power_plan,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4666,6 +4667,22 @@ def write_sota_glassbench_late_recovery_outcome_matrix_csv(
     rows = glassbench_late_recovery_outcome_matrix(
         matrix_id="glassbench_ka2d_late_recovery_outcome_matrix",
         experiment_design_rows=experiment_design_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_decision_power_plan_csv(
+    path: Path,
+    *,
+    outcome_matrix_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the member-count power plan for tc50 late-recovery decisions."""
+
+    rows = glassbench_late_recovery_decision_power_plan(
+        plan_id="glassbench_ka2d_late_recovery_decision_power_plan",
+        outcome_matrix_rows=outcome_matrix_rows,
+        current_member_count=8,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10324,6 +10341,60 @@ def write_sota_glassbench_late_recovery_outcome_matrix_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_late_recovery_decision_power_plan_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 720
+    left, top = 76, 126
+    row_h = 66
+    colors = {
+        "decision_power_sufficient": "#2f855a",
+        "late_ngp_power_extension_required": "#c05621",
+        "mean_value_requires_model_rejection_not_more_precision": "#c53030",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["decision_power_stage"])
+        color = colors.get(stage, "#4a5568")
+        required = int(float(row["required_member_count"]))
+        current = int(float(row["current_member_count"]))
+        additional = int(float(row["additional_member_count_needed"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10.5" font-weight="700">{row["system_id"]} T={row["temperature"]} s={row["structure_id"]} {row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left}" y="{y + 33}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">{str(row["outcome_scenario"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 250}" y="{y - 7}" width="300" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 259}" y="{y + 11}" font-family="Arial, sans-serif" font-size="8.8" fill="#fff">{stage.replace("_", " ")[:50]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10">members current/required/additional = {current}/{required}/{additional}; multiplier={float(row["member_multiplier_needed"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">sigma late NGP current/required = {float(row["current_sigma_late_ngp"]):.3g}/{float(row["required_sigma_late_ngp_for_decision"]):.3g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 575}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:60]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench tc50 late-recovery decision power plan</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The outcome matrix is converted into required member counts, so indeterminate tc50 data cannot be over-promoted to mechanism selection.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target and scenario</text>
+  <text x="{left + 250}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">decision-power stage</text>
+  <text x="{left + 575}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member and uncertainty requirement</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13366,6 +13437,16 @@ def main() -> None:
     write_sota_glassbench_late_recovery_outcome_matrix_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.svg",
         glassbench_late_recovery_outcome_matrix_rows,
+    )
+    glassbench_late_recovery_decision_power_plan_rows = (
+        write_sota_glassbench_late_recovery_decision_power_plan_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv",
+            outcome_matrix_rows=glassbench_late_recovery_outcome_matrix_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_decision_power_plan_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.svg",
+        glassbench_late_recovery_decision_power_plan_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

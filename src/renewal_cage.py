@@ -8714,7 +8714,96 @@ def glassbench_late_recovery_outcome_matrix(
                     if design_ready
                     else "late_recovery_design_incomplete",
                 }
-            )
+        )
+    return rows
+
+
+def glassbench_late_recovery_decision_power_plan(
+    *,
+    plan_id: str,
+    outcome_matrix_rows: Sequence[dict[str, object]],
+    current_member_count: int,
+) -> list[dict[str, float | str]]:
+    """Estimate member-count extension needed for two-sigma late-recovery decisions."""
+
+    if not plan_id:
+        raise ValueError("plan_id must be nonempty")
+    if not outcome_matrix_rows:
+        raise ValueError("outcome_matrix_rows must be nonempty")
+    if current_member_count <= 0:
+        raise ValueError("current_member_count must be positive")
+
+    rows: list[dict[str, float | str]] = []
+    for outcome in outcome_matrix_rows:
+        observed_ngp = float(outcome.get("synthetic_observed_late_ngp", 0.0) or 0.0)
+        current_sigma = float(outcome.get("synthetic_sigma_late_ngp", 0.0) or 0.0)
+        finite_margin = float(outcome.get("finite_exchange_support_margin", 0.0) or 0.0)
+        static_margin = float(outcome.get("static_disorder_rejection_margin", 0.0) or 0.0)
+        decision_ready = float(outcome.get("uncertainty_decision_ready", 0.0) or 0.0) == 1.0
+        inferred_max_ngp = observed_ngp + 2.0 * current_sigma + finite_margin
+        if decision_ready:
+            required_sigma = current_sigma
+            member_multiplier = 1.0
+            required_members = float(current_member_count)
+            additional_members = 0.0
+            stage = "decision_power_sufficient"
+            blocker = "none"
+            next_action = "record_tc50_observation_and_apply_preregistered_verdict"
+        elif inferred_max_ngp > observed_ngp:
+            required_sigma = max((inferred_max_ngp - observed_ngp) / 2.0, 0.0)
+            if required_sigma > 0.0 and current_sigma > required_sigma:
+                member_multiplier = (current_sigma / required_sigma) ** 2
+                raw_required_members = current_member_count * member_multiplier
+                nearest_required_members = round(raw_required_members)
+                if math.isclose(raw_required_members, nearest_required_members, rel_tol=1e-12, abs_tol=1e-9):
+                    required_members = float(nearest_required_members)
+                else:
+                    required_members = float(math.ceil(raw_required_members))
+                additional_members = max(required_members - float(current_member_count), 0.0)
+                stage = "late_ngp_power_extension_required"
+                blocker = "late_ngp_uncertainty"
+                next_action = "increase_tc50_member_count_or_reduce_late_ngp_uncertainty"
+            else:
+                member_multiplier = 1.0
+                required_members = float(current_member_count)
+                additional_members = 0.0
+                stage = "decision_power_sufficient"
+                blocker = "none"
+                next_action = "record_tc50_observation_and_apply_preregistered_verdict"
+        else:
+            required_sigma = 0.0
+            member_multiplier = 0.0
+            required_members = float(current_member_count)
+            additional_members = 0.0
+            stage = "mean_value_requires_model_rejection_not_more_precision"
+            blocker = "late_ngp_mean"
+            next_action = "apply_rejection_path_if_late_recovery_measurement_confirms_mean"
+
+        rows.append(
+            {
+                "plan_id": plan_id,
+                "system_id": str(outcome.get("system_id", "unknown")),
+                "temperature": str(outcome.get("temperature", "none")),
+                "structure_id": str(outcome.get("structure_id", "none")),
+                "target_time_code": str(outcome.get("target_time_code", "none")),
+                "outcome_scenario": str(outcome.get("outcome_scenario", "unknown")),
+                "claim_if_observed": str(outcome.get("claim_if_observed", "none")),
+                "current_member_count": float(current_member_count),
+                "current_sigma_late_ngp": float(current_sigma),
+                "required_sigma_late_ngp_for_decision": float(required_sigma),
+                "member_multiplier_needed": float(member_multiplier),
+                "required_member_count": float(required_members),
+                "additional_member_count_needed": float(additional_members),
+                "inferred_max_finite_exchange_late_ngp": float(inferred_max_ngp),
+                "finite_exchange_support_margin": float(finite_margin),
+                "static_disorder_rejection_margin": float(static_margin),
+                "uncertainty_decision_ready": float(decision_ready),
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "decision_power_stage": stage,
+            }
+        )
     return rows
 
 

@@ -5247,6 +5247,79 @@ def write_sota_glassbench_late_recovery_outcome_matrix_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_late_recovery_decision_power_plan_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench tc50 late-recovery decision power plan")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The preregistered tc50 outcome matrix is converted into member-count requirements for two-sigma mechanism decisions.",
+    )
+    left, top = 42, page_h - 92
+    row_h = 46
+    colors_by_stage = {
+        "decision_power_sufficient": colors.HexColor("#2f855a"),
+        "late_ngp_power_extension_required": colors.HexColor("#c05621"),
+        "mean_value_requires_model_rejection_not_more_precision": colors.HexColor("#c53030"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "target/scenario")
+    c.drawString(left + 190, top + 18, "decision-power stage")
+    c.drawString(left + 430, top + 18, "member and uncertainty requirement")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["decision_power_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 6.8)
+        c.drawString(
+            left,
+            y,
+            f'{row["system_id"]} T={row["temperature"]} s={row["structure_id"]} {row["target_time_code"]}',
+        )
+        c.setFont("Helvetica", 6.1)
+        c.drawString(left, y - 12, row["outcome_scenario"].replace("_", " ")[:38])
+        c.setFillColor(color)
+        c.rect(left + 190, y - 12, 220, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 5.9)
+        c.drawString(left + 198, y - 3, stage.replace("_", " ")[:39])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.4)
+        c.drawString(
+            left + 430,
+            y,
+            "members {:.0f}->{:.0f} (+{:.0f}); multiplier={:.2g}; sigma {:.2g}->{:.2g}".format(
+                float(row["current_member_count"]),
+                float(row["required_member_count"]),
+                float(row["additional_member_count_needed"]),
+                float(row["member_multiplier_needed"]),
+                float(row["current_sigma_late_ngp"]),
+                float(row["required_sigma_late_ngp_for_decision"]),
+            ),
+        )
+        c.setFont("Helvetica", 5.9)
+        c.drawString(
+            left + 430,
+            y - 12,
+            f'blocker={row["primary_blocker"]}; next={row["next_required_action"].replace("_", " ")[:55]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Wide-error late data remain non-decisive until member or uncertainty requirements are met; thermodynamic claims remain out of scope.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -7570,6 +7643,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_late_recovery_outcome_matrix_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf"
     )
+    sota_glassbench_late_recovery_decision_power_plan_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -7800,6 +7876,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_late_recovery_outcome_matrix_pdf(
         sota_glassbench_late_recovery_outcome_matrix_pdf
+    )
+    write_sota_glassbench_late_recovery_decision_power_plan_pdf(
+        sota_glassbench_late_recovery_decision_power_plan_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -8090,6 +8169,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_late_recovery_outcome_matrix_pdf,
             "figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_decision_power_plan_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

@@ -1753,6 +1753,31 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(float(by_scenario["wide_uncertainty_requires_more_data"]["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_late_recovery_decision_power_plan_sizes_tc50_member_extension(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_decision_power_plan.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = [
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        ]
+        by_scenario = {row["outcome_scenario"]: row for row in ka2d_023}
+        sufficient = by_scenario["low_late_ngp_gaussian_recovery"]
+        wide = by_scenario["wide_uncertainty_requires_more_data"]
+
+        self.assertEqual(sufficient["decision_power_stage"], "decision_power_sufficient")
+        self.assertEqual(float(sufficient["additional_member_count_needed"]), 0.0)
+        self.assertEqual(wide["decision_power_stage"], "late_ngp_power_extension_required")
+        self.assertGreater(float(wide["member_multiplier_needed"]), 1.0)
+        self.assertEqual(float(wide["required_member_count"]), 128.0)
+        self.assertEqual(float(wide["additional_member_count_needed"]), 120.0)
+        self.assertGreater(float(wide["required_member_count"]), float(wide["current_member_count"]))
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+        self.assertEqual(float(wide["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2792,6 +2817,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2997,6 +3023,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_late_recovery_experiment_design.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.pdf",
             "figures/renewal_cage_sota_glassbench_late_recovery_outcome_matrix.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_decision_power_plan.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",
