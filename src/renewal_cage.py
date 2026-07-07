@@ -5814,6 +5814,176 @@ def glassbench_alpha_threshold_horizon_audit(
     return out
 
 
+def glassbench_microdynamic_closed_loop_audit(
+    *,
+    audit_id: str,
+    trajectory_rows: Sequence[dict[str, object]],
+    signature_rows: Sequence[dict[str, object]],
+    alpha_horizon_rows: Sequence[dict[str, object]],
+    min_frame_count: int = 2,
+    min_member_count: float = 4.0,
+    required_signature_count: float = 4.0,
+) -> list[dict[str, float | str]]:
+    """Audit whether real GlassBench microstatistics can support held-out predictions."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not trajectory_rows:
+        raise ValueError("trajectory_rows must be nonempty")
+    if not signature_rows:
+        raise ValueError("signature_rows must be nonempty")
+    if not alpha_horizon_rows:
+        raise ValueError("alpha_horizon_rows must be nonempty")
+    if min_frame_count <= 0:
+        raise ValueError("min_frame_count must be positive")
+    for name, value in {
+        "min_member_count": min_member_count,
+        "required_signature_count": required_signature_count,
+    }.items():
+        if value <= 0.0:
+            raise ValueError(f"{name} must be positive")
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    for row in trajectory_rows:
+        key = (str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))
+        grouped.setdefault(key, []).append(row)
+    signature_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in signature_rows
+    }
+    alpha_by_key = {
+        (str(row.get("system_id", "unknown")), str(row.get("temperature", "none"))): row
+        for row in alpha_horizon_rows
+    }
+
+    out: list[dict[str, float | str]] = []
+    for (system_id, temperature), group in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], float(item[0][1])),
+    ):
+        sorted_group = sorted(group, key=lambda row: float(row.get("frame_index", 0.0)))
+        source_paths = sorted({str(row.get("source_path", "none")) for row in sorted_group})
+        usable = [
+            row
+            for row in sorted_group
+            if float(row.get("frame_index_uncertainty_ready", 0.0)) == 1.0
+            and float(row.get("member_count", 0.0) or 0.0) >= min_member_count
+        ]
+        positive_usable = [row for row in usable if float(row.get("frame_index", 0.0)) > 0.0]
+        frame_microstats_ready = len(positive_usable) >= min_frame_count
+        physical_time_ready = frame_microstats_ready and all(
+            float(row.get("physical_time_ready", 0.0)) == 1.0 for row in positive_usable
+        )
+
+        msd_values = np.asarray([float(row.get("msd", 0.0) or 0.0) for row in positive_usable], dtype=float)
+        ngp_values = np.asarray([float(row.get("ngp_2d", 0.0) or 0.0) for row in positive_usable], dtype=float)
+        fs_decay_values: list[float] = []
+        for row in positive_usable:
+            fs_values = _parse_semicolon_float_values(
+                row.get("self_intermediate_scattering_by_k", "none"),
+                name="self_intermediate_scattering_by_k",
+            )
+            if fs_values:
+                fs_decay_values.append(max(0.0, 1.0 - min(fs_values)))
+        cage_length_proxy = float(math.sqrt(float(np.median(msd_values)))) if len(msd_values) else 0.0
+        short_frame_ngp_peak = float(np.max(ngp_values)) if len(ngp_values) else 0.0
+        short_frame_fs_decay = float(max(fs_decay_values)) if fs_decay_values else 0.0
+
+        signature = signature_by_key.get((system_id, temperature), {})
+        macro_signature_ready = (
+            float(signature.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+            and float(signature.get("supported_dynamical_signature_count", 0.0) or 0.0)
+            >= required_signature_count
+        )
+        macro_timecode_ready = float(signature.get("real_time_observable_curve_ready", 0.0) or 0.0) == 1.0
+        alpha = alpha_by_key.get((system_id, temperature), {})
+        alpha_definition_consistent = (
+            float(alpha.get("metadata_tau_alpha_consistent_with_anchor_fs", 0.0) or 0.0) == 1.0
+        )
+        real_pe_inversion_ready = float(signature.get("real_pe_inversion_ready", 0.0) or 0.0) == 1.0
+        cage_jump_clock_ready = False
+        micro_to_macro_prediction_ready = (
+            frame_microstats_ready
+            and physical_time_ready
+            and cage_jump_clock_ready
+            and macro_signature_ready
+            and alpha_definition_consistent
+            and real_pe_inversion_ready
+        )
+        closed_loop_ready = micro_to_macro_prediction_ready
+
+        missing: list[str] = []
+        if not frame_microstats_ready:
+            missing.append("frame_index_member_ensemble_microstatistics")
+        if not physical_time_ready:
+            missing.append("physical_time_semantics")
+        missing.append("cage_jump_event_segmentation")
+        missing.append("persistence_exchange_event_clock")
+        if not macro_timecode_ready:
+            missing.append("macro_timecode_curve")
+        if macro_timecode_ready and not macro_signature_ready:
+            missing.append("macro_dynamical_signatures")
+        if macro_timecode_ready and not alpha_definition_consistent:
+            missing.append("alpha_definition_consistency")
+        if macro_timecode_ready and not real_pe_inversion_ready:
+            missing.append("real_persistence_exchange_inversion")
+        missing = list(dict.fromkeys(missing))
+
+        if closed_loop_ready:
+            stage = "real_microdynamic_closed_loop_ready"
+            blocker = "none"
+            next_action = "run_heldout_micro_to_macro_prediction"
+        elif not macro_timecode_ready:
+            stage = "macro_timecode_upstream_incomplete"
+            blocker = str(signature.get("primary_blocker", "macro_timecode_curve"))
+            next_action = "complete_real_timecode_curve_before_closed_loop_prediction"
+        elif frame_microstats_ready and macro_signature_ready:
+            stage = "real_microstats_macro_signatures_closed_loop_blocked"
+            blocker = missing[0] if missing else "closed_loop_prediction"
+            next_action = "attach_frame_time_mapping_and_extract_cage_jump_events"
+        elif frame_microstats_ready:
+            stage = "real_microstats_macro_signature_incomplete"
+            blocker = "macro_dynamical_signatures"
+            next_action = "complete_real_timecode_signature_support"
+        else:
+            stage = "trajectory_microstatistics_upstream_incomplete"
+            blocker = missing[0] if missing else "trajectory_microstatistics"
+            next_action = "extract_member_ensemble_frame_microstatistics"
+
+        out.append(
+            {
+                "audit_id": audit_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_paths": ";".join(source_paths) if source_paths else "none",
+                "frame_count": float(len(sorted_group)),
+                "usable_frame_count": float(len(positive_usable)),
+                "member_count_minimum": float(min_member_count),
+                "cage_length_proxy": cage_length_proxy,
+                "short_frame_ngp_peak": short_frame_ngp_peak,
+                "short_frame_fs_decay": short_frame_fs_decay,
+                "frame_index_microstats_ready": float(frame_microstats_ready),
+                "physical_time_microstats_ready": float(physical_time_ready),
+                "cage_jump_clock_ready": 0.0,
+                "macro_timecode_ready": float(macro_timecode_ready),
+                "macro_signature_ready": float(macro_signature_ready),
+                "macro_signature_count": float(
+                    signature.get("supported_dynamical_signature_count", 0.0) or 0.0
+                ),
+                "alpha_definition_consistent": float(alpha_definition_consistent),
+                "real_pe_inversion_ready": float(real_pe_inversion_ready),
+                "micro_to_macro_prediction_ready": float(micro_to_macro_prediction_ready),
+                "closed_loop_ready": float(closed_loop_ready),
+                "missing_closed_loop_inputs": ";".join(missing) if missing else "none",
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "closed_loop_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_timecode_signature_support_gate(
     *,
     support_id: str,

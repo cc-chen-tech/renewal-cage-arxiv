@@ -3622,6 +3622,79 @@ def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench microdynamic closed-loop audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Real frame-index microstatistics, real macro dynamical signatures, and missing cage-jump clock inputs are separated.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "real_microdynamic_closed_loop_ready": colors.HexColor("#2f855a"),
+        "real_microstats_macro_signatures_closed_loop_blocked": colors.HexColor("#9f1239"),
+        "real_microstats_macro_signature_incomplete": colors.HexColor("#c05621"),
+        "macro_timecode_upstream_incomplete": colors.HexColor("#2b6cb0"),
+        "trajectory_microstatistics_upstream_incomplete": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "closed-loop stage")
+    c.drawString(left + 370, top + 24, "micro-to-macro evidence status")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["closed_loop_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 252, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:44])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 370,
+            y,
+            "frame microstats={}; macro signatures={}; prediction={}; blocker={}".format(
+                int(float(row["frame_index_microstats_ready"])),
+                int(float(row["macro_signature_ready"])),
+                int(float(row["micro_to_macro_prediction_ready"])),
+                row["primary_blocker"],
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 370,
+            y - 14,
+            "cage proxy={:.3g}; short NGP peak={:.3g}; short Fs decay={:.3g}; signatures={:.0f}".format(
+                float(row["cage_length_proxy"]),
+                float(row["short_frame_ngp_peak"]),
+                float(row["short_frame_fs_decay"]),
+                float(row["macro_signature_count"]),
+            ),
+        )
+        c.drawString(left + 370, y - 27, f'missing={row["missing_closed_loop_inputs"][:82]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This convergence audit blocks held-out micro-to-macro prediction claims until cage jumps and clocks are extracted.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_visible_member_ensemble_audit_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -5178,6 +5251,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
+    sota_glassbench_microdynamic_closed_loop_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
+    )
     sota_glassbench_visible_member_ensemble_audit_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_visible_member_ensemble_audit.pdf"
     )
@@ -5311,6 +5387,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
+    )
+    write_sota_glassbench_microdynamic_closed_loop_pdf(
+        sota_glassbench_microdynamic_closed_loop_pdf
     )
     write_sota_glassbench_trajectory_npz_ensemble_horizon_pdf(
         sota_glassbench_trajectory_npz_ensemble_horizon_pdf
@@ -5486,6 +5565,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_dynamic_signature_alignment_pdf,
             "figures/renewal_cage_sota_dynamic_signature_alignment.pdf",
+        )
+        archive.write(
+            sota_glassbench_microdynamic_closed_loop_pdf,
+            "figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf",
         )
         archive.write(
             sota_glassbench_trajectory_npz_ensemble_horizon_pdf,

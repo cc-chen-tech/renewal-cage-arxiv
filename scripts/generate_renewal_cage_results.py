@@ -50,6 +50,7 @@ from renewal_cage import (  # noqa: E402
     gamma_exchange_diagnostic_map,
     gamma_exchange_temperature_scan,
     glassbench_alpha_threshold_horizon_audit,
+    glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
     infer_gamma_exchange_multik_collapse,
@@ -3957,6 +3958,25 @@ def write_sota_dynamic_signature_alignment_csv(
         claim_rows=claim_alignment_rows,
         literature_rows=literature_readiness_rows,
         glassbench_signature_rows=glassbench_signature_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_microdynamic_closed_loop_csv(
+    path: Path,
+    *,
+    trajectory_rows: list[dict[str, float | str]],
+    signature_rows: list[dict[str, float | str]],
+    alpha_horizon_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Audit the real trajectory-microstatistics to macro-signature closed loop."""
+
+    rows = glassbench_microdynamic_closed_loop_audit(
+        audit_id="glassbench_ka2d_microdynamic_closed_loop",
+        trajectory_rows=trajectory_rows,
+        signature_rows=signature_rows,
+        alpha_horizon_rows=alpha_horizon_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -8814,6 +8834,60 @@ def write_persistence_exchange_uncertainty_protocol_svg(path: Path, rows: list[d
     path.write_text(svg)
 
 
+def write_sota_glassbench_microdynamic_closed_loop_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1160, 350
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "real_microdynamic_closed_loop_ready": "#2f855a",
+        "real_microstats_macro_signatures_closed_loop_blocked": "#9f1239",
+        "real_microstats_macro_signature_incomplete": "#c05621",
+        "macro_timecode_upstream_incomplete": "#2b6cb0",
+        "trajectory_microstatistics_upstream_incomplete": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["closed_loop_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        cage = float(row["cage_length_proxy"])
+        ngp_peak = float(row["short_frame_ngp_peak"])
+        fs_decay = float(row["short_frame_fs_decay"])
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="390" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">frame microstats={int(float(row["frame_index_microstats_ready"]))}; macro signatures={int(float(row["macro_signature_ready"]))}; prediction={int(float(row["micro_to_macro_prediction_ready"]))}; blocker={row["primary_blocker"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">cage length proxy={cage:.3g}; short-frame NGP peak={ngp_peak:.3g}; short-frame Fs decay={fs_decay:.3g}; signatures={float(row["macro_signature_count"]):.0f}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">missing={str(row["missing_closed_loop_inputs"]).replace("_", " ")[:86]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench microdynamic closed-loop audit</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The audit separates real frame-index microstatistics, real macro dynamical signatures, and the missing cage-jump clock required for held-out prediction.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">closed-loop stage</text>
+  <text x="{left + 545}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">micro-to-macro evidence status</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 660
@@ -10106,6 +10180,16 @@ def main() -> None:
     write_sota_dynamic_signature_alignment_svg(
         FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.svg",
         dynamic_signature_alignment_rows,
+    )
+    microdynamic_closed_loop_rows = write_sota_glassbench_microdynamic_closed_loop_csv(
+        DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv",
+        trajectory_rows=glassbench_trajectory_member_ensemble_observable_rows,
+        signature_rows=glassbench_timecode_signature_support_rows,
+        alpha_horizon_rows=glassbench_alpha_threshold_horizon_rows,
+    )
+    write_sota_glassbench_microdynamic_closed_loop_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.svg",
+        microdynamic_closed_loop_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

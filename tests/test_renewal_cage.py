@@ -134,6 +134,7 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_frame_time_mapping_audit_gate,
     sota_glassbench_first_npz_structural_observable_plan_gate,
     glassbench_alpha_threshold_horizon_audit,
+    glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
     glassbench_timecode_curve_bridge,
     sota_glassbench_ka2d_timecode_semantics_gate,
@@ -386,6 +387,82 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(float(row["estimated_lag_extension_factor"]), 1.0)
         self.assertEqual(row["primary_blocker"], "anchor_wave_number_or_alpha_definition_mismatch")
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
+        trajectory_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 0.0,
+                "member_count": 4.0,
+                "msd": 0.0,
+                "ngp_2d": 0.0,
+                "self_intermediate_scattering_by_k": "1;1;1",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 1.0,
+                "member_count": 4.0,
+                "msd": 0.006,
+                "ngp_2d": 0.08,
+                "self_intermediate_scattering_by_k": "0.999;0.998;0.996",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "source_path": "GlassBench/KA2D_trajectories/T0.23.tar.xz",
+                "frame_index": 2.0,
+                "member_count": 4.0,
+                "msd": 0.008,
+                "ngp_2d": 0.05,
+                "self_intermediate_scattering_by_k": "0.998;0.997;0.995",
+                "frame_index_uncertainty_ready": 1.0,
+                "physical_time_ready": 0.0,
+            },
+        ]
+        signature_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "real_time_observable_curve_ready": 1.0,
+                "real_pe_inversion_ready": 0.0,
+                "supported_dynamical_signature_count": 4.0,
+                "alpha_threshold_crossed": 0.0,
+                "primary_blocker": "alpha_threshold_crossing",
+            }
+        ]
+        alpha_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "metadata_tau_alpha_consistent_with_anchor_fs": 0.0,
+                "primary_blocker": "anchor_wave_number_or_alpha_definition_mismatch",
+            }
+        ]
+
+        row = glassbench_microdynamic_closed_loop_audit(
+            audit_id="glassbench_microdynamic_closed_loop",
+            trajectory_rows=trajectory_rows,
+            signature_rows=signature_rows,
+            alpha_horizon_rows=alpha_rows,
+        )[0]
+
+        self.assertEqual(row["closed_loop_stage"], "real_microstats_macro_signatures_closed_loop_blocked")
+        self.assertEqual(float(row["frame_index_microstats_ready"]), 1.0)
+        self.assertEqual(float(row["physical_time_microstats_ready"]), 0.0)
+        self.assertEqual(float(row["macro_signature_ready"]), 1.0)
+        self.assertEqual(float(row["micro_to_macro_prediction_ready"]), 0.0)
+        self.assertEqual(float(row["closed_loop_ready"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "physical_time_semantics")
+        self.assertIn("cage_jump_event_segmentation", row["missing_closed_loop_inputs"])
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
