@@ -8590,6 +8590,130 @@ def glassbench_late_recovery_uncertainty_verdict(
                     "next_required_action": next_action,
                     "uncertainty_verdict_stage": stage,
                 }
+        )
+    return rows
+
+
+def glassbench_late_recovery_outcome_matrix(
+    *,
+    matrix_id: str,
+    experiment_design_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Pre-register possible tc50 late-recovery outcomes and their claims."""
+
+    if not matrix_id:
+        raise ValueError("matrix_id must be nonempty")
+    if not experiment_design_rows:
+        raise ValueError("experiment_design_rows must be nonempty")
+
+    rows: list[dict[str, float | str]] = []
+    scenarios = [
+        (
+            "low_late_ngp_gaussian_recovery",
+            0.25,
+            0.03,
+            1.0,
+            0.04,
+        ),
+        (
+            "high_late_ngp_or_missing_recovery",
+            1.8,
+            0.06,
+            0.0,
+            0.04,
+        ),
+        (
+            "wide_uncertainty_requires_more_data",
+            0.9,
+            0.2,
+            1.0,
+            0.04,
+        ),
+    ]
+
+    for design in experiment_design_rows:
+        system_id = str(design.get("system_id", "unknown"))
+        temperature = str(design.get("temperature", "none"))
+        structure_id = str(design.get("structure_id", "none"))
+        target_time_code = str(design.get("required_time_code", "none"))
+        design_ready = (
+            float(design.get("late_recovery_claim_ready_after_measurement", 0.0) or 0.0) == 1.0
+        )
+        minimum_lag = float(design.get("minimum_required_lag_time", 0.0) or 0.0)
+        planned_lag = float(design.get("planned_lag_time", 0.0) or 0.0)
+        max_finite_ngp = float(design.get("max_finite_exchange_late_ngp", 0.0) or 0.0)
+        static_plateau = float(design.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+
+        for scenario, ngp_factor, sigma_factor, recovery, sigma_recovery in scenarios:
+            observed_late_ngp = max_finite_ngp * ngp_factor
+            sigma_late_ngp = max_finite_ngp * sigma_factor
+            protocol = {
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "envelope_ready": float(design_ready),
+                "required_followup_lag_time": minimum_lag,
+                "max_finite_exchange_late_ngp": max_finite_ngp,
+                "static_gamma_late_ngp_plateau": static_plateau,
+            }
+            ingestion = {
+                "candidate_id": f"{system_id}:{temperature}:{structure_id}:{scenario}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "observed_lag_time": planned_lag,
+                "observed_late_ngp": observed_late_ngp,
+                "sigma_late_ngp": sigma_late_ngp,
+                "observed_tail_gaussian_recovery": recovery,
+                "sigma_tail_recovery": sigma_recovery,
+                "late_recovery_observation_ready": float(design_ready),
+                "primary_blocker": str(design.get("primary_blocker", "late_recovery_observation")),
+            }
+            verdict = glassbench_late_recovery_uncertainty_verdict(
+                verdict_id=f"{matrix_id}_{scenario}",
+                late_recovery_protocol_rows=[protocol],
+                ingestion_rows=[ingestion],
+            )[0]
+            stage = str(verdict["uncertainty_verdict_stage"])
+            if stage == "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected":
+                claim = "finite_exchange_supported_static_disorder_rejected"
+                action = "extract_exchange_clock_for_persistence_exchange_inversion"
+            elif stage == "uncertainty_weighted_finite_exchange_rejected":
+                claim = "finite_exchange_rejected_or_model_reparameterization_required"
+                action = "reject_or_reparameterize_finite_exchange_mechanism"
+            elif design_ready:
+                claim = "no_mechanism_selection_claim"
+                action = "reduce_late_recovery_uncertainty_or_add_later_lag_observation"
+            else:
+                claim = "no_late_recovery_claim"
+                action = "complete_late_recovery_experiment_design"
+
+            rows.append(
+                {
+                    "matrix_id": matrix_id,
+                    "system_id": system_id,
+                    "temperature": temperature,
+                    "structure_id": structure_id,
+                    "target_time_code": target_time_code,
+                    "outcome_scenario": scenario,
+                    "synthetic_observed_lag_time": float(planned_lag),
+                    "synthetic_observed_late_ngp": float(observed_late_ngp),
+                    "synthetic_sigma_late_ngp": float(sigma_late_ngp),
+                    "synthetic_tail_recovery": float(recovery),
+                    "synthetic_sigma_tail_recovery": float(sigma_recovery),
+                    "predicted_uncertainty_verdict_stage": stage,
+                    "finite_exchange_support_margin": float(verdict["finite_exchange_support_margin"]),
+                    "static_disorder_rejection_margin": float(verdict["static_disorder_rejection_margin"]),
+                    "tail_recovery_support_margin": float(verdict["tail_recovery_support_margin"]),
+                    "uncertainty_decision_ready": float(verdict["uncertainty_decision_ready"]),
+                    "claim_if_observed": claim,
+                    "next_required_action_if_observed": action,
+                    "primary_blocker": str(verdict["primary_blocker"]),
+                    "thermodynamic_claim_allowed": 0.0,
+                    "outcome_matrix_stage": "tc50_outcome_matrix_preregistered"
+                    if design_ready
+                    else "late_recovery_design_incomplete",
+                }
             )
     return rows
 

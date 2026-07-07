@@ -78,6 +78,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_sota_public_window_verdict,
     glassbench_late_recovery_experiment_design,
     glassbench_late_recovery_uncertainty_verdict,
+    glassbench_late_recovery_outcome_matrix,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4650,6 +4651,21 @@ def write_sota_glassbench_late_recovery_uncertainty_verdict_csv(
         verdict_id="glassbench_ka2d_late_recovery_uncertainty_verdict",
         late_recovery_protocol_rows=late_recovery_protocol_rows,
         ingestion_rows=ingestion_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_late_recovery_outcome_matrix_csv(
+    path: Path,
+    *,
+    experiment_design_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write pre-registered tc50 outcome paths before observing late data."""
+
+    rows = glassbench_late_recovery_outcome_matrix(
+        matrix_id="glassbench_ka2d_late_recovery_outcome_matrix",
+        experiment_design_rows=experiment_design_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10255,6 +10271,59 @@ def write_sota_glassbench_late_recovery_uncertainty_verdict_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_late_recovery_outcome_matrix_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1230, 720
+    left, top = 76, 126
+    row_h = 66
+    colors = {
+        "finite_exchange_supported_static_disorder_rejected": "#2f855a",
+        "finite_exchange_rejected_or_model_reparameterization_required": "#c53030",
+        "no_mechanism_selection_claim": "#805ad5",
+        "no_late_recovery_claim": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        claim = str(row["claim_if_observed"])
+        color = colors.get(claim, "#4a5568")
+        ready = int(float(row["uncertainty_decision_ready"]))
+        marks.append(
+            f'<text x="{left}" y="{y + 13}" font-family="Arial, sans-serif" font-size="10.5" font-weight="700">{row["system_id"]} T={row["temperature"]} s={row["structure_id"]} {row["target_time_code"]}</text>'
+        )
+        marks.append(
+            f'<text x="{left}" y="{y + 33}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">{str(row["outcome_scenario"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 250}" y="{y - 7}" width="320" height="26" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 259}" y="{y + 11}" font-family="Arial, sans-serif" font-size="8.5" fill="#fff">{claim.replace("_", " ")[:56]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10">decision={ready}; NGP={float(row["synthetic_observed_late_ngp"]):.3g} +/- {float(row["synthetic_sigma_late_ngp"]):.2g}; recovery={float(row["synthetic_tail_recovery"]):.1g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 30}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">verdict={str(row["predicted_uncertainty_verdict_stage"]).replace("_", " ")[:76]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 595}" y="{y + 50}" font-family="Arial, sans-serif" font-size="9.5" fill="#555">finite margin={float(row["finite_exchange_support_margin"]):.3g}; static margin={float(row["static_disorder_rejection_margin"]):.3g}; blocker={str(row["primary_blocker"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="76" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench tc50 late-recovery outcome matrix</text>
+  <text x="76" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Possible tc50 observations are pre-registered as support, rejection, or indeterminate outcomes before late data are available.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target and scenario</text>
+  <text x="{left + 250}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim if observed</text>
+  <text x="{left + 595}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">two-sigma verdict inputs</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_dynamic_signature_alignment_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -13287,6 +13356,16 @@ def main() -> None:
     write_sota_glassbench_late_recovery_uncertainty_verdict_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_uncertainty_verdict.svg",
         glassbench_late_recovery_uncertainty_verdict_rows,
+    )
+    glassbench_late_recovery_outcome_matrix_rows = (
+        write_sota_glassbench_late_recovery_outcome_matrix_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.csv",
+            experiment_design_rows=glassbench_late_recovery_experiment_design_rows,
+        )
+    )
+    write_sota_glassbench_late_recovery_outcome_matrix_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_outcome_matrix.svg",
+        glassbench_late_recovery_outcome_matrix_rows,
     )
     observable_falsification_rows = write_observable_falsification_matrix_csv(
         DATA_DIR / "renewal_cage_observable_falsification_matrix.csv",

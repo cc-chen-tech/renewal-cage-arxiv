@@ -156,6 +156,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_sota_public_window_verdict,
     glassbench_late_recovery_experiment_design,
     glassbench_late_recovery_uncertainty_verdict,
+    glassbench_late_recovery_outcome_matrix,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1768,6 +1769,56 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(wide["static_disorder_uncertainty_rejected"]), 1.0)
         self.assertEqual(float(wide["uncertainty_decision_ready"]), 0.0)
         self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+
+    def test_glassbench_late_recovery_outcome_matrix_preregisters_support_reject_and_indeterminate_paths(self):
+        design_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "required_time_code": "tc50",
+                "minimum_required_lag_time": 42972781.2315918,
+                "planned_lag_time": 166002226.81761542,
+                "planned_lag_over_minimum_required": 3.862962136962582,
+                "max_finite_exchange_late_ngp": 0.05,
+                "static_gamma_late_ngp_plateau": 0.1,
+                "late_recovery_claim_ready_after_measurement": 1.0,
+                "experiment_design_stage": "minimal_tc50_followup_ready",
+            }
+        ]
+
+        rows = glassbench_late_recovery_outcome_matrix(
+            matrix_id="glassbench_late_recovery_outcome_matrix",
+            experiment_design_rows=design_rows,
+        )
+
+        by_scenario = {row["outcome_scenario"]: row for row in rows}
+        support = by_scenario["low_late_ngp_gaussian_recovery"]
+        reject = by_scenario["high_late_ngp_or_missing_recovery"]
+        wide = by_scenario["wide_uncertainty_requires_more_data"]
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(support["target_time_code"], "tc50")
+        self.assertEqual(
+            support["predicted_uncertainty_verdict_stage"],
+            "uncertainty_weighted_finite_exchange_supported_static_disorder_rejected",
+        )
+        self.assertEqual(support["claim_if_observed"], "finite_exchange_supported_static_disorder_rejected")
+        self.assertGreater(float(support["finite_exchange_support_margin"]), 0.0)
+        self.assertGreater(float(support["static_disorder_rejection_margin"]), 0.0)
+        self.assertEqual(float(support["uncertainty_decision_ready"]), 1.0)
+
+        self.assertEqual(reject["predicted_uncertainty_verdict_stage"], "uncertainty_weighted_finite_exchange_rejected")
+        self.assertEqual(reject["claim_if_observed"], "finite_exchange_rejected_or_model_reparameterization_required")
+        self.assertLess(float(reject["finite_exchange_support_margin"]), 0.0)
+        self.assertEqual(float(reject["uncertainty_decision_ready"]), 1.0)
+
+        self.assertEqual(wide["predicted_uncertainty_verdict_stage"], "late_recovery_uncertainty_indeterminate")
+        self.assertEqual(wide["claim_if_observed"], "no_mechanism_selection_claim")
+        self.assertEqual(float(wide["uncertainty_decision_ready"]), 0.0)
+        self.assertEqual(wide["primary_blocker"], "late_ngp_uncertainty")
+        self.assertEqual(float(wide["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(wide["outcome_matrix_stage"], "tc50_outcome_matrix_preregistered")
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [
