@@ -878,6 +878,9 @@ class DelayedRenewalCageTests(unittest.TestCase):
                     "replica_spread_msd": 0.00186,
                     "initial_reference_msd": 0.00350,
                     "initial_reference_ngp_2d": 0.00048,
+                    "initial_reference_fs_by_k": [0.99, 0.97],
+                    "initial_reference_fs_formula": "axis_average_cos_xy",
+                    "single_axis_x_fs_by_k": [0.98, 0.95],
                     "initial_reference_positions_ready": 1.0,
                     "particle_resolved_positions_cached": 1.0,
                 }
@@ -890,6 +893,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
                     "member": "T0.23/test/N1290T0.23_151_tc05.npz",
                     "msd": 0.003511,
                     "ngp_2d": 0.00047,
+                    "self_intermediate_scattering_by_k": [0.9901, 0.9698],
                 }
             ],
             max_reproducible_relative_error=0.05,
@@ -898,8 +902,11 @@ class DelayedRenewalCageTests(unittest.TestCase):
         row = rows[0]
         self.assertLess(float(row["initial_reference_msd_relative_error"]), 0.05)
         self.assertLess(float(row["initial_reference_ngp_2d_relative_error"]), 0.05)
+        self.assertLess(float(row["initial_reference_fs_max_abs_error"]), 0.001)
         self.assertEqual(float(row["official_displacement_observable_reproducible"]), 1.0)
         self.assertEqual(float(row["official_ngp_2d_reproducible"]), 1.0)
+        self.assertEqual(float(row["official_fs_reproducible"]), 1.0)
+        self.assertEqual(row["initial_reference_fs_formula"], "axis_average_cos_xy")
         self.assertEqual(float(row["event_clock_trajectory_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "none")
         self.assertEqual(row["observable_semantics_stage"], "official_displacement_observable_reproduced")

@@ -4161,6 +4161,8 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
 
     cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
     semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    semantics_manifest = json.loads(semantics_path.read_text(encoding="utf-8"))
+    wave_numbers = [float(value) for value in semantics_manifest.get("wave_numbers", [])]
     cached_rows: list[dict[str, float | str]] = []
     with cache_manifest_path.open() as f:
         for row in csv.DictReader(f):
@@ -4187,6 +4189,8 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
             cached_ngp_2d_proxy = float(r4 / (2.0 * replica_spread_msd * replica_spread_msd) - 1.0) if replica_spread_msd > 0 else 0.0
             initial_reference_msd = 0.0
             initial_reference_ngp_2d = 0.0
+            initial_reference_fs_by_k: list[float] = []
+            single_axis_x_fs_by_k: list[float] = []
             if initial_positions is not None and initial_positions.shape == positions.shape[1:]:
                 reference_displacements = positions - initial_positions[None, :, :]
                 if math.isfinite(box) and box > 0.0:
@@ -4208,6 +4212,13 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
                     )
                 else:
                     initial_reference_ngp_2d = 0.0
+                dx = reference_displacements[:, :, 0]
+                dy = reference_displacements[:, :, 1]
+                for wave_number in wave_numbers:
+                    single_axis_x_fs_by_k.append(float(np.mean(np.cos(wave_number * dx))))
+                    initial_reference_fs_by_k.append(
+                        float(0.5 * (np.mean(np.cos(wave_number * dx)) + np.mean(np.cos(wave_number * dy))))
+                    )
             else:
                 pooled_initial_reference_ngp_2d = 0.0
             cached_rows.append(
@@ -4225,12 +4236,14 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
                     "initial_reference_ngp_2d": initial_reference_ngp_2d,
                     "initial_reference_ngp_2d_formula": "mean_replica_alpha2_2d",
                     "pooled_initial_reference_ngp_2d": pooled_initial_reference_ngp_2d,
+                    "initial_reference_fs_by_k": initial_reference_fs_by_k,
+                    "initial_reference_fs_formula": "axis_average_cos_xy",
+                    "single_axis_x_fs_by_k": single_axis_x_fs_by_k,
                     "initial_reference_positions_ready": initial_reference_ready,
                     "particle_resolved_positions_cached": 1.0,
                 }
             )
 
-    semantics_manifest = json.loads(semantics_path.read_text(encoding="utf-8"))
     official_rows: list[dict[str, float | str]] = []
     for entry in semantics_manifest.get("entries", []):
         if not isinstance(entry, dict):
@@ -4246,6 +4259,9 @@ def write_sota_glassbench_cached_particle_observable_semantics_csv(
                     "member": str(member.get("member", "none")),
                     "msd": float(member.get("msd", 0.0) or 0.0),
                     "ngp_2d": float(member.get("ngp_2d", 0.0) or 0.0),
+                    "self_intermediate_scattering_by_k": [
+                        float(value) for value in member.get("self_intermediate_scattering_by_k", [])
+                    ],
                 }
             )
     rows = glassbench_cached_particle_observable_semantics_audit(
@@ -9584,12 +9600,12 @@ def write_sota_glassbench_cached_particle_observable_semantics_svg(
             f'<text x="{left + 153}" y="{y + 12}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:54]}</text>'
         )
         marks.append(
-            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">MSD ref err={float(row["initial_reference_msd_relative_error"]):.2g}; NGP ref err={float(row["initial_reference_ngp_2d_relative_error"]):.2g}; pooled NGP err={float(row["pooled_initial_reference_ngp_2d_relative_error"]):.2g}; init ref={int(float(row["initial_reference_positions_ready"]))}</text>'
+            f'<text x="{left + 500}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">MSD err={float(row["initial_reference_msd_relative_error"]):.2g}; NGP err={float(row["initial_reference_ngp_2d_relative_error"]):.2g}; Fs err={float(row["initial_reference_fs_max_abs_error"]):.2g}; x-Fs err={float(row["single_axis_x_fs_max_abs_error"]):.2g}</text>'
         )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />
   <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench cached-particle observable semantics</text>
-  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached initial references reproduce official MSD and mean-replica NGP; raw coordinates and pooled NGP remain rejected proxies.</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Cached initial references reproduce official MSD, mean-replica NGP, and axis-averaged multi-k Fs; proxy conventions are rejected.</text>
   <text x="{left}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
   <text x="{left + 145}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">observable semantics stage</text>
   <text x="{left + 500}" y="{top - 22}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cached-coordinate audit</text>

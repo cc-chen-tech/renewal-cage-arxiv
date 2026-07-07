@@ -1562,10 +1562,14 @@ averaging convention: the official two-dimensional NGP is the mean over
 isoconfigurational replicas of each replica's alpha-two value, not a pooled
 ratio over all replicas and particles. With that convention the cached
 displacements reproduce the official NGP as well, while the raw coordinate MSD
-and pooled NGP remain rejected proxies. Thus the archive-to-observable
-semantic gap is closed for MSD and NGP on this fixed-lag ladder; the remaining
-promotion blockers are event segmentation, persistence/exchange clocks, and
-alpha-threshold coverage, not displacement-observable reproducibility.
+and pooled NGP remain rejected proxies. Finally, the same displacement tensor
+reproduces the official multi-\(k\) self-intermediate scattering when
+\(F_s(k,t)\) is computed as the average of the \(x\)- and \(y\)-axis cosine
+projections; a single-axis convention is rejected by the audit. Thus the
+archive-to-observable semantic gap is closed for MSD, NGP, and multi-\(k\)
+\(F_s\) on this fixed-lag ladder; the remaining promotion blockers are event
+segmentation, persistence/exchange clocks, and alpha-threshold coverage, not
+fixed-lag observable reproducibility.
 
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out

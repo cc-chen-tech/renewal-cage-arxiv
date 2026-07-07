@@ -1371,6 +1371,22 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertLess(float(tc30["initial_reference_ngp_2d_relative_error"]), 1.0e-12)
         self.assertEqual(float(tc30["official_ngp_2d_reproducible"]), 1.0)
 
+    def test_sota_glassbench_cached_particle_observable_semantics_reproduces_official_fs_formula(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_cached_particle_observable_semantics.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        tc40 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151" and row["time_code"] == "tc40"
+        )
+        self.assertEqual(tc40["initial_reference_fs_formula"], "axis_average_cos_xy")
+        self.assertLess(float(tc40["initial_reference_fs_max_abs_error"]), 1.0e-12)
+        self.assertGreater(float(tc40["single_axis_x_fs_max_abs_error"]), 1.0e-3)
+        self.assertEqual(float(tc40["official_fs_reproducible"]), 1.0)
+
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
         self.assertTrue(path.exists())

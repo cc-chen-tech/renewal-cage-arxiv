@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Sequence
 from dataclasses import dataclass
 import hashlib
 import math
@@ -6436,6 +6437,17 @@ def glassbench_cached_particle_observable_semantics_audit(
 ) -> list[dict[str, float | str]]:
     """Audit whether cached coordinate observables reproduce official displacement observables."""
 
+    def parse_float_list(value: object) -> list[float]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            if not value or value == "none":
+                return []
+            return [float(item) for item in value.split(";") if item]
+        if isinstance(value, Sequence):
+            return [float(item) for item in value]
+        return []
+
     if not audit_id:
         raise ValueError("audit_id must be nonempty")
     if not cached_observable_rows:
@@ -6476,11 +6488,14 @@ def glassbench_cached_particle_observable_semantics_audit(
         )
         official_msd = float(official.get("msd", 0.0) or 0.0) if official else 0.0
         official_ngp_2d = float(official.get("ngp_2d", 0.0) or 0.0) if official else 0.0
+        official_fs = parse_float_list(official.get("self_intermediate_scattering_by_k", [])) if official else []
         raw_coordinate_msd = float(row.get("raw_coordinate_msd", 0.0) or 0.0)
         replica_spread_msd = float(row.get("replica_spread_msd", 0.0) or 0.0)
         initial_reference_msd = float(row.get("initial_reference_msd", 0.0) or 0.0)
         initial_reference_ngp_2d = float(row.get("initial_reference_ngp_2d", 0.0) or 0.0)
         pooled_initial_reference_ngp_2d = float(row.get("pooled_initial_reference_ngp_2d", 0.0) or 0.0)
+        initial_reference_fs = parse_float_list(row.get("initial_reference_fs_by_k", []))
+        single_axis_x_fs = parse_float_list(row.get("single_axis_x_fs_by_k", []))
         denominator = max(abs(official_msd), 1.0e-12)
         raw_rel_error = abs(raw_coordinate_msd - official_msd) / denominator
         spread_rel_error = abs(replica_spread_msd - official_msd) / denominator
@@ -6490,6 +6505,10 @@ def glassbench_cached_particle_observable_semantics_audit(
         pooled_initial_reference_ngp_rel_error = (
             abs(pooled_initial_reference_ngp_2d - official_ngp_2d) / ngp_denominator
         )
+        fs_abs_errors = [abs(a - b) for a, b in zip(initial_reference_fs, official_fs)]
+        single_axis_x_fs_abs_errors = [abs(a - b) for a, b in zip(single_axis_x_fs, official_fs)]
+        initial_reference_fs_max_abs_error = max(fs_abs_errors) if fs_abs_errors else math.inf
+        single_axis_x_fs_max_abs_error = max(single_axis_x_fs_abs_errors) if single_axis_x_fs_abs_errors else math.inf
         cached_ready = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
         initial_ready = float(row.get("initial_reference_positions_ready", 0.0) or 0.0) == 1.0
         official_available = official_msd > 0.0
@@ -6548,6 +6567,18 @@ def glassbench_cached_particle_observable_semantics_audit(
                     initial_ready
                     and official_available
                     and initial_reference_ngp_rel_error <= max_reproducible_relative_error
+                ),
+                "official_fs_by_k": ";".join(f"{value:.17g}" for value in official_fs),
+                "initial_reference_fs_by_k": ";".join(f"{value:.17g}" for value in initial_reference_fs),
+                "initial_reference_fs_formula": str(row.get("initial_reference_fs_formula", "unspecified")),
+                "initial_reference_fs_max_abs_error": float(initial_reference_fs_max_abs_error),
+                "single_axis_x_fs_by_k": ";".join(f"{value:.17g}" for value in single_axis_x_fs),
+                "single_axis_x_fs_max_abs_error": float(single_axis_x_fs_max_abs_error),
+                "official_fs_reproducible": float(
+                    initial_ready
+                    and len(initial_reference_fs) == len(official_fs)
+                    and bool(official_fs)
+                    and initial_reference_fs_max_abs_error <= max_reproducible_relative_error
                 ),
                 "cached_coordinate_proxy_ready": float(cached_ready),
                 "initial_reference_positions_ready": float(initial_ready),
