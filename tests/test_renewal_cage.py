@@ -137,6 +137,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
+    glassbench_multilag_particle_cache_targets,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -726,6 +727,100 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(row["primary_blocker"], "frame_axis_is_isoconfigurational_replicates")
         self.assertEqual(row["next_required_action"], "extract_multi_lag_particle_cache_or_true_trajectory")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_multilag_particle_cache_targets_selects_structure_ladder(self):
+        semantics_manifest = {
+            "entries": [
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "tau_alpha": 918306.0,
+                    "members": [
+                        {
+                            "member": "T0.23/test/N1290T0.23_151_tc05.npz",
+                            "member_md5": "md5-151-05",
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "lag_time_over_tau_alpha": 1.1e-7,
+                            "structure_id": 151,
+                        },
+                        {
+                            "member": "T0.23/test/N1290T0.23_151_tc10.npz",
+                            "member_md5": "md5-151-10",
+                            "time_code": "tc10",
+                            "lag_time": 1.1,
+                            "lag_time_over_tau_alpha": 1.2e-6,
+                            "structure_id": 151,
+                        },
+                        {
+                            "member": "T0.23/test/N1290T0.23_151_tc15.npz",
+                            "member_md5": "md5-151-15",
+                            "time_code": "tc15",
+                            "lag_time": 11.64,
+                            "lag_time_over_tau_alpha": 1.3e-5,
+                            "structure_id": 151,
+                        },
+                        {
+                            "member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                            "member_md5": "md5-202-05",
+                            "time_code": "tc05",
+                            "lag_time": 0.1,
+                            "lag_time_over_tau_alpha": 1.1e-7,
+                            "structure_id": 202,
+                        },
+                    ],
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "tau_alpha": 2200.0,
+                    "members": [
+                        {
+                            "member": "T0.30/train/N1290T0.30_10_tc01.npz",
+                            "member_md5": "md5-10-01",
+                            "time_code": "tc01",
+                            "lag_time": 0.11,
+                            "lag_time_over_tau_alpha": 5.0e-5,
+                            "structure_id": 10,
+                        }
+                    ],
+                },
+            ]
+        }
+        cache_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "first_npz_member": "T0.23/test/N1290T0.23_202_tc05.npz",
+                "npz_member_md5": "md5-202-05",
+                "particle_resolved_positions_cached": 1.0,
+            }
+        ]
+
+        rows = glassbench_multilag_particle_cache_targets(
+            target_id="glassbench_multilag_particle_cache_targets",
+            semantics_manifest=semantics_manifest,
+            cache_rows=cache_rows,
+            minimum_time_codes=3,
+        )
+        by_temp = {row["temperature"]: row for row in rows}
+
+        cold = by_temp["0.23"]
+        self.assertEqual(cold["selected_structure_id"], "151")
+        self.assertEqual(cold["selected_time_codes"], "tc05;tc10;tc15")
+        self.assertEqual(float(cold["official_multi_lag_ladder_ready"]), 1.0)
+        self.assertEqual(float(cold["target_member_count"]), 3.0)
+        self.assertEqual(float(cold["cached_target_member_count"]), 0.0)
+        self.assertEqual(float(cold["particle_lag_ladder_cache_ready"]), 0.0)
+        self.assertEqual(float(cold["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(cold["primary_blocker"], "multi_lag_particle_cache_missing")
+        self.assertEqual(cold["next_required_action"], "extract_structure_matched_multi_lag_npz_members")
+        self.assertEqual(float(cold["thermodynamic_claim_allowed"]), 0.0)
+
+        warm = by_temp["0.30"]
+        self.assertEqual(float(warm["official_multi_lag_ladder_ready"]), 0.0)
+        self.assertEqual(float(warm["target_member_count"]), 1.0)
+        self.assertEqual(warm["primary_blocker"], "official_multi_lag_semantics")
 
     def test_dynamic_signature_alignment_ledger_combines_model_literature_and_real_curve(self):
         claim_rows = [

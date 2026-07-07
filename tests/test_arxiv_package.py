@@ -1286,6 +1286,29 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertAlmostEqual(float(ka2d_030["lag_time"]), 0.11)
         self.assertEqual(float(ka2d_030["physical_lag_time_ready"]), 1.0)
 
+    def test_sota_glassbench_multilag_particle_cache_targets_identifies_next_members(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_key = {(row["system_id"], row["temperature"]): row for row in rows}
+        ka2d_023 = by_key[("KA2D", "0.23")]
+        self.assertEqual(ka2d_023["selected_structure_id"], "151")
+        self.assertEqual(float(ka2d_023["official_multi_lag_ladder_ready"]), 1.0)
+        self.assertEqual(float(ka2d_023["target_member_count"]), 8.0)
+        self.assertEqual(float(ka2d_023["cached_target_member_count"]), 0.0)
+        self.assertIn("T0.23/test/N1290T0.23_151_tc40.npz", ka2d_023["target_members"])
+        self.assertIn("5160feded6ec1a1f366a6e55a7d33f70", ka2d_023["target_member_md5s"])
+        self.assertEqual(float(ka2d_023["particle_lag_ladder_cache_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["event_clock_trajectory_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "multi_lag_particle_cache_missing")
+
+        ka2d_030 = by_key[("KA2D", "0.30")]
+        self.assertEqual(float(ka2d_030["official_multi_lag_ladder_ready"]), 0.0)
+        self.assertEqual(float(ka2d_030["target_member_count"]), 1.0)
+        self.assertEqual(ka2d_030["primary_blocker"], "official_multi_lag_semantics")
+
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
         self.assertTrue(path.exists())
@@ -2064,6 +2087,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf", names)
@@ -2258,6 +2282,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_trajectory_event_clock_macro_predictions.pdf",
             "figures/renewal_cage_trajectory_event_clock_threshold_robustness.pdf",
             "figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf",
+            "figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf",
             "figures/renewal_cage_sota_glassbench_event_clock_threshold_readiness.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_particle_cache_contract.pdf",
             "figures/renewal_cage_trajectory_uncertainty_protocol.pdf",

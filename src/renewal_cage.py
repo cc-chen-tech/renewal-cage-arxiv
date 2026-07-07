@@ -6282,6 +6282,149 @@ def glassbench_cached_particle_timecode_bridge(
     return out
 
 
+def glassbench_multilag_particle_cache_targets(
+    *,
+    target_id: str,
+    semantics_manifest: dict[str, object],
+    cache_rows: Sequence[dict[str, object]],
+    minimum_time_codes: int,
+) -> list[dict[str, float | str]]:
+    """Select structure-matched multi-lag NPZ members needed for particle caches."""
+
+    if not target_id:
+        raise ValueError("target_id must be nonempty")
+    if int(minimum_time_codes) != minimum_time_codes or minimum_time_codes < 2:
+        raise ValueError("minimum_time_codes must be an integer >= 2")
+    entries = semantics_manifest.get("entries", [])
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("semantics_manifest entries must be nonempty")
+
+    cached_members: set[tuple[str, str, str, str]] = set()
+    for row in cache_rows:
+        cached = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) == 1.0
+        if not cached:
+            continue
+        cached_members.add(
+            (
+                str(row.get("system_id", "unknown")),
+                str(row.get("temperature", "none")),
+                str(row.get("first_npz_member", "none")),
+                str(row.get("npz_member_md5", "none")),
+            )
+        )
+
+    out: list[dict[str, float | str]] = []
+    for entry in sorted(
+        entries,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        if not isinstance(entry, dict):
+            continue
+        system_id = str(entry.get("system_id", "unknown"))
+        temperature = str(entry.get("temperature", "none"))
+        source_path = str(entry.get("source_path", "none"))
+        tau_alpha = float(entry.get("tau_alpha", 0.0) or 0.0)
+        by_structure: dict[str, list[dict[str, object]]] = {}
+        for member in entry.get("members", []):
+            if not isinstance(member, dict):
+                continue
+            structure_id = str(member.get("structure_id", "none"))
+            by_structure.setdefault(structure_id, []).append(member)
+
+        ladders: list[tuple[int, float, str, list[dict[str, object]]]] = []
+        for structure_id, members in by_structure.items():
+            dedup: dict[str, dict[str, object]] = {}
+            for member in members:
+                time_code = str(member.get("time_code", "none"))
+                current = dedup.get(time_code)
+                if current is None or float(member.get("lag_time", 0.0) or 0.0) < float(
+                    current.get("lag_time", 0.0) or 0.0
+                ):
+                    dedup[time_code] = member
+            ladder = sorted(dedup.values(), key=lambda item: float(item.get("lag_time", 0.0) or 0.0))
+            if not ladder:
+                continue
+            lag_span = float(ladder[-1].get("lag_time", 0.0) or 0.0) - float(
+                ladder[0].get("lag_time", 0.0) or 0.0
+            )
+            ladders.append((len(ladder), lag_span, structure_id, ladder))
+
+        def structure_sort_value(structure_id: str) -> float:
+            try:
+                return float(structure_id)
+            except ValueError:
+                return float("inf")
+
+        if ladders:
+            ladders.sort(key=lambda item: (-item[0], -item[1], structure_sort_value(item[2]), item[2]))
+            _, lag_span, selected_structure_id, selected_ladder = ladders[0]
+        else:
+            lag_span = 0.0
+            selected_structure_id = "none"
+            selected_ladder = []
+
+        target_keys = [
+            (
+                system_id,
+                temperature,
+                str(member.get("member", "none")),
+                str(member.get("member_md5", "none")),
+            )
+            for member in selected_ladder
+        ]
+        cached_target_count = sum(1 for key in target_keys if key in cached_members)
+        target_count = len(selected_ladder)
+        official_ready = target_count >= int(minimum_time_codes)
+        particle_cache_ready = official_ready and cached_target_count == target_count and target_count > 0
+        event_clock_ready = False
+
+        if event_clock_ready:
+            stage = "multi_lag_particle_event_clock_ready"
+            blocker = "none"
+            next_action = "run_structure_matched_event_clock_threshold_sweep"
+        elif particle_cache_ready:
+            stage = "multi_lag_particle_cache_ready_event_clock_axis_blocked"
+            blocker = "frame_axis_is_isoconfigurational_replicates"
+            next_action = "derive_event_clock_from_structure_matched_replicates"
+        elif official_ready:
+            stage = "official_multi_lag_ladder_ready_cache_missing"
+            blocker = "multi_lag_particle_cache_missing"
+            next_action = "extract_structure_matched_multi_lag_npz_members"
+        else:
+            stage = "official_multi_lag_ladder_incomplete"
+            blocker = "official_multi_lag_semantics"
+            next_action = "extend_official_timecode_member_ladder"
+
+        out.append(
+            {
+                "target_id": f"{target_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "source_path": source_path,
+                "selected_structure_id": selected_structure_id,
+                "selected_time_codes": ";".join(str(member.get("time_code", "none")) for member in selected_ladder),
+                "target_members": ";".join(str(member.get("member", "none")) for member in selected_ladder),
+                "target_member_md5s": ";".join(str(member.get("member_md5", "none")) for member in selected_ladder),
+                "target_lag_times": ";".join(str(float(member.get("lag_time", 0.0) or 0.0)) for member in selected_ladder),
+                "tau_alpha": float(tau_alpha),
+                "target_member_count": float(target_count),
+                "minimum_time_codes": float(minimum_time_codes),
+                "cached_target_member_count": float(cached_target_count),
+                "missing_target_member_count": float(max(0, target_count - cached_target_count)),
+                "lag_span": float(lag_span),
+                "official_multi_lag_ladder_ready": float(official_ready),
+                "particle_lag_ladder_cache_ready": float(particle_cache_ready),
+                "event_clock_trajectory_ready": float(event_clock_ready),
+                "heldout_macro_prediction_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "target_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_microdynamic_closed_loop_audit(
     *,
     audit_id: str,

@@ -54,6 +54,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_timecode_bridge,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_first_npz_particle_cache_contract_gate,
+    glassbench_multilag_particle_cache_targets,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_curve_bridge,
     glassbench_timecode_signature_support_gate,
@@ -4124,6 +4125,25 @@ def write_sota_glassbench_cached_particle_timecode_bridge_csv(
         bridge_id="glassbench_cached_particle_timecode_bridge",
         cache_rows=cache_rows,
         semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_multilag_particle_cache_targets_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    """List structure-matched multi-lag NPZ members needed for particle caches."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_first_npz_particle_cache_manifest.csv"
+    semantics_path = DATA_DIR / "third_party" / "glassbench" / "ka2d_trajectory_timecode_semantics_10118191.json"
+    with cache_manifest_path.open() as f:
+        cache_rows = list(csv.DictReader(f))
+    rows = glassbench_multilag_particle_cache_targets(
+        target_id="glassbench_multilag_particle_cache_targets",
+        semantics_manifest=json.loads(semantics_path.read_text(encoding="utf-8")),
+        cache_rows=cache_rows,
+        minimum_time_codes=3,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -9377,6 +9397,56 @@ def write_sota_glassbench_cached_particle_timecode_bridge_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_multilag_particle_cache_targets_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1260, 360
+    left, top = 70, 122
+    row_h = 90
+    colors = {
+        "multi_lag_particle_event_clock_ready": "#2f855a",
+        "multi_lag_particle_cache_ready_event_clock_axis_blocked": "#805ad5",
+        "official_multi_lag_ladder_ready_cache_missing": "#b7791f",
+        "official_multi_lag_ladder_incomplete": "#9f1239",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["target_stage"])
+        color = colors.get(stage, "#4a5568")
+        target = f'{row["system_id"]} T={row["temperature"]}'
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 130}" y="{y - 6}" width="410" height="27" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["selected_structure_id"]}; codes={row["selected_time_codes"]}; members={int(float(row["target_member_count"]))}; cached={int(float(row["cached_target_member_count"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">lag span={float(row["lag_span"]):.3g}; official ladder={int(float(row["official_multi_lag_ladder_ready"]))}; particle ladder cache={int(float(row["particle_lag_ladder_cache_ready"]))}; event clock={int(float(row["event_clock_trajectory_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={row["primary_blocker"]}; next={str(row["next_required_action"]).replace("_", " ")}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench multi-lag particle-cache targets</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Official structure-matched time-code ladders identify exactly which NPZ members must be cached before a particle-level event-clock test.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">cache-target stage</text>
+  <text x="{left + 565}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">structure-matched lag ladder</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_observable_falsification_matrix_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1180, 660
@@ -10847,6 +10917,15 @@ def main() -> None:
     write_sota_glassbench_cached_particle_timecode_bridge_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg",
         glassbench_cached_particle_timecode_bridge_rows,
+    )
+    glassbench_multilag_particle_cache_targets_rows = (
+        write_sota_glassbench_multilag_particle_cache_targets_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv"
+        )
+    )
+    write_sota_glassbench_multilag_particle_cache_targets_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg",
+        glassbench_multilag_particle_cache_targets_rows,
     )
     glassbench_event_clock_threshold_readiness_rows = (
         write_sota_glassbench_event_clock_threshold_readiness_csv(
