@@ -146,6 +146,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_interval_censored_first_crossing_clock,
     glassbench_interval_censored_persistence_fit,
     glassbench_finite_exchange_falsification_envelope,
+    glassbench_late_recovery_falsification_protocol,
     glassbench_cage_jump_proxy_canary,
     glassbench_event_clock_threshold_readiness_gate,
     glassbench_cached_particle_timecode_bridge,
@@ -1037,6 +1038,69 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "late_ngp_followup_and_exchange_clock")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_late_recovery_protocol_classifies_support_and_rejection(self):
+        envelope_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "structure_id": "151",
+                "envelope_ready": 1.0,
+                "gaussian_recovery_lag_upper_bound": 42972781.2315918,
+                "conditional_persistence_exchange_ratio_lower_bound": 3.6485208210611972,
+                "primary_blocker": "late_ngp_followup_and_exchange_clock",
+            }
+        ]
+        support = glassbench_late_recovery_falsification_protocol(
+            protocol_id="glassbench_late_recovery_protocol",
+            envelope_rows=envelope_rows,
+            late_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.012,
+                    "observed_tail_gaussian_recovery": 1.0,
+                    "static_gamma_late_ngp_plateau": 0.24,
+                }
+            ],
+            max_finite_exchange_late_ngp=0.05,
+            min_static_plateau_rejection_gap=0.05,
+        )[0]
+        reject = glassbench_late_recovery_falsification_protocol(
+            protocol_id="glassbench_late_recovery_protocol",
+            envelope_rows=envelope_rows,
+            late_observable_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "observed_lag_time": 50000000.0,
+                    "observed_late_ngp": 0.16,
+                    "observed_tail_gaussian_recovery": 0.0,
+                    "static_gamma_late_ngp_plateau": 0.24,
+                }
+            ],
+            max_finite_exchange_late_ngp=0.05,
+            min_static_plateau_rejection_gap=0.05,
+        )[0]
+
+        self.assertEqual(support["late_recovery_stage"], "finite_exchange_late_recovery_supported")
+        self.assertEqual(float(support["mechanism_selection_ready"]), 1.0)
+        self.assertEqual(float(support["finite_exchange_supported"]), 1.0)
+        self.assertEqual(float(support["finite_exchange_rejected"]), 0.0)
+        self.assertEqual(float(support["static_disorder_rejected"]), 1.0)
+        self.assertEqual(float(support["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(support["primary_blocker"], "exchange_clock")
+        self.assertEqual(float(support["thermodynamic_claim_allowed"]), 0.0)
+
+        self.assertEqual(reject["late_recovery_stage"], "finite_exchange_late_recovery_failed")
+        self.assertEqual(float(reject["mechanism_selection_ready"]), 1.0)
+        self.assertEqual(float(reject["finite_exchange_supported"]), 0.0)
+        self.assertEqual(float(reject["finite_exchange_rejected"]), 1.0)
+        self.assertEqual(float(reject["static_disorder_rejected"]), 0.0)
+        self.assertEqual(reject["primary_blocker"], "late_gaussian_recovery")
 
     def test_glassbench_microdynamic_closed_loop_audit_keeps_real_data_blockers_explicit(self):
         trajectory_rows = [

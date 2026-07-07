@@ -4422,6 +4422,79 @@ def write_sota_glassbench_finite_exchange_envelope_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_late_recovery_protocol_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench late recovery falsification protocol")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Late-NGP or van-Hove recovery observations are classified as finite-exchange support, rejection, or acquisition-required.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 72
+    colors_by_stage = {
+        "late_recovery_acquisition_required": colors.HexColor("#b7791f"),
+        "finite_exchange_late_recovery_supported": colors.HexColor("#2f855a"),
+        "finite_exchange_late_recovery_failed": colors.HexColor("#c53030"),
+        "late_recovery_protocol_upstream_incomplete": colors.HexColor("#4a5568"),
+        "late_recovery_lag_insufficient": colors.HexColor("#805ad5"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "protocol stage")
+    c.drawString(left + 395, top + 24, "mechanism falsification state")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["late_recovery_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 278, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:50])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.4)
+        c.drawString(
+            left + 395,
+            y,
+            "structure={}; required lag={:.3g}; observed lag={:.3g}; mechanism ready={:.0f}".format(
+                row["structure_id"],
+                float(row["required_followup_lag_time"]),
+                float(row["observed_lag_time"]),
+                float(row["mechanism_selection_ready"]),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 395,
+            y - 14,
+            "finite supported={:.0f}; finite rejected={:.0f}; static rejected={:.0f}; late NGP={:.3g}".format(
+                float(row["finite_exchange_supported"]),
+                float(row["finite_exchange_rejected"]),
+                float(row["static_disorder_rejected"]),
+                float(row["observed_late_ngp"]),
+            ),
+        )
+        c.drawString(left + 395, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:44]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Current GlassBench rows remain acquisition-required until a sufficiently late recovery observable is measured.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_dynamic_signature_alignment_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_dynamic_signature_alignment.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -6712,6 +6785,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_finite_exchange_envelope_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_finite_exchange_envelope.pdf"
     )
+    sota_glassbench_late_recovery_protocol_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_late_recovery_protocol.pdf"
+    )
     sota_dynamic_signature_alignment_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_dynamic_signature_alignment.pdf"
     )
@@ -6909,6 +6985,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_finite_exchange_envelope_pdf(
         sota_glassbench_finite_exchange_envelope_pdf
+    )
+    write_sota_glassbench_late_recovery_protocol_pdf(
+        sota_glassbench_late_recovery_protocol_pdf
     )
     write_sota_dynamic_signature_alignment_pdf(
         sota_dynamic_signature_alignment_pdf
@@ -7155,6 +7234,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_finite_exchange_envelope_pdf,
             "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
+        )
+        archive.write(
+            sota_glassbench_late_recovery_protocol_pdf,
+            "figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf",
         )
         archive.write(
             sota_dynamic_signature_alignment_pdf,

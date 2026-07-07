@@ -1472,6 +1472,27 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(ka2d_023["primary_blocker"], "late_ngp_followup_and_exchange_clock")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_sota_glassbench_late_recovery_protocol_keeps_followup_missing_explicit(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_late_recovery_protocol.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        ka2d_023 = next(
+            row for row in rows
+            if row["system_id"] == "KA2D" and row["temperature"] == "0.23"
+            and row["structure_id"] == "151"
+        )
+        self.assertEqual(ka2d_023["late_recovery_stage"], "late_recovery_acquisition_required")
+        self.assertEqual(float(ka2d_023["mechanism_selection_ready"]), 0.0)
+        self.assertEqual(float(ka2d_023["finite_exchange_supported"]), 0.0)
+        self.assertEqual(float(ka2d_023["finite_exchange_rejected"]), 0.0)
+        self.assertEqual(float(ka2d_023["static_disorder_rejected"]), 0.0)
+        self.assertAlmostEqual(float(ka2d_023["required_followup_lag_time"]), 42972781.2315918, delta=1e-3)
+        self.assertEqual(float(ka2d_023["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(ka2d_023["primary_blocker"], "late_recovery_observation")
+        self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
+
     def test_sota_glassbench_microdynamic_closed_loop_marks_real_blockers(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv"
         self.assertTrue(path.exists())
@@ -2500,6 +2521,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf", names)
@@ -2694,6 +2716,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",
             "figures/renewal_cage_sota_glassbench_interval_censored_persistence_fit.pdf",
             "figures/renewal_cage_sota_glassbench_finite_exchange_envelope.pdf",
+            "figures/renewal_cage_sota_glassbench_late_recovery_protocol.pdf",
             "figures/renewal_cage_sota_glassbench_observable_coverage_audit.pdf",
             "figures/renewal_cage_sota_glassbench_first_npz_structural_observable_plan.pdf",
             "figures/renewal_cage_literature_inversion_readiness.pdf",

@@ -7334,6 +7334,122 @@ def glassbench_finite_exchange_falsification_envelope(
     return rows
 
 
+def glassbench_late_recovery_falsification_protocol(
+    *,
+    protocol_id: str,
+    envelope_rows: Sequence[dict[str, object]],
+    late_observable_rows: Sequence[dict[str, object]],
+    max_finite_exchange_late_ngp: float = 0.05,
+    min_static_plateau_rejection_gap: float = 0.05,
+) -> list[dict[str, float | str]]:
+    """Classify late-NGP / van-Hove follow-up measurements against mechanisms."""
+
+    if not protocol_id:
+        raise ValueError("protocol_id must be nonempty")
+    if not envelope_rows:
+        raise ValueError("envelope_rows must be nonempty")
+    if max_finite_exchange_late_ngp < 0.0:
+        raise ValueError("max_finite_exchange_late_ngp must be nonnegative")
+    if min_static_plateau_rejection_gap < 0.0:
+        raise ValueError("min_static_plateau_rejection_gap must be nonnegative")
+
+    def key_for(row: dict[str, object]) -> tuple[str, str, str]:
+        return (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+
+    late_by_key = {key_for(row): row for row in late_observable_rows}
+    rows: list[dict[str, float | str]] = []
+    for envelope in sorted(envelope_rows, key=key_for):
+        system_id, temperature, structure_id = key_for(envelope)
+        envelope_ready = float(envelope.get("envelope_ready", 0.0) or 0.0) == 1.0
+        required_lag = float(envelope.get("gaussian_recovery_lag_upper_bound", 0.0) or 0.0)
+        ratio_lower = float(envelope.get("conditional_persistence_exchange_ratio_lower_bound", 0.0) or 0.0)
+        late = late_by_key.get((system_id, temperature, structure_id))
+
+        observed_lag = 0.0
+        observed_late_ngp = 0.0
+        observed_recovery = False
+        static_plateau = 0.0
+        lag_power = False
+        finite_supported = False
+        finite_rejected = False
+        static_rejected = False
+        mechanism_ready = False
+
+        if not envelope_ready:
+            stage = "late_recovery_protocol_upstream_incomplete"
+            blocker = "finite_exchange_envelope"
+            next_action = "complete_finite_exchange_falsification_envelope"
+        elif late is None:
+            stage = "late_recovery_acquisition_required"
+            blocker = "late_recovery_observation"
+            next_action = "measure_late_ngp_or_van_hove_at_required_followup_lag"
+        else:
+            observed_lag = float(late.get("observed_lag_time", 0.0) or 0.0)
+            observed_late_ngp = float(late.get("observed_late_ngp", 0.0) or 0.0)
+            observed_recovery = float(late.get("observed_tail_gaussian_recovery", 0.0) or 0.0) == 1.0
+            static_plateau = float(late.get("static_gamma_late_ngp_plateau", 0.0) or 0.0)
+            lag_power = observed_lag >= required_lag and required_lag > 0.0
+            finite_supported = bool(
+                lag_power
+                and observed_recovery
+                and observed_late_ngp <= max_finite_exchange_late_ngp
+            )
+            finite_rejected = bool(
+                lag_power
+                and (not observed_recovery or observed_late_ngp > max_finite_exchange_late_ngp)
+            )
+            static_rejected = bool(
+                finite_supported
+                and static_plateau - observed_late_ngp >= min_static_plateau_rejection_gap
+            )
+            mechanism_ready = lag_power
+            if finite_supported:
+                stage = "finite_exchange_late_recovery_supported"
+                blocker = "exchange_clock"
+                next_action = "extract_exchange_clock_to_upgrade_mechanism_selection_to_pe_inversion"
+            elif finite_rejected:
+                stage = "finite_exchange_late_recovery_failed"
+                blocker = "late_gaussian_recovery"
+                next_action = "reject_or_reparameterize_finite_exchange_mechanism"
+            else:
+                stage = "late_recovery_lag_insufficient"
+                blocker = "late_recovery_horizon"
+                next_action = "extend_late_recovery_measurement_to_required_horizon"
+
+        rows.append(
+            {
+                "protocol_id": protocol_id,
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "envelope_ready": float(envelope_ready),
+                "required_followup_lag_time": float(required_lag),
+                "conditional_persistence_exchange_ratio_lower_bound": float(ratio_lower),
+                "observed_lag_time": float(observed_lag),
+                "observed_late_ngp": float(observed_late_ngp),
+                "max_finite_exchange_late_ngp": float(max_finite_exchange_late_ngp),
+                "observed_tail_gaussian_recovery": float(observed_recovery),
+                "static_gamma_late_ngp_plateau": float(static_plateau),
+                "min_static_plateau_rejection_gap": float(min_static_plateau_rejection_gap),
+                "late_measurement_has_horizon_power": float(lag_power),
+                "mechanism_selection_ready": float(mechanism_ready),
+                "finite_exchange_supported": float(finite_supported),
+                "finite_exchange_rejected": float(finite_rejected),
+                "static_disorder_rejected": float(static_rejected),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "late_recovery_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_cage_jump_proxy_canary(
     *,
     canary_id: str,
