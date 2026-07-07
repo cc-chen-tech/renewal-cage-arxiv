@@ -1358,15 +1358,17 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertEqual(
             ka2d_023["alpha_shape_selection_stage"],
-            "cached_alpha_shape_stretched_candidate_monotonicity_blocked",
+            "cached_alpha_shape_stretched_candidate_multik_blocked",
         )
         self.assertEqual(float(ka2d_023["alpha_shape_selection_ready"]), 1.0)
         self.assertLess(float(ka2d_023["kww_beta"]), 0.2)
         self.assertGreater(float(ka2d_023["delta_aic_exponential_minus_kww"]), 40.0)
         self.assertEqual(float(ka2d_023["stretched_alpha_candidate_supported"]), 1.0)
         self.assertEqual(float(ka2d_023["uncertainty_columns_ready"]), 1.0)
+        self.assertLess(float(ka2d_023["max_monotonicity_violation_z"]), 2.0)
+        self.assertEqual(float(ka2d_023["monotone_compatible_with_uncertainty"]), 1.0)
         self.assertEqual(float(ka2d_023["real_alpha_shape_claim_ready"]), 0.0)
-        self.assertEqual(ka2d_023["primary_blocker"], "nonmonotone_sparse_curve")
+        self.assertEqual(ka2d_023["primary_blocker"], "multi_k_alpha_shape")
         self.assertEqual(float(ka2d_023["thermodynamic_claim_allowed"]), 0.0)
 
     def test_sota_glassbench_direct_alpha_transport_records_proxy_not_inversion(self):

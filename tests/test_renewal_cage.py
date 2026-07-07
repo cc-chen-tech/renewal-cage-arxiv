@@ -686,7 +686,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
                 "threshold_crossing_lag_time": 1500000.0,
                 "alpha_threshold_crossed": 1.0,
                 "strictly_monotone_decay": 0.0,
-                "sigma_direct_alpha_fs_curve": "0.0005;0.0006;0.0006;0.0007;0.0007;0.0008;0.001;0.0012",
+                "sigma_direct_alpha_fs_curve": "9.49487605275e-05;0.00113401209306;0.00221361559753;0.00420511966855;0.00215764308912;0.00399633458454;0.0134453931721;0.0273003517506",
                 "direct_alpha_curve_stage": "cached_direct_alpha_curve_ready_event_clock_blocked",
             }
         ]
@@ -700,7 +700,7 @@ class DelayedRenewalCageTests(unittest.TestCase):
             max_decay=0.99,
         )[0]
 
-        self.assertEqual(row["alpha_shape_selection_stage"], "cached_alpha_shape_stretched_candidate_monotonicity_blocked")
+        self.assertEqual(row["alpha_shape_selection_stage"], "cached_alpha_shape_stretched_candidate_multik_blocked")
         self.assertEqual(float(row["alpha_shape_selection_ready"]), 1.0)
         self.assertAlmostEqual(float(row["kww_beta"]), 0.15933802823269586, delta=1e-12)
         self.assertLess(float(row["kww_log_shape_rmse"]), 0.55)
@@ -708,8 +708,10 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertGreater(float(row["delta_aic_exponential_minus_kww"]), 40.0)
         self.assertEqual(float(row["stretched_alpha_candidate_supported"]), 1.0)
         self.assertEqual(float(row["uncertainty_columns_ready"]), 1.0)
+        self.assertAlmostEqual(float(row["max_monotonicity_violation_z"]), 0.778224421773086, delta=1e-12)
+        self.assertEqual(float(row["monotone_compatible_with_uncertainty"]), 1.0)
         self.assertEqual(float(row["real_alpha_shape_claim_ready"]), 0.0)
-        self.assertEqual(row["primary_blocker"], "nonmonotone_sparse_curve")
+        self.assertEqual(row["primary_blocker"], "multi_k_alpha_shape")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_transport_coupling_matches_crossing_observable(self):

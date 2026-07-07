@@ -334,10 +334,11 @@ The direct-alpha shape selection then compares this real cached alpha curve
 with a threshold-anchored exponential null and a KWW shape fit. The current
 curve strongly favors a stretched-alpha candidate (`beta=0.159`, KWW log-shape
 RMSE `0.510` versus exponential RMSE `7.77`). Frame-block standard errors from
-the cached particle tensor now provide machine-readable `sigma_F_s` values, so
-the remaining blocker is narrower: the sparse curve is not strictly monotone,
-and a real alpha-shape claim still requires a monotone uncertainty-weighted
-multi-k curve.
+the cached particle tensor now provide machine-readable `sigma_F_s` values. The
+only upward step has `z=0.78`, so the sparse nonmonotonicity is statistically
+compatible with a monotone alpha decay under a two-sigma rule. The remaining
+blocker is therefore narrower: a real alpha-shape claim still requires an
+uncertainty-weighted multi-k curve rather than a single direct-alpha anchor.
 The direct-alpha transport proxy then matches that same `tc40` crossing to the
 reproduced GlassBench displacement observable: `MSD=0.9747508406`, giving
 `D_eff=1.6246e-7` and `D_eff tau_alpha=0.24369` in 2D. This is a useful

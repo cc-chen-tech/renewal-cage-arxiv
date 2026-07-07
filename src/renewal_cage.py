@@ -6342,6 +6342,20 @@ def glassbench_direct_alpha_shape_selection(
 
         if ready and points_used >= min_points_for_shape_fit:
             fit = kww_alpha_fit(time, decay, min_decay=min_decay, max_decay=max_decay)
+            monotone_z_threshold = 2.0
+            if decay.size >= 2 and uncertainty_ready:
+                upward = decay[1:] - decay[:-1]
+                combined_sigma = np.sqrt(sigma_decay[1:] ** 2 + sigma_decay[:-1] ** 2)
+                upward_z = np.divide(
+                    upward,
+                    combined_sigma,
+                    out=np.zeros_like(upward),
+                    where=combined_sigma > 0.0,
+                )
+                max_monotone_z = float(np.max(np.maximum(upward_z, 0.0)))
+            else:
+                max_monotone_z = 0.0
+            monotone_compatible = bool(monotone or (uncertainty_ready and max_monotone_z <= monotone_z_threshold))
             x = np.log(time[mask])
             observed = np.log(-np.log(decay[mask]))
             exponential_prediction = x - math.log(tau_alpha)
@@ -6359,13 +6373,17 @@ def glassbench_direct_alpha_shape_selection(
             kww_rmse = float(math.sqrt(kww_rss / n))
             exp_rmse = float(math.sqrt(exp_rss / n))
             candidate = kww_beta < 0.9 and delta_aic >= min_aic_improvement_for_kww
-            claim_ready = candidate and monotone and uncertainty_ready
+            claim_ready = False
             if claim_ready:
                 stage = "cached_alpha_shape_stretched_supported"
                 blocker = "none"
                 next_action = "predict_heldout_multi_k_alpha_shape_from_event_clock"
             elif candidate:
-                if monotone:
+                if monotone_compatible and uncertainty_ready:
+                    stage = "cached_alpha_shape_stretched_candidate_multik_blocked"
+                    blocker = "multi_k_alpha_shape"
+                    next_action = "measure_heldout_uncertainty_weighted_multi_k_alpha_shape"
+                elif monotone:
                     stage = "cached_alpha_shape_stretched_candidate_uncertainty_blocked"
                     blocker = "missing_uncertainty"
                 elif uncertainty_ready:
@@ -6388,6 +6406,9 @@ def glassbench_direct_alpha_shape_selection(
             kww_tau = 0.0
             kww_rmse = 0.0
             exp_rmse = 0.0
+            max_monotone_z = 0.0
+            monotone_z_threshold = 2.0
+            monotone_compatible = False
             candidate = False
             claim_ready = False
             stage = "cached_alpha_shape_selection_upstream_incomplete"
@@ -6418,6 +6439,9 @@ def glassbench_direct_alpha_shape_selection(
                 "stretched_alpha_candidate_supported": float(candidate),
                 "strictly_monotone_decay": float(monotone),
                 "uncertainty_columns_ready": float(uncertainty_ready),
+                "max_monotonicity_violation_z": float(max_monotone_z),
+                "monotone_compatibility_z_threshold": float(monotone_z_threshold),
+                "monotone_compatible_with_uncertainty": float(monotone_compatible),
                 "alpha_shape_selection_ready": float(selection_ready),
                 "real_alpha_shape_claim_ready": float(claim_ready),
                 "real_pe_inversion_ready": 0.0,

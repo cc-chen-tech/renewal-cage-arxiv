@@ -9393,6 +9393,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_svg(
     row_h = 88
     colors = {
         "cached_alpha_shape_stretched_supported": "#2f855a",
+        "cached_alpha_shape_stretched_candidate_multik_blocked": "#2563eb",
         "cached_alpha_shape_stretched_candidate_monotonicity_blocked": "#7c3aed",
         "cached_alpha_shape_stretched_candidate_uncertainty_blocked": "#805ad5",
         "cached_alpha_shape_exponential_not_rejected": "#2b6cb0",
@@ -9408,6 +9409,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_svg(
         delta = float(row["delta_aic_exponential_minus_kww"])
         exp_rmse = float(row["exponential_log_shape_rmse"])
         kww_rmse = float(row["kww_log_shape_rmse"])
+        zmax = float(row["max_monotonicity_violation_z"])
         marks.append(
             f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{target}</text>'
         )
@@ -9421,7 +9423,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_svg(
             f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; beta={beta:.3g}; delta AIC={delta:.3g}; points={float(row["shape_fit_points_used"]):.0f}</text>'
         )
         marks.append(
-            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">RMSE exp={exp_rmse:.3g}; RMSE KWW={kww_rmse:.3g}; candidate={int(float(row["stretched_alpha_candidate_supported"]))}; claim={int(float(row["real_alpha_shape_claim_ready"]))}</text>'
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">RMSE exp={exp_rmse:.3g}; RMSE KWW={kww_rmse:.3g}; zmax={zmax:.2f}; mono-compatible={int(float(row["monotone_compatible_with_uncertainty"]))}</text>'
         )
         marks.append(
             f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:54]}</text>'
@@ -9429,7 +9431,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_svg(
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
   <rect width="100%" height="100%" fill="#ffffff" />
   <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench direct-alpha shape selection</text>
-  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached direct-alpha curve compares a threshold-anchored exponential null with a KWW shape fit while retaining monotonicity and uncertainty blockers.</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The cached direct-alpha curve compares a threshold-anchored exponential null with a KWW fit and tests whether sparse nonmonotonicity is significant relative to sigma_Fs.</text>
   <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
   <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">shape-selection stage</text>
   <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">alpha-shape evidence</text>

@@ -3985,6 +3985,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
     row_h = 62
     colors_by_stage = {
         "cached_alpha_shape_stretched_supported": colors.HexColor("#2f855a"),
+        "cached_alpha_shape_stretched_candidate_multik_blocked": colors.HexColor("#2563eb"),
         "cached_alpha_shape_stretched_candidate_monotonicity_blocked": colors.HexColor("#7c3aed"),
         "cached_alpha_shape_stretched_candidate_uncertainty_blocked": colors.HexColor("#805ad5"),
         "cached_alpha_shape_exponential_not_rejected": colors.HexColor("#2b6cb0"),
@@ -4022,11 +4023,11 @@ def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
         c.drawString(
             left + 390,
             y - 14,
-            "RMSE exp={:.3g}; RMSE KWW={:.3g}; candidate={}; claim={}".format(
+            "RMSE exp={:.3g}; RMSE KWW={:.3g}; zmax={:.2f}; mono-compatible={}".format(
                 float(row["exponential_log_shape_rmse"]),
                 float(row["kww_log_shape_rmse"]),
-                int(float(row["stretched_alpha_candidate_supported"])),
-                int(float(row["real_alpha_shape_claim_ready"])),
+                float(row["max_monotonicity_violation_z"]),
+                int(float(row["monotone_compatible_with_uncertainty"])),
             ),
         )
         c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:36]}; next={row["next_required_action"][:42]}')
@@ -4034,7 +4035,7 @@ def write_sota_glassbench_direct_alpha_shape_selection_pdf(path: Path) -> None:
     c.drawString(
         42,
         34,
-        "Frame-block sigma_Fs is now attached; nonmonotone sparse data still blocks a real stretched-alpha claim.",
+        "Frame-block sigma_Fs makes the sparse nonmonotonicity statistically compatible; multi-k alpha-shape validation remains required.",
     )
     c.showPage()
     c.save()
