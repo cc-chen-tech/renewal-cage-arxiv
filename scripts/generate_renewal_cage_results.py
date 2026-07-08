@@ -81,6 +81,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_threshold_sweep_ensemble_verdict,
     glassbench_threshold_sweep_payload_contract,
     glassbench_threshold_sweep_outcome_matrix,
+    glassbench_threshold_sweep_decision_power_plan,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
@@ -4812,6 +4813,23 @@ def write_sota_glassbench_threshold_sweep_outcome_matrix_csv(
         payload_rows=payload_rows,
         max_mean_persistence_ratio_for_stability=1.5,
         max_recross_fraction_for_stability=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_threshold_sweep_decision_power_plan_csv(
+    path: Path,
+    *,
+    outcome_matrix_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write member-level uncertainty requirements for threshold-sweep decisions."""
+
+    rows = glassbench_threshold_sweep_decision_power_plan(
+        plan_id="glassbench_threshold_sweep_decision_power_plan",
+        outcome_matrix_rows=outcome_matrix_rows,
+        current_independent_member_count=1,
+        minimum_independent_member_count=3,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10639,6 +10657,52 @@ def write_sota_glassbench_threshold_sweep_outcome_matrix_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_threshold_sweep_decision_power_plan_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width = 1160
+    height = max(340, 138 + 88 * len(rows))
+    left, top = 75, 122
+    row_h = 88
+    colors = {
+        "independent_member_extension_required": "#805ad5",
+        "member_uncertainty_design_ready": "#2f855a",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["decision_power_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{row["system_id"]} T={row["temperature"]}</text>'
+        )
+        marks.append(f'<rect x="{left + 130}" y="{y - 6}" width="410" height="27" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:58]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">members={float(row["current_independent_member_count"]):.0f}/{float(row["minimum_independent_member_count"]):.0f}; add={float(row["additional_independent_member_count_needed"]):.0f}; pooled particles allowed={int(float(row["pooled_particle_decision_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">required columns={str(row["required_uncertainty_columns"]).replace(";", "; ")[:86]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:62]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench threshold-sweep decision-power plan</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Threshold-sweep decisions require member-level uncertainty; pooled replica-particle counts are not accepted as independent evidence.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">decision-power stage</text>
+  <text x="{left + 565}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">member-level uncertainty requirement</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -15033,6 +15097,16 @@ def main() -> None:
     write_sota_glassbench_threshold_sweep_outcome_matrix_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.svg",
         glassbench_threshold_sweep_outcome_matrix_rows,
+    )
+    glassbench_threshold_sweep_decision_power_plan_rows = (
+        write_sota_glassbench_threshold_sweep_decision_power_plan_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.csv",
+            outcome_matrix_rows=glassbench_threshold_sweep_outcome_matrix_rows,
+        )
+    )
+    write_sota_glassbench_threshold_sweep_decision_power_plan_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.svg",
+        glassbench_threshold_sweep_decision_power_plan_rows,
     )
     glassbench_direct_alpha_event_clock_contract_rows = (
         write_sota_glassbench_direct_alpha_event_clock_contract_csv(

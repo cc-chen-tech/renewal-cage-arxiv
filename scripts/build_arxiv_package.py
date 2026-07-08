@@ -5078,6 +5078,77 @@ def write_sota_glassbench_threshold_sweep_outcome_matrix_pdf(path: Path) -> None
     c.save()
 
 
+def write_sota_glassbench_threshold_sweep_decision_power_plan_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench threshold-sweep decision power plan")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Threshold-sweep decisions require independent member-level uncertainty, not pooled replica-particle counts.",
+    )
+    left, top = 48, page_h - 98
+    row_h = 66
+    colors_by_stage = {
+        "independent_member_extension_required": colors.HexColor("#805ad5"),
+        "member_uncertainty_design_ready": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 22, "target")
+    c.drawString(left + 105, top + 22, "decision-power stage")
+    c.drawString(left + 390, top + 22, "member-level uncertainty requirement")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["decision_power_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 7.8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFont("Helvetica", 6.5)
+        c.drawString(left, y - 12, f'structure={row["structure_id"]}')
+        c.setFillColor(color)
+        c.rect(left + 105, y - 13, 260, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.8)
+        c.drawString(left + 113, y - 3, stage.replace("_", " ")[:45])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.1)
+        c.drawString(
+            left + 390,
+            y,
+            "members={:.0f}/{:.0f}; add={:.0f}; pooled particles allowed={}".format(
+                float(row["current_independent_member_count"]),
+                float(row["minimum_independent_member_count"]),
+                float(row["additional_independent_member_count_needed"]),
+                int(float(row["pooled_particle_decision_allowed"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.2)
+        c.drawString(
+            left + 390,
+            y - 14,
+            f'required columns={row["required_uncertainty_columns"][:82]}',
+        )
+        c.drawString(
+            left + 390,
+            y - 27,
+            f'blocker={row["primary_blocker"]}; next={row["next_required_action"].replace("_", " ")[:58]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This gate prevents pooled particle counts from being misread as independent evidence for event-clock robustness.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8995,6 +9066,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_threshold_sweep_outcome_matrix_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.pdf"
     )
+    sota_glassbench_threshold_sweep_decision_power_plan_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.pdf"
+    )
     sota_glassbench_direct_alpha_event_clock_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
     )
@@ -9278,6 +9352,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_threshold_sweep_outcome_matrix_pdf(
         sota_glassbench_threshold_sweep_outcome_matrix_pdf
+    )
+    write_sota_glassbench_threshold_sweep_decision_power_plan_pdf(
+        sota_glassbench_threshold_sweep_decision_power_plan_pdf
     )
     write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
         sota_glassbench_direct_alpha_event_clock_contract_pdf
@@ -9630,6 +9707,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_threshold_sweep_outcome_matrix_pdf,
             "figures/renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.pdf",
+        )
+        archive.write(
+            sota_glassbench_threshold_sweep_decision_power_plan_pdf,
+            "figures/renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_event_clock_contract_pdf,

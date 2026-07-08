@@ -7995,6 +7995,82 @@ def glassbench_threshold_sweep_outcome_matrix(
     return out
 
 
+def glassbench_threshold_sweep_decision_power_plan(
+    *,
+    plan_id: str,
+    outcome_matrix_rows: Sequence[dict[str, object]],
+    current_independent_member_count: int,
+    minimum_independent_member_count: int,
+) -> list[dict[str, float | str]]:
+    """Require member-level uncertainty before threshold-sweep outcome decisions."""
+
+    if not plan_id:
+        raise ValueError("plan_id must be nonempty")
+    if not outcome_matrix_rows:
+        raise ValueError("outcome_matrix_rows must be nonempty")
+    if current_independent_member_count <= 0:
+        raise ValueError("current_independent_member_count must be positive")
+    if minimum_independent_member_count <= 1:
+        raise ValueError("minimum_independent_member_count must be > 1")
+
+    required_columns = (
+        "member_mean_persistence_sensitivity_ratio;"
+        "member_max_post_crossing_recross_fraction;"
+        "member_axis0_physical_time_flag;"
+        "member_threshold_sweep_pass_flag"
+    )
+    rows: list[dict[str, float | str]] = []
+    for outcome in sorted(
+        outcome_matrix_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        additional = max(
+            float(minimum_independent_member_count - current_independent_member_count),
+            0.0,
+        )
+        if additional > 0.0:
+            stage = "independent_member_extension_required"
+            blocker = "independent_member_uncertainty"
+            next_action = (
+                f"extract_at_least_{int(additional)}_additional_independent_members_"
+                "and_compute_member_level_threshold_uncertainty"
+            )
+            decision_ready = 0.0
+        else:
+            stage = "member_uncertainty_design_ready"
+            blocker = "threshold_sweep_observation"
+            next_action = "compute_member_level_threshold_uncertainty_and_apply_outcome_matrix"
+            decision_ready = 1.0
+
+        rows.append(
+            {
+                "plan_id": plan_id,
+                "system_id": str(outcome.get("system_id", "unknown")),
+                "temperature": str(outcome.get("temperature", "none")),
+                "structure_id": str(outcome.get("structure_id", "none")),
+                "outcome_stage": str(outcome.get("outcome_stage", "unknown")),
+                "minimum_additional_lag_count": float(
+                    outcome.get("minimum_additional_lag_count", 0.0) or 0.0
+                ),
+                "required_new_observation": str(outcome.get("required_new_observation", "none")),
+                "claim_if_pass": str(outcome.get("claim_if_pass", "none")),
+                "claim_if_fail": str(outcome.get("claim_if_fail", "none")),
+                "current_independent_member_count": float(current_independent_member_count),
+                "minimum_independent_member_count": float(minimum_independent_member_count),
+                "additional_independent_member_count_needed": float(additional),
+                "pooled_particle_decision_allowed": 0.0,
+                "required_uncertainty_columns": required_columns,
+                "threshold_outcome_decision_ready": float(decision_ready),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "decision_power_stage": stage,
+            }
+        )
+    return rows
+
+
 def glassbench_direct_alpha_event_clock_extraction_contract(
     *,
     audit_id: str,

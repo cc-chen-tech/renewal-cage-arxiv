@@ -430,6 +430,12 @@ the hot ladder passes the same threshold-sensitivity and recrossing criteria on
 a physical-time axis it becomes only a threshold-robust event-clock candidate;
 if it fails, the fixed-lag threshold clock is rejected. Neither outcome permits
 a completed PE inversion or thermodynamic glass-transition claim.
+The decision-power plan adds the statistical guardrail for that future test:
+the current cache has one independent member per temperature, so the
+threshold-sweep decision remains blocked until at least three independent
+member/structure-level sweeps are available. Pooled replica-particle counts are
+recorded as `pooled_particle_decision_allowed=0`, because they do not supply
+independent evidence for threshold robustness.
 The real-cached microdynamic verdict then consolidates this lag ladder into a
 stronger real-data statement: the interval-censored fit quantifies a cached
 persistence-clock candidate with `tau_p/tau_alpha=3.65` and a crossed-fraction
@@ -640,6 +646,7 @@ figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.svg
 figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.svg
 figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.svg
 figures/renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.svg
+figures/renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.svg
 figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.svg
 figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg
@@ -784,6 +791,7 @@ data/renewal_cage_sota_glassbench_real_threshold_sweep_canary.csv
 data/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.csv
 data/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.csv
 data/renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.csv
+data/renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.csv
 data/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv
 data/renewal_cage_sota_glassbench_sparse_lag_event_clock.csv
 data/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv
@@ -949,6 +957,7 @@ paper/figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf
 paper/figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf
 paper/figures/renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.pdf
+paper/figures/renewal_cage_sota_glassbench_threshold_sweep_decision_power_plan.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf
 paper/figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf
 paper/figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf

@@ -184,6 +184,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_threshold_sweep_ensemble_verdict,
     glassbench_threshold_sweep_payload_contract,
     glassbench_threshold_sweep_outcome_matrix,
+    glassbench_threshold_sweep_decision_power_plan,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -1716,6 +1717,37 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(hot["claim_if_fail"], "fixed_lag_threshold_event_clock_rejected")
         self.assertEqual(float(hot["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(float(hot["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_threshold_sweep_decision_power_plan_requires_independent_member_uncertainty(self):
+        row = glassbench_threshold_sweep_decision_power_plan(
+            plan_id="glassbench_threshold_sweep_decision_power_plan",
+            outcome_matrix_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "structure_id": "3",
+                    "outcome_stage": "awaiting_payload_preregistered_outcome",
+                    "minimum_additional_lag_count": 2.0,
+                    "required_new_observation": "multi_lag_threshold_sweep_on_physical_time_axis",
+                    "claim_if_pass": "threshold_robust_event_clock_candidate_not_pe_inversion",
+                    "claim_if_fail": "fixed_lag_threshold_event_clock_rejected",
+                    "thermodynamic_claim_allowed": 0.0,
+                }
+            ],
+            current_independent_member_count=1,
+            minimum_independent_member_count=3,
+        )[0]
+
+        self.assertEqual(float(row["current_independent_member_count"]), 1.0)
+        self.assertEqual(float(row["minimum_independent_member_count"]), 3.0)
+        self.assertEqual(float(row["additional_independent_member_count_needed"]), 2.0)
+        self.assertEqual(float(row["pooled_particle_decision_allowed"]), 0.0)
+        self.assertIn("member_mean_persistence_sensitivity_ratio", row["required_uncertainty_columns"])
+        self.assertIn("member_max_post_crossing_recross_fraction", row["required_uncertainty_columns"])
+        self.assertEqual(row["decision_power_stage"], "independent_member_extension_required")
+        self.assertEqual(row["primary_blocker"], "independent_member_uncertainty")
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_event_clock_contract_requires_true_time_axis(self):
         pe_bound_rows = [
