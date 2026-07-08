@@ -6817,6 +6817,66 @@ def write_sota_glassbench_real_data_acquisition_design_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_real_data_acquisition_outcome_matrix_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench acquisition outcome matrix")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Pass/fail outcomes for each future acquisition panel are preregistered before the data are acquired.",
+    )
+    left, top = 42, page_h - 92
+    row_h = 48
+    colors_by_branch = {
+        "pass": colors.HexColor("#2f855a"),
+        "fail": colors.HexColor("#c53030"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 18, "panel")
+    c.drawString(left + 245, top + 18, "branch")
+    c.drawString(left + 325, top + 18, "allowed claim")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        branch = row["outcome_branch"]
+        color = colors_by_branch.get(branch, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 6.6)
+        c.drawString(left, y, row["acquisition_id"].replace("_", " ")[:44])
+        c.setFillColor(color)
+        c.rect(left + 245, y - 12, 55, 24, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 259, y - 3, branch)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.9)
+        c.drawString(left + 325, y, row["allowed_claim_if_observed"].replace("_", " ")[:76])
+        c.setFont("Helvetica", 6.3)
+        c.drawString(
+            left + 325,
+            y - 13,
+            "PE={}; mechanism={}; thermo={}; interpretation={}".format(
+                int(float(row["real_pe_inversion_claim_allowed"])),
+                int(float(row["mechanism_selection_claim_allowed"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+                row["rejection_or_support_interpretation"].replace("_", " ")[:52],
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This matrix prevents after-the-fact promotion of future acquisition results into stronger claims.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -9209,6 +9269,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_real_data_acquisition_design_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_design.pdf"
     )
+    sota_glassbench_real_data_acquisition_outcome_matrix_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf"
+    )
     sota_glassbench_microdynamic_closed_loop_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
     )
@@ -9498,6 +9561,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_real_data_acquisition_design_pdf(
         sota_glassbench_real_data_acquisition_design_pdf
+    )
+    write_sota_glassbench_real_data_acquisition_outcome_matrix_pdf(
+        sota_glassbench_real_data_acquisition_outcome_matrix_pdf
     )
     write_sota_glassbench_microdynamic_closed_loop_pdf(
         sota_glassbench_microdynamic_closed_loop_pdf
@@ -9880,6 +9946,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_real_data_acquisition_design_pdf,
             "figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_data_acquisition_outcome_matrix_pdf,
+            "figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf",
         )
         archive.write(
             sota_glassbench_microdynamic_closed_loop_pdf,

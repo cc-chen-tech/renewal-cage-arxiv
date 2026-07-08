@@ -12266,6 +12266,102 @@ def glassbench_real_data_acquisition_design(
     ]
 
 
+def glassbench_real_data_acquisition_outcome_matrix(
+    *,
+    matrix_id: str,
+    acquisition_design_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Preregister allowed claims for each real-data acquisition panel outcome."""
+
+    if not matrix_id:
+        raise ValueError("matrix_id must be nonempty")
+    if not acquisition_design_rows:
+        raise ValueError("acquisition_design_rows must be nonempty")
+
+    branch_rules = {
+        "multi_temperature_threshold_sweep_member_panel": {
+            "pass": (
+                "threshold_robust_event_clock_candidate_not_pe_inversion",
+                "fixed_lag_threshold_clock_not_rejected_by_threshold_sweep",
+                0.0,
+                0.0,
+            ),
+            "fail": (
+                "fixed_lag_threshold_event_clock_rejected",
+                "threshold_crossing_not_valid_event_clock",
+                0.0,
+                0.0,
+            ),
+        },
+        "physical_time_event_clock_inversion_panel": {
+            "pass": (
+                "uncertainty_weighted_real_pe_inversion_candidate",
+                "micro_to_macro_prediction_test_enabled",
+                1.0,
+                0.0,
+            ),
+            "fail": (
+                "real_pe_inversion_rejected_or_model_reparameterization_required",
+                "renewal_cage_microdynamic_closure_not_supported_by_panel",
+                0.0,
+                0.0,
+            ),
+        },
+        "tc50_late_recovery_mechanism_power_panel": {
+            "pass": (
+                "finite_exchange_supported_static_disorder_rejected",
+                "late_gaussian_recovery_mechanism_selection_enabled",
+                0.0,
+                1.0,
+            ),
+            "fail": (
+                "finite_exchange_rejected_or_static_disorder_not_rejected",
+                "late_ngp_recovery_does_not_select_finite_exchange",
+                0.0,
+                1.0,
+            ),
+        },
+    }
+
+    rows: list[dict[str, float | str]] = []
+    for design in sorted(
+        acquisition_design_rows,
+        key=lambda row: float(row.get("priority_rank", 999.0) or 999.0),
+    ):
+        acquisition_id = str(design.get("acquisition_id", "unknown_panel"))
+        rules = branch_rules.get(
+            acquisition_id,
+            {
+                "pass": ("panel_supported", "panel_claim_enabled", 0.0, 0.0),
+                "fail": ("panel_rejected", "panel_claim_rejected", 0.0, 0.0),
+            },
+        )
+        for branch in ("pass", "fail"):
+            allowed_claim, interpretation, pe_allowed, mechanism_allowed = rules[branch]
+            rows.append(
+                {
+                    "matrix_id": matrix_id,
+                    "acquisition_id": acquisition_id,
+                    "priority_rank": float(design.get("priority_rank", 999.0) or 999.0),
+                    "outcome_branch": branch,
+                    "observed_condition": f"{acquisition_id}_{branch}_criteria_met",
+                    "required_payload": str(design.get("minimum_required_payload", "none")),
+                    "allowed_claim_if_observed": allowed_claim,
+                    "rejection_or_support_interpretation": interpretation,
+                    "threshold_event_clock_claim_allowed": float(
+                        design.get("unlocks_threshold_robust_event_clock_test", 0.0) or 0.0
+                    )
+                    if acquisition_id == "multi_temperature_threshold_sweep_member_panel"
+                    else 0.0,
+                    "real_pe_inversion_claim_allowed": float(pe_allowed),
+                    "mechanism_selection_claim_allowed": float(mechanism_allowed),
+                    "thermodynamic_claim_allowed": 0.0,
+                    "outcome_matrix_stage": "panel_outcomes_preregistered",
+                }
+            )
+    return rows
+
+
 def dynamic_signature_alignment_ledger(
     *,
     alignment_id: str,

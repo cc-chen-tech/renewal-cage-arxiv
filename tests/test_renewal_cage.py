@@ -186,6 +186,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_threshold_sweep_outcome_matrix,
     glassbench_threshold_sweep_decision_power_plan,
     glassbench_real_data_acquisition_design,
+    glassbench_real_data_acquisition_outcome_matrix,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -727,6 +728,76 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(late["additional_independent_member_count_needed"]), 120.0)
         self.assertEqual(float(late["unlocks_mechanism_selection"]), 1.0)
         self.assertEqual(float(late["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_real_data_acquisition_outcome_matrix_preregisters_panel_claims(self):
+        design_rows = [
+            {
+                "acquisition_id": "multi_temperature_threshold_sweep_member_panel",
+                "priority_rank": 1.0,
+                "minimum_required_payload": "physical_time_axis;member_level_threshold_sensitivity",
+                "unlocks_threshold_robust_event_clock_test": 1.0,
+                "unlocks_real_pe_inversion": 0.0,
+                "unlocks_mechanism_selection": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "acquisition_id": "physical_time_event_clock_inversion_panel",
+                "priority_rank": 2.0,
+                "minimum_required_payload": "cage_jump_event_segmentation;persistence_exchange_event_clock",
+                "unlocks_threshold_robust_event_clock_test": 0.0,
+                "unlocks_real_pe_inversion": 1.0,
+                "unlocks_mechanism_selection": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "acquisition_id": "tc50_late_recovery_mechanism_power_panel",
+                "priority_rank": 3.0,
+                "minimum_required_payload": "observe_tc50_late_ngp;sigma_late_ngp",
+                "unlocks_threshold_robust_event_clock_test": 0.0,
+                "unlocks_real_pe_inversion": 0.0,
+                "unlocks_mechanism_selection": 1.0,
+                "thermodynamic_claim_allowed": 0.0,
+            },
+        ]
+
+        rows = glassbench_real_data_acquisition_outcome_matrix(
+            matrix_id="glassbench_real_data_acquisition_outcome_matrix",
+            acquisition_design_rows=design_rows,
+        )
+
+        by_panel_outcome = {
+            (row["acquisition_id"], row["outcome_branch"]): row
+            for row in rows
+        }
+        threshold_pass = by_panel_outcome[
+            ("multi_temperature_threshold_sweep_member_panel", "pass")
+        ]
+        self.assertEqual(
+            threshold_pass["allowed_claim_if_observed"],
+            "threshold_robust_event_clock_candidate_not_pe_inversion",
+        )
+        self.assertEqual(float(threshold_pass["real_pe_inversion_claim_allowed"]), 0.0)
+
+        event_pass = by_panel_outcome[
+            ("physical_time_event_clock_inversion_panel", "pass")
+        ]
+        self.assertEqual(
+            event_pass["allowed_claim_if_observed"],
+            "uncertainty_weighted_real_pe_inversion_candidate",
+        )
+        self.assertEqual(float(event_pass["real_pe_inversion_claim_allowed"]), 1.0)
+
+        late_fail = by_panel_outcome[
+            ("tc50_late_recovery_mechanism_power_panel", "fail")
+        ]
+        self.assertEqual(
+            late_fail["allowed_claim_if_observed"],
+            "finite_exchange_rejected_or_static_disorder_not_rejected",
+        )
+        self.assertEqual(float(late_fail["mechanism_selection_claim_allowed"]), 1.0)
+
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
+        self.assertTrue(all(row["outcome_matrix_stage"] == "panel_outcomes_preregistered" for row in rows))
 
     def test_glassbench_alpha_threshold_horizon_audit_flags_metadata_anchor_mismatch(self):
         timecode_rows = [

@@ -411,6 +411,40 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreaterEqual(float(late["additional_independent_member_count_needed"]), 120.0)
         self.assertEqual(float(late["unlocks_mechanism_selection"]), 1.0)
 
+    def test_glassbench_real_data_acquisition_outcome_matrix_preregisters_panel_outcomes(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_panel_outcome = {
+            (row["acquisition_id"], row["outcome_branch"]): row
+            for row in rows
+        }
+        threshold_pass = by_panel_outcome[
+            ("multi_temperature_threshold_sweep_member_panel", "pass")
+        ]
+        self.assertEqual(
+            threshold_pass["allowed_claim_if_observed"],
+            "threshold_robust_event_clock_candidate_not_pe_inversion",
+        )
+        self.assertEqual(float(threshold_pass["real_pe_inversion_claim_allowed"]), 0.0)
+
+        event_pass = by_panel_outcome[
+            ("physical_time_event_clock_inversion_panel", "pass")
+        ]
+        self.assertEqual(float(event_pass["real_pe_inversion_claim_allowed"]), 1.0)
+        self.assertEqual(float(event_pass["thermodynamic_claim_allowed"]), 0.0)
+
+        late_fail = by_panel_outcome[
+            ("tc50_late_recovery_mechanism_power_panel", "fail")
+        ]
+        self.assertEqual(
+            late_fail["allowed_claim_if_observed"],
+            "finite_exchange_rejected_or_static_disorder_not_rejected",
+        )
+        self.assertTrue(all(row["outcome_matrix_stage"] == "panel_outcomes_preregistered" for row in rows))
+
     def test_glassbench_real_cached_microdynamic_verdict_marks_persistence_but_blocks_inversion(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv"
         self.assertTrue(path.exists())
@@ -3275,6 +3309,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)
@@ -3504,6 +3539,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf",
             "figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf",
             "figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf",
+            "figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",

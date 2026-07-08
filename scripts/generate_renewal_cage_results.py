@@ -100,6 +100,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_direct_four_point_claim_gate,
     glassbench_real_data_closure_priority_ledger,
     glassbench_real_data_acquisition_design,
+    glassbench_real_data_acquisition_outcome_matrix,
     glass_signature_claim_ladder,
     thermodynamic_nonidentifiability_certificate,
     infer_gamma_exchange_multik_collapse,
@@ -5272,6 +5273,21 @@ def write_sota_glassbench_real_data_acquisition_design_csv(
         closure_priority_rows=closure_priority_rows,
         threshold_decision_power_rows=threshold_decision_power_rows,
         late_recovery_power_rows=late_recovery_power_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_data_acquisition_outcome_matrix_csv(
+    path: Path,
+    *,
+    acquisition_design_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Preregister pass/fail interpretations for each acquisition panel."""
+
+    rows = glassbench_real_data_acquisition_outcome_matrix(
+        matrix_id="glassbench_real_data_acquisition_outcome_matrix",
+        acquisition_design_rows=acquisition_design_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -12890,6 +12906,49 @@ def write_sota_glassbench_real_data_acquisition_design_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_data_acquisition_outcome_matrix_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width = 1220
+    height = max(420, 116 + 58 * len(rows))
+    left, top = 70, 116
+    row_h = 58
+    colors = {
+        "pass": "#2f855a",
+        "fail": "#c53030",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        branch = str(row["outcome_branch"])
+        color = colors.get(branch, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11" font-weight="700">{str(row["acquisition_id"]).replace("_", " ")[:48]}</text>'
+        )
+        marks.append(f'<rect x="{left + 330}" y="{y - 6}" width="60" height="24" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 346}" y="{y + 10}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{branch}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 420}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">claim={str(row["allowed_claim_if_observed"]).replace("_", " ")[:78]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 420}" y="{y + 32}" font-family="Arial, sans-serif" font-size="10" fill="#555">PE={int(float(row["real_pe_inversion_claim_allowed"]))}; mechanism={int(float(row["mechanism_selection_claim_allowed"]))}; thermo={int(float(row["thermodynamic_claim_allowed"]))}; interpretation={str(row["rejection_or_support_interpretation"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench acquisition outcome matrix</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Each future acquisition panel has preregistered pass/fail claim consequences; thermodynamic transition claims remain disallowed in every branch.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">panel</text>
+  <text x="{left + 330}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">branch</text>
+  <text x="{left + 420}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">allowed interpretation</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_microdynamic_closed_loop_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -15938,6 +15997,16 @@ def main() -> None:
     write_sota_glassbench_real_data_acquisition_design_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_design.svg",
         glassbench_real_data_acquisition_design_rows,
+    )
+    glassbench_real_data_acquisition_outcome_matrix_rows = (
+        write_sota_glassbench_real_data_acquisition_outcome_matrix_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.csv",
+            acquisition_design_rows=glassbench_real_data_acquisition_design_rows,
+        )
+    )
+    write_sota_glassbench_real_data_acquisition_outcome_matrix_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.svg",
+        glassbench_real_data_acquisition_outcome_matrix_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"
