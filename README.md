@@ -479,6 +479,11 @@ event-clock candidate, the event-clock panel is the only branch allowed to
 promote a real PE-inversion candidate, and the `tc50` panel selects or rejects
 finite exchange against static disorder. Every branch keeps
 `thermodynamic_claim_allowed=0`.
+The manuscript-claim registry is the final wording lock: current text may claim
+real dynamical-signature support before inversion, future PE-inversion wording
+requires the physical-time event-clock panel to pass, and event-clock or
+late-recovery failures become explicit rejection obligations rather than
+ambiguous negative results.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
@@ -685,6 +690,7 @@ figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.svg
 figures/renewal_cage_sota_glassbench_real_data_closure_priority.svg
 figures/renewal_cage_sota_glassbench_real_data_acquisition_design.svg
 figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.svg
+figures/renewal_cage_sota_glassbench_manuscript_claim_registry.svg
 figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
 figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg
 figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg
@@ -832,6 +838,7 @@ data/renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv
 data/renewal_cage_sota_glassbench_real_data_closure_priority.csv
 data/renewal_cage_sota_glassbench_real_data_acquisition_design.csv
 data/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.csv
+data/renewal_cage_sota_glassbench_manuscript_claim_registry.csv
 data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
 data/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv
 data/renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv
@@ -1000,6 +1007,7 @@ paper/figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf
 paper/figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf
 paper/figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf
 paper/figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf
+paper/figures/renewal_cage_sota_glassbench_manuscript_claim_registry.pdf
 paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf

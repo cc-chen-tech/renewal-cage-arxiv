@@ -101,6 +101,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_real_data_closure_priority_ledger,
     glassbench_real_data_acquisition_design,
     glassbench_real_data_acquisition_outcome_matrix,
+    glassbench_manuscript_claim_registry,
     glass_signature_claim_ladder,
     thermodynamic_nonidentifiability_certificate,
     infer_gamma_exchange_multik_collapse,
@@ -5288,6 +5289,23 @@ def write_sota_glassbench_real_data_acquisition_outcome_matrix_csv(
     rows = glassbench_real_data_acquisition_outcome_matrix(
         matrix_id="glassbench_real_data_acquisition_outcome_matrix",
         acquisition_design_rows=acquisition_design_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_manuscript_claim_registry_csv(
+    path: Path,
+    *,
+    evidence_claim_rows: list[dict[str, float | str]],
+    acquisition_outcome_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Lock current and future manuscript claims to evidence/outcome gates."""
+
+    rows = glassbench_manuscript_claim_registry(
+        registry_id="glassbench_manuscript_claim_registry",
+        evidence_claim_rows=evidence_claim_rows,
+        acquisition_outcome_rows=acquisition_outcome_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -12949,6 +12967,51 @@ def write_sota_glassbench_real_data_acquisition_outcome_matrix_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_manuscript_claim_registry_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width = 1220
+    height = max(430, 116 + 58 * len(rows))
+    left, top = 70, 116
+    row_h = 58
+    colors = {
+        "publishable_now_preinversion": "#2f855a",
+        "future_panel_outcome_required": "#2b6cb0",
+        "future_failure_rejection_locked": "#c53030",
+        "scope_boundary_locked": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["claim_registry_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 14}" font-family="Arial, sans-serif" font-size="10" font-weight="700">{str(row["registry_row_id"]).replace("_", " ")[:44]}</text>'
+        )
+        marks.append(f'<rect x="{left + 310}" y="{y - 6}" width="255" height="24" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 320}" y="{y + 10}" font-family="Arial, sans-serif" font-size="9" fill="#fff">{stage.replace("_", " ")[:40]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 590}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10">claim={str(row["allowed_manuscript_claim"]).replace("_", " ")[:74]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 590}" y="{y + 32}" font-family="Arial, sans-serif" font-size="10" fill="#555">now={int(float(row["publishable_now"]))}; future={str(row["required_future_outcome"]).replace("_", " ")[:42]}; PE={int(float(row["real_pe_inversion_claim_allowed"]))}; reject={int(float(row["withdrawal_or_rejection_obligation"]))}; thermo={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench manuscript claim registry</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Current, future-upgrade, failure-rejection, and scope-boundary manuscript claims are locked to explicit evidence or acquisition outcomes.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">registry row</text>
+  <text x="{left + 310}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">claim stage</text>
+  <text x="{left + 590}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">allowed wording and gate</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_microdynamic_closed_loop_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -16007,6 +16070,17 @@ def main() -> None:
     write_sota_glassbench_real_data_acquisition_outcome_matrix_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.svg",
         glassbench_real_data_acquisition_outcome_matrix_rows,
+    )
+    glassbench_manuscript_claim_registry_rows = (
+        write_sota_glassbench_manuscript_claim_registry_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_manuscript_claim_registry.csv",
+            evidence_claim_rows=glassbench_real_evidence_claim_synthesis_rows,
+            acquisition_outcome_rows=glassbench_real_data_acquisition_outcome_matrix_rows,
+        )
+    )
+    write_sota_glassbench_manuscript_claim_registry_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_manuscript_claim_registry.svg",
+        glassbench_manuscript_claim_registry_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"

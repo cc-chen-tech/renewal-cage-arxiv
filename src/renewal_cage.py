@@ -12362,6 +12362,159 @@ def glassbench_real_data_acquisition_outcome_matrix(
     return rows
 
 
+def glassbench_manuscript_claim_registry(
+    *,
+    registry_id: str,
+    evidence_claim_rows: Sequence[dict[str, object]],
+    acquisition_outcome_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Lock current and future manuscript claims to specific evidence states."""
+
+    if not registry_id:
+        raise ValueError("registry_id must be nonempty")
+    if not evidence_claim_rows:
+        raise ValueError("evidence_claim_rows must be nonempty")
+    if not acquisition_outcome_rows:
+        raise ValueError("acquisition_outcome_rows must be nonempty")
+
+    evidence_by_id = {str(row.get("claim_row_id", "")): row for row in evidence_claim_rows}
+    outcome_by_key = {
+        (str(row.get("acquisition_id", "")), str(row.get("outcome_branch", ""))): row
+        for row in acquisition_outcome_rows
+    }
+
+    dynamic = evidence_by_id.get("real_dynamic_signature_support", {})
+    thermodynamic = evidence_by_id.get("thermodynamic_scope_boundary", {})
+    threshold_pass = outcome_by_key.get(("multi_temperature_threshold_sweep_member_panel", "pass"), {})
+    event_pass = outcome_by_key.get(("physical_time_event_clock_inversion_panel", "pass"), {})
+    event_fail = outcome_by_key.get(("physical_time_event_clock_inversion_panel", "fail"), {})
+    late_pass = outcome_by_key.get(("tc50_late_recovery_mechanism_power_panel", "pass"), {})
+    late_fail = outcome_by_key.get(("tc50_late_recovery_mechanism_power_panel", "fail"), {})
+
+    def number(row: dict[str, object], key: str) -> float:
+        return float(row.get(key, 0.0) or 0.0)
+
+    def allowed(row: dict[str, object], default: str) -> str:
+        return str(row.get("allowed_claim_if_observed", row.get("allowed_claim_level", default)))
+
+    def registry_row(
+        *,
+        row_id: str,
+        claim_family: str,
+        allowed_claim: str,
+        evidence_state: str,
+        publishable_now: float,
+        required_future_outcome: str,
+        real_pe_allowed: float,
+        mechanism_allowed: float,
+        withdrawal_obligation: float,
+        thermodynamic_allowed: float = 0.0,
+        stage: str,
+    ) -> dict[str, float | str]:
+        return {
+            "registry_id": registry_id,
+            "registry_row_id": row_id,
+            "claim_family": claim_family,
+            "allowed_manuscript_claim": allowed_claim,
+            "evidence_state": evidence_state,
+            "publishable_now": float(publishable_now),
+            "required_future_outcome": required_future_outcome,
+            "real_pe_inversion_claim_allowed": float(real_pe_allowed),
+            "mechanism_selection_claim_allowed": float(mechanism_allowed),
+            "withdrawal_or_rejection_obligation": float(withdrawal_obligation),
+            "thermodynamic_claim_allowed": float(thermodynamic_allowed),
+            "claim_registry_stage": stage,
+        }
+
+    return [
+        registry_row(
+            row_id="current_dynamic_signature_claim",
+            claim_family="current_safe_claim",
+            allowed_claim=str(dynamic.get("allowed_claim_level", "dynamical_signature_supported")),
+            evidence_state="current_real_glassbench_preinversion_evidence",
+            publishable_now=number(dynamic, "claim_ready_now"),
+            required_future_outcome="none",
+            real_pe_allowed=0.0,
+            mechanism_allowed=0.0,
+            withdrawal_obligation=0.0,
+            stage="publishable_now_preinversion",
+        ),
+        registry_row(
+            row_id="future_threshold_event_clock_candidate",
+            claim_family="future_upgrade",
+            allowed_claim=allowed(threshold_pass, "threshold_robust_event_clock_candidate_not_pe_inversion"),
+            evidence_state="future_threshold_panel_pass",
+            publishable_now=0.0,
+            required_future_outcome="multi_temperature_threshold_sweep_member_panel:pass",
+            real_pe_allowed=0.0,
+            mechanism_allowed=0.0,
+            withdrawal_obligation=0.0,
+            stage="future_panel_outcome_required",
+        ),
+        registry_row(
+            row_id="future_real_pe_inversion_candidate",
+            claim_family="future_upgrade",
+            allowed_claim=allowed(event_pass, "uncertainty_weighted_real_pe_inversion_candidate"),
+            evidence_state="future_event_clock_panel_pass",
+            publishable_now=0.0,
+            required_future_outcome="physical_time_event_clock_inversion_panel:pass",
+            real_pe_allowed=number(event_pass, "real_pe_inversion_claim_allowed"),
+            mechanism_allowed=0.0,
+            withdrawal_obligation=0.0,
+            stage="future_panel_outcome_required",
+        ),
+        registry_row(
+            row_id="future_finite_exchange_selection_claim",
+            claim_family="future_mechanism_selection",
+            allowed_claim=allowed(late_pass, "finite_exchange_supported_static_disorder_rejected"),
+            evidence_state="future_tc50_late_recovery_panel_pass",
+            publishable_now=0.0,
+            required_future_outcome="tc50_late_recovery_mechanism_power_panel:pass",
+            real_pe_allowed=0.0,
+            mechanism_allowed=number(late_pass, "mechanism_selection_claim_allowed"),
+            withdrawal_obligation=0.0,
+            stage="future_panel_outcome_required",
+        ),
+        registry_row(
+            row_id="event_clock_failure_retraction_obligation",
+            claim_family="future_rejection_obligation",
+            allowed_claim=allowed(event_fail, "real_pe_inversion_rejected_or_model_reparameterization_required"),
+            evidence_state="future_event_clock_panel_fail",
+            publishable_now=0.0,
+            required_future_outcome="physical_time_event_clock_inversion_panel:fail",
+            real_pe_allowed=0.0,
+            mechanism_allowed=0.0,
+            withdrawal_obligation=1.0,
+            stage="future_failure_rejection_locked",
+        ),
+        registry_row(
+            row_id="late_recovery_failure_rejection_obligation",
+            claim_family="future_rejection_obligation",
+            allowed_claim=allowed(late_fail, "finite_exchange_rejected_or_static_disorder_not_rejected"),
+            evidence_state="future_tc50_late_recovery_panel_fail",
+            publishable_now=0.0,
+            required_future_outcome="tc50_late_recovery_mechanism_power_panel:fail",
+            real_pe_allowed=0.0,
+            mechanism_allowed=number(late_fail, "mechanism_selection_claim_allowed"),
+            withdrawal_obligation=1.0,
+            stage="future_failure_rejection_locked",
+        ),
+        registry_row(
+            row_id="thermodynamic_transition_boundary",
+            claim_family="scope_boundary",
+            allowed_claim=str(thermodynamic.get("allowed_claim_level", "dynamical_glass_signatures_only")),
+            evidence_state="scope_boundary_not_acquisition_panel",
+            publishable_now=0.0,
+            required_future_outcome="none",
+            real_pe_allowed=0.0,
+            mechanism_allowed=0.0,
+            withdrawal_obligation=0.0,
+            thermodynamic_allowed=0.0,
+            stage="scope_boundary_locked",
+        ),
+    ]
+
+
 def dynamic_signature_alignment_ledger(
     *,
     alignment_id: str,

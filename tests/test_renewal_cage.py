@@ -187,6 +187,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_threshold_sweep_decision_power_plan,
     glassbench_real_data_acquisition_design,
     glassbench_real_data_acquisition_outcome_matrix,
+    glassbench_manuscript_claim_registry,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -798,6 +799,81 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
         self.assertTrue(all(row["outcome_matrix_stage"] == "panel_outcomes_preregistered" for row in rows))
+
+    def test_glassbench_manuscript_claim_registry_locks_current_future_and_rejection_claims(self):
+        evidence_rows = [
+            {
+                "claim_row_id": "real_dynamic_signature_support",
+                "allowed_claim_level": "dynamical_signature_supported",
+                "claim_ready_now": 1.0,
+                "real_quantitative_inversion_ready": 0.0,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "none",
+            },
+            {
+                "claim_row_id": "thermodynamic_scope_boundary",
+                "allowed_claim_level": "dynamical_glass_signatures_only",
+                "claim_ready_now": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": "thermodynamic_input_law",
+            },
+        ]
+        outcome_rows = [
+            {
+                "acquisition_id": "multi_temperature_threshold_sweep_member_panel",
+                "outcome_branch": "pass",
+                "allowed_claim_if_observed": "threshold_robust_event_clock_candidate_not_pe_inversion",
+                "real_pe_inversion_claim_allowed": 0.0,
+                "mechanism_selection_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "acquisition_id": "physical_time_event_clock_inversion_panel",
+                "outcome_branch": "pass",
+                "allowed_claim_if_observed": "uncertainty_weighted_real_pe_inversion_candidate",
+                "real_pe_inversion_claim_allowed": 1.0,
+                "mechanism_selection_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "acquisition_id": "physical_time_event_clock_inversion_panel",
+                "outcome_branch": "fail",
+                "allowed_claim_if_observed": "real_pe_inversion_rejected_or_model_reparameterization_required",
+                "real_pe_inversion_claim_allowed": 0.0,
+                "mechanism_selection_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            },
+        ]
+
+        rows = glassbench_manuscript_claim_registry(
+            registry_id="glassbench_manuscript_claim_registry",
+            evidence_claim_rows=evidence_rows,
+            acquisition_outcome_rows=outcome_rows,
+        )
+
+        by_id = {row["registry_row_id"]: row for row in rows}
+        current = by_id["current_dynamic_signature_claim"]
+        self.assertEqual(float(current["publishable_now"]), 1.0)
+        self.assertEqual(float(current["real_pe_inversion_claim_allowed"]), 0.0)
+        self.assertEqual(current["allowed_manuscript_claim"], "dynamical_signature_supported")
+
+        threshold = by_id["future_threshold_event_clock_candidate"]
+        self.assertEqual(float(threshold["publishable_now"]), 0.0)
+        self.assertEqual(threshold["required_future_outcome"], "multi_temperature_threshold_sweep_member_panel:pass")
+        self.assertEqual(float(threshold["real_pe_inversion_claim_allowed"]), 0.0)
+
+        pe = by_id["future_real_pe_inversion_candidate"]
+        self.assertEqual(pe["required_future_outcome"], "physical_time_event_clock_inversion_panel:pass")
+        self.assertEqual(float(pe["real_pe_inversion_claim_allowed"]), 1.0)
+
+        rejection = by_id["event_clock_failure_retraction_obligation"]
+        self.assertEqual(float(rejection["withdrawal_or_rejection_obligation"]), 1.0)
+        self.assertIn("rejected", rejection["allowed_manuscript_claim"])
+
+        thermo = by_id["thermodynamic_transition_boundary"]
+        self.assertEqual(float(thermo["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(thermo["claim_registry_stage"], "scope_boundary_locked")
 
     def test_glassbench_alpha_threshold_horizon_audit_flags_metadata_anchor_mismatch(self):
         timecode_rows = [

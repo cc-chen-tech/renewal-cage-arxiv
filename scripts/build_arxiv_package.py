@@ -6877,6 +6877,69 @@ def write_sota_glassbench_real_data_acquisition_outcome_matrix_pdf(path: Path) -
     c.save()
 
 
+def write_sota_glassbench_manuscript_claim_registry_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_manuscript_claim_registry.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench manuscript claim registry")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Current claims, future upgrades, failure obligations, and scope boundaries are locked to explicit gates.",
+    )
+    left, top = 42, page_h - 92
+    row_h = 42
+    colors_by_stage = {
+        "publishable_now_preinversion": colors.HexColor("#2f855a"),
+        "future_panel_outcome_required": colors.HexColor("#2b6cb0"),
+        "future_failure_rejection_locked": colors.HexColor("#c53030"),
+        "scope_boundary_locked": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 16, "registry row")
+    c.drawString(left + 235, top + 16, "stage")
+    c.drawString(left + 445, top + 16, "allowed manuscript claim")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["claim_registry_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 6.5)
+        c.drawString(left, y, row["registry_row_id"].replace("_", " ")[:40])
+        c.setFillColor(color)
+        c.rect(left + 235, y - 11, 190, 22, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 5.9)
+        c.drawString(left + 242, y - 3, stage.replace("_", " ")[:34])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 445, y, row["allowed_manuscript_claim"].replace("_", " ")[:70])
+        c.setFont("Helvetica", 6.1)
+        c.drawString(
+            left + 445,
+            y - 12,
+            "now={}; future={}; PE={}; reject={}; thermo={}".format(
+                int(float(row["publishable_now"])),
+                row["required_future_outcome"].replace("_", " ")[:34],
+                int(float(row["real_pe_inversion_claim_allowed"])),
+                int(float(row["withdrawal_or_rejection_obligation"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+            ),
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The registry is the manuscript wording lock: future data can upgrade or reject claims only through named gates.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -9272,6 +9335,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_real_data_acquisition_outcome_matrix_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf"
     )
+    sota_glassbench_manuscript_claim_registry_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_manuscript_claim_registry.pdf"
+    )
     sota_glassbench_microdynamic_closed_loop_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
     )
@@ -9564,6 +9630,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_real_data_acquisition_outcome_matrix_pdf(
         sota_glassbench_real_data_acquisition_outcome_matrix_pdf
+    )
+    write_sota_glassbench_manuscript_claim_registry_pdf(
+        sota_glassbench_manuscript_claim_registry_pdf
     )
     write_sota_glassbench_microdynamic_closed_loop_pdf(
         sota_glassbench_microdynamic_closed_loop_pdf
@@ -9950,6 +10019,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_real_data_acquisition_outcome_matrix_pdf,
             "figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf",
+        )
+        archive.write(
+            sota_glassbench_manuscript_claim_registry_pdf,
+            "figures/renewal_cage_sota_glassbench_manuscript_claim_registry.pdf",
         )
         archive.write(
             sota_glassbench_microdynamic_closed_loop_pdf,

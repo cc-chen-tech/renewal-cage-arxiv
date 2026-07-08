@@ -445,6 +445,27 @@ class ArxivPackageTests(unittest.TestCase):
         )
         self.assertTrue(all(row["outcome_matrix_stage"] == "panel_outcomes_preregistered" for row in rows))
 
+    def test_glassbench_manuscript_claim_registry_locks_safe_claims_and_future_upgrades(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_manuscript_claim_registry.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        by_id = {row["registry_row_id"]: row for row in rows}
+        current = by_id["current_dynamic_signature_claim"]
+        self.assertEqual(float(current["publishable_now"]), 1.0)
+        self.assertEqual(float(current["real_pe_inversion_claim_allowed"]), 0.0)
+
+        pe = by_id["future_real_pe_inversion_candidate"]
+        self.assertEqual(pe["required_future_outcome"], "physical_time_event_clock_inversion_panel:pass")
+        self.assertEqual(float(pe["real_pe_inversion_claim_allowed"]), 1.0)
+
+        rejection = by_id["event_clock_failure_retraction_obligation"]
+        self.assertEqual(float(rejection["withdrawal_or_rejection_obligation"]), 1.0)
+
+        thermo = by_id["thermodynamic_transition_boundary"]
+        self.assertEqual(float(thermo["thermodynamic_claim_allowed"]), 0.0)
+
     def test_glassbench_real_cached_microdynamic_verdict_marks_persistence_but_blocks_inversion(self):
         path = ROOT / "data" / "renewal_cage_sota_glassbench_real_cached_microdynamic_verdict.csv"
         self.assertTrue(path.exists())
@@ -3310,6 +3331,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_manuscript_claim_registry.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)
@@ -3540,6 +3562,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf",
             "figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf",
             "figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf",
+            "figures/renewal_cage_sota_glassbench_manuscript_claim_registry.pdf",
             "figures/renewal_cage_sota_glassbench_short_window_trend_canary.pdf",
             "figures/renewal_cage_sota_glassbench_trajectory_timebase_bridge.pdf",
             "figures/renewal_cage_sota_glassbench_frame_time_mapping_audit.pdf",
