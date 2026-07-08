@@ -79,6 +79,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_real_cached_microdynamic_verdict,
     glassbench_real_threshold_sweep_canary,
     glassbench_threshold_sweep_ensemble_verdict,
+    glassbench_threshold_sweep_payload_contract,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
@@ -4776,6 +4777,23 @@ def write_sota_glassbench_threshold_sweep_ensemble_verdict_csv(
         threshold_sweep_rows=threshold_sweep_rows,
         coverage_rows=list(coverage_by_key.values()),
         min_lag_count_for_threshold_sweep=3,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_threshold_sweep_payload_contract_csv(
+    path: Path,
+    *,
+    ensemble_rows: list[dict[str, float | str]],
+    target_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the minimal data-acquisition contract for threshold-sweep comparison."""
+
+    rows = glassbench_threshold_sweep_payload_contract(
+        audit_id="glassbench_threshold_sweep_payload_contract",
+        ensemble_rows=ensemble_rows,
+        target_rows=target_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10505,6 +10523,54 @@ def write_sota_glassbench_threshold_sweep_ensemble_verdict_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_threshold_sweep_payload_contract_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width = 1160
+    height = max(330, 135 + 88 * len(rows))
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "multi_lag_payload_request_ready": "#805ad5",
+        "threshold_rule_revision_required": "#c05621",
+        "particle_cache_request_ready": "#d69e2e",
+        "payload_ready_event_clock_still_blocked": "#2f855a",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["payload_contract_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{row["system_id"]} T={row["temperature"]}</text>'
+        )
+        marks.append(f'<rect x="{left + 130}" y="{y - 6}" width="410" height="27" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:58]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">lags={float(row["lag_count"]):.0f}/{float(row["minimum_lag_count_for_threshold_sweep"]):.0f}; additional lags={float(row["minimum_additional_lag_count"]):.0f}; official ladder={int(float(row["official_member_ladder_known"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">known codes={row["known_time_codes"]}; payload={str(row["requested_payload"]).replace("_", " ")[:68]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 565}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:62]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench threshold-sweep payload contract</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The contract names the minimum additional public payload needed before promoting fixed-lag threshold evidence into a cross-temperature event-clock comparison.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">payload stage</text>
+  <text x="{left + 565}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">minimum acquisition contract</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -14878,6 +14944,17 @@ def main() -> None:
     write_sota_glassbench_threshold_sweep_ensemble_verdict_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.svg",
         glassbench_threshold_sweep_ensemble_verdict_rows,
+    )
+    glassbench_threshold_sweep_payload_contract_rows = (
+        write_sota_glassbench_threshold_sweep_payload_contract_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_payload_contract.csv",
+            ensemble_rows=glassbench_threshold_sweep_ensemble_verdict_rows,
+            target_rows=glassbench_multilag_particle_cache_targets_rows,
+        )
+    )
+    write_sota_glassbench_threshold_sweep_payload_contract_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_payload_contract.svg",
+        glassbench_threshold_sweep_payload_contract_rows,
     )
     glassbench_direct_alpha_event_clock_contract_rows = (
         write_sota_glassbench_direct_alpha_event_clock_contract_csv(

@@ -2403,6 +2403,22 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(hot["ensemble_stage"], "ensemble_threshold_sweep_coverage_blocked")
         self.assertTrue(all(float(row["real_pe_inversion_ready"]) == 0.0 for row in rows))
 
+    def test_sota_glassbench_threshold_sweep_payload_contract_names_minimal_hot_payload(self):
+        path = ROOT / "data" / "renewal_cage_sota_glassbench_threshold_sweep_payload_contract.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        hot = next(row for row in rows if row["system_id"] == "KA2D" and row["temperature"] == "0.30")
+        self.assertEqual(float(hot["lag_count"]), 1.0)
+        self.assertEqual(float(hot["minimum_lag_count_for_threshold_sweep"]), 3.0)
+        self.assertEqual(float(hot["minimum_additional_lag_count"]), 2.0)
+        self.assertEqual(float(hot["official_member_ladder_known"]), 0.0)
+        self.assertEqual(hot["known_time_codes"], "tc01")
+        self.assertEqual(hot["requested_payload"], "official_multi_lag_member_index_and_particle_coordinates")
+        self.assertEqual(hot["payload_contract_stage"], "multi_lag_payload_request_ready")
+        self.assertEqual(float(hot["real_pe_inversion_ready"]), 0.0)
+
     def test_sota_dynamic_signature_alignment_ledger_combines_literature_and_real_curve(self):
         path = ROOT / "data" / "renewal_cage_sota_dynamic_signature_alignment.csv"
         self.assertTrue(path.exists())
@@ -3219,6 +3235,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf", names)
+            self.assertIn("figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf", names)
@@ -3448,6 +3465,7 @@ class ArxivPackageTests(unittest.TestCase):
             "figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf",
             "figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf",
             "figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf",
+            "figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf",
             "figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf",
             "figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf",
             "figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf",

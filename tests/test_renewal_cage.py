@@ -182,6 +182,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_structure_matched_observable_renewal_canary,
     glassbench_real_threshold_sweep_canary,
     glassbench_threshold_sweep_ensemble_verdict,
+    glassbench_threshold_sweep_payload_contract,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -1624,6 +1625,57 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(hot["primary_blocker"], "insufficient_lag_coverage")
         self.assertEqual(hot["ensemble_stage"], "ensemble_threshold_sweep_coverage_blocked")
         self.assertTrue(all(float(row["real_pe_inversion_ready"]) == 0.0 for row in rows))
+
+    def test_glassbench_threshold_sweep_payload_contract_requests_missing_hot_lag_ladder(self):
+        rows = glassbench_threshold_sweep_payload_contract(
+            audit_id="glassbench_threshold_sweep_payload_contract",
+            ensemble_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "lag_count": 8.0,
+                    "min_lag_count_for_threshold_sweep": 3.0,
+                    "ensemble_stage": "ensemble_threshold_sensitive_blocked",
+                    "primary_blocker": "threshold_sensitivity_recrossing_and_replica_identity",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "structure_id": "3",
+                    "lag_count": 1.0,
+                    "min_lag_count_for_threshold_sweep": 3.0,
+                    "ensemble_stage": "ensemble_threshold_sweep_coverage_blocked",
+                    "primary_blocker": "insufficient_lag_coverage",
+                },
+            ],
+            target_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "selected_structure_id": "3",
+                    "source_path": "GlassBench/KA2D_trajectories/T0.30.tar.xz",
+                    "target_member_count": 1.0,
+                    "selected_time_codes": "tc01",
+                    "target_members": "T0.30/train/N1290T0.30_3_tc01.npz",
+                    "official_multi_lag_ladder_ready": 0.0,
+                    "particle_lag_ladder_cache_ready": 0.0,
+                }
+            ],
+        )
+
+        by_temperature = {row["temperature"]: row for row in rows}
+        cold = by_temperature["0.23"]
+        hot = by_temperature["0.30"]
+        self.assertEqual(float(cold["minimum_additional_lag_count"]), 0.0)
+        self.assertEqual(cold["payload_contract_stage"], "threshold_rule_revision_required")
+        self.assertEqual(float(hot["minimum_additional_lag_count"]), 2.0)
+        self.assertEqual(float(hot["official_member_ladder_known"]), 0.0)
+        self.assertEqual(hot["known_time_codes"], "tc01")
+        self.assertEqual(hot["requested_payload"], "official_multi_lag_member_index_and_particle_coordinates")
+        self.assertEqual(hot["next_required_action"], "obtain_T0_30_multi_lag_member_index_with_at_least_2_additional_lags")
+        self.assertEqual(float(hot["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(hot["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_direct_alpha_event_clock_contract_requires_true_time_axis(self):
         pe_bound_rows = [

@@ -7812,6 +7812,103 @@ def glassbench_threshold_sweep_ensemble_verdict(
     return out
 
 
+def glassbench_threshold_sweep_payload_contract(
+    *,
+    audit_id: str,
+    ensemble_rows: Sequence[dict[str, object]],
+    target_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Name the minimum payload needed to unblock real threshold-sweep comparisons."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not ensemble_rows:
+        raise ValueError("ensemble_rows must be nonempty")
+
+    targets_by_key: dict[tuple[str, str], dict[str, object]] = {}
+    for row in target_rows:
+        targets_by_key[(str(row.get("system_id", "unknown")), str(row.get("temperature", "none")))] = row
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        ensemble_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        key = (system_id, temperature)
+        target = targets_by_key.get(key, {})
+        lag_count = float(row.get("lag_count", 0.0) or 0.0)
+        minimum = float(row.get("min_lag_count_for_threshold_sweep", 0.0) or 0.0)
+        missing = max(0.0, minimum - lag_count)
+        official_ready = float(target.get("official_multi_lag_ladder_ready", 0.0) or 0.0)
+        cache_ready = float(target.get("particle_lag_ladder_cache_ready", 0.0) or 0.0)
+        known_time_codes = str(target.get("selected_time_codes", "none") or "none")
+        known_members = str(target.get("target_members", "none") or "none")
+        source_path = str(target.get("source_path", "none") or "none")
+        selected_structure = str(target.get("selected_structure_id", structure_id) or structure_id)
+        ensemble_stage = str(row.get("ensemble_stage", "unknown"))
+
+        if missing > 0.0 and official_ready == 0.0:
+            requested_payload = "official_multi_lag_member_index_and_particle_coordinates"
+            stage = "multi_lag_payload_request_ready"
+            blocker = "insufficient_lag_coverage"
+            next_action = (
+                f"obtain_T{temperature.replace('.', '_')}_multi_lag_member_index_"
+                f"with_at_least_{int(missing)}_additional_lags"
+            )
+            official_known = 0.0
+        elif missing > 0.0:
+            requested_payload = "particle_coordinates_for_known_multi_lag_members"
+            stage = "particle_cache_request_ready"
+            blocker = "particle_coordinate_cache"
+            next_action = "extract_known_multi_lag_particle_coordinate_caches"
+            official_known = 1.0
+        elif ensemble_stage == "ensemble_threshold_sensitive_blocked":
+            requested_payload = "preregistered_nonrecrossing_event_definition"
+            stage = "threshold_rule_revision_required"
+            blocker = str(row.get("primary_blocker", "threshold_sensitivity"))
+            next_action = "define_true_time_nonrecrossing_cage_jump_rule"
+            official_known = float(official_ready)
+        elif cache_ready != 1.0:
+            requested_payload = "particle_coordinates_for_known_multi_lag_members"
+            stage = "particle_cache_request_ready"
+            blocker = "particle_coordinate_cache"
+            next_action = "extract_known_multi_lag_particle_coordinate_caches"
+            official_known = float(official_ready)
+        else:
+            requested_payload = "none"
+            stage = "payload_ready_event_clock_still_blocked"
+            blocker = str(row.get("primary_blocker", "event_clock_segmentation"))
+            next_action = "run_true_time_event_clock_segmentation"
+            official_known = float(official_ready)
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": selected_structure,
+                "source_path": source_path,
+                "lag_count": float(lag_count),
+                "minimum_lag_count_for_threshold_sweep": float(minimum),
+                "minimum_additional_lag_count": float(missing),
+                "official_member_ladder_known": float(official_known),
+                "particle_lag_ladder_cache_ready": float(cache_ready),
+                "known_time_codes": known_time_codes,
+                "known_target_members": known_members,
+                "requested_payload": requested_payload,
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "payload_contract_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_direct_alpha_event_clock_extraction_contract(
     *,
     audit_id: str,

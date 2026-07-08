@@ -420,6 +420,11 @@ recrossing, while the hotter `T=0.30` structure has only one cached lag and is
 blocked by coverage before any temperature comparison. The real-data claim is
 therefore a falsified fixed-lag event-clock shortcut, not a completed
 cross-temperature persistence/exchange inversion.
+The payload contract makes this next step explicit rather than rhetorical:
+`T=0.30` needs an official multi-lag member index and particle coordinates for
+at least two additional lag targets before it can enter the same threshold
+comparison, while the cold ladder needs a preregistered non-recrossing event
+definition rather than more fixed-lag points.
 The real-cached microdynamic verdict then consolidates this lag ladder into a
 stronger real-data statement: the interval-censored fit quantifies a cached
 persistence-clock candidate with `tau_p/tau_alpha=3.65` and a crossed-fraction
@@ -628,6 +633,7 @@ figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.svg
 figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.svg
 figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.svg
+figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.svg
 figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.svg
 figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.svg
 figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.svg
@@ -770,6 +776,7 @@ data/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.csv
 data/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.csv
 data/renewal_cage_sota_glassbench_real_threshold_sweep_canary.csv
 data/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.csv
+data/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.csv
 data/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv
 data/renewal_cage_sota_glassbench_sparse_lag_event_clock.csv
 data/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.csv
@@ -933,6 +940,7 @@ paper/figures/renewal_cage_sota_glassbench_direct_alpha_displacement_tail_bound.
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_multilag_crossing_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf
+paper/figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf
 paper/figures/renewal_cage_sota_glassbench_sparse_lag_event_clock.pdf
 paper/figures/renewal_cage_sota_glassbench_interval_censored_first_crossing_clock.pdf

@@ -4952,6 +4952,74 @@ def write_sota_glassbench_threshold_sweep_ensemble_verdict_pdf(path: Path) -> No
     c.save()
 
 
+def write_sota_glassbench_threshold_sweep_payload_contract_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_payload_contract.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench threshold-sweep payload contract")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The contract names the minimum data payload needed before cross-temperature event-clock comparison.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "multi_lag_payload_request_ready": colors.HexColor("#805ad5"),
+        "threshold_rule_revision_required": colors.HexColor("#c05621"),
+        "particle_cache_request_ready": colors.HexColor("#d69e2e"),
+        "payload_ready_event_clock_still_blocked": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "payload stage")
+    c.drawString(left + 390, top + 24, "minimum acquisition contract")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["payload_contract_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "lags={:.0f}/{:.0f}; additional={:.0f}; official ladder={}; cache={}".format(
+                float(row["lag_count"]),
+                float(row["minimum_lag_count_for_threshold_sweep"]),
+                float(row["minimum_additional_lag_count"]),
+                int(float(row["official_member_ladder_known"])),
+                int(float(row["particle_lag_ladder_cache_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            f'known codes={row["known_time_codes"][:38]}; payload={row["requested_payload"][:46]}',
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:42]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "The current public cache supports a cold negative canary and names the hot-ladder payload needed next.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8863,6 +8931,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_threshold_sweep_ensemble_verdict_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf"
     )
+    sota_glassbench_threshold_sweep_payload_contract_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf"
+    )
     sota_glassbench_direct_alpha_event_clock_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
     )
@@ -9140,6 +9211,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_threshold_sweep_ensemble_verdict_pdf(
         sota_glassbench_threshold_sweep_ensemble_verdict_pdf
+    )
+    write_sota_glassbench_threshold_sweep_payload_contract_pdf(
+        sota_glassbench_threshold_sweep_payload_contract_pdf
     )
     write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
         sota_glassbench_direct_alpha_event_clock_contract_pdf
@@ -9484,6 +9558,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_threshold_sweep_ensemble_verdict_pdf,
             "figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf",
+        )
+        archive.write(
+            sota_glassbench_threshold_sweep_payload_contract_pdf,
+            "figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_event_clock_contract_pdf,
