@@ -10,6 +10,8 @@ not a first-principles derivation of the thermodynamic glass transition.
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
+- a Langevin/Smoluchowski-to-Kramers bridge from local cage curvature and
+  barrier inputs to effective renewal-cage clocks,
 - delayed cage-renewal events,
 - Gaussian cage-center jumps,
 - closed-form MSD, NGP, self van Hove distribution, self-intermediate
@@ -59,6 +61,48 @@ existence margin `D tau_d F(tau_alpha/tau_d) k^2 / [-log h]` to exceed one.
 A fuller observable inversion uses `f_k`, `D`, NGP peak time, and NGP peak
 height to infer `A`, `q`, `lambda`, and `tau_d`, leaving `tau_alpha` as a
 held-out consistency check.
+The Langevin bridge starts one level earlier: in an overdamped local basin it
+derives `D0=T/gamma`, `cage_variance=T/kappa_c`, `cage_tau=gamma/kappa_c`,
+and Kramers rates `k=sqrt(kappa_c kappa_s)/(2 pi gamma) exp(-Delta F/T)`.
+Those rates are then mapped to `tau_p=1/k_p` and `tau_x=1/k_x`, producing a
+conditional coarse-graining bridge for the persistence/exchange clocks. The
+full effective theory remains partly phenomenological because the delayed
+renewal law, metastable-basin partition, barrier estimates, and jump scale are
+not derived from an arbitrary many-body Langevin equation.
+This matches the existing literature only in pieces: Langevin exit theory
+supports Kramers-to-jump coarse graining, and glass simulations have used
+cage-jump/CTRW descriptions. The specific delayed hazard
+`r(t)=lambda[1-exp(-t/tau_d)]^2` plus closed-form NGP, `F_s(k,t)`, and SE
+diagnostics is the extra modeling compression, not a standard automatic output
+of ordinary Kramers theory.
+The new periodic-softness bridge makes that compression less ad hoc. It starts
+from a Vorselaars-style periodic cage potential
+`U(x)=DeltaU[1-cos(2*pi*x/L)]/2`, derives the curvature
+`kappa=2*pi^2*DeltaU/L^2`, computes the long-time Kramers rate, and then lets
+two independent precursor readiness probabilities multiply:
+`p_i(t)=1-exp(-t/tau_d)`. This gives
+`r(t)=lambda p_1(t)p_2(t)=lambda[1-exp(-t/tau_d)]^2`.
+Equivalently, cage rearrangement is not inserted as an ordinary Langevin drift:
+the working stochastic picture is `dy_t=-(1/tau_c)y_t dt+sqrt(2D_c)dW_t`,
+`dC_t=eta_t dN_t`, and `x_t = y_t + C_t`. The first term is local Gaussian
+cage vibration; the second is the discrete cage-center renewal layer that
+creates non-Gaussian displacement mixtures.
+The broader physical picture is not a single static one-dimensional potential.
+It is an extended coarse-grained landscape such as
+`U(x,C,s1,s2,zeta)=(kappa/2)|x-C|^2+[DeltaU0+chi*zeta-eps*s1*s2]B(x-C)+W1(s1)+W2(s2)+Wzeta(zeta)`.
+Different projections give different modules: the harmonic projection gives the
+OU cage, the periodic projection gives the Vorselaars-type cage-to-cage
+baseline, the softness-gate projection gives the delayed hazard, and the
+mobility-environment projection gives finite-exchange heterogeneity. A
+configurational-entropy or Kauzmann-type layer would require an additional
+basin-counting landscape, not just this single-particle cage escape coordinate.
+The machine-readable version is `data/renewal_cage_potential_taxonomy.csv`,
+which maps each potential projection to derived parameters, supported effective
+modules, supported observables, and the remaining many-body assumption.
+The companion artifact `data/renewal_cage_landscape_parameterization.csv`
+shows the first two numerical closures: basin adjacency gives the jump variance
+`q`, and a discrete inherent-state density `Omega(e)` gives
+`Z_conf`, `F_conf`, `s_c`, and `Delta c_p`.
 The persistence/exchange inversion uses `D` to fix `tau_x=q/(2D)`, solves
 `G(a_k,tau_alpha;tau_p,tau_x)=h` for `tau_p`, and leaves late NGP recovery as a
 held-out falsification observable.
@@ -567,6 +611,7 @@ scripts/compile_latex.sh                    LaTeX compile helper
 data/                                      generated CSV outputs
 figures/                                   generated SVG figures
 docs/                                      derivation and literature positioning notes
+docs/langevin-coarse-graining-bridge.md   Langevin/Kramers to renewal-cage bridge
 docs/arxiv-readiness-checklist.md          submission-readiness checklist
 manuscript/renewal-cage-arxiv-draft.md      prose draft
 paper/main.tex                             arXiv-style LaTeX manuscript
@@ -608,6 +653,8 @@ figures/renewal_cage_translation_rotation_protocol.svg
 figures/renewal_cage_glass_audit.svg
 figures/renewal_cage_glass_signature_claim_ladder.svg
 figures/renewal_cage_glass_phase_diagram.svg
+figures/renewal_cage_langevin_bridge.svg
+figures/renewal_cage_periodic_softness_gate.svg
 figures/renewal_cage_spatial_chi4.svg
 figures/renewal_cage_thermodynamic_closure.svg
 figures/renewal_cage_thermodynamic_nonidentifiability.svg
@@ -899,6 +946,10 @@ data/renewal_cage_trajectory_member_ensemble_uncertainty.csv
 data/renewal_cage_trajectory_inversion_readiness.csv
 data/renewal_cage_benchmark_publication_ladder.csv
 data/renewal_cage_barrier_requirements.csv
+data/renewal_cage_langevin_bridge.csv
+data/renewal_cage_periodic_softness_gate.csv
+data/renewal_cage_potential_taxonomy.csv
+data/renewal_cage_landscape_parameterization.csv
 data/renewal_cage_susceptibility.csv
 data/renewal_cage_chi4.csv
 data/renewal_cage_barrier.csv

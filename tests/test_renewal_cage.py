@@ -17,6 +17,7 @@ from renewal_cage import (  # noqa: E402
     FacilitatedExchangeLawParams,
     GammaExchangeParams,
     LangevinCageLandscapeParams,
+    PeriodicSoftnessGateParams,
     TemperatureLawParams,
     alpha_relaxation_time,
     apparent_alpha_activation_energies,
@@ -25,6 +26,7 @@ from renewal_cage import (  # noqa: E402
     alpha_relaxation_shape_curve,
     alpha_shape_superposition_residual,
     barrier_amplification_laws,
+    basin_adjacency_jump_statistics,
     benchmark_fusion_readiness,
     cage_localization_benchmark_consistency,
     cage_localization_diagnostics,
@@ -74,6 +76,7 @@ from renewal_cage import (  # noqa: E402
     kramers_escape_rate,
     langevin_bare_diffusion,
     langevin_cage_ou_parameters,
+    langevin_coarse_graining_bridge_audit,
     langevin_first_principles_bridge_audit,
     langevin_to_persistence_exchange,
     minimal_barrier_requirements,
@@ -102,7 +105,12 @@ from renewal_cage import (  # noqa: E402
     plateau_ngp_branches,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
+    periodic_cage_curvature,
+    periodic_softness_gate_bridge_audit,
+    periodic_softness_gate_to_delayed_renewal,
     precursor_escape_simulation_diagnostic,
+    precursor_gate_hazard,
+    precursor_gate_mean_count,
     PersistenceExchangeParams,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_count_distribution,
@@ -225,6 +233,7 @@ from renewal_cage import (  # noqa: E402
     sota_signed_constraint_audit,
     thermodynamic_scope_benchmark_consistency,
     thermodynamic_nonidentifiability_certificate,
+    potential_effective_theory_taxonomy,
     temperature_dependent_params,
     temperature_dependent_gamma_exchange,
     temperature_scan,
@@ -3945,6 +3954,124 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["persistence_exchange_params_derived"]), 1.0)
         self.assertEqual(float(row["full_many_body_first_principles_claim_allowed"]), 0.0)
         self.assertEqual(row["remaining_assumption"], "metastable_basin_partition_and_barrier_inputs")
+
+    def test_langevin_coarse_graining_bridge_keeps_effective_theory_boundary(self):
+        landscape = LangevinCageLandscapeParams(
+            temperature=0.75,
+            friction=2.5,
+            cage_curvature=6.0,
+            saddle_curvature=4.0,
+            barrier_height=2.0,
+            jump_length=1.0,
+            persistence_barrier_extra=0.8,
+            exchange_barrier_extra=0.1,
+        )
+        row = langevin_coarse_graining_bridge_audit(landscape)
+
+        self.assertEqual(row["bridge_stage"], "langevin_kramers_to_effective_clock_bridge")
+        self.assertEqual(float(row["langevin_equation_specified"]), 1.0)
+        self.assertEqual(float(row["kramers_rates_derived"]), 1.0)
+        self.assertEqual(float(row["persistence_exchange_params_derived"]), 1.0)
+        self.assertEqual(float(row["entire_effective_theory_from_langevin_claim_allowed"]), 0.0)
+        self.assertGreater(float(row["derived_alpha_time_k1"]), 0.0)
+        self.assertGreater(float(row["derived_stokes_einstein_product"]), 0.0)
+
+    def test_periodic_cage_potential_curvature_matches_cosine_barrier(self):
+        curvature = periodic_cage_curvature(barrier_height=2.5, period=1.25)
+        expected = 2.0 * math.pi**2 * 2.5 / (1.25**2)
+
+        self.assertAlmostEqual(curvature, expected)
+
+    def test_scalar_precursor_gate_derives_square_delayed_hazard_and_mean_count(self):
+        rate = 0.37
+        delay = 4.5
+        time = 7.0
+
+        hazard = precursor_gate_hazard(time, rate, [delay, delay])
+        expected_hazard = rate * (1.0 - math.exp(-time / delay)) ** 2
+        self.assertAlmostEqual(hazard, expected_hazard)
+
+        mean_count = precursor_gate_mean_count(time, rate, [delay, delay])
+        expected_count = rate * delayed_renewal_shape(time / delay) * delay
+        self.assertAlmostEqual(mean_count, expected_count)
+
+    def test_periodic_softness_gate_maps_potential_to_delayed_renewal_parameters(self):
+        params = PeriodicSoftnessGateParams(
+            temperature=0.72,
+            friction=2.8,
+            barrier_height=2.4,
+            period=1.3,
+            precursor_relaxation_time=5.0,
+            dimension=3,
+        )
+
+        renewal = periodic_softness_gate_to_delayed_renewal(params)
+        curvature = periodic_cage_curvature(params.barrier_height, params.period)
+        expected_rate = kramers_escape_rate(
+            temperature=params.temperature,
+            friction=params.friction,
+            basin_curvature=curvature,
+            saddle_curvature=curvature,
+            barrier_height=params.barrier_height,
+        )
+
+        self.assertAlmostEqual(renewal.cage_variance, params.temperature / curvature)
+        self.assertAlmostEqual(renewal.cage_tau, params.friction / curvature)
+        self.assertAlmostEqual(renewal.jump_variance, params.period**2 / params.dimension)
+        self.assertAlmostEqual(renewal.renewal_delay, params.precursor_relaxation_time)
+        self.assertAlmostEqual(renewal.renewal_rate, expected_rate)
+
+        audit = periodic_softness_gate_bridge_audit(params)
+        self.assertEqual(audit["bridge_stage"], "periodic_softness_gate_to_delayed_hazard")
+        self.assertEqual(float(audit["precursor_gate_count"]), 2.0)
+        self.assertEqual(float(audit["delayed_hazard_from_precursors"]), 1.0)
+        self.assertEqual(float(audit["matches_square_delayed_hazard"]), 1.0)
+        self.assertEqual(float(audit["complete_many_body_derivation_claim_allowed"]), 0.0)
+
+    def test_potential_effective_theory_taxonomy_maps_landscapes_to_modules(self):
+        rows = potential_effective_theory_taxonomy()
+        by_id = {row["potential_id"]: row for row in rows}
+        expected = {
+            "harmonic_ou_cage",
+            "periodic_kramers_cage_jump",
+            "two_precursor_softness_gate",
+            "dynamic_barrier_environment",
+            "persistence_exchange_barrier_split",
+            "basin_adjacency_graph",
+            "spatial_facilitation_field",
+            "inherent_state_landscape_density",
+        }
+
+        self.assertTrue(expected.issubset(by_id))
+        self.assertIn("A,tau_c", by_id["harmonic_ou_cage"]["derived_parameters"])
+        self.assertIn("lambda", by_id["periodic_kramers_cage_jump"]["derived_parameters"])
+        self.assertIn("tau_d,delayed_hazard", by_id["two_precursor_softness_gate"]["derived_parameters"])
+        self.assertIn("finite_exchange", by_id["dynamic_barrier_environment"]["effective_modules"])
+        self.assertIn("tau_p/tau_x", by_id["persistence_exchange_barrier_split"]["derived_parameters"])
+        self.assertIn("q", by_id["basin_adjacency_graph"]["derived_parameters"])
+        self.assertIn("chi4", by_id["spatial_facilitation_field"]["supported_observables"])
+        self.assertEqual(
+            by_id["inherent_state_landscape_density"]["complete_many_body_derivation_claim_allowed"],
+            0,
+        )
+
+    def test_basin_adjacency_graph_derives_jump_variance_q(self):
+        centers = np.array(
+            [
+                [0.0, 0.0],
+                [2.0, 0.0],
+                [0.0, 1.0],
+            ]
+        )
+        edges = [(0, 1), (0, 2)]
+        weights = np.array([0.25, 0.75])
+
+        stats = basin_adjacency_jump_statistics(centers, edges, weights=weights)
+        expected_mean_squared_jump = 0.25 * 4.0 + 0.75 * 1.0
+
+        self.assertAlmostEqual(stats["mean_squared_jump"], expected_mean_squared_jump)
+        self.assertAlmostEqual(stats["jump_variance_q"], expected_mean_squared_jump / 2.0)
+        self.assertEqual(stats["edge_count"], 2)
 
     def test_local_cage_variance_has_plateau(self):
         params = DelayedRenewalCageParams(

@@ -20,7 +20,9 @@ from renewal_cage import (  # noqa: E402
     DelayedRenewalCageParams,
     FacilitatedExchangeLawParams,
     GammaExchangeParams,
+    LangevinCageLandscapeParams,
     MCTBetaParams,
+    PeriodicSoftnessGateParams,
     TemperatureLawParams,
     alpha_relaxation_shape_curve,
     alpha_relaxation_time,
@@ -29,6 +31,7 @@ from renewal_cage import (  # noqa: E402
     activated_barrier_temperature_law,
     adam_gibbs_thermodynamic_scan,
     barrier_amplification_laws,
+    basin_adjacency_jump_statistics,
     benchmark_fusion_readiness,
     benchmark_publication_ladder,
     cage_localization_benchmark_consistency,
@@ -107,6 +110,7 @@ from renewal_cage import (  # noqa: E402
     infer_gamma_exchange_multik_collapse,
     infer_gamma_exchange_ratio_from_alpha_rate,
     infer_gamma_exchange_uncertainty_from_late_observables,
+    inherent_state_landscape_thermodynamics,
     inversion_identifiability_audit,
     gamma_exchange_ngp_1d,
     gamma_exchange_normalized_alpha_decay,
@@ -119,6 +123,7 @@ from renewal_cage import (  # noqa: E402
     infer_renewal_correlation_size,
     infer_spatial_facilitation_diffusivity,
     joint_inversion_benchmark_consistency,
+    langevin_coarse_graining_bridge_audit,
     kww_alpha_fit,
     late_mechanism_selection,
     literature_inversion_readiness,
@@ -136,6 +141,8 @@ from renewal_cage import (  # noqa: E402
     observable_falsification_matrix,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
+    periodic_softness_gate_bridge_audit,
+    potential_effective_theory_taxonomy,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_benchmark_consistency,
     persistence_exchange_data_protocol,
@@ -618,6 +625,116 @@ def write_barrier_requirements_csv(
             **requirements,
         }
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_langevin_bridge_csv(path: Path) -> list[dict[str, float | str]]:
+    rows = [
+        langevin_coarse_graining_bridge_audit(
+            LangevinCageLandscapeParams(
+                temperature=0.85,
+                friction=3.0,
+                cage_curvature=7.5,
+                saddle_curvature=5.0,
+                barrier_height=2.0,
+                jump_length=1.0,
+                persistence_barrier_extra=0.25,
+                exchange_barrier_extra=0.25,
+            )
+        ),
+        langevin_coarse_graining_bridge_audit(
+            LangevinCageLandscapeParams(
+                temperature=0.65,
+                friction=3.0,
+                cage_curvature=9.0,
+                saddle_curvature=5.5,
+                barrier_height=2.6,
+                jump_length=1.0,
+                persistence_barrier_extra=1.35,
+                exchange_barrier_extra=0.25,
+            )
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_periodic_softness_gate_csv(path: Path) -> list[dict[str, float | str]]:
+    rows = [
+        periodic_softness_gate_bridge_audit(
+            PeriodicSoftnessGateParams(
+                temperature=0.85,
+                friction=3.0,
+                barrier_height=1.9,
+                period=1.15,
+                precursor_relaxation_time=2.5,
+            )
+        ),
+        periodic_softness_gate_bridge_audit(
+            PeriodicSoftnessGateParams(
+                temperature=0.65,
+                friction=3.0,
+                barrier_height=2.7,
+                period=1.15,
+                precursor_relaxation_time=8.0,
+            )
+        ),
+    ]
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_potential_taxonomy_csv(path: Path) -> list[dict[str, int | str]]:
+    rows = potential_effective_theory_taxonomy()
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_landscape_parameterization_csv(path: Path) -> list[dict[str, float | str]]:
+    basin_stats = basin_adjacency_jump_statistics(
+        centers=np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.2, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.8],
+            ]
+        ),
+        edges=[(0, 1), (0, 2), (0, 3)],
+        weights=np.array([0.4, 0.35, 0.25]),
+    )
+    thermo_row = inherent_state_landscape_thermodynamics(
+        temperatures=np.array([0.8]),
+        energies=np.array([0.0, 0.8, 1.8]),
+        log_density=np.log(np.array([4.0, 3.0, 1.0])),
+    )[0]
+    rows = [
+        {
+            "bridge_stage": "basin_adjacency_to_q",
+            "temperature": np.nan,
+            "jump_variance_q": basin_stats["jump_variance_q"],
+            "mean_squared_jump": basin_stats["mean_squared_jump"],
+            "mean_jump_length": basin_stats["mean_jump_length"],
+            "log_configurational_partition": np.nan,
+            "configurational_free_energy": np.nan,
+            "configurational_entropy": np.nan,
+            "excess_heat_capacity": np.nan,
+            "complete_dynamic_derivation_claim_allowed": basin_stats["complete_dynamic_derivation_claim_allowed"],
+        },
+        {
+            "bridge_stage": "inherent_state_density_to_thermodynamics",
+            "temperature": thermo_row["temperature"],
+            "jump_variance_q": np.nan,
+            "mean_squared_jump": np.nan,
+            "mean_jump_length": np.nan,
+            "log_configurational_partition": thermo_row["log_configurational_partition"],
+            "configurational_free_energy": thermo_row["configurational_free_energy"],
+            "configurational_entropy": thermo_row["configurational_entropy"],
+            "excess_heat_capacity": thermo_row["excess_heat_capacity"],
+            "complete_dynamic_derivation_claim_allowed": thermo_row["complete_dynamic_derivation_claim_allowed"],
+        },
+    ]
     write_sweep_csv(path, rows)
     return rows
 
@@ -12453,6 +12570,83 @@ def write_barrier_requirements_svg(path: Path, rows: list[dict[str, float | str]
     path.write_text(svg)
 
 
+def write_langevin_bridge_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 430
+    left, top = 75, 118
+    row_h = 86
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        ratio = float(row["persistence_exchange_ratio"])
+        se_product = float(row["derived_stokes_einstein_product"])
+        whole_theory_claim = int(float(row["entire_effective_theory_from_langevin_claim_allowed"]))
+        color = "#2b6cb0" if idx == 0 else "#c05621"
+        marks.append(
+            f'<text x="{left}" y="{y + 12}" font-family="Arial, sans-serif" font-size="12" font-weight="700">T={float(row["temperature"]):.2f}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 95}" y="{y - 8}" width="{min(380, 65 * ratio):.2f}" height="20" fill="{color}" opacity="0.86" />'
+        )
+        marks.append(
+            f'<text x="{left + 485}" y="{y + 8}" font-family="Arial, sans-serif" font-size="12">tau_p/tau_x={ratio:.2f}; D tau_alpha={se_product:.2f}; whole-theory Langevin claim={whole_theory_claim}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 95}" y="{y + 35}" font-family="Arial, sans-serif" font-size="10" fill="#555">barriers: base={float(row["barrier_height"]):.2f}, persistence={float(row["persistence_barrier"]):.2f}, exchange={float(row["exchange_barrier"]):.2f}; assumption: {row["remaining_assumption"]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Langevin to renewal-cage bridge</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Overdamped Langevin/Smoluchowski dynamics gives Einstein diffusion, OU cage variance, and Kramers escape rates; metastable basin and barrier inputs remain explicit assumptions.</text>
+  <text x="{left}" y="{top - 35}" font-family="Arial, sans-serif" font-size="12" font-weight="700">state</text>
+  <text x="{left + 95}" y="{top - 35}" font-family="Arial, sans-serif" font-size="12" font-weight="700">persistence/exchange decoupling</text>
+  {"".join(marks)}
+  <text x="75" y="344" font-family="Arial, sans-serif" font-size="12" fill="#444">Derived effective layer: cage variance=T/kappa, cage tau=gamma/kappa, k= sqrt(kappa |k_s|)/(2 pi gamma) exp(-Delta F/T), then tau_p=1/k_p and tau_x=1/k_x.</text>
+  <text x="75" y="366" font-family="Arial, sans-serif" font-size="12" fill="#444">Boundary: only the intra-cage OU layer and local Kramers escape clocks are Langevin-derived; delayed renewal remains a coarse-grained input.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_periodic_softness_gate_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 440
+    left, top = 75, 125
+    row_h = 88
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        rate = float(row["long_time_kramers_rate"])
+        delay = float(row["precursor_relaxation_time"])
+        hazard = float(row["sample_hazard_at_tau_d"])
+        color = "#2b6cb0" if idx == 0 else "#c05621"
+        marks.append(
+            f'<text x="{left}" y="{y + 10}" font-family="Arial, sans-serif" font-size="12" font-weight="700">T={float(row["temperature"]):.2f}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 95}" y="{y - 9}" width="{min(420, 60 * delay):.2f}" height="20" fill="{color}" opacity="0.84" />'
+        )
+        marks.append(
+            f'<text x="{left + 535}" y="{y + 7}" font-family="Arial, sans-serif" font-size="12">tau_d={delay:.2f}; k_K={rate:.4g}; r(tau_d)={hazard:.4g}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 95}" y="{y + 34}" font-family="Arial, sans-serif" font-size="10" fill="#555">period={float(row["period"]):.2f}; curvature={float(row["periodic_curvature"]):.2f}; assumption: {row["remaining_assumption"]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Periodic cage potential with two softness gates</text>
+  <text x="75" y="68" font-family="Arial, sans-serif" font-size="13" fill="#444">Vorselaars-style periodic cage potential supplies the Langevin/Kramers baseline; two slow precursor gates multiply the escape rate.</text>
+  <text x="75" y="92" font-family="Arial, sans-serif" font-size="13" fill="#444">Result: r(t)=lambda[1-exp(-t/tau_d)]^2 and R(t)=lambda tau_d F(t/tau_d), while the many-body origin of the gates remains a coarse-grained assumption.</text>
+  <text x="{left}" y="{top - 34}" font-family="Arial, sans-serif" font-size="12" font-weight="700">state</text>
+  <text x="{left + 95}" y="{top - 34}" font-family="Arial, sans-serif" font-size="12" font-weight="700">precursor build-up time</text>
+  {"".join(marks)}
+  <text x="75" y="350" font-family="Arial, sans-serif" font-size="12" fill="#444">Potential family: U(x)=DeltaU[1-cos(2 pi x/L)]/2 plus two collective softness gates p_i(t)=1-exp(-t/tau_d).</text>
+  <text x="75" y="372" font-family="Arial, sans-serif" font-size="12" fill="#444">Boundary: this is more microscopic than a hand-set hazard, but it is still an effective collective-coordinate model, not a complete many-body derivation.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_persistence_exchange_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     width, height = 1120, 560
@@ -15881,6 +16075,26 @@ def main() -> None:
     write_barrier_requirements_svg(
         FIGURE_DIR / "renewal_cage_barrier_requirements.svg",
         barrier_requirement_rows,
+    )
+    langevin_bridge_rows = write_langevin_bridge_csv(
+        DATA_DIR / "renewal_cage_langevin_bridge.csv",
+    )
+    write_langevin_bridge_svg(
+        FIGURE_DIR / "renewal_cage_langevin_bridge.svg",
+        langevin_bridge_rows,
+    )
+    periodic_softness_rows = write_periodic_softness_gate_csv(
+        DATA_DIR / "renewal_cage_periodic_softness_gate.csv",
+    )
+    write_periodic_softness_gate_svg(
+        FIGURE_DIR / "renewal_cage_periodic_softness_gate.svg",
+        periodic_softness_rows,
+    )
+    write_potential_taxonomy_csv(
+        DATA_DIR / "renewal_cage_potential_taxonomy.csv",
+    )
+    write_landscape_parameterization_csv(
+        DATA_DIR / "renewal_cage_landscape_parameterization.csv",
     )
     persistence_exchange_rows = write_persistence_exchange_csv(
         DATA_DIR / "renewal_cage_persistence_exchange.csv",
