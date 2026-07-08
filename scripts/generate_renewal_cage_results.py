@@ -78,6 +78,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_real_evidence_claim_synthesis,
     glassbench_real_cached_microdynamic_verdict,
     glassbench_real_threshold_sweep_canary,
+    glassbench_threshold_sweep_ensemble_verdict,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
@@ -4739,6 +4740,42 @@ def write_sota_glassbench_real_threshold_sweep_canary_csv(
         stable_threshold_max_multiplier=1.5,
         max_mean_persistence_ratio_for_stability=1.5,
         max_recross_fraction_for_stability=0.05,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_threshold_sweep_ensemble_verdict_csv(
+    path: Path,
+    *,
+    threshold_sweep_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write the temperature coverage verdict for real threshold-sweep claims."""
+
+    cache_manifest_path = DATA_DIR / "renewal_cage_sota_glassbench_multilag_particle_cache_manifest.csv"
+    coverage_by_key: dict[tuple[str, str, str], dict[str, float | str]] = {}
+    with cache_manifest_path.open() as f:
+        for row in csv.DictReader(f):
+            if float(row.get("particle_resolved_positions_cached", 0.0) or 0.0) != 1.0:
+                continue
+            key = (row["system_id"], row["temperature"], row["structure_id"])
+            current = coverage_by_key.setdefault(
+                key,
+                {
+                    "system_id": row["system_id"],
+                    "temperature": row["temperature"],
+                    "structure_id": row["structure_id"],
+                    "lag_count": 0.0,
+                    "particle_resolved_positions_cached": 1.0,
+                },
+            )
+            current["lag_count"] = float(current["lag_count"]) + 1.0
+
+    rows = glassbench_threshold_sweep_ensemble_verdict(
+        audit_id="glassbench_threshold_sweep_ensemble_verdict",
+        threshold_sweep_rows=threshold_sweep_rows,
+        coverage_rows=list(coverage_by_key.values()),
+        min_lag_count_for_threshold_sweep=3,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10419,6 +10456,55 @@ def write_sota_glassbench_real_threshold_sweep_canary_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_threshold_sweep_ensemble_verdict_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width = 1160
+    height = max(330, 135 + 88 * len(rows))
+    left, top = 75, 120
+    row_h = 88
+    colors = {
+        "ensemble_threshold_sensitive_blocked": "#c05621",
+        "ensemble_threshold_sweep_coverage_blocked": "#805ad5",
+        "ensemble_threshold_sweep_cache_blocked": "#4a5568",
+        "ensemble_threshold_sweep_missing": "#d69e2e",
+        "ensemble_threshold_clock_candidate_ready": "#2f855a",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["ensemble_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{row["system_id"]} T={row["temperature"]}</text>'
+        )
+        marks.append(f'<rect x="{left + 130}" y="{y - 6}" width="430" height="27" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:60]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">structure={row["structure_id"]}; lags={float(row["lag_count"]):.0f}; min lags={float(row["min_lag_count_for_threshold_sweep"]):.0f}; sweep candidate={int(float(row["threshold_sweep_candidate_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">mean persistence ratio={float(row["mean_persistence_sensitivity_ratio"]):.3g}; max recross={float(row["max_post_crossing_recross_fraction"]):.3g}; robust clock={int(float(row["ensemble_threshold_robust_ready"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 585}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">blocker={str(row["primary_blocker"]).replace("_", " ")}; next={str(row["next_required_action"]).replace("_", " ")[:58]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench threshold-sweep ensemble verdict</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Temperature comparison is separated from single-temperature sensitivity: sparse lag coverage blocks ensemble promotion even when one cold row has a canary.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">ensemble verdict</text>
+  <text x="{left + 585}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">coverage and stability diagnostics</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -14782,6 +14868,16 @@ def main() -> None:
     write_sota_glassbench_real_threshold_sweep_canary_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_real_threshold_sweep_canary.svg",
         glassbench_real_threshold_sweep_canary_rows,
+    )
+    glassbench_threshold_sweep_ensemble_verdict_rows = (
+        write_sota_glassbench_threshold_sweep_ensemble_verdict_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.csv",
+            threshold_sweep_rows=glassbench_real_threshold_sweep_canary_rows,
+        )
+    )
+    write_sota_glassbench_threshold_sweep_ensemble_verdict_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.svg",
+        glassbench_threshold_sweep_ensemble_verdict_rows,
     )
     glassbench_direct_alpha_event_clock_contract_rows = (
         write_sota_glassbench_direct_alpha_event_clock_contract_csv(

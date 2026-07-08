@@ -4880,6 +4880,78 @@ def write_sota_glassbench_real_threshold_sweep_canary_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_threshold_sweep_ensemble_verdict_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench threshold-sweep ensemble verdict")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Temperature-level coverage is separated from single-row threshold sensitivity before PE inversion claims.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 62
+    colors_by_stage = {
+        "ensemble_threshold_sensitive_blocked": colors.HexColor("#c05621"),
+        "ensemble_threshold_sweep_coverage_blocked": colors.HexColor("#805ad5"),
+        "ensemble_threshold_sweep_cache_blocked": colors.HexColor("#4a5568"),
+        "ensemble_threshold_sweep_missing": colors.HexColor("#d69e2e"),
+        "ensemble_threshold_clock_candidate_ready": colors.HexColor("#2f855a"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "ensemble stage")
+    c.drawString(left + 390, top + 24, "coverage and threshold diagnostics")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["ensemble_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 272, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:48])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.5)
+        c.drawString(
+            left + 390,
+            y,
+            "structure={}; lags={:.0f}; min lags={:.0f}; sweep candidate={}".format(
+                row["structure_id"],
+                float(row["lag_count"]),
+                float(row["min_lag_count_for_threshold_sweep"]),
+                int(float(row["threshold_sweep_candidate_ready"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.8)
+        c.drawString(
+            left + 390,
+            y - 14,
+            "mean persistence ratio={:.3g}; max recross={:.3g}; robust clock={}".format(
+                float(row["mean_persistence_sensitivity_ratio"]),
+                float(row["max_post_crossing_recross_fraction"]),
+                int(float(row["ensemble_threshold_robust_ready"])),
+            ),
+        )
+        c.drawString(left + 390, y - 27, f'blocker={row["primary_blocker"][:42]}; next={row["next_required_action"][:42]}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Current public cached rows support a cold segmentation canary, not a cross-temperature real PE inversion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8788,6 +8860,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_real_threshold_sweep_canary_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf"
     )
+    sota_glassbench_threshold_sweep_ensemble_verdict_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf"
+    )
     sota_glassbench_direct_alpha_event_clock_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
     )
@@ -9062,6 +9137,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_real_threshold_sweep_canary_pdf(
         sota_glassbench_real_threshold_sweep_canary_pdf
+    )
+    write_sota_glassbench_threshold_sweep_ensemble_verdict_pdf(
+        sota_glassbench_threshold_sweep_ensemble_verdict_pdf
     )
     write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
         sota_glassbench_direct_alpha_event_clock_contract_pdf
@@ -9402,6 +9480,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_real_threshold_sweep_canary_pdf,
             "figures/renewal_cage_sota_glassbench_real_threshold_sweep_canary.pdf",
+        )
+        archive.write(
+            sota_glassbench_threshold_sweep_ensemble_verdict_pdf,
+            "figures/renewal_cage_sota_glassbench_threshold_sweep_ensemble_verdict.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_event_clock_contract_pdf,

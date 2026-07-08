@@ -7695,6 +7695,123 @@ def glassbench_real_threshold_sweep_canary(
     return out
 
 
+def glassbench_threshold_sweep_ensemble_verdict(
+    *,
+    audit_id: str,
+    threshold_sweep_rows: Sequence[dict[str, object]],
+    coverage_rows: Sequence[dict[str, object]],
+    min_lag_count_for_threshold_sweep: int,
+) -> list[dict[str, float | str]]:
+    """Summarize which real GlassBench temperatures can support a threshold sweep."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if min_lag_count_for_threshold_sweep < 2:
+        raise ValueError("min_lag_count_for_threshold_sweep must be at least 2")
+    if not coverage_rows:
+        raise ValueError("coverage_rows must be nonempty")
+
+    sweep_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in threshold_sweep_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        sweep_by_key[key] = row
+
+    coverage_by_key: dict[tuple[str, str, str], dict[str, float | str]] = {}
+    for row in coverage_rows:
+        key = (
+            str(row.get("system_id", "unknown")),
+            str(row.get("temperature", "none")),
+            str(row.get("structure_id", "none")),
+        )
+        cached = float(row.get("particle_resolved_positions_cached", 0.0) or 0.0)
+        row_lag_count = float(row.get("lag_count", 0.0) or 0.0)
+        lag_increment = row_lag_count if row_lag_count > 0.0 else 1.0
+        current = coverage_by_key.setdefault(
+            key,
+            {
+                "system_id": key[0],
+                "temperature": key[1],
+                "structure_id": key[2],
+                "lag_count": 0.0,
+                "particle_resolved_positions_cached": 0.0,
+            },
+        )
+        current["lag_count"] = float(current["lag_count"]) + lag_increment
+        current["particle_resolved_positions_cached"] = max(
+            float(current["particle_resolved_positions_cached"]),
+            cached,
+        )
+
+    out: list[dict[str, float | str]] = []
+    for key, coverage in sorted(
+        coverage_by_key.items(),
+        key=lambda item: (item[0][0], float(item[0][1]), item[0][2]),
+    ):
+        system_id, temperature, structure_id = key
+        sweep = sweep_by_key.get(key, {})
+        lag_count = float(coverage["lag_count"])
+        cached = float(coverage["particle_resolved_positions_cached"])
+        candidate = float(sweep.get("threshold_sweep_candidate_ready", 0.0) or 0.0)
+        robust = float(sweep.get("threshold_robust_event_clock_ready", 0.0) or 0.0)
+        mean_ratio = float(sweep.get("mean_persistence_sensitivity_ratio", 0.0) or 0.0)
+        recross = float(sweep.get("max_post_crossing_recross_fraction", 0.0) or 0.0)
+        replica_axis = float(sweep.get("axis0_is_isoconfigurational_replica", 0.0) or 0.0)
+
+        if lag_count < float(min_lag_count_for_threshold_sweep):
+            stage = "ensemble_threshold_sweep_coverage_blocked"
+            blocker = "insufficient_lag_coverage"
+            next_action = "extract_multi_lag_particle_caches_before_temperature_comparison"
+            ensemble_ready = 0.0
+        elif cached != 1.0:
+            stage = "ensemble_threshold_sweep_cache_blocked"
+            blocker = "particle_coordinate_cache"
+            next_action = "cache_particle_resolved_coordinates_for_threshold_sweep"
+            ensemble_ready = 0.0
+        elif candidate != 1.0:
+            stage = "ensemble_threshold_sweep_missing"
+            blocker = "threshold_sweep_rows"
+            next_action = "compute_threshold_sweep_for_temperature"
+            ensemble_ready = 0.0
+        elif robust != 1.0:
+            stage = "ensemble_threshold_sensitive_blocked"
+            blocker = str(sweep.get("primary_blocker", "threshold_sensitivity"))
+            next_action = "preregister_true_time_nonrecrossing_event_clock_before_inversion"
+            ensemble_ready = 0.0
+        else:
+            stage = "ensemble_threshold_clock_candidate_ready"
+            blocker = "macro_heldout_prediction_not_yet_run"
+            next_action = "run_heldout_macro_prediction_before_real_pe_inversion"
+            ensemble_ready = 1.0
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}_s{structure_id}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "lag_count": float(lag_count),
+                "min_lag_count_for_threshold_sweep": float(min_lag_count_for_threshold_sweep),
+                "particle_resolved_positions_cached": float(cached),
+                "threshold_sweep_candidate_ready": float(candidate),
+                "threshold_robust_event_clock_ready": float(robust),
+                "ensemble_threshold_robust_ready": float(ensemble_ready),
+                "mean_persistence_sensitivity_ratio": float(mean_ratio),
+                "max_post_crossing_recross_fraction": float(recross),
+                "axis0_is_isoconfigurational_replica": float(replica_axis),
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "ensemble_stage": stage,
+            }
+        )
+    return out
+
+
 def glassbench_direct_alpha_event_clock_extraction_contract(
     *,
     audit_id: str,

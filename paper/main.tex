@@ -1599,6 +1599,13 @@ post-crossing recross fraction is \(0.256\). The current fixed-lag data
 therefore provide a segmentation target, but not a robust event clock: a
 future trajectory-level test must preregister a non-recrossing cage-jump rule
 on a true physical-time axis.
+The temperature-level verdict is deliberately narrower. The cached cold
+KA2D \(T=0.23\) structure has eight lag targets and is blocked by threshold
+sensitivity and recrossing, whereas the cached \(T=0.30\) structure currently
+has only one lag target and is blocked before a threshold sweep can be
+interpreted. Thus the GlassBench comparison falsifies a fixed-lag event-clock
+shortcut, but it does not yet constitute a cross-temperature
+persistence/exchange inversion.
 
 The next convergence test is stricter: it asks whether the real trajectory
 statistics can already be used as microscopic inputs for held-out

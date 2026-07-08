@@ -181,6 +181,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_cached_particle_observable_semantics_audit,
     glassbench_structure_matched_observable_renewal_canary,
     glassbench_real_threshold_sweep_canary,
+    glassbench_threshold_sweep_ensemble_verdict,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -1575,6 +1576,54 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
         self.assertEqual(row["primary_blocker"], "threshold_sensitivity_and_replica_identity")
         self.assertEqual(row["threshold_sweep_stage"], "real_threshold_sweep_sensitive_replica_axis_blocked")
+
+    def test_glassbench_threshold_sweep_ensemble_verdict_separates_sensitive_and_sparse_temperatures(self):
+        rows = glassbench_threshold_sweep_ensemble_verdict(
+            audit_id="glassbench_threshold_sweep_ensemble_verdict",
+            threshold_sweep_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "threshold_sweep_candidate_ready": 1.0,
+                    "threshold_robust_event_clock_ready": 0.0,
+                    "mean_persistence_sensitivity_ratio": 2.03,
+                    "max_post_crossing_recross_fraction": 0.256,
+                    "axis0_is_isoconfigurational_replica": 1.0,
+                    "primary_blocker": "threshold_sensitivity_recrossing_and_replica_identity",
+                }
+            ],
+            coverage_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "lag_count": 8.0,
+                    "particle_resolved_positions_cached": 1.0,
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "structure_id": "3",
+                    "lag_count": 1.0,
+                    "particle_resolved_positions_cached": 1.0,
+                },
+            ],
+            min_lag_count_for_threshold_sweep=3,
+        )
+
+        by_temperature = {row["temperature"]: row for row in rows}
+        cold = by_temperature["0.23"]
+        hot = by_temperature["0.30"]
+        self.assertEqual(float(cold["threshold_sweep_candidate_ready"]), 1.0)
+        self.assertEqual(float(cold["ensemble_threshold_robust_ready"]), 0.0)
+        self.assertEqual(cold["primary_blocker"], "threshold_sensitivity_recrossing_and_replica_identity")
+        self.assertEqual(cold["ensemble_stage"], "ensemble_threshold_sensitive_blocked")
+        self.assertEqual(float(hot["threshold_sweep_candidate_ready"]), 0.0)
+        self.assertEqual(float(hot["lag_count"]), 1.0)
+        self.assertEqual(hot["primary_blocker"], "insufficient_lag_coverage")
+        self.assertEqual(hot["ensemble_stage"], "ensemble_threshold_sweep_coverage_blocked")
+        self.assertTrue(all(float(row["real_pe_inversion_ready"]) == 0.0 for row in rows))
 
     def test_glassbench_direct_alpha_event_clock_contract_requires_true_time_axis(self):
         pe_bound_rows = [
