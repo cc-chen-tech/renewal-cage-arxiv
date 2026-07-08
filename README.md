@@ -466,6 +466,13 @@ would turn the current GlassBench evidence into stronger falsification tests:
 physical-time event clocks and cage-jump segmentation first, post-alpha multi-k
 `F_s` targets second, late-NGP recovery third, and direct four-point/dynamic
 length data fourth. Every row keeps thermodynamic-transition claims disallowed.
+The acquisition-design ledger turns that priority list into three concrete
+next panels: a multi-temperature threshold-sweep member-power panel, a
+physical-time event-clock inversion panel, and a `tc50` late-recovery
+mechanism-power panel. It records four additional independent threshold-sweep
+members and two additional hot-ladder lags as the present minimum, rejects
+pooled replica-particle substitution, and still keeps thermodynamic claims at
+zero.
 The visible-member ensemble audit adds the next guardrail: the prefix evidence
 now shows member identities and split labels (`test` at `T=0.23`, `train` at
 `T=0.30`) beyond the four-member threshold. It therefore marks the member-list
@@ -670,6 +677,7 @@ figures/renewal_cage_sota_glassbench_timecode_signature_support.svg
 figures/renewal_cage_sota_dynamic_signature_alignment.svg
 figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.svg
 figures/renewal_cage_sota_glassbench_real_data_closure_priority.svg
+figures/renewal_cage_sota_glassbench_real_data_acquisition_design.svg
 figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.svg
 figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.svg
 figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.svg
@@ -815,6 +823,7 @@ data/renewal_cage_sota_glassbench_timecode_signature_support.csv
 data/renewal_cage_sota_dynamic_signature_alignment.csv
 data/renewal_cage_sota_glassbench_direct_four_point_claim_gate.csv
 data/renewal_cage_sota_glassbench_real_data_closure_priority.csv
+data/renewal_cage_sota_glassbench_real_data_acquisition_design.csv
 data/renewal_cage_sota_glassbench_cage_jump_proxy_canary.csv
 data/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.csv
 data/renewal_cage_sota_glassbench_multilag_particle_cache_targets.csv
@@ -981,6 +990,7 @@ paper/figures/renewal_cage_sota_glassbench_timecode_signature_support.pdf
 paper/figures/renewal_cage_sota_dynamic_signature_alignment.pdf
 paper/figures/renewal_cage_sota_glassbench_direct_four_point_claim_gate.pdf
 paper/figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf
+paper/figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf
 paper/figures/renewal_cage_sota_glassbench_cage_jump_proxy_canary.pdf
 paper/figures/renewal_cage_sota_glassbench_cached_particle_timecode_bridge.pdf
 paper/figures/renewal_cage_sota_glassbench_multilag_particle_cache_targets.pdf

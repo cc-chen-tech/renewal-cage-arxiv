@@ -6746,6 +6746,77 @@ def write_sota_glassbench_real_data_closure_priority_pdf(path: Path) -> None:
     c.save()
 
 
+def write_sota_glassbench_real_data_acquisition_design_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_design.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench real-data acquisition design")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "The next real-data panels are separated by decision power, event-clock inversion, and late-recovery mechanism selection.",
+    )
+    left, top = 46, page_h - 96
+    row_h = 66
+    colors_by_stage = {
+        "member_power_extension_required": colors.HexColor("#805ad5"),
+        "threshold_outcome_matrix_ready": colors.HexColor("#2f855a"),
+        "real_pe_inversion_panel_required": colors.HexColor("#9f1239"),
+        "late_recovery_member_power_extension_required": colors.HexColor("#c05621"),
+        "late_recovery_outcome_observation_required": colors.HexColor("#b7791f"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 22, "rank")
+    c.drawString(left + 44, top + 22, "acquisition panel")
+    c.drawString(left + 345, top + 22, "decision power and claim unlocked")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["acquisition_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(left, y, f'#{int(float(row["priority_rank"]))}')
+        c.setFillColor(color)
+        c.rect(left + 44, y - 13, 282, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 6.7)
+        c.drawString(left + 52, y - 3, row["acquisition_id"].replace("_", " ")[:46])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.1)
+        c.drawString(
+            left + 345,
+            y,
+            "members +{:.0f}; lags +{:.0f}; pooled substitution={}; threshold={}; PE={}; mechanism={}; thermo={}".format(
+                float(row["additional_independent_member_count_needed"]),
+                float(row["additional_lag_count_needed"]),
+                int(float(row["pooled_particle_substitution_allowed"])),
+                int(float(row["unlocks_threshold_robust_event_clock_test"])),
+                int(float(row["unlocks_real_pe_inversion"])),
+                int(float(row["unlocks_mechanism_selection"])),
+                int(float(row["thermodynamic_claim_allowed"])),
+            ),
+        )
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 345, y - 14, f'stage={stage.replace("_", " ")[:78]}')
+        c.drawString(
+            left + 345,
+            y - 27,
+            f'payload={row["minimum_required_payload"].replace("_", " ")[:88]}',
+        )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "This design makes the next empirical test explicit; none of the panels permits a thermodynamic transition claim.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -9135,6 +9206,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_real_data_closure_priority_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.pdf"
     )
+    sota_glassbench_real_data_acquisition_design_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_design.pdf"
+    )
     sota_glassbench_microdynamic_closed_loop_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
     )
@@ -9421,6 +9495,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_real_data_closure_priority_pdf(
         sota_glassbench_real_data_closure_priority_pdf
+    )
+    write_sota_glassbench_real_data_acquisition_design_pdf(
+        sota_glassbench_real_data_acquisition_design_pdf
     )
     write_sota_glassbench_microdynamic_closed_loop_pdf(
         sota_glassbench_microdynamic_closed_loop_pdf
@@ -9799,6 +9876,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_real_data_closure_priority_pdf,
             "figures/renewal_cage_sota_glassbench_real_data_closure_priority.pdf",
+        )
+        archive.write(
+            sota_glassbench_real_data_acquisition_design_pdf,
+            "figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf",
         )
         archive.write(
             sota_glassbench_microdynamic_closed_loop_pdf,

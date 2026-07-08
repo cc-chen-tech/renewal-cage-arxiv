@@ -12114,6 +12114,158 @@ def glassbench_real_data_closure_priority_ledger(
     return rows
 
 
+def glassbench_real_data_acquisition_design(
+    *,
+    design_id: str,
+    closure_priority_rows: Sequence[dict[str, object]],
+    threshold_decision_power_rows: Sequence[dict[str, object]],
+    late_recovery_power_rows: Sequence[dict[str, object]],
+) -> list[dict[str, float | str]]:
+    """Convert GlassBench blockers into concrete next-acquisition panels."""
+
+    if not design_id:
+        raise ValueError("design_id must be nonempty")
+    for name, rows in {
+        "closure_priority_rows": closure_priority_rows,
+        "threshold_decision_power_rows": threshold_decision_power_rows,
+        "late_recovery_power_rows": late_recovery_power_rows,
+    }.items():
+        if not rows:
+            raise ValueError(f"{name} must be nonempty")
+
+    closure_by_id = {str(row.get("closure_id", "")): row for row in closure_priority_rows}
+    event_closure = closure_by_id.get("physical_time_event_clock_and_cage_jump_segmentation", {})
+    late_closure = closure_by_id.get("late_ngp_recovery_and_exchange_horizon", {})
+
+    threshold_additional_members = sum(
+        float(row.get("additional_independent_member_count_needed", 0.0) or 0.0)
+        for row in threshold_decision_power_rows
+    )
+    threshold_additional_lags = sum(
+        float(row.get("minimum_additional_lag_count", 0.0) or 0.0)
+        for row in threshold_decision_power_rows
+    )
+    threshold_member_minimum = max(
+        float(row.get("minimum_independent_member_count", 0.0) or 0.0)
+        for row in threshold_decision_power_rows
+    )
+    threshold_blocked = any(
+        float(row.get("threshold_outcome_decision_ready", 0.0) or 0.0) == 0.0
+        for row in threshold_decision_power_rows
+    )
+    threshold_pooled_allowed = min(
+        float(row.get("pooled_particle_decision_allowed", 0.0) or 0.0)
+        for row in threshold_decision_power_rows
+    )
+
+    late_additional_members = max(
+        float(row.get("additional_member_count_needed", 0.0) or 0.0)
+        for row in late_recovery_power_rows
+    )
+    late_required_members = max(
+        float(row.get("required_member_count", 0.0) or 0.0)
+        for row in late_recovery_power_rows
+    )
+    late_blocked = any(
+        float(row.get("uncertainty_decision_ready", 0.0) or 0.0) == 0.0
+        for row in late_recovery_power_rows
+    )
+    late_targets = sorted(
+        {
+            str(row.get("target_time_code", "late_recovery"))
+            for row in late_recovery_power_rows
+            if str(row.get("target_time_code", "none")) != "none"
+        }
+    )
+    late_target = ";".join(late_targets) if late_targets else "tc50"
+
+    event_payload = str(
+        event_closure.get(
+            "minimum_required_payload",
+            "frame_time_mapping;cage_jump_event_segmentation;persistence_exchange_event_clock;"
+            "uncertainty_weighted_macro_observables",
+        )
+    )
+    late_payload = str(
+        late_closure.get(
+            "minimum_required_payload",
+            "observe_tc50_late_ngp;sigma_late_ngp;late_self_van_hove_tail;exchange_clock_fit",
+        )
+    )
+
+    return [
+        {
+            "design_id": design_id,
+            "acquisition_id": "multi_temperature_threshold_sweep_member_panel",
+            "priority_rank": 1.0,
+            "minimum_required_payload": (
+                "physical_time_axis;nonrecrossing_cage_jump_rule;"
+                "member_level_threshold_sensitivity;member_level_recross_fraction"
+            ),
+            "target_temperatures": ";".join(
+                sorted({str(row.get("temperature", "unknown")) for row in threshold_decision_power_rows})
+            ),
+            "minimum_independent_member_count": float(threshold_member_minimum),
+            "additional_independent_member_count_needed": float(threshold_additional_members),
+            "additional_lag_count_needed": float(threshold_additional_lags),
+            "pooled_particle_substitution_allowed": float(threshold_pooled_allowed),
+            "unlocks_threshold_robust_event_clock_test": 1.0,
+            "unlocks_real_pe_inversion": 0.0,
+            "unlocks_mechanism_selection": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": "independent_member_uncertainty" if threshold_blocked else "none",
+            "next_required_action": "extract_independent_member_threshold_sweeps_before_applying_outcome_matrix",
+            "acquisition_stage": (
+                "member_power_extension_required"
+                if threshold_blocked
+                else "threshold_outcome_matrix_ready"
+            ),
+        },
+        {
+            "design_id": design_id,
+            "acquisition_id": "physical_time_event_clock_inversion_panel",
+            "priority_rank": 2.0,
+            "minimum_required_payload": event_payload,
+            "target_temperatures": "KA2D_temperature_panel",
+            "minimum_independent_member_count": float(threshold_member_minimum),
+            "additional_independent_member_count_needed": 0.0,
+            "additional_lag_count_needed": 0.0,
+            "pooled_particle_substitution_allowed": 0.0,
+            "unlocks_threshold_robust_event_clock_test": 0.0,
+            "unlocks_real_pe_inversion": 1.0,
+            "unlocks_mechanism_selection": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": str(event_closure.get("primary_blocker", "physical_time_semantics")),
+            "next_required_action": "segment_physical_time_cage_jumps_and_fit_persistence_exchange_clock",
+            "acquisition_stage": "real_pe_inversion_panel_required",
+        },
+        {
+            "design_id": design_id,
+            "acquisition_id": "tc50_late_recovery_mechanism_power_panel",
+            "priority_rank": 3.0,
+            "minimum_required_payload": late_payload,
+            "target_temperatures": ";".join(
+                sorted({str(row.get("temperature", "unknown")) for row in late_recovery_power_rows})
+            ),
+            "minimum_independent_member_count": float(late_required_members),
+            "additional_independent_member_count_needed": float(late_additional_members),
+            "additional_lag_count_needed": 0.0,
+            "pooled_particle_substitution_allowed": 0.0,
+            "unlocks_threshold_robust_event_clock_test": 0.0,
+            "unlocks_real_pe_inversion": 0.0,
+            "unlocks_mechanism_selection": 1.0,
+            "thermodynamic_claim_allowed": 0.0,
+            "primary_blocker": "late_ngp_uncertainty" if late_blocked else "late_recovery_observation",
+            "next_required_action": f"observe_{late_target}_late_ngp_tail_recovery_with_member_level_uncertainty",
+            "acquisition_stage": (
+                "late_recovery_member_power_extension_required"
+                if late_blocked
+                else "late_recovery_outcome_observation_required"
+            ),
+        },
+    ]
+
+
 def dynamic_signature_alignment_ledger(
     *,
     alignment_id: str,

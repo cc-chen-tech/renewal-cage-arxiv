@@ -185,6 +185,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_threshold_sweep_payload_contract,
     glassbench_threshold_sweep_outcome_matrix,
     glassbench_threshold_sweep_decision_power_plan,
+    glassbench_real_data_acquisition_design,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -642,6 +643,90 @@ class DelayedRenewalCageTests(unittest.TestCase):
 
         self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
         self.assertTrue(all("thermodynamic_transition" not in row["post_unlock_claim_level"] for row in rows))
+
+    def test_glassbench_real_data_acquisition_design_combines_power_and_closure_gates(self):
+        closure_rows = [
+            {
+                "closure_id": "physical_time_event_clock_and_cage_jump_segmentation",
+                "priority_rank": 1.0,
+                "minimum_required_payload": (
+                    "frame_time_mapping;cage_jump_event_segmentation;"
+                    "persistence_exchange_event_clock;uncertainty_weighted_macro_observables"
+                ),
+                "priority_stage": "minimum_real_inversion_closure_priority",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "closure_id": "late_ngp_recovery_and_exchange_horizon",
+                "priority_rank": 3.0,
+                "minimum_required_payload": "observe_tc50_late_ngp;sigma_late_ngp;exchange_clock_fit",
+                "priority_stage": "mechanism_selection_priority",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+        ]
+        threshold_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "current_independent_member_count": 1.0,
+                "minimum_independent_member_count": 3.0,
+                "additional_independent_member_count_needed": 2.0,
+                "minimum_additional_lag_count": 0.0,
+                "pooled_particle_decision_allowed": 0.0,
+                "threshold_outcome_decision_ready": 0.0,
+                "decision_power_stage": "independent_member_extension_required",
+            },
+            {
+                "system_id": "KA2D",
+                "temperature": "0.30",
+                "current_independent_member_count": 1.0,
+                "minimum_independent_member_count": 3.0,
+                "additional_independent_member_count_needed": 2.0,
+                "minimum_additional_lag_count": 2.0,
+                "pooled_particle_decision_allowed": 0.0,
+                "threshold_outcome_decision_ready": 0.0,
+                "decision_power_stage": "independent_member_extension_required",
+            },
+        ]
+        late_power_rows = [
+            {
+                "system_id": "KA2D",
+                "temperature": "0.23",
+                "target_time_code": "tc50",
+                "current_member_count": 8.0,
+                "required_member_count": 128.0,
+                "additional_member_count_needed": 120.0,
+                "uncertainty_decision_ready": 0.0,
+                "decision_power_stage": "late_ngp_power_extension_required",
+            }
+        ]
+
+        rows = glassbench_real_data_acquisition_design(
+            design_id="glassbench_real_data_acquisition_design",
+            closure_priority_rows=closure_rows,
+            threshold_decision_power_rows=threshold_rows,
+            late_recovery_power_rows=late_power_rows,
+        )
+
+        by_id = {row["acquisition_id"]: row for row in rows}
+        threshold = by_id["multi_temperature_threshold_sweep_member_panel"]
+        self.assertEqual(float(threshold["priority_rank"]), 1.0)
+        self.assertEqual(float(threshold["additional_independent_member_count_needed"]), 4.0)
+        self.assertEqual(float(threshold["additional_lag_count_needed"]), 2.0)
+        self.assertEqual(float(threshold["pooled_particle_substitution_allowed"]), 0.0)
+        self.assertEqual(threshold["acquisition_stage"], "member_power_extension_required")
+        self.assertEqual(float(threshold["unlocks_threshold_robust_event_clock_test"]), 1.0)
+        self.assertEqual(float(threshold["unlocks_real_pe_inversion"]), 0.0)
+
+        event_clock = by_id["physical_time_event_clock_inversion_panel"]
+        self.assertIn("persistence_exchange_event_clock", event_clock["minimum_required_payload"])
+        self.assertEqual(float(event_clock["unlocks_real_pe_inversion"]), 1.0)
+        self.assertEqual(float(event_clock["thermodynamic_claim_allowed"]), 0.0)
+
+        late = by_id["tc50_late_recovery_mechanism_power_panel"]
+        self.assertEqual(float(late["additional_independent_member_count_needed"]), 120.0)
+        self.assertEqual(float(late["unlocks_mechanism_selection"]), 1.0)
+        self.assertEqual(float(late["thermodynamic_claim_allowed"]), 0.0)
 
     def test_glassbench_alpha_threshold_horizon_audit_flags_metadata_anchor_mismatch(self):
         timecode_rows = [

@@ -99,6 +99,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_timecode_signature_support_gate,
     glassbench_direct_four_point_claim_gate,
     glassbench_real_data_closure_priority_ledger,
+    glassbench_real_data_acquisition_design,
     glass_signature_claim_ladder,
     thermodynamic_nonidentifiability_certificate,
     infer_gamma_exchange_multik_collapse,
@@ -5252,6 +5253,25 @@ def write_sota_glassbench_real_data_closure_priority_csv(
         post_window_rows=post_window_rows,
         late_recovery_rows=late_recovery_rows,
         four_point_rows=four_point_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_real_data_acquisition_design_csv(
+    path: Path,
+    *,
+    closure_priority_rows: list[dict[str, float | str]],
+    threshold_decision_power_rows: list[dict[str, float | str]],
+    late_recovery_power_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Convert current blockers into a concrete next-acquisition design."""
+
+    rows = glassbench_real_data_acquisition_design(
+        design_id="glassbench_real_data_acquisition_design",
+        closure_priority_rows=closure_priority_rows,
+        threshold_decision_power_rows=threshold_decision_power_rows,
+        late_recovery_power_rows=late_recovery_power_rows,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -12816,6 +12836,60 @@ def write_sota_glassbench_real_data_closure_priority_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_real_data_acquisition_design_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1220, max(390, 126 + 90 * len(rows))
+    left, top = 70, 118
+    row_h = 90
+    colors = {
+        "member_power_extension_required": "#805ad5",
+        "threshold_outcome_matrix_ready": "#2f855a",
+        "real_pe_inversion_panel_required": "#9f1239",
+        "late_recovery_member_power_extension_required": "#c05621",
+        "late_recovery_outcome_observation_required": "#b7791f",
+    }
+    marks = []
+    for row in rows:
+        rank = int(float(row["priority_rank"]))
+        y = top + (rank - 1) * row_h
+        stage = str(row["acquisition_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="18" font-weight="700">#{rank}</text>'
+        )
+        marks.append(
+            f'<rect x="{left + 52}" y="{y - 8}" width="390" height="29" fill="{color}" opacity="0.92" />'
+        )
+        marks.append(
+            f'<text x="{left + 62}" y="{y + 11}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{str(row["acquisition_id"]).replace("_", " ")[:56]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 468}" y="{y + 12}" font-family="Arial, sans-serif" font-size="11">stage={stage.replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 468}" y="{y + 34}" font-family="Arial, sans-serif" font-size="10" fill="#555">additional members={float(row["additional_independent_member_count_needed"]):.0f}; additional lags={float(row["additional_lag_count_needed"]):.0f}; pooled substitution={int(float(row["pooled_particle_substitution_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 468}" y="{y + 55}" font-family="Arial, sans-serif" font-size="10" fill="#555">unlocks: threshold={int(float(row["unlocks_threshold_robust_event_clock_test"]))}; PE inversion={int(float(row["unlocks_real_pe_inversion"]))}; mechanism={int(float(row["unlocks_mechanism_selection"]))}; thermo={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 468}" y="{y + 75}" font-family="Arial, sans-serif" font-size="10" fill="#555">payload={str(row["minimum_required_payload"]).replace("_", " ")[:96]}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="70" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench real-data acquisition design</text>
+  <text x="70" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">The next experiment is decomposed into member-power, event-clock inversion, and late-recovery mechanism panels; pooled particles do not replace independent members.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">rank</text>
+  <text x="{left + 52}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">acquisition panel</text>
+  <text x="{left + 468}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">required data and claim unlocked</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_microdynamic_closed_loop_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -15852,6 +15926,18 @@ def main() -> None:
     write_sota_glassbench_real_data_closure_priority_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_closure_priority.svg",
         glassbench_real_data_closure_priority_rows,
+    )
+    glassbench_real_data_acquisition_design_rows = (
+        write_sota_glassbench_real_data_acquisition_design_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_design.csv",
+            closure_priority_rows=glassbench_real_data_closure_priority_rows,
+            threshold_decision_power_rows=glassbench_threshold_sweep_decision_power_plan_rows,
+            late_recovery_power_rows=glassbench_late_recovery_decision_power_plan_rows,
+        )
+    )
+    write_sota_glassbench_real_data_acquisition_design_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_real_data_acquisition_design.svg",
+        glassbench_real_data_acquisition_design_rows,
     )
     trajectory_uncertainty_rows = write_trajectory_uncertainty_protocol_csv(
         DATA_DIR / "renewal_cage_trajectory_uncertainty_protocol.csv"
