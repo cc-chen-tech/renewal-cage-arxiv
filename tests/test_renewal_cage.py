@@ -183,6 +183,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_real_threshold_sweep_canary,
     glassbench_threshold_sweep_ensemble_verdict,
     glassbench_threshold_sweep_payload_contract,
+    glassbench_threshold_sweep_outcome_matrix,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -1674,6 +1675,45 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(hot["known_time_codes"], "tc01")
         self.assertEqual(hot["requested_payload"], "official_multi_lag_member_index_and_particle_coordinates")
         self.assertEqual(hot["next_required_action"], "obtain_T0_30_multi_lag_member_index_with_at_least_2_additional_lags")
+        self.assertEqual(float(hot["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(hot["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_glassbench_threshold_sweep_outcome_matrix_preregisters_pass_and_fail_claims(self):
+        rows = glassbench_threshold_sweep_outcome_matrix(
+            audit_id="glassbench_threshold_sweep_outcome_matrix",
+            payload_rows=[
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.23",
+                    "structure_id": "151",
+                    "minimum_additional_lag_count": 0.0,
+                    "requested_payload": "preregistered_nonrecrossing_event_definition",
+                    "payload_contract_stage": "threshold_rule_revision_required",
+                },
+                {
+                    "system_id": "KA2D",
+                    "temperature": "0.30",
+                    "structure_id": "3",
+                    "minimum_additional_lag_count": 2.0,
+                    "requested_payload": "official_multi_lag_member_index_and_particle_coordinates",
+                    "payload_contract_stage": "multi_lag_payload_request_ready",
+                },
+            ],
+            max_mean_persistence_ratio_for_stability=1.5,
+            max_recross_fraction_for_stability=0.05,
+        )
+
+        by_temperature = {row["temperature"]: row for row in rows}
+        cold = by_temperature["0.23"]
+        hot = by_temperature["0.30"]
+        self.assertEqual(cold["outcome_stage"], "awaiting_event_rule_preregistered_outcome")
+        self.assertEqual(cold["required_new_observation"], "nonrecrossing_event_definition_on_true_time_axis")
+        self.assertEqual(hot["outcome_stage"], "awaiting_payload_preregistered_outcome")
+        self.assertEqual(float(hot["minimum_additional_lag_count"]), 2.0)
+        self.assertIn("mean_persistence_sensitivity_ratio <= 1.5", hot["preregistered_pass_condition"])
+        self.assertIn("max_post_crossing_recross_fraction <= 0.05", hot["preregistered_pass_condition"])
+        self.assertEqual(hot["claim_if_pass"], "threshold_robust_event_clock_candidate_not_pe_inversion")
+        self.assertEqual(hot["claim_if_fail"], "fixed_lag_threshold_event_clock_rejected")
         self.assertEqual(float(hot["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(float(hot["thermodynamic_claim_allowed"]), 0.0)
 

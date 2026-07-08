@@ -80,6 +80,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_real_threshold_sweep_canary,
     glassbench_threshold_sweep_ensemble_verdict,
     glassbench_threshold_sweep_payload_contract,
+    glassbench_threshold_sweep_outcome_matrix,
     glassbench_late_recovery_falsification_protocol,
     glassbench_late_recovery_ingestion_contract,
     glassbench_late_recovery_timecode_target,
@@ -4794,6 +4795,23 @@ def write_sota_glassbench_threshold_sweep_payload_contract_csv(
         audit_id="glassbench_threshold_sweep_payload_contract",
         ensemble_rows=ensemble_rows,
         target_rows=target_rows,
+    )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_sota_glassbench_threshold_sweep_outcome_matrix_csv(
+    path: Path,
+    *,
+    payload_rows: list[dict[str, float | str]],
+) -> list[dict[str, float | str]]:
+    """Write preregistered pass/fail interpretations for the next threshold sweep."""
+
+    rows = glassbench_threshold_sweep_outcome_matrix(
+        audit_id="glassbench_threshold_sweep_outcome_matrix",
+        payload_rows=payload_rows,
+        max_mean_persistence_ratio_for_stability=1.5,
+        max_recross_fraction_for_stability=0.05,
     )
     write_sweep_csv(path, rows)
     return rows
@@ -10571,6 +10589,56 @@ def write_sota_glassbench_threshold_sweep_payload_contract_svg(
     path.write_text(svg)
 
 
+def write_sota_glassbench_threshold_sweep_outcome_matrix_svg(
+    path: Path, rows: list[dict[str, float | str]]
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width = 1160
+    height = max(350, 140 + 96 * len(rows))
+    left, top = 75, 126
+    row_h = 96
+    colors = {
+        "awaiting_payload_preregistered_outcome": "#805ad5",
+        "awaiting_event_rule_preregistered_outcome": "#c05621",
+        "awaiting_preregistered_outcome": "#4a5568",
+    }
+    marks = []
+    for idx, row in enumerate(rows):
+        y = top + idx * row_h
+        stage = str(row["outcome_stage"])
+        color = colors.get(stage, "#4a5568")
+        marks.append(
+            f'<text x="{left}" y="{y + 16}" font-family="Arial, sans-serif" font-size="12" font-weight="700">{row["system_id"]} T={row["temperature"]}</text>'
+        )
+        marks.append(f'<rect x="{left + 130}" y="{y - 6}" width="390" height="27" fill="{color}" opacity="0.92" />')
+        marks.append(
+            f'<text x="{left + 140}" y="{y + 12}" font-family="Arial, sans-serif" font-size="10" fill="#fff">{stage.replace("_", " ")[:56]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 14}" font-family="Arial, sans-serif" font-size="11">required={str(row["required_new_observation"]).replace("_", " ")[:76]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 36}" font-family="Arial, sans-serif" font-size="10" fill="#555">pass: {str(row["preregistered_pass_condition"]).replace("_", " ")[:86]}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 56}" font-family="Arial, sans-serif" font-size="10" fill="#555">pass claim={str(row["claim_if_pass"]).replace("_", " ")}; fail claim={str(row["claim_if_fail"]).replace("_", " ")}</text>'
+        )
+        marks.append(
+            f'<text x="{left + 545}" y="{y + 76}" font-family="Arial, sans-serif" font-size="10" fill="#555">scope={str(row["claim_scope"]).replace("_", " ")}; thermodynamic claim={int(float(row["thermodynamic_claim_allowed"]))}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="75" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">GlassBench threshold-sweep outcome matrix</text>
+  <text x="75" y="66" font-family="Arial, sans-serif" font-size="13" fill="#444">Pass and fail interpretations are preregistered before the missing payload is acquired, keeping the result falsifiable rather than post-hoc.</text>
+  <text x="{left}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">target</text>
+  <text x="{left + 130}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">outcome stage</text>
+  <text x="{left + 545}" y="{top - 24}" font-family="Arial, sans-serif" font-size="12" font-weight="700">preregistered decision rule</text>
+  {"".join(marks)}
+</svg>
+"""
+    path.write_text(svg)
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_svg(
     path: Path, rows: list[dict[str, float | str]]
 ) -> None:
@@ -14955,6 +15023,16 @@ def main() -> None:
     write_sota_glassbench_threshold_sweep_payload_contract_svg(
         FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_payload_contract.svg",
         glassbench_threshold_sweep_payload_contract_rows,
+    )
+    glassbench_threshold_sweep_outcome_matrix_rows = (
+        write_sota_glassbench_threshold_sweep_outcome_matrix_csv(
+            DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.csv",
+            payload_rows=glassbench_threshold_sweep_payload_contract_rows,
+        )
+    )
+    write_sota_glassbench_threshold_sweep_outcome_matrix_svg(
+        FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.svg",
+        glassbench_threshold_sweep_outcome_matrix_rows,
     )
     glassbench_direct_alpha_event_clock_contract_rows = (
         write_sota_glassbench_direct_alpha_event_clock_contract_csv(

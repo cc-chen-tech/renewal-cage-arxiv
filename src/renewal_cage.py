@@ -7909,6 +7909,92 @@ def glassbench_threshold_sweep_payload_contract(
     return out
 
 
+def glassbench_threshold_sweep_outcome_matrix(
+    *,
+    audit_id: str,
+    payload_rows: Sequence[dict[str, object]],
+    max_mean_persistence_ratio_for_stability: float,
+    max_recross_fraction_for_stability: float,
+) -> list[dict[str, float | str]]:
+    """Preregister pass/fail interpretations for the next GlassBench threshold sweep."""
+
+    if not audit_id:
+        raise ValueError("audit_id must be nonempty")
+    if not payload_rows:
+        raise ValueError("payload_rows must be nonempty")
+    if max_mean_persistence_ratio_for_stability <= 1.0:
+        raise ValueError("max_mean_persistence_ratio_for_stability must be > 1")
+    if max_recross_fraction_for_stability < 0.0:
+        raise ValueError("max_recross_fraction_for_stability must be nonnegative")
+
+    pass_condition = (
+        "mean_persistence_sensitivity_ratio <= "
+        f"{max_mean_persistence_ratio_for_stability:.6g} and "
+        "max_post_crossing_recross_fraction <= "
+        f"{max_recross_fraction_for_stability:.6g} and "
+        "axis0_is_physical_time == 1"
+    )
+    fail_condition = (
+        "mean_persistence_sensitivity_ratio > "
+        f"{max_mean_persistence_ratio_for_stability:.6g} or "
+        "max_post_crossing_recross_fraction > "
+        f"{max_recross_fraction_for_stability:.6g} or "
+        "axis0_is_physical_time == 0"
+    )
+
+    out: list[dict[str, float | str]] = []
+    for row in sorted(
+        payload_rows,
+        key=lambda item: (str(item.get("system_id", "unknown")), float(item.get("temperature", 0.0))),
+    ):
+        system_id = str(row.get("system_id", "unknown"))
+        temperature = str(row.get("temperature", "none"))
+        structure_id = str(row.get("structure_id", "none"))
+        payload_stage = str(row.get("payload_contract_stage", "unknown"))
+        requested_payload = str(row.get("requested_payload", "none"))
+        missing = float(row.get("minimum_additional_lag_count", 0.0) or 0.0)
+
+        if payload_stage == "multi_lag_payload_request_ready":
+            outcome_stage = "awaiting_payload_preregistered_outcome"
+            required_observation = "multi_lag_threshold_sweep_on_physical_time_axis"
+            blocker = "payload_not_yet_observed"
+            next_action = "collect_payload_then_apply_preregistered_threshold_sweep_gate"
+        elif payload_stage == "threshold_rule_revision_required":
+            outcome_stage = "awaiting_event_rule_preregistered_outcome"
+            required_observation = "nonrecrossing_event_definition_on_true_time_axis"
+            blocker = "event_definition_not_yet_preregistered"
+            next_action = "define_event_rule_then_repeat_threshold_sweep_gate"
+        else:
+            outcome_stage = "awaiting_preregistered_outcome"
+            required_observation = requested_payload
+            blocker = str(row.get("primary_blocker", "upstream_payload_contract"))
+            next_action = "resolve_payload_contract_then_apply_outcome_matrix"
+
+        out.append(
+            {
+                "audit_id": f"{audit_id}_{system_id.lower()}_t{temperature.replace('.', '_')}",
+                "system_id": system_id,
+                "temperature": temperature,
+                "structure_id": structure_id,
+                "payload_contract_stage": payload_stage,
+                "requested_payload": requested_payload,
+                "minimum_additional_lag_count": float(missing),
+                "required_new_observation": required_observation,
+                "preregistered_pass_condition": pass_condition,
+                "preregistered_fail_condition": fail_condition,
+                "claim_if_pass": "threshold_robust_event_clock_candidate_not_pe_inversion",
+                "claim_if_fail": "fixed_lag_threshold_event_clock_rejected",
+                "claim_scope": "dynamical_event_clock_diagnostic_only",
+                "real_pe_inversion_ready": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+                "primary_blocker": blocker,
+                "next_required_action": next_action,
+                "outcome_stage": outcome_stage,
+            }
+        )
+    return out
+
+
 def glassbench_direct_alpha_event_clock_extraction_contract(
     *,
     audit_id: str,

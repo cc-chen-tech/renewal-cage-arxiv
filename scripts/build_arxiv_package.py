@@ -5020,6 +5020,64 @@ def write_sota_glassbench_threshold_sweep_payload_contract_pdf(path: Path) -> No
     c.save()
 
 
+def write_sota_glassbench_threshold_sweep_outcome_matrix_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "GlassBench threshold-sweep outcome matrix")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Pass and fail interpretations are preregistered before acquiring the missing threshold-sweep payload.",
+    )
+    left, top = 48, page_h - 100
+    row_h = 68
+    colors_by_stage = {
+        "awaiting_payload_preregistered_outcome": colors.HexColor("#805ad5"),
+        "awaiting_event_rule_preregistered_outcome": colors.HexColor("#c05621"),
+        "awaiting_preregistered_outcome": colors.HexColor("#4a5568"),
+    }
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(left, top + 24, "target")
+    c.drawString(left + 100, top + 24, "outcome stage")
+    c.drawString(left + 380, top + 24, "preregistered decision rule")
+    for index, row in enumerate(rows):
+        y = top - index * row_h
+        stage = row["outcome_stage"]
+        color = colors_by_stage.get(stage, colors.HexColor("#4a5568"))
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(left, y, f'{row["system_id"]} T={row["temperature"]}')
+        c.setFillColor(color)
+        c.rect(left + 100, y - 13, 262, 25, fill=1, stroke=0)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica", 7)
+        c.drawString(left + 108, y - 3, stage.replace("_", " ")[:46])
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(left + 380, y, f'required={row["required_new_observation"][:64]}')
+        c.setFont("Helvetica", 6.6)
+        c.drawString(left + 380, y - 14, f'pass={row["preregistered_pass_condition"][:80]}')
+        c.drawString(
+            left + 380,
+            y - 27,
+            f'pass claim={row["claim_if_pass"][:42]}; fail claim={row["claim_if_fail"][:38]}',
+        )
+        c.drawString(left + 380, y - 40, f'scope={row["claim_scope"]}; thermodynamic={int(float(row["thermodynamic_claim_allowed"]))}')
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        34,
+        "Passing this gate can only promote an event-clock candidate; PE inversion and thermodynamic claims remain blocked.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_direct_alpha_event_clock_contract_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -8934,6 +8992,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_threshold_sweep_payload_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf"
     )
+    sota_glassbench_threshold_sweep_outcome_matrix_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.pdf"
+    )
     sota_glassbench_direct_alpha_event_clock_contract_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_direct_alpha_event_clock_contract.pdf"
     )
@@ -9214,6 +9275,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     write_sota_glassbench_threshold_sweep_payload_contract_pdf(
         sota_glassbench_threshold_sweep_payload_contract_pdf
+    )
+    write_sota_glassbench_threshold_sweep_outcome_matrix_pdf(
+        sota_glassbench_threshold_sweep_outcome_matrix_pdf
     )
     write_sota_glassbench_direct_alpha_event_clock_contract_pdf(
         sota_glassbench_direct_alpha_event_clock_contract_pdf
@@ -9562,6 +9626,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_threshold_sweep_payload_contract_pdf,
             "figures/renewal_cage_sota_glassbench_threshold_sweep_payload_contract.pdf",
+        )
+        archive.write(
+            sota_glassbench_threshold_sweep_outcome_matrix_pdf,
+            "figures/renewal_cage_sota_glassbench_threshold_sweep_outcome_matrix.pdf",
         )
         archive.write(
             sota_glassbench_direct_alpha_event_clock_contract_pdf,
