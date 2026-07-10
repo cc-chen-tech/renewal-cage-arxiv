@@ -32,6 +32,123 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(phenomena["mct_beta_relaxation"]["model_status"], "partial")
         self.assertGreaterEqual(len(rows), 10)
 
+    def test_langevin_bridge_derives_effective_clocks_without_whole_theory_overclaim(self):
+        path = ROOT / "data" / "renewal_cage_langevin_bridge.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        self.assertEqual(len(rows), 2)
+        cold = rows[-1]
+        self.assertEqual(cold["bridge_stage"], "langevin_kramers_to_effective_clock_bridge")
+        self.assertEqual(float(cold["langevin_equation_specified"]), 1.0)
+        self.assertEqual(float(cold["harmonic_cage_ou_derived"]), 1.0)
+        self.assertEqual(float(cold["kramers_rates_derived"]), 1.0)
+        self.assertGreater(float(cold["persistence_exchange_ratio"]), 1.0)
+        self.assertGreater(float(cold["derived_stokes_einstein_product"]), 0.0)
+        self.assertEqual(float(cold["entire_effective_theory_from_langevin_claim_allowed"]), 0.0)
+        self.assertEqual(cold["remaining_assumption"], "metastable_basin_partition_and_barrier_inputs")
+
+    def test_langevin_bridge_states_rearrangement_is_jump_process_not_drift(self):
+        doc_text = (ROOT / "docs" / "langevin-coarse-graining-bridge.md").read_text()
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+
+        for text in (doc_text, main_text):
+            self.assertIn("cage rearrangement is not inserted as an ordinary Langevin drift", text)
+            self.assertIn("x_t = y_t + C_t", text)
+            self.assertIn("dC_t = eta_t dN_t", text)
+
+    def test_langevin_bridge_literature_position_keeps_novelty_boundary(self):
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        refs_text = (ROOT / "paper" / "references.bib").read_text()
+
+        for key in (
+            "lelievre2022eyring",
+            "pastore2016cagejump",
+            "pastore2017cage",
+            "kikutsuji2019water",
+        ):
+            self.assertIn(key, refs_text)
+            self.assertIn(key, main_text)
+
+        self.assertIn("is not a standard output of ordinary Kramers theory", main_text)
+        self.assertIn("closed-form NGP, self-scattering, and SE diagnostics", main_text)
+
+    def test_periodic_softness_gate_records_potential_to_delayed_hazard_bridge(self):
+        path = ROOT / "data" / "renewal_cage_periodic_softness_gate.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+
+        self.assertEqual(len(rows), 2)
+        cold = rows[-1]
+        self.assertEqual(cold["bridge_stage"], "periodic_softness_gate_to_delayed_hazard")
+        self.assertEqual(float(cold["delayed_hazard_from_precursors"]), 1.0)
+        self.assertEqual(float(cold["matches_square_delayed_hazard"]), 1.0)
+        self.assertEqual(float(cold["complete_many_body_derivation_claim_allowed"]), 0.0)
+        self.assertIn("periodic cage potential plus two precursor gates", main_text)
+        self.assertIn("two precursor readiness probabilities multiply", main_text)
+
+    def test_extended_landscape_scope_separates_potential_projections(self):
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        refs_text = (ROOT / "paper" / "references.bib").read_text()
+
+        self.assertIn("a single static one-dimensional potential is not enough", main_text)
+        self.assertIn("U(x,C,s_1,s_2,zeta)", main_text)
+        self.assertIn("harmonic projection gives the OU cage", main_text)
+        self.assertIn("periodic projection gives the Vorselaars-type cage-to-cage baseline", main_text)
+        self.assertIn("softness-gate projection gives the delayed hazard", main_text)
+        self.assertIn("mobility-environment projection gives finite-exchange heterogeneity", main_text)
+        self.assertIn("Journal de l'Ecole polytechnique", refs_text)
+        self.assertIn("10.5802/jep.303", refs_text)
+
+    def test_potential_taxonomy_artifact_maps_potentials_to_effective_theory(self):
+        path = ROOT / "data" / "renewal_cage_potential_taxonomy.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+        by_id = {row["potential_id"]: row for row in rows}
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        readme_text = (ROOT / "README.md").read_text()
+
+        self.assertIn("two_precursor_softness_gate", by_id)
+        self.assertIn("dynamic_barrier_environment", by_id)
+        self.assertIn("inherent_state_landscape_density", by_id)
+        self.assertIn("tau_d,delayed_hazard", by_id["two_precursor_softness_gate"]["derived_parameters"])
+        self.assertEqual(by_id["two_precursor_softness_gate"]["microscopic_status"], "coarse_grained_collective_coordinate")
+        self.assertEqual(by_id["inherent_state_landscape_density"]["effective_modules"], "thermodynamic_entropy_closure")
+        self.assertEqual(float(by_id["inherent_state_landscape_density"]["complete_many_body_derivation_claim_allowed"]), 0.0)
+        self.assertIn("Table~\\ref{tab:potential-taxonomy}", main_text)
+        self.assertIn("renewal_cage_potential_taxonomy.csv", readme_text)
+
+    def test_landscape_parameterization_artifact_derives_q_and_entropy_rows(self):
+        path = ROOT / "data" / "renewal_cage_landscape_parameterization.csv"
+        self.assertTrue(path.exists())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+        by_stage = {row["bridge_stage"]: row for row in rows}
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        readme_text = (ROOT / "README.md").read_text()
+
+        self.assertIn("basin_adjacency_to_q", by_stage)
+        self.assertIn("inherent_state_density_to_thermodynamics", by_stage)
+        self.assertGreater(float(by_stage["basin_adjacency_to_q"]["jump_variance_q"]), 0.0)
+        self.assertGreater(
+            float(by_stage["inherent_state_density_to_thermodynamics"]["configurational_entropy"]),
+            0.0,
+        )
+        self.assertGreater(
+            float(by_stage["inherent_state_density_to_thermodynamics"]["excess_heat_capacity"]),
+            0.0,
+        )
+        self.assertEqual(
+            float(by_stage["inherent_state_density_to_thermodynamics"]["complete_dynamic_derivation_claim_allowed"]),
+            0.0,
+        )
+        self.assertIn("renewal_cage_landscape_parameterization.csv", main_text)
+        self.assertIn("renewal_cage_landscape_parameterization.csv", readme_text)
+
     def test_sota_benchmark_consistency_contains_multiple_mechanism_checks(self):
         path = ROOT / "data" / "renewal_cage_sota_benchmark_consistency.csv"
         self.assertTrue(path.exists())
