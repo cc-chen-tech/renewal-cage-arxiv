@@ -7040,6 +7040,119 @@ def write_weeks_hard_colloid_true_time_pdf(path: Path) -> None:
     c.save()
 
 
+def write_weeks_hard_colloid_event_clock_censoring_pdf(path: Path) -> None:
+    """Render the field-of-view event-clock non-identifiability audit."""
+
+    with (DATA_DIR / "renewal_cage_weeks_hard_colloid_event_clock_censoring.csv").open() as handle:
+        rows = list(csv.DictReader(handle))
+    with (DATA_DIR / "renewal_cage_weeks_hard_colloid_event_clock_censoring_verdict.csv").open() as handle:
+        verdict_rows = list(csv.DictReader(handle))
+    if not rows or not verdict_rows:
+        raise ValueError("Weeks event-clock censoring artifacts must be nonempty")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Public hard-colloid event-clock identifiability audit")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Cage-relative Candelier-type segmentation is threshold-stable, but finite field-of-view tracks do not identify a persistence/exchange ratio.",
+    )
+
+    panel_width, panel_height, bottom = 290, 255, 168
+    panel_lefts = (70, 420)
+    log_ratio_range = (math.log10(0.7), math.log10(200.0))
+    x_range = (100.0, 500.0)
+    palette = (colors.HexColor("#1f77b4"), colors.HexColor("#d62728"))
+    for index, verdict in enumerate(verdict_rows):
+        left = panel_lefts[index]
+        sample_id = verdict["sample_id"]
+        draw_axes(
+            c,
+            left,
+            bottom,
+            panel_width,
+            panel_height,
+            f"phi={float(verdict['area_fraction']):.2f} {sample_id}",
+            "minimum contiguous track length (frames)",
+            x_range,
+            log_ratio_range,
+        )
+        c.saveState()
+        c.translate(left - 38, bottom + panel_height / 2.0)
+        c.rotate(90)
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(0, 0, "log10(persistence / exchange ratio)")
+        c.restoreState()
+        horizon_rows = sorted(
+            [
+                row for row in rows
+                if row["sample_id"] == sample_id
+                and float(row["threshold"]) == float(verdict["selected_horizon_threshold"])
+            ],
+            key=lambda row: float(row["min_track_frames"]),
+        )
+        for color, key in zip(
+            palette,
+            ("naive_persistence_exchange_ratio", "censored_persistence_exchange_ratio"),
+        ):
+            x = np.array([float(row["min_track_frames"]) for row in horizon_rows])
+            y = np.log10(np.array([float(row[key]) for row in horizon_rows]))
+            draw_polyline(
+                c,
+                scale(x, left, left + panel_width, x_range),
+                scale(y, bottom, bottom + panel_height, log_ratio_range),
+                color,
+                1.7,
+            )
+            c.setFillColor(color)
+            for x_value, y_value in zip(
+                scale(x, left, left + panel_width, x_range),
+                scale(y, bottom, bottom + panel_height, log_ratio_range),
+            ):
+                c.circle(float(x_value), float(y_value), 2.2, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 7.2)
+        c.drawString(left + 6, bottom + 12, "threshold stable=1; PE inversion=0")
+
+    c.setFillColor(palette[0])
+    c.rect(72, 124, 16, 4, stroke=0, fill=1)
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    c.drawString(94, 121, "naive first-event mean / exchange mean")
+    c.setFillColor(palette[1])
+    c.rect(330, 124, 16, 4, stroke=0, fill=1)
+    c.setFillColor(colors.black)
+    c.drawString(352, 121, "right-censored first-event estimate / exchange mean")
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(72, 90, "sample")
+    c.drawString(200, 90, "threshold log spread")
+    c.drawString(345, 90, "naive / censored horizon spread")
+    c.drawString(570, 90, "claim boundary")
+    c.setFont("Helvetica", 7.2)
+    for index, verdict in enumerate(verdict_rows):
+        y = 75 - index * 22
+        c.drawString(72, y, f"phi={verdict['area_fraction']} {verdict['sample_id']}")
+        c.drawString(200, y, f"{float(verdict['threshold_log_ratio_spread']):.3f}")
+        c.drawString(
+            345,
+            y,
+            f"{float(verdict['naive_horizon_log_ratio_spread']):.3f} / {float(verdict['censored_horizon_log_ratio_spread']):.3f}",
+        )
+        c.drawString(570, y, "observation-window censoring; real PE=0")
+    c.setFont("Helvetica", 7.2)
+    c.drawString(
+        72,
+        30,
+        "Input: public Vivek et al. 2D trajectories. Event segmentation follows the Candelier-type separation score; CSV retains thresholds, coverage, and source fingerprints.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -9441,6 +9554,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     weeks_hard_colloid_true_time_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_weeks_hard_colloid_true_time.pdf"
     )
+    weeks_hard_colloid_event_clock_censoring_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_weeks_hard_colloid_event_clock_censoring.pdf"
+    )
     sota_glassbench_microdynamic_closed_loop_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
     )
@@ -9738,6 +9854,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         sota_glassbench_manuscript_claim_registry_pdf
     )
     write_weeks_hard_colloid_true_time_pdf(weeks_hard_colloid_true_time_pdf)
+    write_weeks_hard_colloid_event_clock_censoring_pdf(
+        weeks_hard_colloid_event_clock_censoring_pdf
+    )
     write_sota_glassbench_microdynamic_closed_loop_pdf(
         sota_glassbench_microdynamic_closed_loop_pdf
     )
@@ -10131,6 +10250,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             weeks_hard_colloid_true_time_pdf,
             "figures/renewal_cage_weeks_hard_colloid_true_time.pdf",
+        )
+        archive.write(
+            weeks_hard_colloid_event_clock_censoring_pdf,
+            "figures/renewal_cage_weeks_hard_colloid_event_clock_censoring.pdf",
         )
         archive.write(
             sota_glassbench_microdynamic_closed_loop_pdf,

@@ -43,6 +43,31 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("vivek2017longwavelength", main_text)
         self.assertIn("vivek2017longwavelength", references_text)
 
+    def test_weeks_event_clock_audit_rejects_window_censored_pe_inversion(self):
+        verdict_path = ROOT / "data" / "renewal_cage_weeks_hard_colloid_event_clock_censoring_verdict.csv"
+        event_path = ROOT / "data" / "renewal_cage_weeks_hard_colloid_event_clock_censoring.csv"
+        self.assertTrue(verdict_path.exists())
+        self.assertTrue(event_path.exists())
+        self.assertNotIn(b"\r\n", verdict_path.read_bytes())
+        with verdict_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["identifiability_stage"], "censoring_nonidentifiability_detected")
+            self.assertEqual(float(row["threshold_stable_event_segmentation_ready"]), 1.0)
+            self.assertEqual(float(row["naive_horizon_stable"]), 0.0)
+            self.assertEqual(float(row["censored_horizon_stable"]), 0.0)
+            self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+            self.assertEqual(float(row["finite_exchange_selection_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertEqual(row["primary_blocker"], "observation_window_censoring")
+
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        references_text = (ROOT / "paper" / "references.bib").read_text()
+        self.assertIn("candelier2009building", main_text)
+        self.assertIn("candelier2009building", references_text)
+
     def test_sota_comparison_table_keeps_scope_boundaries(self):
         path = ROOT / "data" / "renewal_cage_sota_comparison.csv"
         self.assertTrue(path.exists())
@@ -3478,6 +3503,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_manuscript_claim_registry.pdf", names)
             self.assertIn("figures/renewal_cage_weeks_hard_colloid_true_time.pdf", names)
+            self.assertIn("figures/renewal_cage_weeks_hard_colloid_event_clock_censoring.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)

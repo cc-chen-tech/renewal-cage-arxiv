@@ -21,7 +21,10 @@ DATA_DIR = ROOT / "data"
 FIGURE_DIR = ROOT / "figures"
 sys.path.insert(0, str(ROOT / "src"))
 
-from renewal_cage import weeks_colloid_true_time_verdict  # noqa: E402
+from renewal_cage import (  # noqa: E402
+    censored_event_clock_identifiability_verdict,
+    weeks_colloid_true_time_verdict,
+)
 
 
 BASE_URL = "https://faculty.college.emory.edu/sites/weeks/data/2dskanda"
@@ -66,7 +69,7 @@ def fetch_sample(sample: Sample, cache_dir: Path, *, fetch: bool) -> Path:
     return path
 
 
-def load_tracks(path: Path) -> tuple[list[tuple[np.ndarray, np.ndarray, dict[int, int]]], list[dict[int, np.ndarray]]]:
+def load_tracks(path: Path) -> tuple[list[tuple[int, np.ndarray, np.ndarray, dict[int, int]]], list[dict[int, np.ndarray]]]:
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         if len(names) != 1 or not names[0].endswith(".txt"):
@@ -81,12 +84,12 @@ def load_tracks(path: Path) -> tuple[list[tuple[np.ndarray, np.ndarray, dict[int
     if time.min() != 0 or not np.array_equal(np.unique(time), np.arange(time.max() + 1)):
         raise ValueError("Weeks trajectory time indices must be consecutive and start at zero")
 
-    tracks: list[tuple[np.ndarray, np.ndarray, dict[int, int]]] = []
+    tracks: list[tuple[int, np.ndarray, np.ndarray, dict[int, int]]] = []
     for identifier in np.unique(particle_id):
         rows = table[particle_id == identifier]
         times = rows[:, 3].astype(int)
         positions = rows[:, :2]
-        tracks.append((times, positions, {int(value): index for index, value in enumerate(times)}))
+        tracks.append((int(identifier), times, positions, {int(value): index for index, value in enumerate(times)}))
 
     frames: list[dict[int, np.ndarray]] = []
     for frame_time in range(time.max() + 1):
@@ -104,12 +107,12 @@ def lag_grid(frame_count: int, point_count: int = 24) -> np.ndarray:
 
 
 def raw_lag_observables(
-    tracks: list[tuple[np.ndarray, np.ndarray, dict[int, int]]],
+    tracks: list[tuple[int, np.ndarray, np.ndarray, dict[int, int]]],
     lag: int,
     wave_number: float,
 ) -> dict[str, float]:
     displacements: list[np.ndarray] = []
-    for times, positions, index in tracks:
+    for _, times, positions, index in tracks:
         pairs = [
             (current, index[int(time) + lag])
             for current, time in enumerate(times)
@@ -174,6 +177,213 @@ def cage_relative_ngp(
         "msd": msd,
         "ngp_2d": float(np.mean(squared**2) / (2.0 * msd**2) - 1.0),
     }
+
+
+def cage_relative_coordinates(
+    frames: list[dict[int, np.ndarray]],
+    neighbor_count: int = 6,
+) -> list[dict[int, np.ndarray]]:
+    """Return instantaneous six-neighbor cage-relative coordinates by particle ID."""
+
+    if neighbor_count < 1:
+        raise ValueError("neighbor_count must be positive")
+    coordinates: list[dict[int, np.ndarray]] = []
+    for frame in frames:
+        identifiers = np.asarray(sorted(frame), dtype=int)
+        if len(identifiers) <= neighbor_count:
+            coordinates.append({})
+            continue
+        positions = np.stack([frame[int(identifier)] for identifier in identifiers])
+        separation = positions[:, None, :] - positions[None, :, :]
+        distance_squared = np.sum(separation**2, axis=2)
+        np.fill_diagonal(distance_squared, np.inf)
+        neighbors = np.argpartition(distance_squared, neighbor_count - 1, axis=1)[:, :neighbor_count]
+        relative = positions - np.mean(positions[neighbors], axis=1)
+        coordinates.append(
+            {int(identifier): relative[index] for index, identifier in enumerate(identifiers)}
+        )
+    return coordinates
+
+
+def contiguous_segments(
+    times: np.ndarray,
+    coordinates: np.ndarray,
+    min_track_frames: int,
+) -> list[np.ndarray]:
+    """Split field-of-view tracks at gaps before applying an event protocol."""
+
+    if min_track_frames < 2:
+        raise ValueError("min_track_frames must be at least two")
+    boundaries = np.flatnonzero(np.diff(times) != 1) + 1
+    chunks = np.split(coordinates, boundaries)
+    return [chunk for chunk in chunks if len(chunk) >= min_track_frames]
+
+
+def candelier_jump_indices(
+    coordinates: np.ndarray,
+    cage_length_threshold: float,
+    min_subsegment_frames: int = 50,
+) -> list[int]:
+    """Recursively locate Candelier maxima above a cage-length threshold.
+
+    The separation score is a squared length, so the supplied cage-length
+    threshold is squared before comparison.
+    """
+
+    if cage_length_threshold <= 0.0:
+        raise ValueError("cage_length_threshold must be positive")
+    if min_subsegment_frames < 2:
+        raise ValueError("min_subsegment_frames must be at least two")
+
+    def best_split(segment: np.ndarray) -> tuple[int | None, float]:
+        size = len(segment)
+        if size < 2 * min_subsegment_frames:
+            return None, 0.0
+        cumulative = np.concatenate(
+            [np.zeros((1, segment.shape[1])), np.cumsum(segment, axis=0)]
+        )
+        cumulative_norm_squared = np.concatenate(
+            [[0.0], np.cumsum(np.sum(segment**2, axis=1))]
+        )
+        candidates = np.arange(min_subsegment_frames, size - min_subsegment_frames + 1)
+        left_count = candidates.astype(float)
+        right_count = float(size) - left_count
+        left_mean = cumulative[candidates] / left_count[:, None]
+        right_mean = (cumulative[size] - cumulative[candidates]) / right_count[:, None]
+        left_mean_squared = cumulative_norm_squared[candidates] / left_count
+        right_mean_squared = (cumulative_norm_squared[size] - cumulative_norm_squared[candidates]) / right_count
+        left_about_right = left_mean_squared - 2.0 * np.sum(left_mean * right_mean, axis=1) + np.sum(right_mean**2, axis=1)
+        right_about_left = right_mean_squared - 2.0 * np.sum(right_mean * left_mean, axis=1) + np.sum(left_mean**2, axis=1)
+        score = np.sqrt((left_count / size) * (right_count / size)) * np.sqrt(
+            np.maximum(left_about_right, 0.0) * np.maximum(right_about_left, 0.0)
+        )
+        index = int(np.argmax(score))
+        return int(candidates[index]), float(score[index])
+
+    def split(offset: int, segment: np.ndarray) -> list[int]:
+        split_index, score = best_split(segment)
+        if split_index is None or score < cage_length_threshold**2:
+            return []
+        left = split(offset, segment[:split_index])
+        right = split(offset + split_index, segment[split_index:])
+        return left + [offset + split_index] + right
+
+    return split(0, coordinates)
+
+
+def event_clock_row(
+    sample: Sample,
+    tracks: list[tuple[int, np.ndarray, np.ndarray, dict[int, int]]],
+    relative_frames: list[dict[int, np.ndarray]],
+    *,
+    threshold: float,
+    min_track_frames: int,
+    scan_kind: str,
+) -> dict[str, float | str]:
+    """Extract first-event and exchange statistics with explicit right censoring."""
+
+    first_event_times: list[float] = []
+    first_exposures: list[float] = []
+    exchange_intervals: list[float] = []
+    event_track_count = 0
+    right_censored_track_count = 0
+    for particle_id, times, _, _ in tracks:
+        relative_coordinates = np.asarray(
+            [relative_frames[int(time)][particle_id] for time in times], dtype=float
+        )
+        for segment in contiguous_segments(times, relative_coordinates, min_track_frames):
+            event_track_count += 1
+            jump_indices = candelier_jump_indices(segment, threshold)
+            exposure = float(len(segment) - 1)
+            if not jump_indices:
+                first_exposures.append(exposure)
+                right_censored_track_count += 1
+                continue
+            first_time = float(jump_indices[0])
+            first_event_times.append(first_time)
+            first_exposures.append(first_time)
+            exchange_intervals.extend(
+                float(right - left) for left, right in zip(jump_indices, jump_indices[1:])
+            )
+
+    if event_track_count == 0:
+        raise ValueError("no contiguous tracks meet the selected observation horizon")
+    if not first_event_times:
+        raise ValueError("no observed first cage escapes at the selected threshold")
+    if not exchange_intervals:
+        raise ValueError("no exchange intervals at the selected threshold")
+
+    naive_persistence_mean = float(np.mean(first_event_times))
+    censored_persistence_mean = float(np.sum(first_exposures) / len(first_event_times))
+    exchange_mean = float(np.mean(exchange_intervals))
+    return {
+        "source_id": "vivek2017_2d_hard_colloid",
+        "sample_id": sample.sample_id,
+        "area_fraction": sample.area_fraction,
+        "time_step_seconds": sample.time_step_seconds,
+        "threshold": threshold,
+        "min_track_frames": float(min_track_frames),
+        "scan_kind": scan_kind,
+        "event_track_count": float(event_track_count),
+        "observed_first_escape_count": float(len(first_event_times)),
+        "right_censored_first_track_count": float(right_censored_track_count),
+        "exchange_interval_count": float(len(exchange_intervals)),
+        "naive_persistence_mean": naive_persistence_mean,
+        "censored_persistence_mean": censored_persistence_mean,
+        "exchange_mean": exchange_mean,
+        "naive_persistence_exchange_ratio": naive_persistence_mean / exchange_mean,
+        "censored_persistence_exchange_ratio": censored_persistence_mean / exchange_mean,
+    }
+
+
+def analyze_event_clock_sample(
+    sample: Sample,
+    path: Path,
+) -> tuple[list[dict[str, float | str]], dict[str, float | str]]:
+    """Audit whether this finite-FOV data set identifies a PE clock ratio."""
+
+    tracks, frames = load_tracks(path)
+    relative_frames = cage_relative_coordinates(frames)
+    scan_specification = (
+        (0.4, 100, "threshold_scan"),
+        (0.6, 100, "threshold_scan"),
+        (0.8, 100, "threshold_scan"),
+        (0.6, 250, "horizon_scan"),
+        (0.6, 500, "horizon_scan"),
+    )
+    rows = [
+        event_clock_row(
+            sample,
+            tracks,
+            relative_frames,
+            threshold=threshold,
+            min_track_frames=min_track_frames,
+            scan_kind=scan_kind,
+        )
+        for threshold, min_track_frames, scan_kind in scan_specification
+    ]
+    for row in rows:
+        row["source_url"] = sample.url
+        row["source_sha256"] = sha256(path)
+
+    verdict = censored_event_clock_identifiability_verdict(
+        verdict_id="weeks_hard_colloid_event_clock_censoring_verdict",
+        sample_id=sample.sample_id,
+        event_clock_rows=rows,
+        min_exchange_interval_count=20,
+        max_threshold_log_ratio_spread=0.15,
+        max_horizon_log_ratio_spread=0.30,
+    )
+    verdict.update(
+        {
+            "source_id": "vivek2017_2d_hard_colloid",
+            "area_fraction": sample.area_fraction,
+            "time_step_seconds": sample.time_step_seconds,
+            "source_url": sample.url,
+            "source_sha256": sha256(path),
+        }
+    )
+    return rows, verdict
 
 
 def analyze_sample(sample: Sample, path: Path, wave_number: float = 3.0) -> tuple[list[dict[str, float | str]], dict[str, float | str]]:
@@ -313,6 +523,86 @@ def write_svg(path: Path, rows: list[dict[str, float | str]], verdicts: list[dic
     path.write_text("\n".join(lines))
 
 
+def write_event_clock_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+    verdicts: list[dict[str, float | str]],
+) -> None:
+    """Plot track-horizon sensitivity at the common threshold used by the audit."""
+
+    width, height = 920, 490
+    top, bottom = 60, 78
+    panel_width, panel_height = 360, height - top - bottom
+    panel_lefts = (92, 510)
+    y_min, y_max = math.log10(0.7), math.log10(200.0)
+    x_min, x_max = 90.0, 510.0
+    colors = {"naive": "#1f77b4", "right-censored": "#d62728"}
+
+    def x_coord(value: float, left: float) -> float:
+        return left + (value - x_min) / (x_max - x_min) * panel_width
+
+    def y_coord(value: float) -> float:
+        return top + (y_max - math.log10(value)) / (y_max - y_min) * panel_height
+
+    lines = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        '<rect width="100%" height="100%" fill="white"/>',
+        '<style>text{font-family:Arial,sans-serif;fill:#202124} .axis{stroke:#202124;stroke-width:1.3} .grid{stroke:#d9d9d9;stroke-width:1} .series{fill:none;stroke-width:2.4} .marker{stroke:white;stroke-width:1}</style>',
+        '<text x="92" y="30" font-size="18">Cage-jump event clocks: observation-window identifiability audit</text>',
+        '<text x="92" y="48" font-size="12">Candelier-type cage-relative segmentation is threshold-stable, but PE ratios drift strongly with field-of-view track horizon.</text>',
+    ]
+    for index, verdict in enumerate(verdicts):
+        left = panel_lefts[index]
+        sample_id = str(verdict["sample_id"])
+        lines.extend(
+            [
+                f'<line class="axis" x1="{left}" y1="{top + panel_height}" x2="{left + panel_width}" y2="{top + panel_height}"/>',
+                f'<line class="axis" x1="{left}" y1="{top}" x2="{left}" y2="{top + panel_height}"/>',
+                f'<text x="{left + panel_width / 2:.2f}" y="{top - 14}" text-anchor="middle" font-size="14">phi={float(verdict["area_fraction"]):.2f}, {sample_id}</text>',
+            ]
+        )
+        for tick in (100.0, 250.0, 500.0):
+            x = x_coord(tick, left)
+            lines.append(f'<line class="grid" x1="{x:.2f}" y1="{top}" x2="{x:.2f}" y2="{top + panel_height}"/>')
+            lines.append(f'<text x="{x:.2f}" y="{top + panel_height + 22}" text-anchor="middle" font-size="11">{int(tick)}</text>')
+        for tick in (1.0, 3.0, 10.0, 30.0, 100.0):
+            y = y_coord(tick)
+            lines.append(f'<line class="grid" x1="{left}" y1="{y:.2f}" x2="{left + panel_width}" y2="{y:.2f}"/>')
+            lines.append(f'<text x="{left - 8}" y="{y + 4:.2f}" text-anchor="end" font-size="11">{tick:g}</text>')
+        horizon_rows = sorted(
+            [
+                row for row in rows
+                if str(row["sample_id"]) == sample_id and float(row["threshold"]) == float(verdict["selected_horizon_threshold"])
+            ],
+            key=lambda row: float(row["min_track_frames"]),
+        )
+        for label, key in (
+            ("naive", "naive_persistence_exchange_ratio"),
+            ("right-censored", "censored_persistence_exchange_ratio"),
+        ):
+            points = " ".join(
+                f'{x_coord(float(row["min_track_frames"]), left):.2f},{y_coord(float(row[key])):.2f}'
+                for row in horizon_rows
+            )
+            lines.append(f'<polyline class="series" stroke="{colors[label]}" points="{points}"/>')
+            for row in horizon_rows:
+                lines.append(f'<circle class="marker" fill="{colors[label]}" cx="{x_coord(float(row["min_track_frames"]), left):.2f}" cy="{y_coord(float(row[key])):.2f}" r="3.2"/>')
+        lines.append(f'<text x="{left + panel_width / 2:.2f}" y="{height - 22}" text-anchor="middle" font-size="13">minimum contiguous track length (frames)</text>')
+        lines.append(f'<text x="{left + 8}" y="{top + panel_height - 12}" font-size="11">threshold stable=1; PE inversion=0</text>')
+    lines.extend(
+        [
+            '<line x1="92" y1="438" x2="112" y2="438" stroke="#1f77b4" stroke-width="2.4"/>',
+            '<text x="118" y="442" font-size="12">naive first-event mean / exchange mean</text>',
+            '<line x1="350" y1="438" x2="370" y2="438" stroke="#d62728" stroke-width="2.4"/>',
+            '<text x="376" y="442" font-size="12">right-censored first-event estimate / exchange mean</text>',
+            '<text x="22" y="{:.2f}" transform="rotate(-90 22 {:.2f})" text-anchor="middle" font-size="13">persistence / exchange ratio (log scale)</text>'.format(top + panel_height / 2, top + panel_height / 2),
+            '</svg>',
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--fetch", action="store_true", help="download the fixed public source files when absent")
@@ -320,18 +610,29 @@ def main() -> None:
     parser.add_argument("--curve-csv", type=Path, default=DATA_DIR / "renewal_cage_weeks_hard_colloid_true_time_curve.csv")
     parser.add_argument("--verdict-csv", type=Path, default=DATA_DIR / "renewal_cage_weeks_hard_colloid_true_time_verdict.csv")
     parser.add_argument("--svg", type=Path, default=FIGURE_DIR / "renewal_cage_weeks_hard_colloid_true_time.svg")
+    parser.add_argument("--event-clock-csv", type=Path, default=DATA_DIR / "renewal_cage_weeks_hard_colloid_event_clock_censoring.csv")
+    parser.add_argument("--event-clock-verdict-csv", type=Path, default=DATA_DIR / "renewal_cage_weeks_hard_colloid_event_clock_censoring_verdict.csv")
+    parser.add_argument("--event-clock-svg", type=Path, default=FIGURE_DIR / "renewal_cage_weeks_hard_colloid_event_clock_censoring.svg")
     args = parser.parse_args()
 
     curve_rows: list[dict[str, float | str]] = []
     verdict_rows: list[dict[str, float | str]] = []
+    event_clock_rows: list[dict[str, float | str]] = []
+    event_clock_verdict_rows: list[dict[str, float | str]] = []
     for sample in SAMPLES:
         source = fetch_sample(sample, args.cache_dir, fetch=args.fetch)
         rows, verdict = analyze_sample(sample, source)
         curve_rows.extend(rows)
         verdict_rows.append(verdict)
+        event_rows, event_verdict = analyze_event_clock_sample(sample, source)
+        event_clock_rows.extend(event_rows)
+        event_clock_verdict_rows.append(event_verdict)
     write_csv(args.curve_csv, curve_rows)
     write_csv(args.verdict_csv, verdict_rows)
     write_svg(args.svg, curve_rows, verdict_rows)
+    write_csv(args.event_clock_csv, event_clock_rows)
+    write_csv(args.event_clock_verdict_csv, event_clock_verdict_rows)
+    write_event_clock_svg(args.event_clock_svg, event_clock_rows, event_clock_verdict_rows)
 
 
 if __name__ == "__main__":

@@ -12988,6 +12988,137 @@ def weeks_colloid_true_time_verdict(
     }
 
 
+def censored_event_clock_identifiability_verdict(
+    *,
+    verdict_id: str,
+    sample_id: str,
+    event_clock_rows: Sequence[dict[str, object]],
+    min_exchange_interval_count: int,
+    max_threshold_log_ratio_spread: float,
+    max_horizon_log_ratio_spread: float,
+) -> dict[str, float | str]:
+    """Separate cage-jump segmentation stability from clock identifiability.
+
+    A threshold-stable catalogue of jumps is not by itself enough to infer a
+    persistence/exchange ratio from finite field-of-view tracks.  This audit
+    requires the ratio to be stable both across segmentation thresholds at the
+    shortest admissible horizon and across successive track-length cutoffs at
+    one common threshold.  The latter comparison is evaluated for both the
+    naive event mean and a right-censored exponential estimate.
+    """
+
+    if not verdict_id or not sample_id:
+        raise ValueError("verdict_id and sample_id must be nonempty")
+    if not event_clock_rows:
+        raise ValueError("event_clock_rows must be nonempty")
+    if min_exchange_interval_count <= 0:
+        raise ValueError("min_exchange_interval_count must be positive")
+    if max_threshold_log_ratio_spread < 0.0:
+        raise ValueError("max_threshold_log_ratio_spread must be nonnegative")
+    if max_horizon_log_ratio_spread < 0.0:
+        raise ValueError("max_horizon_log_ratio_spread must be nonnegative")
+
+    parsed_rows: list[dict[str, float]] = []
+    required = (
+        "threshold",
+        "min_track_frames",
+        "naive_persistence_mean",
+        "censored_persistence_mean",
+        "exchange_mean",
+        "exchange_interval_count",
+    )
+    for source_row in event_clock_rows:
+        row: dict[str, float] = {}
+        for key in required:
+            value = float(source_row.get(key, 0.0) or 0.0)
+            if value <= 0.0:
+                raise ValueError(f"{key} must be positive in every event clock row")
+            row[key] = value
+        row["naive_ratio"] = row["naive_persistence_mean"] / row["exchange_mean"]
+        row["censored_ratio"] = row["censored_persistence_mean"] / row["exchange_mean"]
+        parsed_rows.append(row)
+
+    baseline_min_track_frames = min(row["min_track_frames"] for row in parsed_rows)
+    threshold_rows = [
+        row for row in parsed_rows if row["min_track_frames"] == baseline_min_track_frames
+    ]
+    eligible_threshold_rows = [
+        row
+        for row in threshold_rows
+        if row["exchange_interval_count"] >= float(min_exchange_interval_count)
+    ]
+    if len({row["threshold"] for row in threshold_rows}) < 2:
+        raise ValueError("at least two thresholds are required at the baseline horizon")
+    if len(eligible_threshold_rows) < 2:
+        raise ValueError("at least two threshold rows must meet exchange interval coverage")
+
+    threshold_ratios = [row["naive_ratio"] for row in eligible_threshold_rows]
+    threshold_log_ratio_spread = math.log(max(threshold_ratios) / min(threshold_ratios))
+    threshold_stable = threshold_log_ratio_spread <= max_threshold_log_ratio_spread
+
+    horizons_by_threshold: dict[float, set[float]] = {}
+    for row in parsed_rows:
+        if row["exchange_interval_count"] >= float(min_exchange_interval_count):
+            horizons_by_threshold.setdefault(row["threshold"], set()).add(row["min_track_frames"])
+    selected_horizon_threshold = min(
+        horizons_by_threshold,
+        key=lambda threshold: (-len(horizons_by_threshold[threshold]), threshold),
+    )
+    horizon_rows = sorted(
+        (
+            row
+            for row in parsed_rows
+            if row["threshold"] == selected_horizon_threshold
+            and row["exchange_interval_count"] >= float(min_exchange_interval_count)
+        ),
+        key=lambda row: row["min_track_frames"],
+    )
+    if len({row["min_track_frames"] for row in horizon_rows}) < 2:
+        raise ValueError("one threshold must have at least two admissible observation horizons")
+
+    naive_horizon_ratios = [row["naive_ratio"] for row in horizon_rows]
+    censored_horizon_ratios = [row["censored_ratio"] for row in horizon_rows]
+    naive_horizon_log_ratio_spread = math.log(
+        max(naive_horizon_ratios) / min(naive_horizon_ratios)
+    )
+    censored_horizon_log_ratio_spread = math.log(
+        max(censored_horizon_ratios) / min(censored_horizon_ratios)
+    )
+    naive_horizon_stable = naive_horizon_log_ratio_spread <= max_horizon_log_ratio_spread
+    censored_horizon_stable = censored_horizon_log_ratio_spread <= max_horizon_log_ratio_spread
+    real_pe_inversion_ready = threshold_stable and naive_horizon_stable and censored_horizon_stable
+
+    if not threshold_stable:
+        stage = "event_segmentation_threshold_unstable"
+        blocker = "event_segmentation_threshold"
+    elif not naive_horizon_stable or not censored_horizon_stable:
+        stage = "censoring_nonidentifiability_detected"
+        blocker = "observation_window_censoring"
+    else:
+        stage = "censoring_stable_event_clock_ready"
+        blocker = "none"
+
+    return {
+        "verdict_id": verdict_id,
+        "sample_id": sample_id,
+        "baseline_min_track_frames": baseline_min_track_frames,
+        "threshold_count": float(len({row["threshold"] for row in threshold_rows})),
+        "selected_horizon_threshold": selected_horizon_threshold,
+        "horizon_count": float(len({row["min_track_frames"] for row in horizon_rows})),
+        "threshold_log_ratio_spread": threshold_log_ratio_spread,
+        "naive_horizon_log_ratio_spread": naive_horizon_log_ratio_spread,
+        "censored_horizon_log_ratio_spread": censored_horizon_log_ratio_spread,
+        "threshold_stable_event_segmentation_ready": float(threshold_stable),
+        "naive_horizon_stable": float(naive_horizon_stable),
+        "censored_horizon_stable": float(censored_horizon_stable),
+        "finite_exchange_selection_claim_allowed": 0.0,
+        "real_pe_inversion_ready": float(real_pe_inversion_ready),
+        "thermodynamic_claim_allowed": 0.0,
+        "primary_blocker": blocker,
+        "identifiability_stage": stage,
+    }
+
+
 def dynamic_signature_alignment_ledger(
     *,
     alignment_id: str,

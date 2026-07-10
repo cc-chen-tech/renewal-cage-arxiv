@@ -2377,9 +2377,25 @@ a six-neighbor cage-relative displacement.  This repeat matters: both samples
 retain peak-to-late NGP decay, but the late NGP is representation-sensitive in
 the two-dimensional data.  We therefore treat the result as real
 true-time dynamical-signature support, not a finite-exchange selection, a
-persistence/exchange inversion, or a thermodynamic claim.  A particle-level
-cage-relative event segmentation and a later Gaussian-recovery window remain
-required before those stronger statements are available.
+persistence/exchange inversion, or a thermodynamic claim.
+
+We also apply the recursive separation-score cage-jump construction of
+Candelier, Dauchot, and Biroli \cite{candelier2009building} to the
+six-neighbor cage-relative trajectories.  This is an important negative
+identifiability check rather than another fit.  At a fixed minimum contiguous
+track length of 100 frames, the naive persistence/exchange ratio is stable
+across cage-length thresholds $0.4$, $0.6$, and $0.8$: its log-spread is
+$0.070$ at $\phi=0.76$ and $0.073$ at $\phi=0.78$, both below the declared
+$0.15$ threshold.  That validates the selected event catalogue against this
+threshold scan.  It does not validate a clock inversion.  Raising the required
+contiguous horizon from 100 to 250 and 500 frames makes the naive ratio drift
+(log-spreads $0.990$ and $0.412$), while the right-censored first-event estimate
+drifts even more strongly ($1.450$ and $1.915$).  All exceed the declared
+$0.30$ horizon-stability limit.  Thus the finite field-of-view tracks make the
+persistence/exchange ratio non-identifiable in this public data set.  The
+result rejects both an apparent equality of clocks and an apparent decoupling
+as data conclusions; it does not select a renewal mechanism or turn the
+effective model into a thermodynamic theory.
 
 \begin{figure}[p]
   \centering
@@ -2390,6 +2406,18 @@ required before those stronger statements are available.
   the observation supports a dynamical signature while explicitly blocking
   finite-exchange selection and event-clock inversion until a two-dimensional
   cage-relative segmentation protocol is validated.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_weeks_hard_colloid_event_clock_censoring.pdf}
+  \caption{Cage-relative event-clock identifiability audit for the same public
+  hard-colloid trajectories. The Candelier-type segmentation passes the
+  threshold-stability scan at the shortest admissible horizon, but both naive
+  and right-censored persistence/exchange ratios vary strongly as the
+  field-of-view track-length cutoff is increased. Consequently, the artifact
+  records \texttt{real\_pe\_inversion\_ready=0}: the data cannot establish
+  either equal or decoupled persistence and exchange clocks.}
 \end{figure}
 
 \clearpage

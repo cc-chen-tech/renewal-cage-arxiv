@@ -28,6 +28,7 @@ from renewal_cage import (  # noqa: E402
     barrier_amplification_laws,
     basin_adjacency_jump_statistics,
     benchmark_fusion_readiness,
+    censored_event_clock_identifiability_verdict,
     cage_localization_benchmark_consistency,
     cage_localization_diagnostics,
     correlated_domain_susceptibility,
@@ -2347,6 +2348,67 @@ class DelayedRenewalCageTests(unittest.TestCase):
             row["primary_blocker"],
             "two_dimensional_representation_dependence;event_segmentation;late_gaussian_recovery",
         )
+
+    def test_censored_event_clock_verdict_separates_threshold_stability_from_window_identifiability(self):
+        row = censored_event_clock_identifiability_verdict(
+            verdict_id="weeks_censoring_identifiability",
+            sample_id="t2_10_29b",
+            event_clock_rows=[
+                {
+                    "threshold": 0.4,
+                    "min_track_frames": 100,
+                    "naive_persistence_mean": 69.96,
+                    "censored_persistence_mean": 460.0,
+                    "exchange_mean": 66.92,
+                    "exchange_interval_count": 1016,
+                },
+                {
+                    "threshold": 0.6,
+                    "min_track_frames": 100,
+                    "naive_persistence_mean": 77.53,
+                    "censored_persistence_mean": 509.60,
+                    "exchange_mean": 72.98,
+                    "exchange_interval_count": 249,
+                },
+                {
+                    "threshold": 0.8,
+                    "min_track_frames": 100,
+                    "naive_persistence_mean": 94.89,
+                    "censored_persistence_mean": 620.0,
+                    "exchange_mean": 95.84,
+                    "exchange_interval_count": 25,
+                },
+                {
+                    "threshold": 0.6,
+                    "min_track_frames": 250,
+                    "naive_persistence_mean": 125.20,
+                    "censored_persistence_mean": 1066.67,
+                    "exchange_mean": 77.63,
+                    "exchange_interval_count": 176,
+                },
+                {
+                    "threshold": 0.6,
+                    "min_track_frames": 500,
+                    "naive_persistence_mean": 235.63,
+                    "censored_persistence_mean": 2454.0,
+                    "exchange_mean": 82.42,
+                    "exchange_interval_count": 65,
+                },
+            ],
+            min_exchange_interval_count=20,
+            max_threshold_log_ratio_spread=0.15,
+            max_horizon_log_ratio_spread=0.30,
+        )
+
+        self.assertEqual(row["identifiability_stage"], "censoring_nonidentifiability_detected")
+        self.assertEqual(float(row["threshold_stable_event_segmentation_ready"]), 1.0)
+        self.assertEqual(float(row["naive_horizon_stable"]), 0.0)
+        self.assertEqual(float(row["censored_horizon_stable"]), 0.0)
+        self.assertGreater(float(row["naive_horizon_log_ratio_spread"]), 0.9)
+        self.assertGreater(float(row["censored_horizon_log_ratio_spread"]), 1.4)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(row["primary_blocker"], "observation_window_censoring")
 
     def test_glassbench_real_cached_microdynamic_verdict_separates_evidence_from_inversion(self):
         rows = glassbench_real_cached_microdynamic_verdict(
