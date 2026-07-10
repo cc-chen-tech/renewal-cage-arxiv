@@ -196,6 +196,7 @@ from renewal_cage import (  # noqa: E402
     glassbench_real_data_acquisition_design,
     glassbench_real_data_acquisition_outcome_matrix,
     glassbench_manuscript_claim_registry,
+    weeks_colloid_true_time_verdict,
     glassbench_first_npz_particle_cache_contract_gate,
     glassbench_microdynamic_closed_loop_audit,
     glassbench_timecode_signature_support_gate,
@@ -2308,6 +2309,44 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
         self.assertEqual(row["primary_blocker"], "late_ngp_followup_and_exchange_clock")
         self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_weeks_colloid_true_time_verdict_supports_signatures_but_blocks_mechanism_selection(self):
+        row = weeks_colloid_true_time_verdict(
+            verdict_id="weeks_hard_colloid_true_time_verdict",
+            source_id="vivek2017_2d_hard_colloid",
+            sample_id="t2_10_29b",
+            published_tau_alpha=3000.0,
+            raw_observables={
+                "peak_time": 1386.0,
+                "peak_ngp": 1.8352534625485073,
+                "late_time": 33000.0,
+                "late_ngp": 0.38210628626838083,
+                "late_pair_count": 85078.0,
+            },
+            cage_relative_observables={
+                "peak_time": 1386.0,
+                "peak_ngp": 1.7709398833087011,
+                "late_time": 33000.0,
+                "late_ngp": 0.839558426524581,
+                "late_pair_count": 85078.0,
+            },
+            minimum_late_pair_count=1000.0,
+            minimum_representation_log_difference=0.3,
+        )
+
+        self.assertEqual(row["verdict_stage"], "true_time_dynamic_signature_representation_sensitive")
+        self.assertEqual(float(row["physical_time_particle_trajectory_ready"]), 1.0)
+        self.assertEqual(float(row["shared_ngp_peak_and_decay"]), 1.0)
+        self.assertGreater(float(row["raw_peak_to_late_ngp_ratio"]), 4.0)
+        self.assertGreater(float(row["cage_relative_peak_to_late_ngp_ratio"]), 2.0)
+        self.assertEqual(float(row["representation_sensitive"]), 1.0)
+        self.assertEqual(float(row["finite_exchange_selection_claim_allowed"]), 0.0)
+        self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+        self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(
+            row["primary_blocker"],
+            "two_dimensional_representation_dependence;event_segmentation;late_gaussian_recovery",
+        )
 
     def test_glassbench_real_cached_microdynamic_verdict_separates_evidence_from_inversion(self):
         rows = glassbench_real_cached_microdynamic_verdict(

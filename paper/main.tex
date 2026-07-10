@@ -2364,6 +2364,34 @@ diagnostic input are different states.
   blockers, and thermodynamic scope boundaries.
 \end{center}
 
+The current package also contains an independent true-time experimental check
+using the public two-dimensional bidisperse hard-colloid trajectories of
+Vivek \emph{et al.}\ \cite{vivek2017longwavelength}.  The source records
+particle identities and a physical sampling interval, unlike the
+isoconfigurational-replica axis in the current GlassBench cache.  For the
+published $\phi=0.76$ and $0.78$ hard-particle samples, the raw-particle NGP
+has a resolved peak followed by a substantial late decline over the available
+window.  The corresponding artifact stores the source URLs and SHA256 hashes,
+the physical lag grid, MSD, NGP, and $F_s$, then repeats the selected lags with
+a six-neighbor cage-relative displacement.  This repeat matters: both samples
+retain peak-to-late NGP decay, but the late NGP is representation-sensitive in
+the two-dimensional data.  We therefore treat the result as real
+true-time dynamical-signature support, not a finite-exchange selection, a
+persistence/exchange inversion, or a thermodynamic claim.  A particle-level
+cage-relative event segmentation and a later Gaussian-recovery window remain
+required before those stronger statements are available.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_weeks_hard_colloid_true_time.pdf}
+  \caption{True-time public 2D hard-colloid trajectory check. Both published
+  samples show a real NGP peak followed by a late decline on their reported
+  $\tau_\alpha$ scale. Cage-relative recomputation changes the late value, so
+  the observation supports a dynamical signature while explicitly blocking
+  finite-exchange selection and event-clock inversion until a two-dimensional
+  cage-relative segmentation protocol is validated.}
+\end{figure}
+
 \clearpage
 \section{Discussion}
 

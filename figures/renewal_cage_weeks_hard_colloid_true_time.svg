@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="510" viewBox="0 0 920 510">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:Arial,sans-serif;fill:#202124} .axis{stroke:#202124;stroke-width:1.3} .grid{stroke:#d9d9d9;stroke-width:1} .series{fill:none;stroke-width:2.5} .marker{stroke:white;stroke-width:1}</style>
+<text x="84" y="29" font-size="18">Public 2D hard-colloid trajectories: true-time NGP evidence</text>
+<line class="axis" x1="84" y1="436" x2="878" y2="436"/>
+<line class="axis" x1="84" y1="54" x2="84" y2="436"/>
+<line class="grid" x1="469.73" y1="54" x2="469.73" y2="436"/>
+<text x="469.73" y="459" text-anchor="middle" font-size="12">0.1</text>
+<line class="grid" x1="669.72" y1="54" x2="669.72" y2="436"/>
+<text x="669.72" y="459" text-anchor="middle" font-size="12">1</text>
+<line class="grid" x1="869.72" y1="54" x2="869.72" y2="436"/>
+<text x="869.72" y="459" text-anchor="middle" font-size="12">10</text>
+<line class="grid" x1="84" y1="436.00" x2="878" y2="436.00"/>
+<text x="74" y="440.00" text-anchor="end" font-size="12">0.0</text>
+<line class="grid" x1="84" y1="340.50" x2="878" y2="340.50"/>
+<text x="74" y="344.50" text-anchor="end" font-size="12">0.8</text>
+<line class="grid" x1="84" y1="245.00" x2="878" y2="245.00"/>
+<text x="74" y="249.00" text-anchor="end" font-size="12">1.5</text>
+<line class="grid" x1="84" y1="149.50" x2="878" y2="149.50"/>
+<text x="74" y="153.50" text-anchor="end" font-size="12">2.3</text>
+<line class="grid" x1="84" y1="54.00" x2="878" y2="54.00"/>
+<text x="74" y="58.00" text-anchor="end" font-size="12">3.1</text>
+<polyline class="series" stroke="#1f77b4" points="217.80,370.74 278.01,351.81 313.22,335.04 338.21,320.70 357.59,307.74 386.82,288.91 417.80,266.79 447.02,245.06 478.00,228.49 504.07,219.10 533.75,215.10 562.65,210.52 590.46,209.87 619.52,210.30 648.25,218.86 677.13,229.82 705.66,242.08 734.44,268.94 763.14,306.49 791.88,336.27 820.61,355.17 849.29,380.76 878.00,388.61"/>
+<circle class="marker" fill="#1f77b4" cx="217.80" cy="370.74" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="278.01" cy="351.81" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="313.22" cy="335.04" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="338.21" cy="320.70" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="357.59" cy="307.74" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="386.82" cy="288.91" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="417.80" cy="266.79" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="447.02" cy="245.06" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="478.00" cy="228.49" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="504.07" cy="219.10" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="533.75" cy="215.10" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="562.65" cy="210.52" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="590.46" cy="209.87" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="619.52" cy="210.30" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="648.25" cy="218.86" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="677.13" cy="229.82" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="705.66" cy="242.08" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="734.44" cy="268.94" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="763.14" cy="306.49" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="791.88" cy="336.27" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="820.61" cy="355.17" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="849.29" cy="380.76" r="3.2"/>
+<circle class="marker" fill="#1f77b4" cx="878.00" cy="388.61" r="3.2"/>
+<polyline class="series" stroke="#d62728" points="84.00,364.27 144.21,348.13 179.42,334.08 204.41,322.66 223.79,313.50 253.02,292.41 284.00,266.73 313.22,238.30 344.20,203.11 370.27,176.01 399.95,147.33 428.85,117.78 456.66,92.80 485.72,82.30 514.45,82.48 543.33,92.94 571.86,115.45 600.63,145.51 629.34,180.47 658.08,223.69 686.81,251.60 715.49,262.98 744.20,317.00"/>
+<circle class="marker" fill="#d62728" cx="84.00" cy="364.27" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="144.21" cy="348.13" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="179.42" cy="334.08" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="204.41" cy="322.66" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="223.79" cy="313.50" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="253.02" cy="292.41" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="284.00" cy="266.73" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="313.22" cy="238.30" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="344.20" cy="203.11" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="370.27" cy="176.01" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="399.95" cy="147.33" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="428.85" cy="117.78" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="456.66" cy="92.80" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="485.72" cy="82.30" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="514.45" cy="82.48" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="543.33" cy="92.94" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="571.86" cy="115.45" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="600.63" cy="145.51" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="629.34" cy="180.47" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="658.08" cy="223.69" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="686.81" cy="251.60" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="715.49" cy="262.98" r="3.2"/>
+<circle class="marker" fill="#d62728" cx="744.20" cy="317.00" r="3.2"/>
+<line x1="106" y1="74" x2="128" y2="74" stroke="#1f77b4" stroke-width="2.5"/>
+<text x="136" y="78" font-size="12">phi=0.76, t2_10_29b</text>
+<line x1="106" y1="96" x2="128" y2="96" stroke="#d62728" stroke-width="2.5"/>
+<text x="136" y="100" font-size="12">phi=0.78, t2_10_30b</text>
+<text x="481.00" y="492" text-anchor="middle" font-size="14">lag time / published tau_alpha</text>
+<text x="20" y="245.00" transform="rotate(-90 20 245.00)" text-anchor="middle" font-size="14">two-dimensional non-Gaussian parameter</text>
+</svg>

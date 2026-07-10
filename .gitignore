@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 tmp/
 .tmp/
+data/third_party/weeks/*.zip
 paper/*.aux
 paper/*.bbl
 paper/*.blg

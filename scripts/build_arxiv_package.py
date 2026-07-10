@@ -6940,6 +6940,106 @@ def write_sota_glassbench_manuscript_claim_registry_pdf(path: Path) -> None:
     c.save()
 
 
+def write_weeks_hard_colloid_true_time_pdf(path: Path) -> None:
+    """Render the public true-time colloid NGP check without a network dependency."""
+
+    with (DATA_DIR / "renewal_cage_weeks_hard_colloid_true_time_curve.csv").open() as handle:
+        curve_rows = list(csv.DictReader(handle))
+    with (DATA_DIR / "renewal_cage_weeks_hard_colloid_true_time_verdict.csv").open() as handle:
+        verdict_rows = list(csv.DictReader(handle))
+    if not curve_rows or not verdict_rows:
+        raise ValueError("Weeks hard-colloid artifacts must be nonempty")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Public true-time 2D hard-colloid trajectory check")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "Raw-particle NGP has a peak and late decline; cage-relative recomputation keeps the dynamical signature but blocks mechanism selection.",
+    )
+
+    left, bottom, width, height = 72, 172, 620, 295
+    log_time = np.log10(np.array([float(row["lag_over_published_tau_alpha"]) for row in curve_rows]))
+    ngp = np.array([float(row["ngp_2d"]) for row in curve_rows])
+    x_range = (float(log_time.min()), float(log_time.max()))
+    y_range = (0.0, max(1.0, float(ngp.max()) * 1.08))
+    draw_axes(
+        c,
+        left,
+        bottom,
+        width,
+        height,
+        "Raw-particle NGP on the published alpha-time scale",
+        "log10(lag time / published tau alpha)",
+        x_range,
+        y_range,
+    )
+    c.saveState()
+    c.translate(20, bottom + height / 2.0)
+    c.rotate(90)
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(0, 0, "two-dimensional NGP")
+    c.restoreState()
+
+    palette = [colors.HexColor("#1f77b4"), colors.HexColor("#d62728")]
+    for index, verdict in enumerate(verdict_rows):
+        sample_id = verdict["sample_id"]
+        rows = [row for row in curve_rows if row["sample_id"] == sample_id]
+        x = np.log10(np.array([float(row["lag_over_published_tau_alpha"]) for row in rows]))
+        y = np.array([float(row["ngp_2d"]) for row in rows])
+        sx = scale(x, left, left + width, x_range)
+        sy = scale(y, bottom, bottom + height, y_range)
+        draw_polyline(c, sx, sy, palette[index], 1.7)
+        c.setFillColor(palette[index])
+        for x_value, y_value in zip(sx, sy):
+            c.circle(float(x_value), float(y_value), 1.6, stroke=0, fill=1)
+        c.setFont("Helvetica", 7.2)
+        legend_y = bottom + height - 18 - 15 * index
+        c.setFillColor(palette[index])
+        c.rect(left + 12, legend_y - 3, 14, 4, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.drawString(
+            left + 31,
+            legend_y - 4,
+            "phi={} {}; peak/late={:.2f}; representation-sensitive={}".format(
+                verdict["area_fraction"],
+                sample_id,
+                float(verdict["raw_peak_to_late_ngp_ratio"]),
+                int(float(verdict["representation_sensitive"])),
+            ),
+        )
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(72, 132, "sample")
+    c.drawString(170, 132, "late NGP raw / cage-relative")
+    c.drawString(385, 132, "late pairs")
+    c.drawString(465, 132, "claim boundary")
+    c.setFont("Helvetica", 7.2)
+    for index, row in enumerate(verdict_rows):
+        y = 116 - index * 24
+        c.drawString(72, y, f"phi={row['area_fraction']} {row['sample_id']}")
+        c.drawString(170, y, f"{float(row['raw_late_ngp']):.3f} / {float(row['cage_relative_late_ngp']):.3f}")
+        c.drawString(385, y, f"{int(float(row['late_pair_count']))}")
+        c.drawString(465, y, "dynamic signature only; PE=0; finite exchange=0; thermo=0")
+    c.setFont("Helvetica", 7.2)
+    c.drawString(
+        72,
+        60,
+        "Source: Vivek et al. PNAS 114, 1850 (2017). CSV records the public URLs and SHA256 fingerprints; raw archives are deliberately excluded from the arXiv source package.",
+    )
+    c.drawString(
+        72,
+        46,
+        "Primary blocker: two-dimensional representation dependence, then cage-relative event segmentation and a later Gaussian-recovery window.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_sota_glassbench_microdynamic_closed_loop_pdf(path: Path) -> None:
     with (DATA_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.csv").open() as f:
         rows = list(csv.DictReader(f))
@@ -9338,6 +9438,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     sota_glassbench_manuscript_claim_registry_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_manuscript_claim_registry.pdf"
     )
+    weeks_hard_colloid_true_time_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_weeks_hard_colloid_true_time.pdf"
+    )
     sota_glassbench_microdynamic_closed_loop_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_sota_glassbench_microdynamic_closed_loop.pdf"
     )
@@ -9634,6 +9737,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_sota_glassbench_manuscript_claim_registry_pdf(
         sota_glassbench_manuscript_claim_registry_pdf
     )
+    write_weeks_hard_colloid_true_time_pdf(weeks_hard_colloid_true_time_pdf)
     write_sota_glassbench_microdynamic_closed_loop_pdf(
         sota_glassbench_microdynamic_closed_loop_pdf
     )
@@ -10023,6 +10127,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(
             sota_glassbench_manuscript_claim_registry_pdf,
             "figures/renewal_cage_sota_glassbench_manuscript_claim_registry.pdf",
+        )
+        archive.write(
+            weeks_hard_colloid_true_time_pdf,
+            "figures/renewal_cage_weeks_hard_colloid_true_time.pdf",
         )
         archive.write(
             sota_glassbench_microdynamic_closed_loop_pdf,

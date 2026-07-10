@@ -15,6 +15,34 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_weeks_true_time_colloid_artifact_keeps_representation_boundary_explicit(self):
+        path = ROOT / "data" / "renewal_cage_weeks_hard_colloid_true_time_verdict.csv"
+        self.assertTrue(path.exists())
+        self.assertNotIn(b"\r\n", path.read_bytes())
+        with path.open() as f:
+            rows = list(csv.DictReader(f))
+
+        self.assertEqual(len(rows), 2)
+        by_sample = {row["sample_id"]: row for row in rows}
+        slow = by_sample["t2_10_29b"]
+        cold = by_sample["t2_10_30b"]
+        for row in (slow, cold):
+            self.assertEqual(float(row["physical_time_particle_trajectory_ready"]), 1.0)
+            self.assertEqual(float(row["shared_ngp_peak_and_decay"]), 1.0)
+            self.assertEqual(float(row["representation_sensitive"]), 1.0)
+            self.assertEqual(float(row["finite_exchange_selection_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["real_pe_inversion_ready"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertIn("two_dimensional_representation_dependence", row["primary_blocker"])
+            self.assertEqual(row["verdict_stage"], "true_time_dynamic_signature_representation_sensitive")
+        self.assertGreater(float(slow["raw_peak_to_late_ngp_ratio"]), 4.0)
+        self.assertGreater(float(cold["raw_peak_to_late_ngp_ratio"]), 2.0)
+
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        references_text = (ROOT / "paper" / "references.bib").read_text()
+        self.assertIn("vivek2017longwavelength", main_text)
+        self.assertIn("vivek2017longwavelength", references_text)
+
     def test_sota_comparison_table_keeps_scope_boundaries(self):
         path = ROOT / "data" / "renewal_cage_sota_comparison.csv"
         self.assertTrue(path.exists())
@@ -3449,6 +3477,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_acquisition_design.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_real_data_acquisition_outcome_matrix.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_manuscript_claim_registry.pdf", names)
+            self.assertIn("figures/renewal_cage_weeks_hard_colloid_true_time.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_threshold_horizon.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_rescue_protocol.pdf", names)
             self.assertIn("figures/renewal_cage_sota_glassbench_alpha_anchor_cached_fs.pdf", names)

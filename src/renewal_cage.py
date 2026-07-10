@@ -12889,6 +12889,105 @@ def glassbench_manuscript_claim_registry(
     ]
 
 
+def weeks_colloid_true_time_verdict(
+    *,
+    verdict_id: str,
+    source_id: str,
+    sample_id: str,
+    published_tau_alpha: float,
+    raw_observables: dict[str, float],
+    cage_relative_observables: dict[str, float],
+    minimum_late_pair_count: float,
+    minimum_representation_log_difference: float,
+) -> dict[str, float | str]:
+    """Classify a true-time 2D colloid trajectory without overpromoting it.
+
+    The raw and cage-relative observables are deliberately kept separate.  In
+    two dimensions, long-wavelength collective motion can alter a raw-particle
+    displacement diagnostic without changing local cage breaking.  A shared
+    peak-to-late decline is therefore real dynamical-signature evidence, while
+    a representation mismatch blocks mechanism selection and event-clock
+    inversion until a cage-relative segmentation protocol is supplied.
+    """
+
+    if not verdict_id or not source_id or not sample_id:
+        raise ValueError("verdict_id, source_id, and sample_id must be nonempty")
+    if published_tau_alpha <= 0.0:
+        raise ValueError("published_tau_alpha must be positive")
+    if minimum_late_pair_count <= 0.0:
+        raise ValueError("minimum_late_pair_count must be positive")
+    if minimum_representation_log_difference < 0.0:
+        raise ValueError("minimum_representation_log_difference must be nonnegative")
+
+    def number(values: dict[str, float], key: str) -> float:
+        value = float(values.get(key, 0.0) or 0.0)
+        if value <= 0.0:
+            raise ValueError(f"{key} must be positive")
+        return value
+
+    raw_peak_time = number(raw_observables, "peak_time")
+    raw_peak_ngp = number(raw_observables, "peak_ngp")
+    raw_late_time = number(raw_observables, "late_time")
+    raw_late_ngp = number(raw_observables, "late_ngp")
+    raw_late_pair_count = number(raw_observables, "late_pair_count")
+    cage_peak_time = number(cage_relative_observables, "peak_time")
+    cage_peak_ngp = number(cage_relative_observables, "peak_ngp")
+    cage_late_time = number(cage_relative_observables, "late_time")
+    cage_late_ngp = number(cage_relative_observables, "late_ngp")
+    cage_late_pair_count = number(cage_relative_observables, "late_pair_count")
+
+    raw_decay = raw_peak_ngp > raw_late_ngp
+    cage_decay = cage_peak_ngp > cage_late_ngp
+    shared_decay = raw_decay and cage_decay
+    late_pairs_ready = (
+        raw_late_pair_count >= minimum_late_pair_count
+        and cage_late_pair_count >= minimum_late_pair_count
+    )
+    representation_log_difference = abs(math.log(raw_late_ngp / cage_late_ngp))
+    representation_sensitive = representation_log_difference >= minimum_representation_log_difference
+    physical_time_ready = late_pairs_ready and raw_late_time > 0.0 and cage_late_time > 0.0
+
+    if not physical_time_ready:
+        stage = "true_time_trajectory_late_pair_coverage_incomplete"
+        blocker = "late_pair_coverage"
+    elif not shared_decay:
+        stage = "true_time_ngp_peak_to_late_decline_not_shared"
+        blocker = "cross_representation_ngp_decay"
+    elif representation_sensitive:
+        stage = "true_time_dynamic_signature_representation_sensitive"
+        blocker = "two_dimensional_representation_dependence;event_segmentation;late_gaussian_recovery"
+    else:
+        stage = "true_time_dynamic_signature_preinversion"
+        blocker = "event_segmentation;late_gaussian_recovery"
+
+    return {
+        "verdict_id": verdict_id,
+        "source_id": source_id,
+        "sample_id": sample_id,
+        "published_tau_alpha": float(published_tau_alpha),
+        "physical_time_particle_trajectory_ready": float(physical_time_ready),
+        "raw_peak_time_over_tau_alpha": raw_peak_time / published_tau_alpha,
+        "raw_late_time_over_tau_alpha": raw_late_time / published_tau_alpha,
+        "raw_peak_ngp": raw_peak_ngp,
+        "raw_late_ngp": raw_late_ngp,
+        "raw_peak_to_late_ngp_ratio": raw_peak_ngp / raw_late_ngp,
+        "cage_relative_peak_time_over_tau_alpha": cage_peak_time / published_tau_alpha,
+        "cage_relative_late_time_over_tau_alpha": cage_late_time / published_tau_alpha,
+        "cage_relative_peak_ngp": cage_peak_ngp,
+        "cage_relative_late_ngp": cage_late_ngp,
+        "cage_relative_peak_to_late_ngp_ratio": cage_peak_ngp / cage_late_ngp,
+        "late_pair_count": min(raw_late_pair_count, cage_late_pair_count),
+        "shared_ngp_peak_and_decay": float(shared_decay and late_pairs_ready),
+        "representation_late_ngp_log_difference": representation_log_difference,
+        "representation_sensitive": float(representation_sensitive),
+        "finite_exchange_selection_claim_allowed": 0.0,
+        "real_pe_inversion_ready": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+        "primary_blocker": blocker,
+        "verdict_stage": stage,
+    }
+
+
 def dynamic_signature_alignment_ledger(
     *,
     alignment_id: str,
