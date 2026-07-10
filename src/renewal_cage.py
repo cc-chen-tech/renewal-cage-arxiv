@@ -153,6 +153,24 @@ class PersistenceExchangeParams:
 
 
 @dataclass(frozen=True)
+class SpatialRenewalFieldParams:
+    """Marginal-preserving spatial covariance field for renewal events.
+
+    ``branching_ratio`` controls the asymptotic amplification of correlated
+    event-count fluctuations, ``kernel_length`` sets the spatial range, and
+    ``facilitation_lifetime`` controls how quickly the covariance field builds.
+    The field modifies four-point covariances only; the one-particle renewal
+    process and its displacement observables remain unchanged.
+    """
+
+    branching_ratio: float
+    kernel_length: float
+    facilitation_lifetime: float
+    dimension: int = 3
+    particle_density: float = 1.0
+
+
+@dataclass(frozen=True)
 class LangevinCageLandscapeParams:
     """Overdamped Langevin landscape inputs for an effective renewal bridge.
 
@@ -222,6 +240,19 @@ def _validate_gamma_exchange(heterogeneity: GammaExchangeParams) -> None:
         value = getattr(heterogeneity, name)
         if value <= 0.0:
             raise ValueError(f"{name} must be positive")
+
+
+def _validate_spatial_renewal_field(field: SpatialRenewalFieldParams) -> None:
+    if not 0.0 <= field.branching_ratio < 1.0:
+        raise ValueError("branching_ratio must be in [0, 1)")
+    if field.kernel_length <= 0.0:
+        raise ValueError("kernel_length must be positive")
+    if field.facilitation_lifetime <= 0.0:
+        raise ValueError("facilitation_lifetime must be positive")
+    if field.dimension <= 0:
+        raise ValueError("dimension must be positive")
+    if field.particle_density <= 0.0:
+        raise ValueError("particle_density must be positive")
 
 
 def _validate_temperature_law(law: TemperatureLawParams) -> None:
@@ -19749,6 +19780,154 @@ def renewal_scattering_susceptibility(
     second_moment = np.exp(-wave_number**2 * local + renewal * (jump_characteristic**2 - 1.0))
     mean_square = self_intermediate_scattering(wave_number, t, params) ** 2
     return second_moment - mean_square
+
+
+def _spatial_renewal_branching_fraction(
+    t: np.ndarray,
+    field: SpatialRenewalFieldParams,
+) -> np.ndarray:
+    _validate_spatial_renewal_field(field)
+    t = np.asarray(t, dtype=float)
+    if t.ndim != 1 or t.size == 0:
+        raise ValueError("t must be a nonempty one-dimensional array")
+    if np.any(~np.isfinite(t)) or np.any(t < 0.0):
+        raise ValueError("t must be finite and nonnegative")
+    return field.branching_ratio * (1.0 - np.exp(-t / field.facilitation_lifetime))
+
+
+def spatial_renewal_dynamic_length(
+    t: np.ndarray,
+    field: SpatialRenewalFieldParams,
+) -> np.ndarray:
+    """Dynamic correlation length of the marginal-preserving spatial field.
+
+    The microscopic kernel length is amplified as
+    ``xi=ell/sqrt(1-b)``. At zero coupling the distinct-particle amplitude
+    vanishes, so the returned microscopic length is present but unobservable
+    in ``S4``.
+    """
+
+    branching = _spatial_renewal_branching_fraction(t, field)
+    return field.kernel_length / np.sqrt(1.0 - branching)
+
+
+def spatial_renewal_structure_factor(
+    *,
+    spatial_wave_numbers: np.ndarray,
+    t: np.ndarray,
+    local_susceptibility: np.ndarray,
+    field: SpatialRenewalFieldParams,
+) -> np.ndarray:
+    """Four-point structure factor generated from a local renewal variance.
+
+    The self-plus-distinct decomposition
+
+    ``S4/chi_R = 1 + (M-1) [1+(q*xi)^2]^(-(d+1)/2)``
+
+    uses ``M=(1-b)^(-2)`` and the Fourier transform of an exponential
+    distinct-particle covariance in dimension ``d``. The first term is the
+    unchanged particle-self variance. At zero coupling, ``M=1`` and ``S4`` is
+    exactly the supplied local susceptibility; at large q the distinct term
+    vanishes for finite coupling.
+    """
+
+    branching = _spatial_renewal_branching_fraction(t, field)
+    spatial_wave_numbers = np.asarray(spatial_wave_numbers, dtype=float)
+    local_susceptibility = np.asarray(local_susceptibility, dtype=float)
+    if spatial_wave_numbers.ndim != 1 or spatial_wave_numbers.size == 0:
+        raise ValueError("spatial_wave_numbers must be a nonempty one-dimensional array")
+    if np.any(~np.isfinite(spatial_wave_numbers)) or np.any(spatial_wave_numbers < 0.0):
+        raise ValueError("spatial_wave_numbers must be finite and nonnegative")
+    if local_susceptibility.shape != branching.shape:
+        raise ValueError("local_susceptibility must match t")
+    if np.any(~np.isfinite(local_susceptibility)) or np.any(local_susceptibility < 0.0):
+        raise ValueError("local_susceptibility must be finite and nonnegative")
+
+    dynamic_length = field.kernel_length / np.sqrt(1.0 - branching)
+    zero_wave_enhancement = 1.0 / (1.0 - branching) ** 2
+    distinct_shape = 1.0 / (
+        1.0 + (dynamic_length[:, None] * spatial_wave_numbers[None, :]) ** 2
+    ) ** (0.5 * (field.dimension + 1))
+    transfer = 1.0 + (zero_wave_enhancement[:, None] - 1.0) * distinct_shape
+    return local_susceptibility[:, None] * transfer
+
+
+def persistence_exchange_spatial_closure(
+    params: PersistenceExchangeParams,
+    *,
+    coupling_exponent: float,
+    kernel_length: float,
+    facilitation_lifetime: float,
+    dimension: int = 3,
+    particle_density: float = 1.0,
+) -> dict[str, float | str]:
+    """Link persistence/exchange decoupling to chi4 and xi4 predictions.
+
+    This is a falsifiable closure hypothesis, not an identity of renewal
+    theory. With ``R=tau_p/tau_x``, it sets
+    ``B=1-R**(-gamma)``. One reference-state fit of ``gamma`` and ``ell`` then
+    predicts both the asymptotic zero-q enhancement ``R**(2*gamma)`` and the
+    total length ``xi4=ell*sqrt(R**gamma)`` at held-out state points. The
+    distinct-particle excess length is ``ell*sqrt(R**gamma-1)``.
+    """
+
+    _validate_persistence_exchange(params)
+    if coupling_exponent <= 0.0:
+        raise ValueError("coupling_exponent must be positive")
+    if kernel_length <= 0.0:
+        raise ValueError("kernel_length must be positive")
+    if facilitation_lifetime <= 0.0:
+        raise ValueError("facilitation_lifetime must be positive")
+    if dimension <= 0:
+        raise ValueError("dimension must be positive")
+    if particle_density <= 0.0:
+        raise ValueError("particle_density must be positive")
+    ratio = params.persistence_mean / params.exchange_mean
+    if ratio < 1.0:
+        raise ValueError("persistence_mean must be at least exchange_mean for the spatial closure")
+
+    ratio_power = ratio**coupling_exponent
+    branching_ratio = 1.0 - 1.0 / ratio_power
+    field = SpatialRenewalFieldParams(
+        branching_ratio=branching_ratio,
+        kernel_length=kernel_length,
+        facilitation_lifetime=facilitation_lifetime,
+        dimension=dimension,
+        particle_density=particle_density,
+    )
+    _validate_spatial_renewal_field(field)
+    dynamic_length = kernel_length * math.sqrt(ratio_power)
+    excess_dynamic_length = kernel_length * math.sqrt(ratio_power - 1.0)
+    unit_sphere_area = 2.0 * math.pi ** (0.5 * dimension) / math.gamma(0.5 * dimension)
+    exponential_correlation_volume = unit_sphere_area * math.gamma(dimension) * dynamic_length**dimension
+    chi4_enhancement = ratio_power**2
+    pair_correlation_amplitude = (chi4_enhancement - 1.0) / (
+        particle_density * exponential_correlation_volume
+    )
+    pair_correlation_admissible = pair_correlation_amplitude <= 1.0
+    return {
+        "persistence_exchange_ratio": ratio,
+        "coupling_exponent": coupling_exponent,
+        "branching_ratio": branching_ratio,
+        "kernel_length": kernel_length,
+        "facilitation_lifetime": facilitation_lifetime,
+        "dimension": float(dimension),
+        "particle_density": particle_density,
+        "chi4_enhancement": chi4_enhancement,
+        "dynamic_correlation_length": dynamic_length,
+        "excess_dynamic_length": excess_dynamic_length,
+        "exponential_correlation_volume": exponential_correlation_volume,
+        "pair_correlation_amplitude": pair_correlation_amplitude,
+        "pair_correlation_admissible": float(pair_correlation_admissible),
+        "single_particle_marginal_preserved": 1.0,
+        "direct_four_point_prediction_ready": float(pair_correlation_admissible),
+        "thermodynamic_claim_allowed": 0.0,
+        "spatial_closure_stage": (
+            "marginal_preserving_spatial_covariance_prediction"
+            if pair_correlation_admissible
+            else "spatial_covariance_pair_bound_failed"
+        ),
+    }
 
 
 def correlated_domain_susceptibility(

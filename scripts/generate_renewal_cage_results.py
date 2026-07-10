@@ -23,6 +23,7 @@ from renewal_cage import (  # noqa: E402
     LangevinCageLandscapeParams,
     MCTBetaParams,
     PeriodicSoftnessGateParams,
+    SpatialRenewalFieldParams,
     TemperatureLawParams,
     alpha_relaxation_shape_curve,
     alpha_relaxation_time,
@@ -152,6 +153,7 @@ from renewal_cage import (  # noqa: E402
     persistence_exchange_normalized_alpha_decay,
     persistence_exchange_scan,
     persistence_exchange_scattering_susceptibility,
+    persistence_exchange_spatial_closure,
     PersistenceExchangeParams,
     radial_van_hove_3d,
     raw_curve_ingestion_contract,
@@ -166,6 +168,7 @@ from renewal_cage import (  # noqa: E402
     sota_experimental_verdict_matrix,
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
+    spatial_renewal_structure_factor,
     sota_claim_alignment,
     sota_archive_preflight_gate,
     sota_data_accession_gate,
@@ -1249,6 +1252,56 @@ def write_spatial_chi4_csv(
         facilitation_diffusivity=facilitation_diffusivity,
         particle_density=particle_density,
     )
+    write_sweep_csv(path, rows)
+    return rows
+
+
+def write_spatial_covariance_closure_csv(
+    path: Path,
+    *,
+    persistence_exchange_ratios: list[float],
+    coupling_exponent: float,
+    kernel_length: float,
+    facilitation_lifetime: float,
+) -> list[dict[str, float | str]]:
+    rows: list[dict[str, float | str]] = []
+    spatial_wave_numbers = np.array([0.0, 0.5, 1.5])
+    observation_time = 20.0 * facilitation_lifetime
+    for ratio in persistence_exchange_ratios:
+        params = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            persistence_mean=ratio,
+            exchange_mean=1.0,
+        )
+        closure = persistence_exchange_spatial_closure(
+            params,
+            coupling_exponent=coupling_exponent,
+            kernel_length=kernel_length,
+            facilitation_lifetime=facilitation_lifetime,
+        )
+        field = SpatialRenewalFieldParams(
+            branching_ratio=float(closure["branching_ratio"]),
+            kernel_length=kernel_length,
+            facilitation_lifetime=facilitation_lifetime,
+        )
+        normalized_s4 = spatial_renewal_structure_factor(
+            spatial_wave_numbers=spatial_wave_numbers,
+            t=np.array([observation_time]),
+            local_susceptibility=np.array([1.0]),
+            field=field,
+        )[0]
+        rows.append(
+            {
+                **closure,
+                "observation_time_over_facilitation_lifetime": 20.0,
+                "s4_over_chiR_q0": float(normalized_s4[0]),
+                "s4_over_chiR_q0_5": float(normalized_s4[1]),
+                "s4_over_chiR_q1_5": float(normalized_s4[2]),
+                "prediction_scope": "dynamical_four_point_covariance_not_thermodynamic_transition",
+            }
+        )
     write_sweep_csv(path, rows)
     return rows
 
@@ -7803,6 +7856,70 @@ def write_spatial_chi4_svg(path: Path, rows: list[dict[str, float]]) -> None:
   {plot(left_a, right_a, [("xi4 / hot", length_growth, "#2b6cb0"), ("Ncorr / hot", size_growth, "#2f855a"), ("chi4 peak / hot", chi4_growth, "#c05621")])}
   {axes(left_b, right_b, "B. Timing of the spatial susceptibility", "inverse-temperature shift")}
   {plot(left_b, right_b, [("chi4 peak time", peak_times / peak_times[0], "#805ad5"), ("tau alpha", tau_alpha / tau_alpha[0], "#d69e2e")])}
+</svg>
+"""
+    path.write_text(svg)
+
+
+def write_spatial_covariance_closure_svg(
+    path: Path,
+    rows: list[dict[str, float | str]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width, height = 1120, 560
+    top, bottom = 105, 430
+    left_a, right_a = 80, 515
+    left_b, right_b = 650, 1040
+    ratios = np.array([float(row["persistence_exchange_ratio"]) for row in rows])
+    enhancement = np.array([float(row["chi4_enhancement"]) for row in rows])
+    lengths = np.array([float(row["dynamic_correlation_length"]) for row in rows])
+    q0 = np.array([float(row["s4_over_chiR_q0"]) for row in rows])
+    q05 = np.array([float(row["s4_over_chiR_q0_5"]) for row in rows])
+    q15 = np.array([float(row["s4_over_chiR_q1_5"]) for row in rows])
+
+    x_a = scale(ratios, left_a, right_a)
+    y_a_all = scale(np.concatenate([enhancement, lengths]), bottom, top)
+    y_enhancement = y_a_all[: len(rows)]
+    y_lengths = y_a_all[len(rows) :]
+    x_b = scale(ratios, left_b, right_b)
+    y_b_all = scale(np.concatenate([q0, q05, q15]), bottom, top)
+    y_q0 = y_b_all[: len(rows)]
+    y_q05 = y_b_all[len(rows) : 2 * len(rows)]
+    y_q15 = y_b_all[2 * len(rows) :]
+
+    tick_labels = "".join(
+        f'<text x="{x_a[idx] - 8:.1f}" y="{bottom + 25}" font-family="Arial, sans-serif" font-size="11">{ratio:g}</text>'
+        for idx, ratio in enumerate(ratios)
+    )
+    tick_labels_b = "".join(
+        f'<text x="{x_b[idx] - 8:.1f}" y="{bottom + 25}" font-family="Arial, sans-serif" font-size="11">{ratio:g}</text>'
+        for idx, ratio in enumerate(ratios)
+    )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="80" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700">Persistence-exchange spatial covariance closure</text>
+  <text x="80" y="68" font-family="Arial, sans-serif" font-size="13" fill="#444">One clock ratio predicts both the four-point amplitude and dynamic length while preserving one-particle marginals.</text>
+  <line x1="{left_a}" y1="{bottom}" x2="{right_a}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_a}" y1="{bottom}" x2="{left_a}" y2="{top}" stroke="#222" />
+  <text x="{left_a}" y="{top - 22}" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Joint clock-to-spatial prediction</text>
+  {polyline(x_a, y_enhancement, "#c05621")}
+  {polyline(x_a, y_lengths, "#2b6cb0")}
+  <text x="{left_a + 18}" y="{top + 24}" font-family="Arial, sans-serif" font-size="12" fill="#c05621">chi4 / chiR</text>
+  <text x="{left_a + 18}" y="{top + 43}" font-family="Arial, sans-serif" font-size="12" fill="#2b6cb0">xi4</text>
+  {tick_labels}
+  <text x="{left_a + 135}" y="{bottom + 50}" font-family="Arial, sans-serif" font-size="13">persistence / exchange</text>
+  <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
+  <text x="{left_b}" y="{top - 22}" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Four-point wave-number discrimination</text>
+  {polyline(x_b, y_q0, "#805ad5")}
+  {polyline(x_b, y_q05, "#2f855a")}
+  {polyline(x_b, y_q15, "#d69e2e")}
+  <text x="{left_b + 18}" y="{top + 24}" font-family="Arial, sans-serif" font-size="12" fill="#805ad5">q=0</text>
+  <text x="{left_b + 18}" y="{top + 43}" font-family="Arial, sans-serif" font-size="12" fill="#2f855a">q=0.5</text>
+  <text x="{left_b + 18}" y="{top + 62}" font-family="Arial, sans-serif" font-size="12" fill="#d69e2e">q=1.5</text>
+  {tick_labels_b}
+  <text x="{left_b + 115}" y="{bottom + 50}" font-family="Arial, sans-serif" font-size="13">persistence / exchange</text>
+  <text x="80" y="520" font-family="Arial, sans-serif" font-size="12" fill="#444">Finite q must approach the local renewal variance; thermodynamic-transition claims remain disallowed.</text>
 </svg>
 """
     path.write_text(svg)
@@ -15982,6 +16099,17 @@ def main() -> None:
         microscopic_length=1.0,
         max_diffusivity_relative_std=0.05,
         min_length_growth=1.5,
+    )
+    spatial_covariance_rows = write_spatial_covariance_closure_csv(
+        DATA_DIR / "renewal_cage_spatial_covariance_closure.csv",
+        persistence_exchange_ratios=[1.0, 2.0, 4.0, 8.0, 12.0],
+        coupling_exponent=0.5,
+        kernel_length=1.4,
+        facilitation_lifetime=2.0,
+    )
+    write_spatial_covariance_closure_svg(
+        FIGURE_DIR / "renewal_cage_spatial_covariance_closure.svg",
+        spatial_covariance_rows,
     )
     thermodynamic_rows = write_thermodynamic_closure_csv(
         DATA_DIR / "renewal_cage_thermodynamic_closure.csv",

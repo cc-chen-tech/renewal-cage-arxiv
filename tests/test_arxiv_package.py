@@ -15,6 +15,35 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_spatial_covariance_closure_links_pe_decoupling_to_four_point_predictions(self):
+        path = ROOT / "data" / "renewal_cage_spatial_covariance_closure.csv"
+        figure = ROOT / "figures" / "renewal_cage_spatial_covariance_closure.svg"
+        self.assertTrue(path.exists())
+        self.assertTrue(figure.exists())
+        self.assertNotIn(b"\r\n", path.read_bytes())
+        with path.open() as handle:
+            rows = list(csv.DictReader(handle))
+
+        self.assertGreaterEqual(len(rows), 4)
+        ratios = [float(row["persistence_exchange_ratio"]) for row in rows]
+        enhancements = [float(row["chi4_enhancement"]) for row in rows]
+        lengths = [float(row["dynamic_correlation_length"]) for row in rows]
+        self.assertTrue(all(later > earlier for earlier, later in zip(ratios, ratios[1:])))
+        self.assertTrue(all(later > earlier for earlier, later in zip(enhancements, enhancements[1:])))
+        self.assertTrue(all(later > earlier for earlier, later in zip(lengths, lengths[1:])))
+        for row in rows:
+            self.assertEqual(float(row["single_particle_marginal_preserved"]), 1.0)
+            self.assertEqual(float(row["direct_four_point_prediction_ready"]), 1.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertEqual(
+                row["spatial_closure_stage"],
+                "marginal_preserving_spatial_covariance_prediction",
+            )
+
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        self.assertIn("marginal-preserving spatial covariance", main_text)
+        self.assertIn("renewal_cage_spatial_covariance_closure", main_text)
+
     def test_weeks_true_time_colloid_artifact_keeps_representation_boundary_explicit(self):
         path = ROOT / "data" / "renewal_cage_weeks_hard_colloid_true_time_verdict.csv"
         self.assertTrue(path.exists())
@@ -3458,6 +3487,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_glass_audit.pdf", names)
             self.assertIn("figures/renewal_cage_glass_phase_diagram.pdf", names)
             self.assertIn("figures/renewal_cage_spatial_chi4.pdf", names)
+            self.assertIn("figures/renewal_cage_spatial_covariance_closure.pdf", names)
             self.assertIn("figures/renewal_cage_thermodynamic_closure.pdf", names)
             self.assertIn("figures/renewal_cage_thermodynamic_nonidentifiability.pdf", names)
             self.assertIn("figures/renewal_cage_glass_signature_claim_ladder.pdf", names)

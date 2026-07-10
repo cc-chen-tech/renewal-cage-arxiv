@@ -5051,6 +5051,97 @@ class DelayedRenewalCageTests(unittest.TestCase):
         self.assertEqual(summary["facilitation_growth_law_consistent"], 0.0)
         self.assertEqual(summary["overall_consistent"], 0.0)
 
+    def test_spatial_renewal_structure_factor_preserves_local_marginal_at_zero_coupling(self):
+        field_params = getattr(sys.modules["renewal_cage"], "SpatialRenewalFieldParams", None)
+        structure_factor_fn = getattr(sys.modules["renewal_cage"], "spatial_renewal_structure_factor", None)
+        dynamic_length_fn = getattr(sys.modules["renewal_cage"], "spatial_renewal_dynamic_length", None)
+        if field_params is None or structure_factor_fn is None or dynamic_length_fn is None:
+            self.fail("spatial renewal covariance field API is missing")
+        field = field_params(
+            branching_ratio=0.0,
+            kernel_length=1.7,
+            facilitation_lifetime=2.5,
+        )
+        times = np.array([0.0, 0.5, 3.0])
+        spatial_wave_numbers = np.array([0.0, 0.4, 2.0])
+        local_susceptibility = np.array([0.0, 0.2, 0.5])
+
+        structure_factor = structure_factor_fn(
+            spatial_wave_numbers=spatial_wave_numbers,
+            t=times,
+            local_susceptibility=local_susceptibility,
+            field=field,
+        )
+
+        np.testing.assert_allclose(
+            structure_factor,
+            local_susceptibility[:, None] * np.ones((1, spatial_wave_numbers.size)),
+            rtol=0.0,
+            atol=0.0,
+        )
+        np.testing.assert_allclose(dynamic_length_fn(times, field), field.kernel_length, atol=0.0)
+
+    def test_spatial_renewal_structure_factor_has_closed_zero_wave_enhancement_and_length(self):
+        field_params = getattr(sys.modules["renewal_cage"], "SpatialRenewalFieldParams", None)
+        structure_factor_fn = getattr(sys.modules["renewal_cage"], "spatial_renewal_structure_factor", None)
+        dynamic_length_fn = getattr(sys.modules["renewal_cage"], "spatial_renewal_dynamic_length", None)
+        if field_params is None or structure_factor_fn is None or dynamic_length_fn is None:
+            self.fail("spatial renewal covariance field API is missing")
+        field = field_params(
+            branching_ratio=0.75,
+            kernel_length=2.0,
+            facilitation_lifetime=0.5,
+        )
+        times = np.array([0.0, 50.0])
+        local_susceptibility = np.array([0.25, 0.25])
+
+        structure_factor = structure_factor_fn(
+            spatial_wave_numbers=np.array([0.0, 1.0, 1.0e6]),
+            t=times,
+            local_susceptibility=local_susceptibility,
+            field=field,
+        )
+        lengths = dynamic_length_fn(times, field)
+
+        self.assertAlmostEqual(structure_factor[0, 0], local_susceptibility[0])
+        self.assertAlmostEqual(structure_factor[-1, 0] / local_susceptibility[-1], 16.0)
+        self.assertAlmostEqual(
+            structure_factor[-1, 1] / local_susceptibility[-1],
+            1.0 + 15.0 / (1.0 + 4.0**2) ** 2,
+        )
+        self.assertAlmostEqual(structure_factor[-1, -1], local_susceptibility[-1], places=10)
+        self.assertAlmostEqual(lengths[-1], 4.0)
+
+    def test_persistence_exchange_spatial_closure_jointly_predicts_chi4_and_length(self):
+        closure_fn = getattr(sys.modules["renewal_cage"], "persistence_exchange_spatial_closure", None)
+        if closure_fn is None:
+            self.fail("persistence_exchange_spatial_closure is missing")
+        persistence_exchange = PersistenceExchangeParams(
+            cage_variance=1.0,
+            cage_tau=0.25,
+            jump_variance=0.8,
+            persistence_mean=9.0,
+            exchange_mean=1.0,
+        )
+
+        closure = closure_fn(
+            persistence_exchange,
+            coupling_exponent=0.5,
+            kernel_length=1.4,
+            facilitation_lifetime=2.0,
+        )
+
+        self.assertAlmostEqual(closure["persistence_exchange_ratio"], 9.0)
+        self.assertAlmostEqual(closure["branching_ratio"], 2.0 / 3.0)
+        self.assertAlmostEqual(closure["chi4_enhancement"], 9.0)
+        self.assertAlmostEqual(closure["dynamic_correlation_length"], 1.4 * math.sqrt(3.0))
+        self.assertAlmostEqual(closure["excess_dynamic_length"], 1.4 * math.sqrt(2.0))
+        self.assertGreater(closure["pair_correlation_amplitude"], 0.0)
+        self.assertLess(closure["pair_correlation_amplitude"], 1.0)
+        self.assertEqual(closure["pair_correlation_admissible"], 1.0)
+        self.assertEqual(closure["single_particle_marginal_preserved"], 1.0)
+        self.assertEqual(closure["thermodynamic_claim_allowed"], 0.0)
+
     def test_activated_barrier_gap_controls_delayed_renewal_product(self):
         barrier = ActivatedBarrierParams(
             reference_temperature=1.0,

@@ -1107,6 +1107,66 @@ def write_spatial_chi4_pdf(path: Path) -> None:
     c.save()
 
 
+def write_spatial_covariance_closure_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_spatial_covariance_closure.csv").open() as handle:
+        rows = list(csv.DictReader(handle))
+    ratios = np.array([float(row["persistence_exchange_ratio"]) for row in rows])
+    enhancement = np.array([float(row["chi4_enhancement"]) for row in rows])
+    lengths = np.array([float(row["dynamic_correlation_length"]) for row in rows])
+    q0 = np.array([float(row["s4_over_chiR_q0"]) for row in rows])
+    q05 = np.array([float(row["s4_over_chiR_q0_5"]) for row in rows])
+    q15 = np.array([float(row["s4_over_chiR_q1_5"]) for row in rows])
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Persistence-exchange spatial covariance closure")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        page_h - 48,
+        "One clock ratio predicts four-point amplitude and dynamic length while preserving all one-particle marginals.",
+    )
+    draw_panel(
+        c,
+        45,
+        160,
+        320,
+        280,
+        ratios,
+        [
+            ("chi4 / chiR", enhancement, colors.HexColor("#c05621")),
+            ("xi4", lengths, colors.HexColor("#2b6cb0")),
+        ],
+        "A. Joint clock-to-spatial prediction",
+        xlabel="persistence / exchange",
+    )
+    draw_panel(
+        c,
+        430,
+        160,
+        320,
+        280,
+        ratios,
+        [
+            ("q=0", q0, colors.HexColor("#805ad5")),
+            ("q=0.5", q05, colors.HexColor("#2f855a")),
+            ("q=1.5", q15, colors.HexColor("#d69e2e")),
+        ],
+        "B. Four-point wave-number discrimination",
+        xlabel="persistence / exchange",
+    )
+    c.setFont("Helvetica", 7.5)
+    c.drawString(
+        45,
+        82,
+        "Finite q returns toward the local renewal variance; thermodynamic-transition claims remain disallowed.",
+    )
+    c.showPage()
+    c.save()
+
+
 def write_thermodynamic_closure_pdf(path: Path) -> None:
     data = read_csv_columns(DATA_DIR / "renewal_cage_thermodynamic_closure.csv")
     inverse_shift = 1.0 / data["temperature"] - 1.0 / data["temperature"][0]
@@ -9323,6 +9383,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     glass_signature_claim_ladder_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_signature_claim_ladder.pdf"
     glass_phase_diagram_pdf = PAPER_FIGURE_DIR / "renewal_cage_glass_phase_diagram.pdf"
     spatial_chi4_pdf = PAPER_FIGURE_DIR / "renewal_cage_spatial_chi4.pdf"
+    spatial_covariance_closure_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_spatial_covariance_closure.pdf"
+    )
     thermodynamic_closure_pdf = PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_closure.pdf"
     thermodynamic_nonidentifiability_pdf = (
         PAPER_FIGURE_DIR / "renewal_cage_thermodynamic_nonidentifiability.pdf"
@@ -9654,6 +9717,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_glass_signature_claim_ladder_pdf(glass_signature_claim_ladder_pdf)
     write_glass_phase_diagram_pdf(glass_phase_diagram_pdf)
     write_spatial_chi4_pdf(spatial_chi4_pdf)
+    write_spatial_covariance_closure_pdf(spatial_covariance_closure_pdf)
     write_thermodynamic_closure_pdf(thermodynamic_closure_pdf)
     write_thermodynamic_nonidentifiability_pdf(thermodynamic_nonidentifiability_pdf)
     write_mct_beta_closure_pdf(mct_beta_closure_pdf)
@@ -9951,6 +10015,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         )
         archive.write(glass_phase_diagram_pdf, "figures/renewal_cage_glass_phase_diagram.pdf")
         archive.write(spatial_chi4_pdf, "figures/renewal_cage_spatial_chi4.pdf")
+        archive.write(
+            spatial_covariance_closure_pdf,
+            "figures/renewal_cage_spatial_covariance_closure.pdf",
+        )
         archive.write(thermodynamic_closure_pdf, "figures/renewal_cage_thermodynamic_closure.pdf")
         archive.write(
             thermodynamic_nonidentifiability_pdf,

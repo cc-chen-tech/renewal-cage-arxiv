@@ -541,6 +541,67 @@ different temperatures do not collapse to a positive constant within
 uncertainty. This gives a concrete four-point-length protocol without claiming
 to derive the full spatial facilitation field.
 
+Renewal/facilitation analyses already establish that four-point
+susceptibilities carry a probe-length dependence, and colloidal trajectories
+show mobility propagating near the cage-breaking time
+\cite{chandler2006fourpoint,franklin2014facilitation}.  These results motivate a
+nonlocal covariance but do not imply the clock-to-length relation below.  The
+compact-domain construction can be sharpened without changing any one-particle
+displacement law.  We introduce a marginal-preserving spatial covariance field
+whose time-dependent branching fraction, zero-wave enhancement, and spatial
+length are
+
+\begin{equation}
+  b(t)=B\left(1-e^{-t/\tau_f}\right),\quad 0\leq B<1,
+  \qquad
+  M(t)=[1-b(t)]^{-2},\qquad
+  \xi_4(t)=\frac{\ell}{\sqrt{1-b(t)}}.
+\end{equation}
+It acts only on the covariance of renewal events.  If $\chi_R(t)$ is the local
+renewal-count susceptibility above, the corresponding four-point structure
+factor is
+\begin{equation}
+  \frac{S_4^R(q,t)}{\chi_R(t)}
+  =1+[M(t)-1]\left[1+(q\xi_4(t))^2\right]^{-(d+1)/2}.
+\end{equation}
+The first term is the unchanged particle-self variance; the second is the
+Fourier transform of an exponential distinct-particle covariance in dimension
+$d$.  Consequently $B=0$ recovers the original $q$-independent local variance
+exactly, and any finite-$B$ curve returns to the same local variance as
+$q\to\infty$.  Its real-space pair-correlation amplitude is
+\begin{equation}
+  c(t)=\frac{M(t)-1}
+  {\rho S_{d-1}\Gamma(d)\xi_4(t)^d},\qquad
+  S_{d-1}=\frac{2\pi^{d/2}}{\Gamma(d/2)}.
+\end{equation}
+The covariance closure is admissible only when $0\leq c(t)\leq1$; violation of
+this bound rejects the parameterization.  The MSD, NGP, $F_s$, diffusion
+coefficient, and Gaussian recovery are inherited unchanged from the
+one-particle theory.
+
+The new falsifiable closure hypothesis links the asymptotic branching fraction
+to persistence--exchange decoupling.  With
+$R(T)=\tau_p(T)/\tau_x(T)$, let
+\begin{equation}
+  B(T)=1-R(T)^{-\gamma}.
+\end{equation}
+After $\gamma$ and $\ell$ are fixed at one reference state, held-out state
+points must satisfy both
+\begin{equation}
+  \frac{\chi_{4,\mathrm{peak}}(T)}{\chi_{R,\mathrm{peak}}(T)}
+  =R(T)^{2\gamma},
+  \qquad
+  \xi_4(T)^2=\ell^2R(T)^\gamma.
+\end{equation}
+The excess squared length above the microscopic kernel scale is therefore
+$\xi_4^2-\ell^2=\ell^2[R^\gamma-1]$.
+The file \texttt{\detokenize{renewal_cage_spatial_covariance_closure.csv}}
+records this joint prediction and its finite-$q$ discrimination.  These
+relations are an effective dynamical hypothesis, not a known identity: failure
+of one $(\gamma,\ell)$ pair to predict both observables rejects the closure.
+It neither supplies configurational entropy nor licenses a thermodynamic glass
+transition claim.
+
 \section{Thermodynamic Entropy Closure}
 
 The renewal model above is kinetic. To compare with thermodynamic glass
@@ -2115,6 +2176,15 @@ rejected without refitting the clocks.
   length $\xi_4$ and correlated renewal volume $N_{\rm corr}$, making the
   renewal contribution to the $\chi_4$ peak grow on cooling without fitting an
   external domain size.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_spatial_covariance_closure.pdf}
+  \caption{Marginal-preserving spatial covariance closure.  The
+  persistence--exchange ratio fixes the asymptotic covariance amplification
+  and dynamic length through one coupling exponent, while finite spatial wave
+  number returns to the unchanged local renewal variance.}
 \end{figure}
 
 \begin{figure}[h]
