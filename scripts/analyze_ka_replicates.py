@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -17,6 +18,9 @@ sys.path.insert(0, str(ROOT / "src"))
 from ka_replicates import load_lammps_custom_trajectory, summarize_replicate_curves  # noqa: E402
 from renewal_cage import (  # noqa: E402
     block_trajectory_observables,
+    event_clock_statistics,
+    extract_nonrecrossing_phop_events,
+    phop_values,
     summarize_block_trajectory_observables,
 )
 
@@ -33,6 +37,42 @@ def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
+def summarize_event_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    metrics = (
+        "event_rate",
+        "exchange_mean",
+        "exchange_cv2",
+        "stationary_persistence_mean",
+        "persistence_exchange_ratio",
+        "jump_squared_mean",
+        "count_fano",
+        "correlated_diffusion",
+    )
+    summary: list[dict[str, object]] = []
+    for metric in metrics:
+        values = np.array([float(row[metric]) for row in rows])
+        mean = float(np.mean(values))
+        standard_deviation = float(np.std(values, ddof=1))
+        standard_error = standard_deviation / math.sqrt(len(values))
+        summary.append(
+            {
+                "metric": metric,
+                "mean": mean,
+                "standard_deviation": standard_deviation,
+                "standard_error": standard_error,
+                "ci95_low": mean - 1.96 * standard_error,
+                "ci95_high": mean + 1.96 * standard_error,
+                "independent_replicate_count": float(len(values)),
+                "temperature": float(rows[0]["temperature"]),
+                "threshold": float(rows[0]["threshold"]),
+                "half_window": float(rows[0]["half_window"]),
+                "independence_class": str(rows[0]["independence_class"]),
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+    return summary
+
+
 def analyze_ensemble(
     ensemble_directory: Path,
     *,
@@ -46,10 +86,13 @@ def analyze_ensemble(
     list[dict[str, object]],
     list[dict[str, object]],
     list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
 ]:
     manifest = json.loads((ensemble_directory / "ensemble_manifest.json").read_text())
     expected_replicates = int(manifest["replicate_count"])
     curve_rows: list[dict[str, object]] = []
+    event_rows: list[dict[str, object]] = []
     for replicate in manifest["replicates"]:
         replicate_index = int(replicate["replicate"])
         directory = ensemble_directory / str(replicate["directory"])
@@ -80,6 +123,34 @@ def analyze_ensemble(
             row["independence_class"] = str(manifest["independence_class"])
             row["thermodynamic_claim_allowed"] = 0.0
         curve_rows.extend(rows)
+        a_positions = positions[:, particle_mask]
+        activity_times, activity_values = phop_values(a_positions, half_window=5)
+        events = extract_nonrecrossing_phop_events(
+            a_positions,
+            threshold=0.2,
+            half_window=5,
+            recrossing_radius=math.sqrt(0.2),
+            activity_times=activity_times,
+            activity_values=activity_values,
+        )
+        event_row: dict[str, object] = {
+            "replicate": float(replicate_index),
+            "temperature": float(manifest["temperature"]),
+            "threshold": 0.2,
+            "half_window": 5.0,
+            "event_definition": "candelier_phop_contiguous_peak_recursive_ABA_removal",
+            "independence_class": str(manifest["independence_class"]),
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        event_row.update(
+            event_clock_statistics(
+                events,
+                duration=production_time,
+                particle_count=int(np.sum(particle_mask)),
+                dimension=3,
+            )
+        )
+        event_rows.append(event_row)
 
     if len({int(row["replicate"]) for row in curve_rows}) != expected_replicates:
         raise ValueError("replicate count does not match the ensemble manifest")
@@ -109,7 +180,14 @@ def analyze_ensemble(
         row["independence_class"] = str(manifest["independence_class"])
         row["maximum_absolute_initial_fs"] = float(manifest["maximum_absolute_fs_observed"])
         row["thermodynamic_claim_allowed"] = 0.0
-    return curve_rows, curve_summary_rows, replicate_rows, summary_rows
+    return (
+        curve_rows,
+        curve_summary_rows,
+        replicate_rows,
+        summary_rows,
+        event_rows,
+        summarize_event_rows(event_rows),
+    )
 
 
 def main() -> None:
@@ -123,7 +201,7 @@ def main() -> None:
     parser.add_argument("--output-prefix", type=Path, required=True)
     args = parser.parse_args()
 
-    curves, curve_summary, replicates, summary = analyze_ensemble(
+    curves, curve_summary, replicates, summary, events, event_summary = analyze_ensemble(
         args.ensemble_directory,
         lags=parse_numbers(args.lags, int),
         wave_numbers=parse_numbers(args.wave_numbers, float),
@@ -138,6 +216,11 @@ def main() -> None:
     )
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_replicates.csv"), replicates)
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_summary.csv"), summary)
+    write_rows(args.output_prefix.with_name(args.output_prefix.name + "_event_replicates.csv"), events)
+    write_rows(
+        args.output_prefix.with_name(args.output_prefix.name + "_event_summary.csv"),
+        event_summary,
+    )
 
 
 if __name__ == "__main__":

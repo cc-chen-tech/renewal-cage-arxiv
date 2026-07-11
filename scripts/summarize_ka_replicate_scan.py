@@ -97,12 +97,57 @@ def provenance_rows(manifest_path: Path) -> list[dict[str, object]]:
     return rows
 
 
+def event_temperature_trends(
+    high_rows: list[dict[str, str]],
+    low_rows: list[dict[str, str]],
+) -> list[dict[str, object]]:
+    high = {row["metric"]: row for row in high_rows}
+    low = {row["metric"]: row for row in low_rows}
+    directions = {
+        "event_rate": "decrease",
+        "exchange_mean": "increase",
+        "stationary_persistence_mean": "increase",
+        "persistence_exchange_ratio": "increase",
+        "count_fano": "increase",
+        "correlated_diffusion": "decrease",
+    }
+    rows: list[dict[str, object]] = []
+    for metric, direction in directions.items():
+        high_mean, low_mean = float(high[metric]["mean"]), float(low[metric]["mean"])
+        if direction == "increase":
+            ratio = low_mean / high_mean
+            separated = float(low[metric]["ci95_low"]) > float(high[metric]["ci95_high"])
+        else:
+            ratio = high_mean / low_mean
+            separated = float(low[metric]["ci95_high"]) < float(high[metric]["ci95_low"])
+        rows.append(
+            {
+                "metric": metric,
+                "cooling_direction": direction,
+                "high_temperature_mean": high_mean,
+                "high_temperature_ci95_low": float(high[metric]["ci95_low"]),
+                "high_temperature_ci95_high": float(high[metric]["ci95_high"]),
+                "low_temperature_mean": low_mean,
+                "low_temperature_ci95_low": float(low[metric]["ci95_low"]),
+                "low_temperature_ci95_high": float(low[metric]["ci95_high"]),
+                "effect_ratio": ratio,
+                "directional_ci95_separated": separated,
+                "trend_pass": ratio > 1.0 and separated,
+                "independent_replicates_per_temperature": 5,
+                "thermodynamic_claim_allowed": False,
+            }
+        )
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--high-summary", type=Path, required=True)
     parser.add_argument("--low-summary", type=Path, required=True)
     parser.add_argument("--high-parent-summary", type=Path, required=True)
     parser.add_argument("--low-parent-summary", type=Path, required=True)
+    parser.add_argument("--high-event-summary", type=Path, required=True)
+    parser.add_argument("--low-event-summary", type=Path, required=True)
     parser.add_argument("--high-temperature", type=float, required=True)
     parser.add_argument("--low-temperature", type=float, required=True)
     parser.add_argument("--high-ensemble-manifest", type=Path, required=True)
@@ -110,6 +155,7 @@ def main() -> None:
     parser.add_argument("--trend-output", type=Path, required=True)
     parser.add_argument("--protocol-output", type=Path, required=True)
     parser.add_argument("--provenance-output", type=Path, required=True)
+    parser.add_argument("--event-trend-output", type=Path, required=True)
     args = parser.parse_args()
 
     high = read_rows(args.high_summary)
@@ -134,6 +180,13 @@ def main() -> None:
     write_rows(
         args.provenance_output,
         provenance_rows(args.high_ensemble_manifest) + provenance_rows(args.low_ensemble_manifest),
+    )
+    write_rows(
+        args.event_trend_output,
+        event_temperature_trends(
+            read_rows(args.high_event_summary),
+            read_rows(args.low_event_summary),
+        ),
     )
 
 

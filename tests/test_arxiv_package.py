@@ -20,10 +20,29 @@ class ArxivPackageTests(unittest.TestCase):
         protocol_path = ROOT / "data" / "renewal_cage_ka_replicate_protocol_bias.csv"
         provenance_path = ROOT / "data" / "renewal_cage_ka_replicate_provenance.csv"
         for code in ("T070", "T058"):
-            for suffix in ("curves", "curve_summary", "replicates", "summary"):
+            for suffix in (
+                "curves",
+                "curve_summary",
+                "replicates",
+                "summary",
+                "event_replicates",
+                "event_summary",
+            ):
                 self.assertTrue(
                     (ROOT / "data" / f"renewal_cage_ka_replicates_{code}_{suffix}.csv").exists()
                 )
+            with (
+                ROOT / "data" / f"renewal_cage_ka_replicates_{code}_event_summary.csv"
+            ).open() as handle:
+                event_summary = {row["metric"]: row for row in csv.DictReader(handle)}
+            self.assertEqual(
+                int(float(event_summary["persistence_exchange_ratio"]["independent_replicate_count"])),
+                5,
+            )
+            if code == "T070":
+                self.assertLess(float(event_summary["persistence_exchange_ratio"]["ci95_high"]), 1.0)
+            else:
+                self.assertGreater(float(event_summary["persistence_exchange_ratio"]["ci95_low"]), 1.0)
         with trend_path.open() as handle:
             trends = {row["metric"]: row for row in csv.DictReader(handle)}
         self.assertEqual(
@@ -51,6 +70,13 @@ class ArxivPackageTests(unittest.TestCase):
             all(row["independently_prepared_parent_samples"] == "False" for row in provenance)
         )
         self.assertTrue(all(row["simulation_engine"] == "LAMMPS_22Jul2025_update4" for row in provenance))
+        event_trend_path = ROOT / "data" / "renewal_cage_ka_replicate_event_temperature_trend.csv"
+        with event_trend_path.open() as handle:
+            event_trends = {row["metric"]: row for row in csv.DictReader(handle)}
+        self.assertTrue(all(row["trend_pass"] == "True" for row in event_trends.values()))
+        self.assertGreater(float(event_trends["exchange_mean"]["effect_ratio"]), 3.5)
+        self.assertGreater(float(event_trends["count_fano"]["effect_ratio"]), 1.15)
+        self.assertGreater(float(event_trends["persistence_exchange_ratio"]["effect_ratio"]), 1.05)
         self.assertGreater(float(trends["diffusion"]["effect_ratio"]), 3.0)
         self.assertGreater(float(trends["diffusion_alpha_product"]["effect_ratio"]), 1.15)
         self.assertGreater(float(trends["ngp_peak"]["effect_ratio"]), 1.7)
