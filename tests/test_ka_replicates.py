@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from ka_replicates import (  # noqa: E402
+    distance_resolved_event_count_covariance,
+    fit_spatial_covariance_length,
     initial_configuration_fs,
     load_lammps_custom_trajectory,
     prepare_replicate,
@@ -22,6 +24,47 @@ from ka_replicates import (  # noqa: E402
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_spatial_covariance_length_recovers_exponential_decay(self):
+        rows = [
+            {"distance_midpoint": r, "mean_covariance_excess": 2.0 * np.exp(-r / 1.5)}
+            for r in (1.0, 2.0, 3.0, 4.0)
+        ]
+
+        fit = fit_spatial_covariance_length(rows, minimum_distance=1.0)
+
+        self.assertAlmostEqual(fit["correlation_length"], 1.5)
+        self.assertAlmostEqual(fit["amplitude"], 2.0)
+        self.assertAlmostEqual(fit["log_space_r_squared"], 1.0)
+        self.assertEqual(fit["fit_point_count"], 4.0)
+
+    def test_distance_resolved_covariance_finds_close_pair_coactivity(self):
+        positions = np.array(
+            [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0], [5.0, 0.0, 0.0], [5.5, 0.0, 0.0]]
+        )
+        events = {
+            "particle": np.array([0, 1, 2, 3, 0, 1, 2, 3]),
+            "time": np.array([1, 1, 11, 11, 21, 21, 31, 31]),
+        }
+
+        rows = distance_resolved_event_count_covariance(
+            events,
+            positions,
+            np.array([20.0, 20.0, 20.0]),
+            duration=40.0,
+            count_window=10.0,
+            distance_edges=np.array([0.0, 1.0, 10.0]),
+        )
+
+        close, far = rows
+        self.assertEqual(close["pair_count"], 2.0)
+        self.assertEqual(far["pair_count"], 4.0)
+        self.assertGreater(close["covariance_excess_over_all_pairs"], 0.0)
+        self.assertLess(far["covariance_excess_over_all_pairs"], 0.0)
+        self.assertAlmostEqual(
+            sum(row["pair_count"] * row["covariance_excess_over_all_pairs"] for row in rows),
+            0.0,
+        )
+
     def test_replicate_curve_summary_uses_between_trajectory_error(self):
         rows = [
             {"replicate": 1.0, "lag": 1.0, "msd": 1.0, "fs_k7p25": 0.8},

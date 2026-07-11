@@ -15,6 +15,123 @@ import numpy as np
 SOURCE_DOI = "10.5281/zenodo.7469766"
 
 
+def fit_spatial_covariance_length(
+    rows: Sequence[dict[str, object]],
+    *,
+    minimum_distance: float,
+) -> dict[str, float]:
+    """Fit the positive covariance branch to A exp(-r/xi) in log space."""
+
+    if not math.isfinite(minimum_distance) or minimum_distance < 0.0:
+        raise ValueError("minimum_distance must be nonnegative and finite")
+    distance = np.array([float(row["distance_midpoint"]) for row in rows])
+    covariance = np.array([float(row["mean_covariance_excess"]) for row in rows])
+    selected = (distance >= minimum_distance) & (covariance > 0.0)
+    if np.sum(selected) < 3:
+        raise ValueError("at least three positive covariance bins are required")
+    x = distance[selected]
+    log_y = np.log(covariance[selected])
+    slope, intercept = np.polyfit(x, log_y, 1)
+    if slope >= 0.0:
+        raise ValueError("positive covariance branch does not decay with distance")
+    prediction = intercept + slope * x
+    residual_sum = float(np.sum((log_y - prediction) ** 2))
+    total_sum = float(np.sum((log_y - np.mean(log_y)) ** 2))
+    return {
+        "amplitude": float(math.exp(intercept)),
+        "correlation_length": float(-1.0 / slope),
+        "log_space_r_squared": float(1.0 - residual_sum / total_sum) if total_sum > 0.0 else 1.0,
+        "fit_point_count": float(np.sum(selected)),
+        "fit_distance_min": float(np.min(x)),
+        "fit_distance_max": float(np.max(x)),
+    }
+
+
+def distance_resolved_event_count_covariance(
+    events: dict[str, np.ndarray],
+    reference_positions: np.ndarray,
+    box_lengths: np.ndarray,
+    *,
+    duration: float,
+    count_window: float,
+    distance_edges: np.ndarray,
+) -> list[dict[str, float]]:
+    """Measure spatial count covariance after removing global activity fluctuations."""
+
+    positions = np.asarray(reference_positions, dtype=float)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    edges = np.asarray(distance_edges, dtype=float)
+    if positions.ndim != 2 or positions.shape[1] != len(box_lengths):
+        raise ValueError("reference_positions must have shape (particles, dimensions)")
+    if np.any(~np.isfinite(positions)) or np.any(~np.isfinite(box_lengths)) or np.any(box_lengths <= 0.0):
+        raise ValueError("positions and positive box lengths must be finite")
+    if not math.isfinite(duration) or not math.isfinite(count_window) or duration <= 0.0 or count_window <= 0.0:
+        raise ValueError("duration and count_window must be positive and finite")
+    if edges.ndim != 1 or len(edges) < 2 or np.any(~np.isfinite(edges)) or np.any(np.diff(edges) <= 0.0):
+        raise ValueError("distance_edges must be a strictly increasing finite sequence")
+    particle = np.asarray(events["particle"], dtype=int)
+    event_time = np.asarray(events["time"], dtype=float)
+    if particle.shape != event_time.shape or np.any(particle < 0) or np.any(particle >= len(positions)):
+        raise ValueError("event particles and times must be aligned and in range")
+    window_count = int(math.floor(duration / count_window))
+    if window_count < 2:
+        raise ValueError("at least two complete count windows are required")
+
+    counts = np.zeros((len(positions), window_count), dtype=float)
+    window = np.floor(event_time / count_window).astype(int)
+    retained = (event_time >= 0.0) & (window >= 0) & (window < window_count)
+    np.add.at(counts, (particle[retained], window[retained]), 1.0)
+    residual = counts - np.mean(counts, axis=0, keepdims=True)
+    residual -= np.mean(residual, axis=1, keepdims=True)
+
+    bin_count = np.zeros(len(edges) - 1, dtype=np.int64)
+    bin_sum = np.zeros(len(edges) - 1, dtype=float)
+    all_pair_sum = 0.0
+    all_pair_count = 0
+    for left in range(len(positions) - 1):
+        displacement = positions[left + 1 :] - positions[left]
+        displacement -= box_lengths * np.rint(displacement / box_lengths)
+        distance = np.linalg.norm(displacement, axis=1)
+        covariance = residual[left + 1 :] @ residual[left] / window_count
+        all_pair_sum += float(np.sum(covariance))
+        all_pair_count += len(covariance)
+        bin_index = np.searchsorted(edges, distance, side="right") - 1
+        valid = (bin_index >= 0) & (bin_index < len(bin_count))
+        bin_count += np.bincount(bin_index[valid], minlength=len(bin_count))
+        bin_sum += np.bincount(
+            bin_index[valid],
+            weights=covariance[valid],
+            minlength=len(bin_count),
+        )
+
+    all_pair_mean = all_pair_sum / all_pair_count
+    individual_variance = float(np.mean(residual**2))
+    rows: list[dict[str, float]] = []
+    for index, pair_count in enumerate(bin_count):
+        if pair_count == 0:
+            raise ValueError("every distance bin must contain at least one particle pair")
+        covariance = bin_sum[index] / pair_count
+        excess = covariance - all_pair_mean
+        rows.append(
+            {
+                "distance_low": float(edges[index]),
+                "distance_high": float(edges[index + 1]),
+                "distance_midpoint": float((edges[index] + edges[index + 1]) / 2.0),
+                "pair_count": float(pair_count),
+                "count_window": count_window,
+                "window_count": float(window_count),
+                "retained_event_count": float(np.sum(retained)),
+                "count_covariance": float(covariance),
+                "all_pair_covariance_null": float(all_pair_mean),
+                "covariance_excess_over_all_pairs": float(excess),
+                "normalized_covariance_excess": float(excess / individual_variance)
+                if individual_variance > 0.0
+                else 0.0,
+            }
+        )
+    return rows
+
+
 def summarize_replicate_curves(
     rows: Sequence[dict[str, object]],
     *,

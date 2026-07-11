@@ -1,0 +1,2 @@
+amplitude,correlation_length,log_space_r_squared,fit_point_count,fit_distance_min,fit_distance_max,temperature,fit_status,independent_replicate_count,spatial_model_claim_allowed,thermodynamic_claim_allowed
+0.005807413367598488,0.7421212776810243,0.9966581268681838,5.0,1.25,4.25,0.45,exploratory_single_trajectory_pilot,1.0,0.0,0.0

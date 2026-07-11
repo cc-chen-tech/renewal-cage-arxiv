@@ -15,6 +15,25 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_t045_spatial_covariance_pilot_is_localized_and_claim_limited(self):
+        summary_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_spatial_covariance_pilot_summary.csv"
+        )
+        fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_spatial_covariance_pilot_fit.csv"
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertGreater(float(rows[0]["ci95_low"]), 0.0)
+        self.assertLess(float(rows[-1]["ci95_high"]), 0.0)
+        self.assertTrue(all(float(row["independent_replicate_count"]) == 1.0 for row in rows))
+        self.assertTrue(all(float(row["spatial_model_claim_allowed"]) == 0.0 for row in rows))
+        with fit_path.open() as handle:
+            fit = next(csv.DictReader(handle))
+        self.assertEqual(fit["fit_status"], "exploratory_single_trajectory_pilot")
+        self.assertGreater(float(fit["correlation_length"]), 0.5)
+        self.assertLess(float(fit["correlation_length"]), 1.0)
+        self.assertGreater(float(fit["log_space_r_squared"]), 0.99)
+        self.assertEqual(float(fit["spatial_model_claim_allowed"]), 0.0)
+
     def test_independent_ka_restarts_resolve_cooling_and_protocol_bias(self):
         trend_path = ROOT / "data" / "renewal_cage_ka_replicate_temperature_trend.csv"
         protocol_path = ROOT / "data" / "renewal_cage_ka_replicate_protocol_bias.csv"
