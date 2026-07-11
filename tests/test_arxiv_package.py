@@ -15,6 +15,22 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
+        curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
+        fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
+        with curve_path.open() as handle:
+            curve = list(csv.DictReader(handle))
+        self.assertEqual(float(curve[0]["integer_squared"]), 0.0)
+        self.assertGreater(float(curve[1]["s4"]), 5.0 * float(curve[0]["s4"]),)
+        self.assertTrue(all(float(row["ensemble_correction_available"]) == 0.0 for row in curve))
+        self.assertTrue(all(float(row["xi4_claim_allowed"]) == 0.0 for row in curve))
+        with fit_path.open() as handle:
+            fit = next(csv.DictReader(handle))
+        self.assertLess(float(fit["inverse_intercept"]), 0.0)
+        self.assertEqual(float(fit["xi4_identifiable"]), 0.0)
+        self.assertEqual(fit["verdict"], "xi4_not_identifiable_negative_OZ_intercept")
+        self.assertEqual(float(fit["xi4_claim_allowed"]), 0.0)
+
     def test_spatial_covariance_sota_ledger_blocks_xi4_overclaim(self):
         path = ROOT / "data" / "renewal_cage_ka_spatial_covariance_sota_alignment.csv"
         with path.open() as handle:

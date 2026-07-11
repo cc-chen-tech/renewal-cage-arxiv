@@ -13,8 +13,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from ka_replicates import (  # noqa: E402
     distance_resolved_event_count_covariance,
     fit_spatial_covariance_length,
+    fit_ornstein_zernike_structure_factor,
     initial_configuration_fs,
     load_lammps_custom_trajectory,
+    overlap_four_point_structure_factor,
     prepare_replicate,
     prepare_replicate_ensemble,
     summarize_replicate_curves,
@@ -24,6 +26,61 @@ from ka_replicates import (  # noqa: E402
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
+        valid_rows = [
+            {"wave_number": q, "s4": 10.0 / (1.0 + (2.0 * q) ** 2)}
+            for q in (0.2, 0.3, 0.4, 0.5)
+        ]
+        valid = fit_ornstein_zernike_structure_factor(valid_rows)
+        self.assertTrue(valid["fit_valid"])
+        self.assertAlmostEqual(valid["amplitude"], 10.0)
+        self.assertAlmostEqual(valid["correlation_length"], 2.0)
+
+        invalid_rows = [
+            {"wave_number": q, "s4": s4}
+            for q, s4 in ((0.4, 25.0), (0.6, 4.5), (0.8, 2.0), (1.0, 1.1))
+        ]
+        invalid = fit_ornstein_zernike_structure_factor(invalid_rows)
+        self.assertFalse(invalid["fit_valid"])
+        self.assertLess(invalid["inverse_intercept"], 0.0)
+        self.assertTrue(np.isnan(invalid["correlation_length"]))
+
+    def test_overlap_s4_is_periodic_translation_invariant_and_has_q0_susceptibility(self):
+        frame0 = np.array(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
+        )
+        frame1 = frame0.copy()
+        frame1[0, 0] += 1.0
+        frame2 = frame1.copy()
+        frame2[[0, 1, 2], 1] += 1.0
+        trajectory = np.stack([frame0, frame1, frame2])
+
+        rows = overlap_four_point_structure_factor(
+            trajectory,
+            box_lengths=np.array([4.0, 4.0, 4.0]),
+            lag=1,
+            overlap_radius=0.3,
+            origin_stride=1,
+            maximum_integer_squared=1,
+        )
+        shifted = overlap_four_point_structure_factor(
+            trajectory + np.array([4.0, -4.0, 8.0]),
+            box_lengths=np.array([4.0, 4.0, 4.0]),
+            lag=1,
+            overlap_radius=0.3,
+            origin_stride=1,
+            maximum_integer_squared=1,
+        )
+
+        self.assertEqual(rows[0]["integer_squared"], 0.0)
+        self.assertAlmostEqual(rows[0]["s4"], 0.25)
+        self.assertEqual(rows[1]["wavevector_count"], 6.0)
+        self.assertGreaterEqual(rows[1]["s4"], 0.0)
+        np.testing.assert_allclose(
+            [row["s4"] for row in rows],
+            [row["s4"] for row in shifted],
+        )
+
     def test_spatial_covariance_length_recovers_exponential_decay(self):
         rows = [
             {"distance_midpoint": r, "mean_covariance_excess": 2.0 * np.exp(-r / 1.5)}

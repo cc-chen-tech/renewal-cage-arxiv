@@ -15,6 +15,120 @@ import numpy as np
 SOURCE_DOI = "10.5281/zenodo.7469766"
 
 
+def fit_ornstein_zernike_structure_factor(
+    rows: Sequence[dict[str, object]],
+) -> dict[str, float | bool]:
+    """Fit S(q)=A/[1+(q xi)^2] through a linear inverse transform."""
+
+    q = np.array([float(row["wave_number"]) for row in rows], dtype=float)
+    s4 = np.array([float(row["s4"]) for row in rows], dtype=float)
+    selected = (q > 0.0) & (s4 > 0.0) & np.isfinite(q) & np.isfinite(s4)
+    if np.sum(selected) < 3:
+        raise ValueError("at least three positive finite-q S4 shells are required")
+    x = q[selected] ** 2
+    y = 1.0 / s4[selected]
+    slope, intercept = np.polyfit(x, y, 1)
+    prediction = intercept + slope * x
+    residual_sum = float(np.sum((y - prediction) ** 2))
+    total_sum = float(np.sum((y - np.mean(y)) ** 2))
+    fit_valid = bool(intercept > 0.0 and slope > 0.0)
+    return {
+        "inverse_intercept": float(intercept),
+        "inverse_slope": float(slope),
+        "amplitude": float(1.0 / intercept) if fit_valid else math.nan,
+        "correlation_length": float(math.sqrt(slope / intercept)) if fit_valid else math.nan,
+        "inverse_space_r_squared": float(1.0 - residual_sum / total_sum)
+        if total_sum > 0.0
+        else 1.0,
+        "fit_shell_count": float(np.sum(selected)),
+        "fit_wave_number_min": float(np.min(q[selected])),
+        "fit_wave_number_max": float(np.max(q[selected])),
+        "fit_valid": fit_valid,
+    }
+
+
+def overlap_four_point_structure_factor(
+    unwrapped_positions: np.ndarray,
+    *,
+    box_lengths: np.ndarray,
+    lag: int,
+    overlap_radius: float,
+    origin_stride: int,
+    maximum_integer_squared: int,
+) -> list[dict[str, float]]:
+    """Compute overlap S4 on reciprocal-box wavevector shells."""
+
+    positions = np.asarray(unwrapped_positions, dtype=float)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    if positions.ndim != 3 or positions.shape[2] != len(box_lengths):
+        raise ValueError("unwrapped_positions must have shape (frames, particles, dimensions)")
+    if positions.shape[0] <= lag or lag < 1:
+        raise ValueError("lag must be positive and shorter than the trajectory")
+    if origin_stride < 1 or maximum_integer_squared < 1:
+        raise ValueError("origin_stride and maximum_integer_squared must be positive")
+    if not math.isfinite(overlap_radius) or overlap_radius <= 0.0:
+        raise ValueError("overlap_radius must be positive and finite")
+    if np.any(~np.isfinite(positions)) or np.any(~np.isfinite(box_lengths)) or np.any(box_lengths <= 0.0):
+        raise ValueError("positions and positive box lengths must be finite")
+
+    origins = np.arange(0, positions.shape[0] - lag, origin_stride, dtype=int)
+    if len(origins) < 2:
+        raise ValueError("at least two time origins are required")
+    overlap = np.empty((len(origins), positions.shape[1]), dtype=float)
+    for index, origin in enumerate(origins):
+        displacement = positions[origin + lag] - positions[origin]
+        overlap[index] = np.sum(displacement**2, axis=1) < overlap_radius**2
+    overlap_mean = float(np.mean(overlap))
+    fluctuation = overlap - overlap_mean
+    overlap_fraction = np.mean(overlap, axis=1)
+    particle_count = positions.shape[1]
+    chi4 = particle_count * float(np.var(overlap_fraction))
+    rows: list[dict[str, float]] = [
+        {
+            "integer_squared": 0.0,
+            "wave_number": 0.0,
+            "wavevector_count": 1.0,
+            "s4": chi4,
+            "overlap_mean": overlap_mean,
+            "origin_count": float(len(origins)),
+            "particle_count": float(particle_count),
+        }
+    ]
+
+    maximum_component = int(math.ceil(math.sqrt(maximum_integer_squared)))
+    integer_vectors = np.array(
+        [
+            vector
+            for vector in np.ndindex(*([2 * maximum_component + 1] * positions.shape[2]))
+            if 0
+            < sum((component - maximum_component) ** 2 for component in vector)
+            <= maximum_integer_squared
+        ],
+        dtype=int,
+    ) - maximum_component
+    integer_squared = np.sum(integer_vectors**2, axis=1)
+    for shell in sorted(set(int(value) for value in integer_squared)):
+        vectors = integer_vectors[integer_squared == shell]
+        wavevectors = 2.0 * math.pi * vectors / box_lengths
+        accumulated = 0.0
+        for origin_index, origin in enumerate(origins):
+            phase = positions[origin] @ wavevectors.T
+            amplitude = fluctuation[origin_index] @ np.exp(1j * phase)
+            accumulated += float(np.sum(np.abs(amplitude) ** 2))
+        rows.append(
+            {
+                "integer_squared": float(shell),
+                "wave_number": float(np.mean(np.linalg.norm(wavevectors, axis=1))),
+                "wavevector_count": float(len(vectors)),
+                "s4": accumulated / (particle_count * len(origins) * len(vectors)),
+                "overlap_mean": overlap_mean,
+                "origin_count": float(len(origins)),
+                "particle_count": float(particle_count),
+            }
+        )
+    return rows
+
+
 def fit_spatial_covariance_length(
     rows: Sequence[dict[str, object]],
     *,
