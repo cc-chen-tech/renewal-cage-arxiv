@@ -15,6 +15,25 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_spatial_covariance_sota_ledger_blocks_xi4_overclaim(self):
+        path = ROOT / "data" / "renewal_cage_ka_spatial_covariance_sota_alignment.csv"
+        with path.open() as handle:
+            rows = {row["source_id"]: row for row in csv.DictReader(handle)}
+        self.assertEqual(
+            set(rows),
+            {
+                "lang_scaliet_royall_2024",
+                "martinelli_et_al_2024",
+                "tah_karmakar_2020",
+                "leocmach_tanaka_2012",
+            },
+        )
+        self.assertTrue(all(float(row["numerical_comparison_allowed"]) == 0.0 for row in rows.values()))
+        self.assertEqual(rows["leocmach_tanaka_2012"]["alignment"], "definition_mismatch")
+        self.assertIn("S4(q,t)", rows["leocmach_tanaka_2012"]["next_required_test"])
+        self.assertIn("g_uu", rows["tah_karmakar_2020"]["next_required_test"])
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows.values()))
+
     def test_t045_spatial_covariance_pilot_is_localized_and_claim_limited(self):
         summary_path = (
             ROOT / "data" / "renewal_cage_ka_replicates_T045_spatial_covariance_pilot_summary.csv"
