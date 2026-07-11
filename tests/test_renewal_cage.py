@@ -208,6 +208,8 @@ from renewal_cage import (  # noqa: E402
     sota_glassbench_observable_coverage_audit_gate,
     sota_glassbench_trajectory_first_npz_observable_curve_gate,
     sota_glassbench_trajectory_first_npz_inversion_readiness_gate,
+    StationaryRenewalParams,
+    stationary_gamma_count_moments,
     sota_glassbench_trajectory_member_ensemble_observable_gate,
     sota_glassbench_trajectory_npz_member_index_gate,
     sota_glassbench_short_window_trend_canary_gate,
@@ -262,6 +264,27 @@ from renewal_cage import (  # noqa: E402
 
 
 class DelayedRenewalCageTests(unittest.TestCase):
+    def test_stationary_renewal_residual_life(self):
+        params = StationaryRenewalParams(exchange_mean=44.0, exchange_cv2=1.31)
+
+        self.assertAlmostEqual(params.persistence_mean, 50.82)
+        self.assertAlmostEqual(params.persistence_exchange_ratio, 1.155)
+
+    def test_stationary_renewal_mean_count_is_linear(self):
+        params = StationaryRenewalParams(exchange_mean=4.0, exchange_cv2=2.0)
+        times = np.array([0.0, 0.5, 4.0, 12.0])
+
+        moments = stationary_gamma_count_moments(times, params)
+
+        np.testing.assert_allclose(moments["mean"], times / 4.0, atol=1e-12)
+        self.assertTrue(np.all(moments["variance"] >= 0.0))
+
+    def test_stationary_renewal_rejects_invalid_exchange_law(self):
+        with self.assertRaisesRegex(ValueError, "exchange_mean"):
+            StationaryRenewalParams(exchange_mean=0.0, exchange_cv2=1.0)
+        with self.assertRaisesRegex(ValueError, "exchange_cv2"):
+            StationaryRenewalParams(exchange_mean=1.0, exchange_cv2=-0.1)
+
     def test_delayed_poisson_mean_has_cubic_short_time_onset(self):
         params = DelayedRenewalCageParams(
             cage_variance=1.0,

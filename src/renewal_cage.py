@@ -138,11 +138,13 @@ class FacilitatedExchangeLawParams:
 
 @dataclass(frozen=True)
 class PersistenceExchangeParams:
-    """Persistence/exchange renewal cage parameters.
+    """Nonstationary delayed-first persistence/exchange cage parameters.
 
     The first cage escape has mean ``persistence_mean``. After the first escape,
     subsequent cage exchanges have mean ``exchange_mean``. This makes the
     structural relaxation clock separable from the long-time diffusion clock.
+    The independently assigned first wait is a diagnostic null, not the
+    equilibrium residual-life distribution of the exchange process.
     """
 
     cage_variance: float
@@ -150,6 +152,30 @@ class PersistenceExchangeParams:
     jump_variance: float
     persistence_mean: float
     exchange_mean: float
+
+
+@dataclass(frozen=True)
+class StationaryRenewalParams:
+    """Equilibrium renewal clock specified by exchange waiting-time moments."""
+
+    exchange_mean: float
+    exchange_cv2: float
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.exchange_mean) or self.exchange_mean <= 0.0:
+            raise ValueError("exchange_mean must be positive and finite")
+        if not math.isfinite(self.exchange_cv2) or self.exchange_cv2 < 0.0:
+            raise ValueError("exchange_cv2 must be nonnegative and finite")
+
+    @property
+    def persistence_mean(self) -> float:
+        """Mean forward-recurrence time from an equilibrium time origin."""
+
+        return 0.5 * self.exchange_mean * (1.0 + self.exchange_cv2)
+
+    @property
+    def persistence_exchange_ratio(self) -> float:
+        return 0.5 * (1.0 + self.exchange_cv2)
 
 
 @dataclass(frozen=True)
@@ -17346,6 +17372,58 @@ def persistence_exchange_count_moments_from_distribution(
     mean = probability @ counts
     second = probability @ (counts**2)
     return {"mean": mean, "variance": second - mean**2}
+
+
+def stationary_gamma_count_moments(
+    t: np.ndarray,
+    params: StationaryRenewalParams,
+    *,
+    quadrature_points: int = 4096,
+) -> dict[str, np.ndarray]:
+    """Mean and variance of an equilibrium gamma-renewal event count.
+
+    The mean is the exact stationary identity. The variance follows the
+    stationary renewal-density formula, with the gamma convolution series
+    evaluated by deterministic midpoint quadrature.
+    """
+
+    t = np.asarray(t, dtype=float)
+    if np.any(~np.isfinite(t)) or np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative and finite")
+    if quadrature_points < 128:
+        raise ValueError("quadrature_points must be at least 128")
+
+    mean = t / params.exchange_mean
+    if params.exchange_cv2 == 0.0:
+        phase = mean - np.floor(mean)
+        return {"mean": mean, "variance": phase * (1.0 - phase)}
+
+    shape = 1.0 / params.exchange_cv2
+    scale = params.exchange_mean / shape
+    event_rate = 1.0 / params.exchange_mean
+    variance = np.zeros_like(t)
+    for index, time in np.ndenumerate(t):
+        if time == 0.0:
+            continue
+        point_count = max(128, min(quadrature_points, int(64.0 * time / params.exchange_mean) + 256))
+        width = time / point_count
+        u = (np.arange(point_count, dtype=float) + 0.5) * width
+        expected = time / params.exchange_mean
+        count_limit = max(32, int(math.ceil(expected + 12.0 * math.sqrt(expected * params.exchange_cv2 + 1.0))))
+        renewal_density = np.zeros_like(u)
+        log_u = np.log(u)
+        for count in range(1, count_limit + 1):
+            convolution_shape = count * shape
+            log_density = (
+                (convolution_shape - 1.0) * log_u
+                - u / scale
+                - math.lgamma(convolution_shape)
+                - convolution_shape * math.log(scale)
+            )
+            renewal_density += np.exp(np.clip(log_density, -745.0, 700.0))
+        correction = np.sum((time - u) * (renewal_density - event_rate)) * width
+        variance[index] = max(event_rate * time + 2.0 * event_rate * correction, 0.0)
+    return {"mean": mean, "variance": variance}
 
 
 
