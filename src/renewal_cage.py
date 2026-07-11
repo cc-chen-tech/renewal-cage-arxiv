@@ -17553,6 +17553,29 @@ def finite_flight_self_intermediate_scattering(
     return np.exp(log_scattering)
 
 
+def event_space_correlated_diffusion(
+    event_rate: float,
+    jump_squared_mean: float,
+    jump_dot_correlations: Sequence[float],
+    dimension: int = 3,
+) -> float:
+    """Long-time diffusion including event-indexed jump-vector correlations."""
+
+    if not math.isfinite(event_rate) or event_rate <= 0.0:
+        raise ValueError("event_rate must be positive and finite")
+    if not math.isfinite(jump_squared_mean) or jump_squared_mean <= 0.0:
+        raise ValueError("jump_squared_mean must be positive and finite")
+    if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 1:
+        raise ValueError("dimension must be a positive integer")
+    correlations = np.asarray(tuple(jump_dot_correlations), dtype=float)
+    if correlations.ndim != 1 or np.any(~np.isfinite(correlations)):
+        raise ValueError("jump_dot_correlations must be a finite sequence")
+    green_kubo_bracket = jump_squared_mean + 2.0 * float(np.sum(correlations))
+    if green_kubo_bracket <= 0.0:
+        raise ValueError("event-space Green-Kubo bracket must be positive")
+    return event_rate * green_kubo_bracket / (2.0 * dimension)
+
+
 def persistence_exchange_diffusion_coefficient(params: PersistenceExchangeParams) -> float:
     """Long-time one-dimensional diffusion coefficient set by exchange events."""
 

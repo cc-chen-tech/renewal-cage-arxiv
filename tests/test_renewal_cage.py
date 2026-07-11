@@ -47,6 +47,7 @@ from renewal_cage import (  # noqa: E402
     glass_signature_phase_diagram,
     dynamic_heterogeneity_benchmark_consistency,
     dynamic_signature_alignment_ledger,
+    event_space_correlated_diffusion,
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
@@ -268,6 +269,38 @@ from renewal_cage import (  # noqa: E402
 
 
 class DelayedRenewalCageTests(unittest.TestCase):
+    def test_event_space_correlated_diffusion_recovers_independent_limit(self):
+        observed = event_space_correlated_diffusion(
+            event_rate=0.2,
+            jump_squared_mean=0.9,
+            jump_dot_correlations=[],
+            dimension=3,
+        )
+
+        self.assertAlmostEqual(observed, 0.2 * 0.9 / 6.0)
+
+    def test_event_space_correlations_close_cold_ka_diffusion(self):
+        uncorrelated_diffusion = 3.579e-5
+        jump_squared_mean = 6.0 * uncorrelated_diffusion
+        observed = event_space_correlated_diffusion(
+            event_rate=1.0,
+            jump_squared_mean=jump_squared_mean,
+            jump_dot_correlations=jump_squared_mean * np.array([-0.05485, -0.05191]),
+            dimension=3,
+        )
+        heldout = 2.785581176e-5
+
+        self.assertAlmostEqual(observed, 2.81491e-5, delta=2.0e-9)
+        self.assertLess(abs(observed / heldout - 1.0), 0.02)
+
+    def test_event_space_correlated_diffusion_rejects_nonpositive_bracket(self):
+        with self.assertRaisesRegex(ValueError, "Green-Kubo"):
+            event_space_correlated_diffusion(
+                event_rate=1.0,
+                jump_squared_mean=1.0,
+                jump_dot_correlations=[-0.6],
+            )
+
     def test_finite_flight_weight_integral_has_correct_piecewise_limits(self):
         self.assertAlmostEqual(finite_flight_weight_integral(0.5, 1.0, 2), 5.0 / 24.0)
         self.assertAlmostEqual(finite_flight_weight_integral(2.0, 1.0, 2), 5.0 / 3.0)
