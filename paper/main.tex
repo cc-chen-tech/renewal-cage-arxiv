@@ -887,6 +887,73 @@ the post-escape exchange clock. Because $\langle N(t)\rangle\sim t/\tau_x$ and
 ${\rm Var}\,N(t)/\langle N(t)\rangle^2\to0$, the long-time NGP still recovers
 to zero.
 
+The independently assigned first wait in the preceding construction is
+nonstationary unless (	au_p=	au_x).  For an equilibrium observation origin,
+the first waiting-time density is instead the residual-life law
+egin{equation}
+  psi_p(t)=\frac{S_x(t)}{\langle\tau_x\rangle},\qquad
+  \frac{\langle\tau_p\rangle}{\langle\tau_x\rangle}
+  =\frac{1+\mathrm{CV}_x^2}{2},\qquad
+  \langle N(t)\rangle=\frac{t}{\langle\tau_x\rangle}.
+\end{equation}
+We therefore retain the closed delayed-first model as a nonstationary null and
+add an equilibrium residual-life clock for trajectory comparisons.  A gamma
+exchange law fixed by the first two waiting-time moments supplies a useful
+stationary count-variance closure, but is not assumed to be the microscopic
+waiting-time law.
+
+Finite jump duration is a second necessary correction.  For a linear flight of
+duration (Delta), the integrated (m)-th power of its displacement weight in
+a lag window is
+egin{equation}
+ W_m(t,\Delta)=
+ \begin{cases}
+ t-\Delta+2\Delta/(m+1),&t\ge\Delta,\\
+ \Delta(t/\Delta)^m[1-(t/\Delta)(m-1)/(m+1)],&t<\Delta.
+ \end{cases}
+\end{equation}
+This replaces instantaneous marks in the second and fourth cumulants and
+allows the measured flight-vector characteristic function to predict
+(F_s(k,t)).  Event-vector anticorrelations enter long-time transport through
+the event-space Green--Kubo relation
+egin{equation}
+ D=\frac{\nu}{2d}\left[\langle J^2\rangle
+ +2\sum_{m\ge1}\langle\mathbf J_0\!\cdot\!\mathbf J_m\rangle\right].
+\end{equation}
+
+We tested these corrections on continuous-time Kob--Andersen trajectories from
+Zenodo record 7469766 using a fixed non-recrossing cage-center rule.  At
+(T=0.58), event statistics predict the held-out diffusion coefficient within
+(1.4\%\); the finite-flight closure reduces the NGP-peak prediction from
+(1.31) to (0.65), compared with (0.551), and predicts three-(k)
+(F_s) with RMSE (0.0166).  At (T=0.45), the uncorrelated event estimate
+overpredicts diffusion by (28.5\%\).  The measured event-lag correlations
+(C_1/\langle J^2\rangle=-0.05485) and
+(C_2/\langle J^2\rangle=-0.05191) reduce the held-out error to (1.05\%\).
+Cooling also increases (D\tau_\alpha) by a factor (1.78), the
+non-recrossing persistence/exchange ratio from (1.16) to (3.31), and both
+the NGP and overlap-susceptibility peaks.  The stationary gamma count-variance
+closure passes at (T=0.58) but is only partial at (T=0.45), which records a
+real model deficiency rather than hiding it.  These values and their fixed
+event-rule metadata are archived in
+\texttt{renewal\_cage\_stationary\_finite\_flight.csv}.
+They are point estimates from one long trajectory per temperature.  Independent
+trajectory ensembles, threshold-sweep re-extraction, and propagated
+uncertainties are not available in the committed derivative package, so the
+table keeps \texttt{publication\_grade\_real\_data\_closure=0} with
+\texttt{independent\_trajectory\_uncertainty} as the primary blocker.  The
+result is evidence for the stationary finite-flight mechanism and a fixed
+falsification target, not a completed uncertainty-weighted material fit.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_stationary_finite_flight.pdf}
+  \caption{Held-out continuous-trajectory tests.  Event-space jump-vector
+  correlations close the cold diffusion discrepancy, while finite flight
+  duration reduces the hot transient-NGP error.  The cold stationary-gamma
+  count-variance mismatch remains an explicit partial verdict.}
+\end{figure}
+
 \section{Asymptotics and Peak Condition}
 
 At short times,

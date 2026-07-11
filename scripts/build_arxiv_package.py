@@ -9358,6 +9358,62 @@ def write_benchmark_publication_ladder_pdf(path: Path) -> None:
     c.save()
 
 
+def write_stationary_finite_flight_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_stationary_finite_flight.csv").open() as handle:
+        rows = {float(row["temperature"]): row for row in csv.DictReader(handle)}
+    hot = rows[0.58]
+    cold = rows[0.45]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Stationary finite-flight closure on continuous KA trajectories")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 49, "Event statistics are calibration inputs; diffusion, transient NGP, multi-k Fs, and cooling trends are held out.")
+
+    def bar_panel(left: float, title: str, labels: list[str], values: list[float], ceiling: float) -> None:
+        bottom, width, height = 105.0, 300.0, 300.0
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(left, bottom + height + 24, title)
+        c.line(left, bottom, left + width, bottom)
+        c.line(left, bottom, left, bottom + height)
+        palette = [colors.HexColor("#b45309"), colors.HexColor("#047857")]
+        for index, (label, value) in enumerate(zip(labels, values)):
+            x = left + 55 + index * 135
+            bar_height = min(value / ceiling, 1.0) * height
+            c.setFillColor(palette[index])
+            c.rect(x, bottom, 65, bar_height, stroke=0, fill=1)
+            c.setFillColor(colors.black)
+            c.setFont("Helvetica", 8)
+            c.drawCentredString(x + 32.5, bottom - 15, label)
+            c.drawCentredString(x + 32.5, bottom + bar_height + 7, f"{value:.3g}")
+
+    bar_panel(
+        70,
+        "A. T=0.45 diffusion relative error",
+        ["uncorrelated", "Green-Kubo"],
+        [float(cold["uncorrelated_diffusion_relative_error"]), float(cold["correlated_diffusion_relative_error"])],
+        0.35,
+    )
+    observed_ngp = float(hot["observed_ngp_peak"])
+    bar_panel(
+        430,
+        "B. T=0.58 transient NGP absolute error",
+        ["instantaneous", "finite flight"],
+        [
+            abs(float(hot["instantaneous_ngp_prediction"]) - observed_ngp),
+            abs(float(hot["finite_flight_ngp_prediction"]) - observed_ngp),
+        ],
+        0.9,
+    )
+    c.setFont("Helvetica", 8)
+    c.drawString(42, 63, "Cold correction uses measured event-lag correlations C1/q=-0.05485 and C2/q=-0.05191; relative diffusion error is 1.05%.")
+    c.drawString(42, 49, "Cooling increases tau_p/tau_x, D tau_alpha, NGP, and overlap susceptibility; the gamma count-variance closure remains partial at T=0.45.")
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -9365,6 +9421,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     PAPER_FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 
     results_pdf = PAPER_FIGURE_DIR / "renewal_cage_results.pdf"
+    stationary_finite_flight_pdf = PAPER_FIGURE_DIR / "renewal_cage_stationary_finite_flight.pdf"
     dimensionless_pdf = PAPER_FIGURE_DIR / "renewal_cage_dimensionless.pdf"
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
@@ -9703,6 +9760,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     static_null_pdf = PAPER_FIGURE_DIR / "renewal_cage_static_null.pdf"
     inversion_pdf = PAPER_FIGURE_DIR / "renewal_cage_inversion.pdf"
     write_results_pdf(results_pdf)
+    write_stationary_finite_flight_pdf(stationary_finite_flight_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
@@ -9992,6 +10050,14 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(PAPER_DIR / "main.tex", "main.tex")
         archive.write(PAPER_DIR / "references.bib", "references.bib")
         archive.write(results_pdf, "figures/renewal_cage_results.pdf")
+        archive.write(
+            stationary_finite_flight_pdf,
+            "figures/renewal_cage_stationary_finite_flight.pdf",
+        )
+        archive.write(
+            DATA_DIR / "renewal_cage_stationary_finite_flight.csv",
+            "data/renewal_cage_stationary_finite_flight.csv",
+        )
         archive.write(dimensionless_pdf, "figures/renewal_cage_dimensionless.pdf")
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")

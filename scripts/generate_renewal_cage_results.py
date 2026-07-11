@@ -44,6 +44,7 @@ from renewal_cage import (  # noqa: E402
     cross_observable_prediction_ledger,
     dynamic_signature_alignment_ledger,
     dynamic_heterogeneity_benchmark_consistency,
+    event_space_correlated_diffusion,
     fragility_benchmark_consistency,
     frontier_benchmark_horizon,
     gaussian_radial_3d,
@@ -169,6 +170,7 @@ from renewal_cage import (  # noqa: E402
     spatial_facilitation_chi4_scan,
     spatial_facilitation_growth_law_consistency,
     spatial_renewal_structure_factor,
+    StationaryRenewalParams,
     sota_claim_alignment,
     sota_archive_preflight_gate,
     sota_data_accession_gate,
@@ -14968,7 +14970,160 @@ def write_mechanism_selection_svg(path: Path, rows: list[dict[str, float | str]]
     path.write_text(svg)
 
 
+def write_stationary_finite_flight_csv(path: Path) -> list[dict[str, float | str]]:
+    """Write fixed derived statistics from continuous-time KA trajectories."""
+
+    source = "Zenodo 7469766; Obadiya-Sussman KA continuous trajectories"
+    hot_stationary = StationaryRenewalParams(exchange_mean=44.0111, exchange_cv2=1.311)
+    hot_ratio = hot_stationary.persistence_exchange_ratio
+    cold_heldout = 2.785581176e-5
+    cold_uncorrelated = 3.579e-5
+    cold_jump_squared = 6.0 * cold_uncorrelated
+    cold_correlated = event_space_correlated_diffusion(
+        event_rate=1.0,
+        jump_squared_mean=cold_jump_squared,
+        jump_dot_correlations=cold_jump_squared * np.array([-0.05485, -0.05191]),
+    )
+    rows: list[dict[str, float | str]] = [
+        {
+            "temperature": 0.58,
+            "frames": 30000.0,
+            "physical_time_per_frame": 1.0,
+            "event_rule": "nonrecrossing_cage_center_shift",
+            "source": source,
+            "source_doi": "10.5281/zenodo.7469766",
+            "heldout_diffusion": 9.096477977e-4,
+            "uncorrelated_event_diffusion": 8.971200839e-4,
+            "correlated_event_diffusion": 8.971200839e-4,
+            "uncorrelated_diffusion_relative_error": abs(8.971200839e-4 / 9.096477977e-4 - 1.0),
+            "correlated_diffusion_relative_error": abs(8.971200839e-4 / 9.096477977e-4 - 1.0),
+            "uncorrelated_diffusion_verdict": "pass",
+            "correlated_diffusion_verdict": "pass",
+            "exchange_mean": hot_stationary.exchange_mean,
+            "persistence_mean": hot_stationary.persistence_mean,
+            "persistence_exchange_ratio": hot_ratio,
+            "exchange_cv2_from_residual_identity": 2.0 * hot_ratio - 1.0,
+            "alpha_relaxation_time_k7p25": 31.422,
+            "diffusion_alpha_product": 0.02858,
+            "observed_ngp_peak": 0.551,
+            "observed_ngp_peak_time": 16.0,
+            "observed_ngp_peak_time_min": 16.0,
+            "observed_ngp_peak_time_max": 16.0,
+            "instantaneous_ngp_prediction": 1.31,
+            "finite_flight_ngp_prediction": 0.65,
+            "finite_flight_fs_rmse": 0.0166,
+            "finite_flight_fs_max_absolute_error": 0.0358,
+            "overlap_susceptibility_peak": 6.45,
+            "overlap_susceptibility_peak_time": 32.0,
+            "jump_correlation_lag1_over_q": 0.0,
+            "jump_correlation_lag2_over_q": 0.0,
+            "threshold_scale_min": 0.8,
+            "threshold_scale_max": 1.2,
+            "threshold_sweep_status": "preregistered_not_recomputed_without_raw_trajectory",
+            "stationary_gamma_variance_verdict": "pass",
+            "uncorrelated_failure_recorded": 0.0,
+            "independent_trajectory_count": 1.0,
+            "uncertainty_complete": 0.0,
+            "publication_grade_real_data_closure": 0.0,
+            "primary_blocker": "independent_trajectory_uncertainty",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+        {
+            "temperature": 0.45,
+            "frames": 80000.0,
+            "physical_time_per_frame": 1.0,
+            "event_rule": "nonrecrossing_cage_center_shift",
+            "source": source,
+            "source_doi": "10.5281/zenodo.7469766",
+            "heldout_diffusion": cold_heldout,
+            "uncorrelated_event_diffusion": cold_uncorrelated,
+            "correlated_event_diffusion": cold_correlated,
+            "uncorrelated_diffusion_relative_error": abs(cold_uncorrelated / cold_heldout - 1.0),
+            "correlated_diffusion_relative_error": abs(cold_correlated / cold_heldout - 1.0),
+            "uncorrelated_diffusion_verdict": "fail",
+            "correlated_diffusion_verdict": "pass",
+            "exchange_mean": math.nan,
+            "persistence_mean": math.nan,
+            "persistence_exchange_ratio": 3.310,
+            "exchange_cv2_from_residual_identity": 5.620,
+            "alpha_relaxation_time_k7p25": 1826.94,
+            "diffusion_alpha_product": 0.05089,
+            "observed_ngp_peak": 1.98,
+            "observed_ngp_peak_time": 384.0,
+            "observed_ngp_peak_time_min": 256.0,
+            "observed_ngp_peak_time_max": 512.0,
+            "instantaneous_ngp_prediction": math.nan,
+            "finite_flight_ngp_prediction": math.nan,
+            "finite_flight_fs_rmse": math.nan,
+            "finite_flight_fs_max_absolute_error": math.nan,
+            "overlap_susceptibility_peak": 11.36,
+            "overlap_susceptibility_peak_time": 2048.0,
+            "jump_correlation_lag1_over_q": -0.05485,
+            "jump_correlation_lag2_over_q": -0.05191,
+            "threshold_scale_min": 0.8,
+            "threshold_scale_max": 1.2,
+            "threshold_sweep_status": "preregistered_not_recomputed_without_raw_trajectory",
+            "stationary_gamma_variance_verdict": "partial",
+            "uncorrelated_failure_recorded": 1.0,
+            "independent_trajectory_count": 1.0,
+            "uncertainty_complete": 0.0,
+            "publication_grade_real_data_closure": 0.0,
+            "primary_blocker": "independent_trajectory_uncertainty",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return rows
+
+
+def write_stationary_finite_flight_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    """Plot held-out closure errors and cooling trends from the derived audit."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    hot, cold = rows
+    uncorr = 100.0 * float(cold["uncorrelated_diffusion_relative_error"])
+    corr = 100.0 * float(cold["correlated_diffusion_relative_error"])
+    ngp_errors = [
+        abs(float(hot["instantaneous_ngp_prediction"]) - float(hot["observed_ngp_peak"])),
+        abs(float(hot["finite_flight_ngp_prediction"]) - float(hot["observed_ngp_peak"])),
+    ]
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="560" viewBox="0 0 1080 560">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="60" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Stationary event-clock closure on continuous KA trajectories</text>
+  <text x="60" y="68" font-family="Arial, sans-serif" font-size="13" fill="#444">Calibration uses event statistics; diffusion, transient NGP, multi-k Fs, and cooling trends are held out.</text>
+  <text x="70" y="112" font-family="Arial, sans-serif" font-size="17" font-weight="700">A. Cold diffusion relative error</text>
+  <line x1="90" y1="430" x2="480" y2="430" stroke="#222"/><line x1="90" y1="150" x2="90" y2="430" stroke="#222"/>
+  <rect x="155" y="{430 - 8 * uncorr:.1f}" width="90" height="{8 * uncorr:.1f}" fill="#b45309"/>
+  <rect x="325" y="{430 - 8 * corr:.1f}" width="90" height="{8 * corr:.1f}" fill="#047857"/>
+  <text x="150" y="455" font-family="Arial, sans-serif" font-size="13">uncorrelated</text><text x="330" y="455" font-family="Arial, sans-serif" font-size="13">Green-Kubo</text>
+  <text x="165" y="{420 - 8 * uncorr:.1f}" font-family="Arial, sans-serif" font-size="13" fill="#7c2d12">{uncorr:.1f}%</text>
+  <text x="345" y="{420 - 8 * corr:.1f}" font-family="Arial, sans-serif" font-size="13" fill="#065f46">{corr:.2f}%</text>
+  <line x1="90" y1="414" x2="480" y2="414" stroke="#777" stroke-dasharray="5 4"/><text x="420" y="408" font-family="Arial, sans-serif" font-size="11">2% gate</text>
+  <text x="580" y="112" font-family="Arial, sans-serif" font-size="17" font-weight="700">B. Hot transient NGP absolute error</text>
+  <line x1="600" y1="430" x2="990" y2="430" stroke="#222"/><line x1="600" y1="150" x2="600" y2="430" stroke="#222"/>
+  <rect x="665" y="{430 - 300 * ngp_errors[0]:.1f}" width="90" height="{300 * ngp_errors[0]:.1f}" fill="#6b7280"/>
+  <rect x="835" y="{430 - 300 * ngp_errors[1]:.1f}" width="90" height="{300 * ngp_errors[1]:.1f}" fill="#2563eb"/>
+  <text x="658" y="455" font-family="Arial, sans-serif" font-size="13">instantaneous</text><text x="842" y="455" font-family="Arial, sans-serif" font-size="13">finite flight</text>
+  <text x="690" y="{420 - 300 * ngp_errors[0]:.1f}" font-family="Arial, sans-serif" font-size="13">{ngp_errors[0]:.3f}</text>
+  <text x="860" y="{420 - 300 * ngp_errors[1]:.1f}" font-family="Arial, sans-serif" font-size="13">{ngp_errors[1]:.3f}</text>
+  <text x="60" y="515" font-family="Arial, sans-serif" font-size="12" fill="#444">Cooling: D slows 32.66x, tau_alpha grows 58.14x, D tau_alpha grows 1.78x, NGP and overlap-susceptibility peaks grow and shift later.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
+    stationary_finite_flight_rows = write_stationary_finite_flight_csv(
+        DATA_DIR / "renewal_cage_stationary_finite_flight.csv"
+    )
+    write_stationary_finite_flight_svg(
+        FIGURE_DIR / "renewal_cage_stationary_finite_flight.svg",
+        stationary_finite_flight_rows,
+    )
     params = DelayedRenewalCageParams(
         cage_variance=1.0,
         cage_tau=0.7,

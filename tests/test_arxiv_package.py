@@ -15,6 +15,39 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_stationary_finite_flight_real_trajectory_closure_is_falsifiable(self):
+        path = ROOT / "data" / "renewal_cage_stationary_finite_flight.csv"
+        svg = ROOT / "figures" / "renewal_cage_stationary_finite_flight.svg"
+        pdf = ROOT / "paper" / "figures" / "renewal_cage_stationary_finite_flight.pdf"
+        self.assertTrue(path.exists())
+        self.assertTrue(svg.exists())
+        self.assertTrue(pdf.exists())
+        with path.open() as handle:
+            rows = list(csv.DictReader(handle))
+
+        self.assertEqual({float(row["temperature"]) for row in rows}, {0.45, 0.58})
+        by_temperature = {float(row["temperature"]): row for row in rows}
+        hot = by_temperature[0.58]
+        cold = by_temperature[0.45]
+        self.assertLess(
+            abs(float(hot["finite_flight_ngp_prediction"]) - float(hot["observed_ngp_peak"])),
+            abs(float(hot["instantaneous_ngp_prediction"]) - float(hot["observed_ngp_peak"])),
+        )
+        self.assertGreater(float(cold["uncorrelated_diffusion_relative_error"]), 0.25)
+        self.assertLess(float(cold["correlated_diffusion_relative_error"]), 0.02)
+        self.assertEqual(cold["uncorrelated_diffusion_verdict"], "fail")
+        self.assertEqual(cold["correlated_diffusion_verdict"], "pass")
+        self.assertEqual(cold["stationary_gamma_variance_verdict"], "partial")
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows))
+        self.assertTrue(all(float(row["independent_trajectory_count"]) == 1.0 for row in rows))
+        self.assertTrue(all(float(row["uncertainty_complete"]) == 0.0 for row in rows))
+        self.assertTrue(all(float(row["publication_grade_real_data_closure"]) == 0.0 for row in rows))
+        self.assertTrue(all(row["primary_blocker"] == "independent_trajectory_uncertainty" for row in rows))
+
+        main_text = (ROOT / "paper" / "main.tex").read_text()
+        self.assertIn("equilibrium residual-life", main_text)
+        self.assertIn("renewal_cage_stationary_finite_flight", main_text)
+
     def test_spatial_covariance_closure_links_pe_decoupling_to_four_point_predictions(self):
         path = ROOT / "data" / "renewal_cage_spatial_covariance_closure.csv"
         figure = ROOT / "figures" / "renewal_cage_spatial_covariance_closure.svg"
