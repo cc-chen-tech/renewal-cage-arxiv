@@ -28,6 +28,26 @@ PAPER_FIGURE_DIR = PAPER_DIR / "figures"
 DIST_DIR = ROOT / "dist"
 
 
+class DeterministicZipFile(zipfile.ZipFile):
+    """Zip writer with fixed metadata so source packages are reproducible."""
+
+    def write(
+        self,
+        filename: str | Path,
+        arcname: str | None = None,
+        compress_type: int | None = None,
+        compresslevel: int | None = None,
+    ) -> None:
+        source = Path(filename)
+        archive_name = arcname or source.name
+        info = zipfile.ZipInfo(str(archive_name), date_time=(2000, 1, 1, 0, 0, 0))
+        info.compress_type = self.compression if compress_type is None else compress_type
+        info._compresslevel = compresslevel
+        info.create_system = 3
+        info.external_attr = 0o100644 << 16
+        self.writestr(info, source.read_bytes())
+
+
 def read_csv_columns(path: Path) -> dict[str, np.ndarray]:
     with path.open() as f:
         rows = list(csv.DictReader(f))
@@ -10046,7 +10066,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_inversion_pdf(inversion_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with DeterministicZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.write(PAPER_DIR / "main.tex", "main.tex")
         archive.write(PAPER_DIR / "references.bib", "references.bib")
         archive.write(results_pdf, "figures/renewal_cage_results.pdf")

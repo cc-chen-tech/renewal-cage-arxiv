@@ -15,6 +15,14 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_arxiv_source_zip_is_deterministic_across_file_mtimes(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            first_zip = build_arxiv_package(output_dir=Path(first)).read_bytes()
+            time.sleep(1.1)
+            second_zip = build_arxiv_package(output_dir=Path(second)).read_bytes()
+
+        self.assertEqual(first_zip, second_zip)
+
     def test_stationary_finite_flight_real_trajectory_closure_is_falsifiable(self):
         path = ROOT / "data" / "renewal_cage_stationary_finite_flight.csv"
         svg = ROOT / "figures" / "renewal_cage_stationary_finite_flight.svg"
