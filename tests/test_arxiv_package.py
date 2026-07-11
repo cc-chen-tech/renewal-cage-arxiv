@@ -18,6 +18,9 @@ class ArxivPackageTests(unittest.TestCase):
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
+        block_verdict_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_block_verdict.csv"
+        )
         with curve_path.open() as handle:
             curve = list(csv.DictReader(handle))
         self.assertEqual(float(curve[0]["integer_squared"]), 0.0)
@@ -32,6 +35,14 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(fit["xi4_identifiable"]), 0.0)
         self.assertEqual(fit["verdict"], "xi4_not_identifiable_negative_OZ_intercept")
         self.assertEqual(float(fit["xi4_claim_allowed"]), 0.0)
+        with block_verdict_path.open() as handle:
+            block_verdict = next(csv.DictReader(handle))
+        self.assertEqual(float(block_verdict["block_count"]), 5.0)
+        self.assertEqual(float(block_verdict["invalid_OZ_fit_count"]), 5.0)
+        self.assertGreater(float(block_verdict["ci95_low_minimum_q_to_raw_q0_ratio"]), 1.0)
+        self.assertEqual(float(block_verdict["xi4_identifiable"]), 0.0)
+        self.assertEqual(block_verdict["verdict"], "xi4_not_identifiable_across_time_blocks")
+        self.assertEqual(float(block_verdict["independent_replicate_count"]), 1.0)
 
     def test_spatial_covariance_sota_ledger_blocks_xi4_overclaim(self):
         path = ROOT / "data" / "renewal_cage_ka_spatial_covariance_sota_alignment.csv"
