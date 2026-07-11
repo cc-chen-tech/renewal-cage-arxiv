@@ -15,6 +15,61 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_independent_ka_restarts_resolve_cooling_and_protocol_bias(self):
+        trend_path = ROOT / "data" / "renewal_cage_ka_replicate_temperature_trend.csv"
+        protocol_path = ROOT / "data" / "renewal_cage_ka_replicate_protocol_bias.csv"
+        provenance_path = ROOT / "data" / "renewal_cage_ka_replicate_provenance.csv"
+        for code in ("T070", "T058"):
+            for suffix in ("curves", "curve_summary", "replicates", "summary"):
+                self.assertTrue(
+                    (ROOT / "data" / f"renewal_cage_ka_replicates_{code}_{suffix}.csv").exists()
+                )
+        with trend_path.open() as handle:
+            trends = {row["metric"]: row for row in csv.DictReader(handle)}
+        self.assertEqual(
+            set(trends),
+            {
+                "diffusion",
+                "alpha_relaxation_time",
+                "diffusion_alpha_product",
+                "ngp_peak",
+                "overlap_chi4_peak",
+            },
+        )
+        self.assertTrue(all(row["trend_pass"] == "True" for row in trends.values()))
+        self.assertTrue(
+            all(int(row["independent_replicates_per_temperature"]) == 5 for row in trends.values())
+        )
+
+        with provenance_path.open() as handle:
+            provenance = list(csv.DictReader(handle))
+        self.assertEqual(len(provenance), 10)
+        self.assertEqual({float(row["temperature"]) for row in provenance}, {0.58, 0.70})
+        self.assertEqual(len({int(row["velocity_seed"]) for row in provenance}), 10)
+        self.assertTrue(all(len(row["source_sha256"]) == 64 for row in provenance))
+        self.assertTrue(
+            all(row["independently_prepared_parent_samples"] == "False" for row in provenance)
+        )
+        self.assertTrue(all(row["simulation_engine"] == "LAMMPS_22Jul2025_update4" for row in provenance))
+        self.assertGreater(float(trends["diffusion"]["effect_ratio"]), 3.0)
+        self.assertGreater(float(trends["diffusion_alpha_product"]["effect_ratio"]), 1.15)
+        self.assertGreater(float(trends["ngp_peak"]["effect_ratio"]), 1.7)
+        self.assertTrue(all(row["thermodynamic_claim_allowed"] == "False" for row in trends.values()))
+
+        with protocol_path.open() as handle:
+            protocol = list(csv.DictReader(handle))
+        self.assertEqual(len(protocol), 10)
+        diffusion = [row for row in protocol if row["metric"] == "diffusion"]
+        self.assertEqual(len(diffusion), 2)
+        self.assertTrue(all(row["ci95_overlap"] == "False" for row in diffusion))
+        self.assertTrue(
+            all(
+                row["interpretation"]
+                == "statistical_and_protocol_uncertainty_must_be_reported_separately"
+                for row in protocol
+            )
+        )
+
     def test_low_temperature_waiting_shuffle_selects_empirical_iid_not_memory(self):
         waiting_path = ROOT / "data" / "renewal_cage_obadiya_T045_waiting_shuffle.csv"
         threshold_path = ROOT / "data" / "renewal_cage_obadiya_T045_phop_threshold_summary.csv"
