@@ -15,6 +15,54 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_manuscript_contains_no_ascii_control_bytes(self):
+        payload = (ROOT / "paper" / "main.tex").read_bytes()
+        controls = {byte for byte in payload if byte < 32 and byte not in {9, 10, 13}}
+
+        self.assertEqual(controls, set())
+
+    def test_obadiya_block_uncertainty_resolves_cooling_trends_and_sota_boundaries(self):
+        summaries = {}
+        for code, temperature, expected_blocks in [("T070", 0.70, 10), ("T058", 0.58, 10), ("T045", 0.45, 8)]:
+            path = ROOT / "data" / f"renewal_cage_obadiya_{code}_block_summary.csv"
+            self.assertTrue(path.exists())
+            with path.open() as handle:
+                rows = {row["metric"]: row for row in csv.DictReader(handle)}
+            self.assertEqual({int(float(row["block_count"])) for row in rows.values()}, {expected_blocks})
+            self.assertTrue(all(float(row["temperature"]) == temperature for row in rows.values()))
+            self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows.values()))
+            summaries[temperature] = rows
+
+        for metric in ["diffusion_alpha_product", "ngp_peak", "overlap_chi4_peak"]:
+            hot, middle, cold = (summaries[t][metric] for t in [0.70, 0.58, 0.45])
+            self.assertLess(float(hot["ci95_high"]), float(middle["ci95_low"]))
+            self.assertLess(float(middle["ci95_high"]), float(cold["ci95_low"]))
+        self.assertGreater(
+            float(summaries[0.70]["diffusion"]["ci95_low"]),
+            float(summaries[0.45]["diffusion"]["ci95_high"]),
+        )
+        self.assertLess(
+            float(summaries[0.70]["alpha_relaxation_time"]["ci95_high"]),
+            float(summaries[0.45]["alpha_relaxation_time"]["ci95_low"]),
+        )
+
+        ledger_path = ROOT / "data" / "renewal_cage_obadiya_sota_alignment.csv"
+        svg_path = ROOT / "figures" / "renewal_cage_obadiya_sota_alignment.svg"
+        pdf_path = ROOT / "paper" / "figures" / "renewal_cage_obadiya_sota_alignment.pdf"
+        self.assertTrue(ledger_path.exists())
+        self.assertTrue(svg_path.exists())
+        self.assertTrue(pdf_path.exists())
+        with ledger_path.open() as handle:
+            ledger = {row["signature"]: row for row in csv.DictReader(handle)}
+        self.assertEqual(ledger["stokes_einstein_decoupling"]["verdict"], "aligned")
+        self.assertEqual(ledger["dynamic_heterogeneity_growth"]["verdict"], "aligned")
+        self.assertEqual(ledger["near_tg_heterogeneity_saturation"]["verdict"], "untested")
+        self.assertEqual(ledger["direct_facilitation_scaling"]["verdict"], "partial")
+        self.assertEqual(ledger["experimental_chi4_growth"]["verdict"], "qualitatively_aligned")
+        self.assertEqual(ledger["structure_dynamics_correlation"]["verdict"], "untested")
+        self.assertEqual(ledger["thermodynamic_transition"]["verdict"], "out_of_scope")
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in ledger.values()))
+
     def test_arxiv_source_zip_is_deterministic_across_file_mtimes(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             first_zip = build_arxiv_package(output_dir=Path(first)).read_bytes()

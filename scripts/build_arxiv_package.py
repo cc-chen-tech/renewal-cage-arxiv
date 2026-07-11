@@ -9434,6 +9434,48 @@ def write_stationary_finite_flight_pdf(path: Path) -> None:
     c.save()
 
 
+def write_obadiya_sota_alignment_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_obadiya_sota_alignment.csv").open() as handle:
+        rows = {row["signature"]: row for row in csv.DictReader(handle)}
+    signatures = [
+        "diffusion_slowdown",
+        "alpha_slowdown",
+        "stokes_einstein_decoupling",
+        "non_gaussian_peak_growth",
+        "dynamic_heterogeneity_growth",
+    ]
+    ratios = []
+    for signature in signatures:
+        ratio = float(rows[signature]["cooling_ratio_low_over_high"])
+        ratios.append(1.0 / ratio if signature == "diffusion_slowdown" else ratio)
+    max_log = max(math.log10(value) for value in ratios)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Block-resolved cooling trends and SOTA alignment")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 49, "T=0.70 to 0.45; bars show endpoint growth factors, using inverse diffusion for slowdown.")
+    bottom, top = 120.0, 430.0
+    c.line(55, bottom, page_w - 40, bottom)
+    palette = ["#374151", "#2563eb", "#047857", "#b45309", "#7c3aed"]
+    labels = ["1/D", "tau alpha", "D tau alpha", "NGP peak", "overlap chi4"]
+    for index, (ratio, label, color) in enumerate(zip(ratios, labels, palette)):
+        x = 85 + index * 140
+        height = (top - bottom) * math.log10(ratio) / max_log
+        c.setFillColor(colors.HexColor(color))
+        c.rect(x, bottom, 78, height, stroke=0, fill=1)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(x + 39, bottom - 16, label)
+        c.drawCentredString(x + 39, bottom + height + 8, f"{ratio:.2f}x")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, 78, "Aligned: slowdown, SE decoupling, NGP growth, and overlap-susceptibility growth with nonoverlapping block intervals.")
+    c.drawString(42, 64, "Untested: near-Tg saturation. Partial: direct facilitation scaling. Out of scope: thermodynamic transition.")
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -9442,6 +9484,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
 
     results_pdf = PAPER_FIGURE_DIR / "renewal_cage_results.pdf"
     stationary_finite_flight_pdf = PAPER_FIGURE_DIR / "renewal_cage_stationary_finite_flight.pdf"
+    obadiya_sota_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_obadiya_sota_alignment.pdf"
     dimensionless_pdf = PAPER_FIGURE_DIR / "renewal_cage_dimensionless.pdf"
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
@@ -9781,6 +9824,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     inversion_pdf = PAPER_FIGURE_DIR / "renewal_cage_inversion.pdf"
     write_results_pdf(results_pdf)
     write_stationary_finite_flight_pdf(stationary_finite_flight_pdf)
+    write_obadiya_sota_alignment_pdf(obadiya_sota_alignment_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
@@ -10075,9 +10119,22 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_stationary_finite_flight.pdf",
         )
         archive.write(
+            obadiya_sota_alignment_pdf,
+            "figures/renewal_cage_obadiya_sota_alignment.pdf",
+        )
+        archive.write(
             DATA_DIR / "renewal_cage_stationary_finite_flight.csv",
             "data/renewal_cage_stationary_finite_flight.csv",
         )
+        archive.write(
+            DATA_DIR / "renewal_cage_obadiya_sota_alignment.csv",
+            "data/renewal_cage_obadiya_sota_alignment.csv",
+        )
+        for temperature_code in ("T070", "T058", "T045"):
+            archive.write(
+                DATA_DIR / f"renewal_cage_obadiya_{temperature_code}_block_summary.csv",
+                f"data/renewal_cage_obadiya_{temperature_code}_block_summary.csv",
+            )
         archive.write(dimensionless_pdf, "figures/renewal_cage_dimensionless.pdf")
         archive.write(scattering_pdf, "figures/renewal_cage_scattering.pdf")
         archive.write(temperature_pdf, "figures/renewal_cage_temperature.pdf")

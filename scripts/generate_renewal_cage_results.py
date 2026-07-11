@@ -15116,6 +15116,188 @@ def write_stationary_finite_flight_svg(path: Path, rows: list[dict[str, float | 
     path.write_text(svg)
 
 
+def write_obadiya_sota_alignment_csv(path: Path) -> list[dict[str, float | str]]:
+    summaries: dict[float, dict[str, dict[str, str]]] = {}
+    for code, temperature in (("T070", 0.70), ("T058", 0.58), ("T045", 0.45)):
+        with (DATA_DIR / f"renewal_cage_obadiya_{code}_block_summary.csv").open() as handle:
+            summaries[temperature] = {row["metric"]: row for row in csv.DictReader(handle)}
+
+    def value(temperature: float, metric: str, column: str = "mean") -> float:
+        return float(summaries[temperature][metric][column])
+
+    def comparison(metric: str) -> tuple[float, float, float, float]:
+        hot = value(0.70, metric)
+        cold = value(0.45, metric)
+        standard_error = math.sqrt(
+            value(0.70, metric, "standard_error") ** 2
+            + value(0.45, metric, "standard_error") ** 2
+        )
+        return hot, cold, cold / hot, abs(cold - hot) / standard_error
+
+    source = "10.5281/zenodo.7469766"
+    rows: list[dict[str, float | str]] = []
+    definitions = [
+        ("diffusion_slowdown", "diffusion", "decreases_on_cooling", "aligned", "direct_block_observable", source),
+        ("alpha_slowdown", "alpha_relaxation_time", "increases_on_cooling", "aligned", "direct_block_observable", source),
+        ("stokes_einstein_decoupling", "diffusion_alpha_product", "increases_on_cooling", "aligned", "direct_block_observable", source),
+        ("non_gaussian_peak_growth", "ngp_peak", "increases_on_cooling", "aligned", "direct_block_observable", source),
+        (
+            "dynamic_heterogeneity_growth",
+            "overlap_chi4_peak",
+            "increases_with_relaxation_time",
+            "aligned",
+            "overlap_susceptibility_proxy_not_spatial_length",
+            "10.1103/PhysRevLett.132.248201",
+        ),
+        ("ngp_peak_shift", "ngp_peak_time", "moves_later_on_cooling", "aligned", "direct_block_observable", source),
+        (
+            "chi4_peak_shift",
+            "overlap_chi4_peak_time",
+            "tracks_alpha_slowing",
+            "aligned",
+            "overlap_susceptibility_proxy_not_spatial_length",
+            "10.1103/PhysRevLett.132.248201",
+        ),
+    ]
+    for signature, metric, expected, verdict, scope, doi in definitions:
+        hot, cold, ratio, z_score = comparison(metric)
+        rows.append(
+            {
+                "signature": signature,
+                "high_temperature_value": hot,
+                "low_temperature_value": cold,
+                "cooling_ratio_low_over_high": ratio,
+                "endpoint_difference_z": z_score,
+                "expected_sota_trend": expected,
+                "verdict": verdict,
+                "evidence_scope": scope,
+                "sota_source_doi": doi,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+    rows.extend(
+        [
+            {
+                "signature": "gaussian_recovery",
+                "high_temperature_value": 0.0178,
+                "low_temperature_value": 0.5868,
+                "cooling_ratio_low_over_high": 32.966,
+                "endpoint_difference_z": math.nan,
+                "expected_sota_trend": "ngp_returns_to_zero_after_peak",
+                "verdict": "censored_at_low_temperature",
+                "evidence_scope": "recovery_seen_at_T070_and_T058_but_T045_window_ends_non_gaussian",
+                "sota_source_doi": source,
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "signature": "direct_facilitation_scaling",
+                "high_temperature_value": math.nan,
+                "low_temperature_value": math.nan,
+                "cooling_ratio_low_over_high": math.nan,
+                "endpoint_difference_z": math.nan,
+                "expected_sota_trend": "facilitation_exponent_and_range_depend_on_temperature",
+                "verdict": "partial",
+                "evidence_scope": "event_exchange_changes_but_no_direct_facilitation_front_or_exponent",
+                "sota_source_doi": "10.1103/PhysRevLett.132.258201",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "signature": "near_tg_heterogeneity_saturation",
+                "high_temperature_value": math.nan,
+                "low_temperature_value": math.nan,
+                "cooling_ratio_low_over_high": math.nan,
+                "endpoint_difference_z": math.nan,
+                "expected_sota_trend": "heterogeneity_growth_slows_near_experimental_Tg",
+                "verdict": "untested",
+                "evidence_scope": "three_MD_temperatures_do_not_reach_experimental_Tg",
+                "sota_source_doi": "10.1103/PhysRevB.109.064205",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "signature": "experimental_chi4_growth",
+                "high_temperature_value": 2.8819388175612124,
+                "low_temperature_value": 14.684771244469417,
+                "cooling_ratio_low_over_high": 5.095448645539302,
+                "endpoint_difference_z": 2.9835064429396305,
+                "expected_sota_trend": "experimental_dynamic_susceptibility_strengthens_in_glassy_state",
+                "verdict": "qualitatively_aligned",
+                "evidence_scope": "cross_material_overlap_proxy_vs_light_scattering_chi4_no_amplitude_match",
+                "sota_source_doi": "10.1038/s41526-024-00455-8",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "signature": "structure_dynamics_correlation",
+                "high_temperature_value": math.nan,
+                "low_temperature_value": math.nan,
+                "cooling_ratio_low_over_high": math.nan,
+                "endpoint_difference_z": math.nan,
+                "expected_sota_trend": "locally_ordered_regions_relax_more_slowly",
+                "verdict": "untested",
+                "evidence_scope": "renewal_clock_has_no_structural_order_variable",
+                "sota_source_doi": "10.1038/s41427-024-00577-1",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+            {
+                "signature": "thermodynamic_transition",
+                "high_temperature_value": math.nan,
+                "low_temperature_value": math.nan,
+                "cooling_ratio_low_over_high": math.nan,
+                "endpoint_difference_z": math.nan,
+                "expected_sota_trend": "requires_static_or_thermodynamic_observables",
+                "verdict": "out_of_scope",
+                "evidence_scope": "kinetic_trajectory_observables_only",
+                "sota_source_doi": "10.1103/PhysRevLett.132.248201",
+                "thermodynamic_claim_allowed": 0.0,
+            },
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return rows
+
+
+def write_obadiya_sota_alignment_svg(path: Path, rows: list[dict[str, float | str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    signatures = [
+        "diffusion_slowdown",
+        "alpha_slowdown",
+        "stokes_einstein_decoupling",
+        "non_gaussian_peak_growth",
+        "dynamic_heterogeneity_growth",
+    ]
+    row_map = {str(row["signature"]): row for row in rows}
+    ratios = []
+    for signature in signatures:
+        ratio = float(row_map[signature]["cooling_ratio_low_over_high"])
+        ratios.append(1.0 / ratio if signature == "diffusion_slowdown" else ratio)
+    max_log = max(math.log10(value) for value in ratios)
+    bars = []
+    labels = []
+    for index, (signature, ratio) in enumerate(zip(signatures, ratios)):
+        x = 95 + index * 185
+        height = 300.0 * math.log10(ratio) / max_log
+        y = 430.0 - height
+        color = ["#374151", "#2563eb", "#047857", "#b45309", "#7c3aed"][index]
+        bars.append(f'<rect x="{x}" y="{y:.2f}" width="105" height="{height:.2f}" fill="{color}" />')
+        bars.append(f'<text x="{x + 52}" y="{y - 9:.2f}" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">{ratio:.2f}x</text>')
+        labels.append(f'<text x="{x + 52}" y="453" text-anchor="middle" font-family="Arial, sans-serif" font-size="12">{signature.replace("_", " ")}</text>')
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="560" viewBox="0 0 1080 560">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="60" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Block-resolved cooling trends and SOTA alignment</text>
+  <text x="60" y="68" font-family="Arial, sans-serif" font-size="13" fill="#444">T=0.70 to 0.45; bars show endpoint growth factors (inverse diffusion for slowdown).</text>
+  <line x1="70" y1="430" x2="1030" y2="430" stroke="#222" />
+  <line x1="70" y1="120" x2="70" y2="430" stroke="#222" />
+  {''.join(bars)}
+  {''.join(labels)}
+  <text x="60" y="505" font-family="Arial, sans-serif" font-size="12" fill="#444">Aligned: slowdown, SE decoupling, NGP growth, and overlap-susceptibility growth. Untested: near-Tg saturation. Partial: direct facilitation scaling.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     stationary_finite_flight_rows = write_stationary_finite_flight_csv(
         DATA_DIR / "renewal_cage_stationary_finite_flight.csv"
@@ -15123,6 +15305,13 @@ def main() -> None:
     write_stationary_finite_flight_svg(
         FIGURE_DIR / "renewal_cage_stationary_finite_flight.svg",
         stationary_finite_flight_rows,
+    )
+    obadiya_sota_rows = write_obadiya_sota_alignment_csv(
+        DATA_DIR / "renewal_cage_obadiya_sota_alignment.csv"
+    )
+    write_obadiya_sota_alignment_svg(
+        FIGURE_DIR / "renewal_cage_obadiya_sota_alignment.svg",
+        obadiya_sota_rows,
     )
     params = DelayedRenewalCageParams(
         cage_variance=1.0,

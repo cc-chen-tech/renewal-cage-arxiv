@@ -17576,6 +17576,200 @@ def event_space_correlated_diffusion(
     return event_rate * green_kubo_bracket / (2.0 * dimension)
 
 
+def periodic_unwrap_trajectory(positions: np.ndarray, box_lengths: np.ndarray) -> np.ndarray:
+    """Unwrap a periodic trajectory using frame-to-frame minimum images."""
+
+    positions = np.asarray(positions)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    if positions.ndim != 3 or positions.shape[2] != len(box_lengths):
+        raise ValueError("positions must have shape (frames, particles, dimensions)")
+    if positions.shape[0] < 1 or positions.shape[1] < 1:
+        raise ValueError("positions must contain at least one frame and particle")
+    if np.any(~np.isfinite(positions)) or np.any(~np.isfinite(box_lengths)) or np.any(box_lengths <= 0.0):
+        raise ValueError("positions and positive box lengths must be finite")
+    unwrapped = np.empty_like(positions, dtype=np.result_type(positions.dtype, np.float32))
+    unwrapped[0] = positions[0]
+    for frame in range(1, positions.shape[0]):
+        increment = np.asarray(positions[frame] - positions[frame - 1], dtype=float)
+        increment -= box_lengths * np.rint(increment / box_lengths)
+        unwrapped[frame] = unwrapped[frame - 1] + increment
+    return unwrapped
+
+
+def block_trajectory_observables(
+    unwrapped_positions: np.ndarray,
+    *,
+    lags: np.ndarray,
+    block_size: int,
+    wave_numbers: np.ndarray,
+    overlap_radius: float,
+    particle_mask: np.ndarray | None = None,
+    origin_stride: int = 1,
+) -> list[dict[str, float]]:
+    """Estimate displacement observables in nonoverlapping time-origin blocks."""
+
+    positions = np.asarray(unwrapped_positions)
+    lags = np.asarray(lags)
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if positions.ndim != 3 or positions.shape[2] < 1:
+        raise ValueError("unwrapped_positions must have shape (frames, particles, dimensions)")
+    if isinstance(block_size, bool) or not isinstance(block_size, int) or block_size < 2:
+        raise ValueError("block_size must be an integer of at least two")
+    if isinstance(origin_stride, bool) or not isinstance(origin_stride, int) or origin_stride < 1:
+        raise ValueError("origin_stride must be a positive integer")
+    if lags.ndim != 1 or len(lags) == 0 or np.any(lags < 1) or np.any(lags != np.floor(lags)):
+        raise ValueError("lags must be positive integers")
+    lags = lags.astype(int)
+    if np.any(lags >= block_size):
+        raise ValueError("each lag must be smaller than block_size")
+    if wave_numbers.ndim != 1 or len(wave_numbers) == 0 or np.any(~np.isfinite(wave_numbers)) or np.any(wave_numbers <= 0.0):
+        raise ValueError("wave_numbers must be positive and finite")
+    if not math.isfinite(overlap_radius) or overlap_radius <= 0.0:
+        raise ValueError("overlap_radius must be positive and finite")
+    if particle_mask is None:
+        mask = np.ones(positions.shape[1], dtype=bool)
+    else:
+        mask = np.asarray(particle_mask, dtype=bool)
+        if mask.shape != (positions.shape[1],):
+            raise ValueError("particle_mask must match the particle axis")
+    particle_count = int(np.sum(mask))
+    if particle_count == 0:
+        raise ValueError("particle_mask must select at least one particle")
+    block_count = (positions.shape[0] - 1) // block_size
+    if block_count < 1:
+        raise ValueError("trajectory is shorter than one complete block")
+
+    rows: list[dict[str, float]] = []
+    dimension = positions.shape[2]
+    for block_index in range(block_count):
+        block_start = block_index * block_size
+        block_end = block_start + block_size
+        for lag in lags:
+            origins = range(block_start, block_end - int(lag) + 1, origin_stride)
+            r2_sum = 0.0
+            r4_sum = 0.0
+            sample_count = 0
+            overlap_values: list[float] = []
+            fs_sums = np.zeros(len(wave_numbers), dtype=float)
+            for origin in origins:
+                displacement = np.asarray(positions[origin + lag, mask] - positions[origin, mask], dtype=float)
+                squared_radius = np.sum(displacement**2, axis=1)
+                r2_sum += float(np.sum(squared_radius))
+                r4_sum += float(np.sum(squared_radius**2))
+                sample_count += particle_count
+                overlap_values.append(float(np.mean(squared_radius < overlap_radius**2)))
+                for wave_index, wave_number in enumerate(wave_numbers):
+                    fs_sums[wave_index] += float(np.sum(np.cos(wave_number * displacement))) / dimension
+            mean_r2 = r2_sum / sample_count
+            mean_r4 = r4_sum / sample_count
+            ngp = dimension * mean_r4 / ((dimension + 2.0) * mean_r2**2) - 1.0 if mean_r2 > 0.0 else 0.0
+            overlap = np.asarray(overlap_values, dtype=float)
+            row: dict[str, float] = {
+                "block_index": float(block_index),
+                "lag": float(lag),
+                "origin_count": float(len(overlap_values)),
+                "particle_count": float(particle_count),
+                "msd": mean_r2,
+                "ngp_3d": ngp,
+                "overlap_mean": float(np.mean(overlap)),
+                "overlap_chi4": particle_count * float(np.var(overlap)),
+            }
+            for wave_index, wave_number in enumerate(wave_numbers):
+                key = f"fs_k{wave_number:g}".replace(".", "p")
+                row[key] = fs_sums[wave_index] / sample_count
+            rows.append(row)
+    return rows
+
+
+def summarize_block_trajectory_observables(
+    rows: Sequence[dict[str, float]],
+    *,
+    fs_key: str,
+    diffusion_lag: int,
+    dimension: int = 3,
+    alpha_threshold: float = math.exp(-1.0),
+) -> tuple[list[dict[str, float]], list[dict[str, float | str]]]:
+    """Reduce lag curves to block estimates and cross-block confidence intervals."""
+
+    if not rows:
+        raise ValueError("rows must be nonempty")
+    if dimension < 1 or diffusion_lag < 1:
+        raise ValueError("dimension and diffusion_lag must be positive")
+    if not 0.0 < alpha_threshold < 1.0:
+        raise ValueError("alpha_threshold must lie between zero and one")
+    grouped: dict[int, list[dict[str, float]]] = {}
+    for row in rows:
+        if fs_key not in row:
+            raise ValueError(f"missing scattering column {fs_key}")
+        grouped.setdefault(int(row["block_index"]), []).append(row)
+
+    block_rows: list[dict[str, float]] = []
+    for block_index, block in sorted(grouped.items()):
+        block = sorted(block, key=lambda row: row["lag"])
+        diffusion_candidates = [row for row in block if int(row["lag"]) == diffusion_lag]
+        if len(diffusion_candidates) != 1:
+            raise ValueError("each block must contain the requested diffusion_lag exactly once")
+        diffusion_row = diffusion_candidates[0]
+        diffusion = diffusion_row["msd"] / (2.0 * dimension * diffusion_lag)
+
+        alpha_time = math.nan
+        for earlier, later in zip(block, block[1:]):
+            earlier_fs = earlier[fs_key]
+            later_fs = later[fs_key]
+            if earlier_fs >= alpha_threshold >= later_fs and earlier_fs > 0.0 and later_fs > 0.0:
+                log_fraction = (
+                    math.log(alpha_threshold) - math.log(earlier_fs)
+                ) / (math.log(later_fs) - math.log(earlier_fs))
+                alpha_time = math.exp(
+                    math.log(earlier["lag"])
+                    + log_fraction * (math.log(later["lag"]) - math.log(earlier["lag"]))
+                )
+                break
+        if not math.isfinite(alpha_time):
+            raise ValueError("alpha relaxation threshold is not bracketed in every block")
+        ngp_peak = max(block, key=lambda row: row["ngp_3d"])
+        chi4_peak = max(block, key=lambda row: row["overlap_chi4"])
+        block_rows.append(
+            {
+                "block_index": float(block_index),
+                "diffusion": float(diffusion),
+                "alpha_relaxation_time": float(alpha_time),
+                "diffusion_alpha_product": float(diffusion * alpha_time),
+                "ngp_peak": float(ngp_peak["ngp_3d"]),
+                "ngp_peak_time": float(ngp_peak["lag"]),
+                "overlap_chi4_peak": float(chi4_peak["overlap_chi4"]),
+                "overlap_chi4_peak_time": float(chi4_peak["lag"]),
+            }
+        )
+
+    summary: list[dict[str, float | str]] = []
+    for metric in (
+        "diffusion",
+        "alpha_relaxation_time",
+        "diffusion_alpha_product",
+        "ngp_peak",
+        "ngp_peak_time",
+        "overlap_chi4_peak",
+        "overlap_chi4_peak_time",
+    ):
+        values = np.array([row[metric] for row in block_rows], dtype=float)
+        mean = float(np.mean(values))
+        standard_deviation = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
+        standard_error = standard_deviation / math.sqrt(len(values))
+        summary.append(
+            {
+                "metric": metric,
+                "mean": mean,
+                "standard_deviation": standard_deviation,
+                "standard_error": standard_error,
+                "ci95_low": mean - 1.96 * standard_error,
+                "ci95_high": mean + 1.96 * standard_error,
+                "block_count": float(len(values)),
+            }
+        )
+    return block_rows, summary
+
+
 def persistence_exchange_diffusion_coefficient(params: PersistenceExchangeParams) -> float:
     """Long-time one-dimensional diffusion coefficient set by exchange events."""
 

@@ -888,10 +888,10 @@ ${\rm Var}\,N(t)/\langle N(t)\rangle^2\to0$, the long-time NGP still recovers
 to zero.
 
 The independently assigned first wait in the preceding construction is
-nonstationary unless (	au_p=	au_x).  For an equilibrium observation origin,
+nonstationary unless $\tau_p=\tau_x$.  For an equilibrium observation origin,
 the first waiting-time density is instead the residual-life law
-egin{equation}
-  psi_p(t)=\frac{S_x(t)}{\langle\tau_x\rangle},\qquad
+\begin{equation}
+  \psi_p(t)=\frac{S_x(t)}{\langle\tau_x\rangle},\qquad
   \frac{\langle\tau_p\rangle}{\langle\tau_x\rangle}
   =\frac{1+\mathrm{CV}_x^2}{2},\qquad
   \langle N(t)\rangle=\frac{t}{\langle\tau_x\rangle}.
@@ -903,9 +903,9 @@ stationary count-variance closure, but is not assumed to be the microscopic
 waiting-time law.
 
 Finite jump duration is a second necessary correction.  For a linear flight of
-duration (Delta), the integrated (m)-th power of its displacement weight in
+duration $\Delta$, the integrated $m$-th power of its displacement weight in
 a lag window is
-egin{equation}
+\begin{equation}
  W_m(t,\Delta)=
  \begin{cases}
  t-\Delta+2\Delta/(m+1),&t\ge\Delta,\\
@@ -914,36 +914,70 @@ a lag window is
 \end{equation}
 This replaces instantaneous marks in the second and fourth cumulants and
 allows the measured flight-vector characteristic function to predict
-(F_s(k,t)).  Event-vector anticorrelations enter long-time transport through
+$F_s(k,t)$.  Event-vector anticorrelations enter long-time transport through
 the event-space Green--Kubo relation
-egin{equation}
+\begin{equation}
  D=\frac{\nu}{2d}\left[\langle J^2\rangle
  +2\sum_{m\ge1}\langle\mathbf J_0\!\cdot\!\mathbf J_m\rangle\right].
 \end{equation}
 
 We tested these corrections on continuous-time Kob--Andersen trajectories from
-Zenodo record 7469766 using a fixed non-recrossing cage-center rule.  At
-(T=0.58), event statistics predict the held-out diffusion coefficient within
-(1.4\%\); the finite-flight closure reduces the NGP-peak prediction from
-(1.31) to (0.65), compared with (0.551), and predicts three-(k)
-(F_s) with RMSE (0.0166).  At (T=0.45), the uncorrelated event estimate
-overpredicts diffusion by (28.5\%\).  The measured event-lag correlations
-(C_1/\langle J^2\rangle=-0.05485) and
-(C_2/\langle J^2\rangle=-0.05191) reduce the held-out error to (1.05\%\).
-Cooling also increases (D\tau_\alpha) by a factor (1.78), the
-non-recrossing persistence/exchange ratio from (1.16) to (3.31), and both
-the NGP and overlap-susceptibility peaks.  The stationary gamma count-variance
-closure passes at (T=0.58) but is only partial at (T=0.45), which records a
-real model deficiency rather than hiding it.  These values and their fixed
-event-rule metadata are archived in
+Zenodo record 7469766 using a fixed non-recrossing cage-center rule
+\cite{obadiya2022fluid}.  At $T=0.58$, event statistics predict the held-out
+diffusion coefficient within $1.4\%$; the finite-flight closure reduces the
+NGP-peak prediction from $1.31$ to $0.65$, compared with $0.551$, and predicts
+three-$k$ $F_s$ with RMSE $0.0166$.  At $T=0.45$, the uncorrelated event
+estimate overpredicts diffusion by $28.5\%$.  The measured event-lag
+correlations $C_1/\langle J^2\rangle=-0.05485$ and
+$C_2/\langle J^2\rangle=-0.05191$ reduce the held-out error to $1.05\%$.
+Cooling also increases $D\tau_\alpha$ by a factor $1.78$, the non-recrossing
+persistence/exchange ratio from $1.16$ to $3.31$, and both the NGP and
+overlap-susceptibility peaks.  The stationary gamma count-variance closure
+passes at $T=0.58$ but is only partial at $T=0.45$, which records a real model
+deficiency rather than hiding it.  These values and their fixed event-rule
+metadata are archived in
 \texttt{renewal\_cage\_stationary\_finite\_flight.csv}.
-They are point estimates from one long trajectory per temperature.  Independent
-trajectory ensembles, threshold-sweep re-extraction, and propagated
-uncertainties are not available in the committed derivative package, so the
-table keeps \texttt{publication\_grade\_real\_data\_closure=0} with
-\texttt{independent\_trajectory\_uncertainty} as the primary blocker.  The
-result is evidence for the stationary finite-flight mechanism and a fixed
-falsification target, not a completed uncertainty-weighted material fit.
+
+We separately divide the $T=0.70$, $0.58$, and $0.45$ trajectories into 10,
+10, and 8 nonoverlapping time blocks.  Each block is longer than the raw
+$F_s(k=7.25,t)=e^{-1}$ alpha time and independently yields $D$, the raw
+$\tau_\alpha$, $D\tau_\alpha$, the NGP peak, and an overlap-susceptibility
+peak.  The endpoint values of $D\tau_\alpha$ are
+$0.01328\pm0.00013$ and $0.03549\pm0.00137$; the NGP peaks are
+$0.3208\pm0.0022$ and $2.109\pm0.087$; and the overlap-susceptibility peaks
+are $2.88\pm0.14$ and $14.68\pm3.95$, where uncertainties are block standard
+errors.  The 95\% intervals remain nonoverlapping at each adjacent temperature
+for all three quantities.  The raw alpha times
+$4.483\pm0.017$, $17.19\pm0.15$, and $1284\pm127$ differ from the
+cage-normalized alpha clocks used in the event inversion; both definitions are
+therefore retained rather than combined.
+
+These trends align with recent results that dynamic-heterogeneity magnitude
+tracks relaxation time across altered kinetic rules \cite{gavazzoni2024kinetic}
+and that facilitation changes strongly with temperature
+\cite{herrero2024facilitation}.  They do not test the predicted slowing of
+heterogeneity growth near experimental $T_g$ \cite{berthier2024experimental},
+because the three molecular-dynamics temperatures do not reach that regime.
+The growth of the overlap susceptibility is also qualitatively consistent with
+the pronounced experimental $\chi_4$ enhancement reported on entering a glassy
+soft-matter state \cite{martinelli2024lightscattering}, but amplitudes are not
+compared across these different materials and observables.  Conversely, the
+observed correlation between local order and slow dynamics in metallic-glass
+5D-STEM \cite{nakazawa2024structure} is untested because the renewal clock has
+no structural-order variable.
+The signed comparison is archived in
+\texttt{renewal\_cage\_obadiya\_sota\_alignment.csv}: direct dynamical trends
+are marked aligned, direct facilitation scaling is partial, low-temperature
+Gaussian recovery is censored by the available lag window, and a thermodynamic
+transition remains out of scope.
+
+Only one simulation trajectory is available at each temperature.  Time-block
+uncertainties are now complete for the displacement observables, but independent
+simulation replicates and block-resolved event-clock threshold sweeps remain
+absent.  The event-level table therefore keeps
+\texttt{publication\_grade\_real\_data\_closure=0}.  The result is an
+uncertainty-resolved dynamical validation and a fixed falsification target, not
+a completed material-level or thermodynamic glass-transition theory.
 
 \begin{figure}[p]
   \centering
@@ -952,6 +986,16 @@ falsification target, not a completed uncertainty-weighted material fit.
   correlations close the cold diffusion discrepancy, while finite flight
   duration reduces the hot transient-NGP error.  The cold stationary-gamma
   count-variance mismatch remains an explicit partial verdict.}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_obadiya_sota_alignment.pdf}
+  \caption{Block-resolved endpoint trends from $T=0.70$ to $0.45$.  Bars show
+  inverse-diffusion slowdown and growth of the raw alpha time, Stokes--Einstein
+  product, NGP peak, and overlap-susceptibility peak.  The accompanying ledger
+  distinguishes aligned, partial, censored, untested, and out-of-scope SOTA
+  comparisons.}
 \end{figure}
 
 \section{Asymptotics and Peak Condition}

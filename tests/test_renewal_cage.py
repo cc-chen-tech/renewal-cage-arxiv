@@ -112,11 +112,14 @@ from renewal_cage import (  # noqa: E402
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
     periodic_cage_curvature,
+    periodic_unwrap_trajectory,
     periodic_softness_gate_bridge_audit,
     periodic_softness_gate_to_delayed_renewal,
     precursor_escape_simulation_diagnostic,
     precursor_gate_hazard,
     precursor_gate_mean_count,
+    block_trajectory_observables,
+    summarize_block_trajectory_observables,
     PersistenceExchangeParams,
     persistence_exchange_alpha_relaxation_time,
     persistence_exchange_count_distribution,
@@ -269,6 +272,73 @@ from renewal_cage import (  # noqa: E402
 
 
 class DelayedRenewalCageTests(unittest.TestCase):
+    def test_periodic_unwrap_trajectory_recovers_boundary_crossing(self):
+        wrapped = np.array(
+            [
+                [[4.8, 0.0, 0.0]],
+                [[-4.9, 0.2, 0.0]],
+                [[-4.5, 0.4, 0.0]],
+            ]
+        )
+
+        unwrapped = periodic_unwrap_trajectory(wrapped, np.array([10.0, 10.0, 10.0]))
+
+        np.testing.assert_allclose(unwrapped[:, 0], [[4.8, 0.0, 0.0], [5.1, 0.2, 0.0], [5.5, 0.4, 0.0]])
+
+    def test_block_trajectory_observables_recover_brownian_scaling(self):
+        rng = np.random.default_rng(8431)
+        diffusion = 0.04
+        increments = rng.normal(scale=math.sqrt(2.0 * diffusion), size=(120, 600, 3))
+        positions = np.concatenate([np.zeros((1, 600, 3)), np.cumsum(increments, axis=0)], axis=0)
+
+        rows = block_trajectory_observables(
+            positions,
+            lags=np.array([1, 4, 12]),
+            block_size=40,
+            wave_numbers=np.array([1.0, 2.0]),
+            overlap_radius=0.3,
+            origin_stride=2,
+        )
+
+        self.assertEqual(len(rows), 9)
+        lag12 = [row for row in rows if row["lag"] == 12.0]
+        self.assertEqual({row["block_index"] for row in lag12}, {0.0, 1.0, 2.0})
+        self.assertTrue(all(abs(row["msd"] / (6.0 * diffusion * 12.0) - 1.0) < 0.08 for row in lag12))
+        self.assertTrue(all(abs(row["ngp_3d"]) < 0.08 for row in lag12))
+        self.assertTrue(all(row["fs_k1"] > row["fs_k2"] for row in lag12))
+        self.assertTrue(all(row["overlap_chi4"] >= 0.0 for row in lag12))
+
+    def test_block_summary_propagates_cross_block_uncertainty(self):
+        rows = []
+        for block, scale in enumerate([0.9, 1.0, 1.1]):
+            for lag, fs, ngp, chi4 in [(1, 0.8, 0.2, 1.0), (4, 0.35, 0.5, 3.0), (8, 0.1, 0.3, 2.0)]:
+                rows.append(
+                    {
+                        "block_index": float(block),
+                        "lag": float(lag),
+                        "msd": scale * 6.0 * 0.04 * lag,
+                        "ngp_3d": scale * ngp,
+                        "overlap_chi4": scale * chi4,
+                        "fs_k7p25": fs ** scale,
+                    }
+                )
+
+        block_rows, summary = summarize_block_trajectory_observables(
+            rows,
+            fs_key="fs_k7p25",
+            diffusion_lag=8,
+        )
+
+        self.assertEqual(len(block_rows), 3)
+        by_metric = {row["metric"]: row for row in summary}
+        self.assertAlmostEqual(by_metric["diffusion"]["mean"], 0.04)
+        self.assertGreater(by_metric["diffusion"]["standard_error"], 0.0)
+        self.assertLess(by_metric["diffusion"]["ci95_low"], by_metric["diffusion"]["mean"])
+        self.assertGreater(by_metric["diffusion"]["ci95_high"], by_metric["diffusion"]["mean"])
+        self.assertTrue(1.0 < by_metric["alpha_relaxation_time"]["mean"] < 8.0)
+        self.assertAlmostEqual(by_metric["ngp_peak_time"]["mean"], 4.0)
+        self.assertAlmostEqual(by_metric["overlap_chi4_peak_time"]["mean"], 4.0)
+
     def test_event_space_correlated_diffusion_recovers_independent_limit(self):
         observed = event_space_correlated_diffusion(
             event_rate=0.2,
