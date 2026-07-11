@@ -37,6 +37,10 @@ from renewal_cage import (  # noqa: E402
     delayed_renewal_shape,
     dimensionless_peak_prediction,
     fractional_stokes_einstein_exponents,
+    finite_flight_moments_1d,
+    finite_flight_ngp_1d,
+    finite_flight_self_intermediate_scattering,
+    finite_flight_weight_integral,
     gamma_exchange_temperature_scan,
     glass_phenomenon_audit,
     glass_signature_claim_ladder,
@@ -264,6 +268,63 @@ from renewal_cage import (  # noqa: E402
 
 
 class DelayedRenewalCageTests(unittest.TestCase):
+    def test_finite_flight_weight_integral_has_correct_piecewise_limits(self):
+        self.assertAlmostEqual(finite_flight_weight_integral(0.5, 1.0, 2), 5.0 / 24.0)
+        self.assertAlmostEqual(finite_flight_weight_integral(2.0, 1.0, 2), 5.0 / 3.0)
+        self.assertAlmostEqual(finite_flight_weight_integral(2.0, 0.0, 4), 2.0)
+
+    def test_finite_flight_moments_recover_instantaneous_random_sum(self):
+        times = np.array([1.0, 4.0, 20.0])
+        moments = finite_flight_moments_1d(
+            times,
+            event_rate=0.25,
+            count_fano=1.7,
+            cage_variance=0.0,
+            cage_tau=1.0,
+            mark_second_moment=0.8,
+            mark_fourth_moment=3.0 * 0.8**2,
+            flight_duration=0.0,
+        )
+
+        expected_second = 0.25 * times * 0.8
+        expected_fourth = 3.0 * expected_second**2 + 3.0 * 1.7 * 0.25 * times * 0.8**2
+        np.testing.assert_allclose(moments["second"], expected_second)
+        np.testing.assert_allclose(moments["fourth"], expected_fourth)
+
+    def test_finite_flight_ngp_recovers_gaussian_at_long_time(self):
+        alpha = finite_flight_ngp_1d(
+            np.array([8.0, 80.0, 800.0]),
+            event_rate=0.1,
+            count_fano=2.0,
+            cage_variance=0.3,
+            cage_tau=1.0,
+            mark_second_moment=1.0,
+            mark_fourth_moment=3.4,
+            flight_duration=6.0,
+        )
+
+        self.assertGreater(alpha[0], alpha[-1])
+        self.assertLess(alpha[-1], 0.03)
+
+    def test_finite_flight_scattering_reaches_instantaneous_mark_limit(self):
+        times = np.array([0.5, 2.0, 5.0])
+        wave_number = 1.2
+        marks = np.array([-0.8, 0.8])
+        observed = finite_flight_self_intermediate_scattering(
+            wave_number,
+            times,
+            event_rate=0.3,
+            cage_variance=0.2,
+            cage_tau=0.7,
+            flight_duration=0.0,
+            mark_displacements=marks,
+            mark_probabilities=np.array([0.5, 0.5]),
+        )
+        cage = 0.2 * (1.0 - np.exp(-times / 0.7))
+        expected = np.exp(-0.5 * wave_number**2 * cage + 0.3 * times * (np.cos(0.8 * wave_number) - 1.0))
+
+        np.testing.assert_allclose(observed, expected, atol=1e-12)
+
     def test_stationary_renewal_residual_life(self):
         params = StationaryRenewalParams(exchange_mean=44.0, exchange_cv2=1.31)
 

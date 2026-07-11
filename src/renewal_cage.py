@@ -17426,6 +17426,132 @@ def stationary_gamma_count_moments(
     return {"mean": mean, "variance": variance}
 
 
+def finite_flight_weight_integral(time: float, duration: float, moment_order: int) -> float:
+    """Integral of a linear flight's window-overlap weight to a given power."""
+
+    if not math.isfinite(time) or time < 0.0:
+        raise ValueError("time must be nonnegative and finite")
+    if not math.isfinite(duration) or duration < 0.0:
+        raise ValueError("duration must be nonnegative and finite")
+    if isinstance(moment_order, bool) or not isinstance(moment_order, int) or moment_order < 1:
+        raise ValueError("moment_order must be a positive integer")
+    if duration == 0.0:
+        return time
+    if time >= duration:
+        return time - duration + 2.0 * duration / (moment_order + 1.0)
+    ratio = time / duration
+    return duration * ratio**moment_order * (
+        1.0 - ratio * (moment_order - 1.0) / (moment_order + 1.0)
+    )
+
+
+def finite_flight_moments_1d(
+    t: np.ndarray,
+    *,
+    event_rate: float,
+    count_fano: float | np.ndarray,
+    cage_variance: float,
+    cage_tau: float,
+    mark_second_moment: float,
+    mark_fourth_moment: float,
+    flight_duration: float,
+) -> dict[str, np.ndarray]:
+    """Second and fourth displacement moments for finite-duration marked flights."""
+
+    t = np.asarray(t, dtype=float)
+    fano = np.broadcast_to(np.asarray(count_fano, dtype=float), t.shape)
+    if np.any(~np.isfinite(t)) or np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative and finite")
+    scalar_inputs = (event_rate, cage_variance, cage_tau, mark_second_moment, mark_fourth_moment, flight_duration)
+    if any(not math.isfinite(value) for value in scalar_inputs):
+        raise ValueError("finite-flight parameters must be finite")
+    if event_rate <= 0.0 or cage_tau <= 0.0:
+        raise ValueError("event_rate and cage_tau must be positive")
+    if cage_variance < 0.0 or mark_second_moment <= 0.0 or flight_duration < 0.0:
+        raise ValueError("variances and duration must be nonnegative")
+    if mark_fourth_moment < mark_second_moment**2:
+        raise ValueError("mark_fourth_moment is inconsistent with mark_second_moment")
+    if np.any(~np.isfinite(fano)) or np.any(fano < 0.0):
+        raise ValueError("count_fano must be nonnegative and finite")
+
+    weight2 = np.array(
+        [finite_flight_weight_integral(float(value), flight_duration, 2) for value in t.flat]
+    ).reshape(t.shape)
+    weight4 = np.array(
+        [finite_flight_weight_integral(float(value), flight_duration, 4) for value in t.flat]
+    ).reshape(t.shape)
+    local = cage_variance * (1.0 - np.exp(-t / cage_tau))
+    second = local + event_rate * weight2 * mark_second_moment
+    mark_excess = mark_fourth_moment - 3.0 * mark_second_moment**2
+    fourth_cumulant = event_rate * weight4 * (
+        mark_excess + 3.0 * fano * mark_second_moment**2
+    )
+    fourth = 3.0 * second**2 + fourth_cumulant
+    return {"second": second, "fourth": fourth, "fourth_cumulant": fourth_cumulant}
+
+
+def finite_flight_ngp_1d(t: np.ndarray, **kwargs: object) -> np.ndarray:
+    """One-dimensional NGP from finite-flight second and fourth moments."""
+
+    moments = finite_flight_moments_1d(t, **kwargs)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        alpha = moments["fourth"] / (3.0 * moments["second"] ** 2) - 1.0
+    return np.where(np.isfinite(alpha), alpha, 0.0)
+
+
+def finite_flight_self_intermediate_scattering(
+    wave_number: float,
+    t: np.ndarray,
+    *,
+    event_rate: float,
+    cage_variance: float,
+    cage_tau: float,
+    flight_duration: float,
+    mark_displacements: np.ndarray,
+    mark_probabilities: np.ndarray,
+    quadrature_points: int = 2048,
+) -> np.ndarray:
+    """Poisson marked-flight scattering closure with measured 1D flight marks."""
+
+    if not math.isfinite(wave_number) or wave_number <= 0.0:
+        raise ValueError("wave_number must be positive and finite")
+    if event_rate <= 0.0 or cage_variance < 0.0 or cage_tau <= 0.0 or flight_duration < 0.0:
+        raise ValueError("invalid finite-flight scattering parameters")
+    t = np.asarray(t, dtype=float)
+    marks = np.asarray(mark_displacements, dtype=float)
+    probabilities = np.asarray(mark_probabilities, dtype=float)
+    if np.any(~np.isfinite(t)) or np.any(t < 0.0):
+        raise ValueError("time values must be nonnegative and finite")
+    if marks.ndim != 1 or probabilities.shape != marks.shape or len(marks) == 0:
+        raise ValueError("mark arrays must be nonempty one-dimensional arrays of equal length")
+    if np.any(~np.isfinite(marks)) or np.any(~np.isfinite(probabilities)) or np.any(probabilities < 0.0):
+        raise ValueError("mark distribution must be finite and nonnegative")
+    probability_sum = float(np.sum(probabilities))
+    if probability_sum <= 0.0:
+        raise ValueError("mark probabilities must have positive sum")
+    probabilities = probabilities / probability_sum
+    local = cage_variance * (1.0 - np.exp(-t / cage_tau))
+    log_scattering = -0.5 * wave_number**2 * local
+    if flight_duration == 0.0:
+        mark_factor = float(np.sum(probabilities * np.cos(wave_number * marks)))
+        return np.exp(log_scattering + event_rate * t * (mark_factor - 1.0))
+    if quadrature_points < 128:
+        raise ValueError("quadrature_points must be at least 128")
+    for index, time in np.ndenumerate(t):
+        if time == 0.0:
+            continue
+        width = (time + flight_duration) / quadrature_points
+        starts = -flight_duration + (np.arange(quadrature_points) + 0.5) * width
+        end_fraction = np.clip((time - starts) / flight_duration, 0.0, 1.0)
+        start_fraction = np.clip(-starts / flight_duration, 0.0, 1.0)
+        weights = end_fraction - start_fraction
+        characteristic = np.sum(
+            probabilities[:, None] * np.cos(wave_number * marks[:, None] * weights[None, :]),
+            axis=0,
+        )
+        log_scattering[index] += event_rate * width * float(np.sum(characteristic - 1.0))
+    return np.exp(log_scattering)
+
 
 def persistence_exchange_diffusion_coefficient(params: PersistenceExchangeParams) -> float:
     """Long-time one-dimensional diffusion coefficient set by exchange events."""
