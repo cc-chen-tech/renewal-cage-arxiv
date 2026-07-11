@@ -27,6 +27,8 @@ class ArxivPackageTests(unittest.TestCase):
         with fit_path.open() as handle:
             fit = next(csv.DictReader(handle))
         self.assertLess(float(fit["inverse_intercept"]), 0.0)
+        self.assertGreater(float(fit["minimum_q_wavevector_min"]), float(fit["raw_q0_susceptibility"]))
+        self.assertEqual(float(fit["all_minimum_q_directions_exceed_raw_q0"]), 1.0)
         self.assertEqual(float(fit["xi4_identifiable"]), 0.0)
         self.assertEqual(fit["verdict"], "xi4_not_identifiable_negative_OZ_intercept")
         self.assertEqual(float(fit["xi4_claim_allowed"]), 0.0)

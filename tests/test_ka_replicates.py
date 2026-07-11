@@ -76,6 +76,9 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertAlmostEqual(rows[0]["s4"], 0.25)
         self.assertEqual(rows[1]["wavevector_count"], 6.0)
         self.assertGreaterEqual(rows[1]["s4"], 0.0)
+        self.assertLessEqual(rows[1]["s4_wavevector_min"], rows[1]["s4"])
+        self.assertGreaterEqual(rows[1]["s4_wavevector_max"], rows[1]["s4"])
+        self.assertGreaterEqual(rows[1]["s4_wavevector_standard_deviation"], 0.0)
         np.testing.assert_allclose(
             [row["s4"] for row in rows],
             [row["s4"] for row in shifted],

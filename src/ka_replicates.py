@@ -89,6 +89,9 @@ def overlap_four_point_structure_factor(
             "wave_number": 0.0,
             "wavevector_count": 1.0,
             "s4": chi4,
+            "s4_wavevector_standard_deviation": 0.0,
+            "s4_wavevector_min": chi4,
+            "s4_wavevector_max": chi4,
             "overlap_mean": overlap_mean,
             "origin_count": float(len(origins)),
             "particle_count": float(particle_count),
@@ -110,17 +113,21 @@ def overlap_four_point_structure_factor(
     for shell in sorted(set(int(value) for value in integer_squared)):
         vectors = integer_vectors[integer_squared == shell]
         wavevectors = 2.0 * math.pi * vectors / box_lengths
-        accumulated = 0.0
+        vector_accumulated = np.zeros(len(vectors), dtype=float)
         for origin_index, origin in enumerate(origins):
             phase = positions[origin] @ wavevectors.T
             amplitude = fluctuation[origin_index] @ np.exp(1j * phase)
-            accumulated += float(np.sum(np.abs(amplitude) ** 2))
+            vector_accumulated += np.abs(amplitude) ** 2
+        vector_s4 = vector_accumulated / (particle_count * len(origins))
         rows.append(
             {
                 "integer_squared": float(shell),
                 "wave_number": float(np.mean(np.linalg.norm(wavevectors, axis=1))),
                 "wavevector_count": float(len(vectors)),
-                "s4": accumulated / (particle_count * len(origins) * len(vectors)),
+                "s4": float(np.mean(vector_s4)),
+                "s4_wavevector_standard_deviation": float(np.std(vector_s4)),
+                "s4_wavevector_min": float(np.min(vector_s4)),
+                "s4_wavevector_max": float(np.max(vector_s4)),
                 "overlap_mean": overlap_mean,
                 "origin_count": float(len(origins)),
                 "particle_count": float(particle_count),

@@ -21,7 +21,7 @@ from ka_replicates import (  # noqa: E402
 def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -63,7 +63,15 @@ def main() -> None:
             "lag": float(args.lag),
             "raw_q0_susceptibility": float(rows[0]["s4"]),
             "minimum_q_s4": float(rows[1]["s4"]),
+            "minimum_q_wavevector_standard_deviation": float(
+                rows[1]["s4_wavevector_standard_deviation"]
+            ),
+            "minimum_q_wavevector_min": float(rows[1]["s4_wavevector_min"]),
+            "minimum_q_wavevector_max": float(rows[1]["s4_wavevector_max"]),
             "minimum_q_to_raw_q0_ratio": float(rows[1]["s4"]) / float(rows[0]["s4"]),
+            "all_minimum_q_directions_exceed_raw_q0": float(
+                float(rows[1]["s4_wavevector_min"]) > float(rows[0]["s4"])
+            ),
             "ensemble_correction_available": 0.0,
             "xi4_identifiable": float(bool(fit["fit_valid"])),
             "verdict": "xi4_not_identifiable_negative_OZ_intercept"
