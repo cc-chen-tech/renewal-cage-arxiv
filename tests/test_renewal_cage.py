@@ -48,6 +48,8 @@ from renewal_cage import (  # noqa: E402
     dynamic_heterogeneity_benchmark_consistency,
     dynamic_signature_alignment_ledger,
     event_space_correlated_diffusion,
+    event_clock_statistics,
+    waiting_time_shuffle_diagnostics,
     infer_parameters_from_full_observables,
     infer_renewal_correlation_size,
     infer_parameters_from_scattering_transport,
@@ -111,6 +113,8 @@ from renewal_cage import (  # noqa: E402
     plateau_ngp_branches,
     plateau_peak_diagnostics,
     peak_relaxation_coupling,
+    phop_values,
+    extract_nonrecrossing_phop_events,
     periodic_cage_curvature,
     periodic_unwrap_trajectory,
     periodic_softness_gate_bridge_audit,
@@ -272,6 +276,79 @@ from renewal_cage import (  # noqa: E402
 
 
 class DelayedRenewalCageTests(unittest.TestCase):
+    def test_waiting_time_shuffle_diagnostics_detect_temporal_memory(self):
+        particles = []
+        times = []
+        for particle in range(80):
+            interval_pattern = np.array(([2.0] * 8 + [12.0] * 8) * 4)
+            particle_times = 1.0 + np.cumsum(interval_pattern)
+            particle_times = particle_times[particle_times < 440.0]
+            particles.extend([particle] * len(particle_times))
+            times.extend(particle_times)
+        events = {"particle": np.array(particles), "time": np.array(times)}
+
+        result = waiting_time_shuffle_diagnostics(
+            events,
+            duration=440.0,
+            particle_count=80,
+            count_window=40.0,
+            shuffle_replicates=24,
+            random_seed=812,
+        )
+
+        self.assertGreater(result["waiting_lag1_correlation"], 0.5)
+        self.assertGreater(result["actual_count_fano"], 1.2 * result["sequence_shuffle_count_fano"])
+        self.assertGreater(result["temporal_memory_excess_fraction"], 0.2)
+
+    def test_event_clock_statistics_recover_exchange_and_residual_life(self):
+        events = {
+            "particle": np.array([0, 0, 0, 1, 1, 1]),
+            "time": np.array([10, 20, 30, 5, 15, 25]),
+            "jump_vector": np.array(
+                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]] * 2
+            ),
+        }
+
+        result = event_clock_statistics(events, duration=40.0, particle_count=2, dimension=3)
+
+        self.assertAlmostEqual(result["exchange_mean"], 10.0)
+        self.assertAlmostEqual(result["exchange_cv2"], 0.0)
+        self.assertAlmostEqual(result["stationary_persistence_mean"], 5.0)
+        self.assertAlmostEqual(result["persistence_exchange_ratio"], 0.5)
+        self.assertAlmostEqual(result["jump_squared_mean"], 1.0)
+        self.assertAlmostEqual(result["event_rate"], 6.0 / 80.0)
+        self.assertAlmostEqual(result["jump_correlation_lag1_over_q"], 0.0)
+        self.assertAlmostEqual(result["correlated_diffusion"], result["uncorrelated_diffusion"])
+
+    def test_phop_values_locate_a_permanent_cage_jump(self):
+        positions = np.zeros((31, 1, 3))
+        positions[15:, 0, 0] = 1.0
+
+        times, values = phop_values(positions, half_window=5)
+
+        peak_time = int(times[np.argmax(values[:, 0])])
+        self.assertTrue(13 <= peak_time <= 16)
+        self.assertGreater(float(np.max(values[:, 0])), 0.8)
+        self.assertAlmostEqual(float(values[0, 0]), 0.0)
+
+    def test_nonrecrossing_phop_events_remove_a_to_b_to_a_pair(self):
+        positions = np.zeros((45, 2, 3))
+        positions[12:, 0, 0] = 1.0
+        positions[28:, 0, 0] = 0.0
+        positions[18:, 1, 0] = 1.2
+
+        events = extract_nonrecrossing_phop_events(
+            positions,
+            threshold=0.2,
+            half_window=5,
+            recrossing_radius=math.sqrt(0.2),
+        )
+
+        self.assertFalse(np.any(events["particle"] == 0))
+        particle_one = events["particle"] == 1
+        self.assertEqual(int(np.sum(particle_one)), 1)
+        self.assertAlmostEqual(float(events["jump_vector"][particle_one][0, 0]), 1.2, delta=0.05)
+
     def test_periodic_unwrap_trajectory_recovers_boundary_crossing(self):
         wrapped = np.array(
             [

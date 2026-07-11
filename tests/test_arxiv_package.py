@@ -15,6 +15,40 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_low_temperature_waiting_shuffle_selects_empirical_iid_not_memory(self):
+        waiting_path = ROOT / "data" / "renewal_cage_obadiya_T045_waiting_shuffle.csv"
+        threshold_path = ROOT / "data" / "renewal_cage_obadiya_T045_phop_threshold_summary.csv"
+        verdict_path = ROOT / "data" / "renewal_cage_obadiya_T045_waiting_failure_verdict.csv"
+        svg_path = ROOT / "figures" / "renewal_cage_obadiya_T045_waiting_shuffle.svg"
+        pdf_path = ROOT / "paper" / "figures" / "renewal_cage_obadiya_T045_waiting_shuffle.pdf"
+        for path in [waiting_path, threshold_path, verdict_path, svg_path, pdf_path]:
+            self.assertTrue(path.exists())
+
+        with waiting_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual({float(row["threshold"]) for row in rows}, {0.16, 0.20, 0.24})
+        self.assertTrue(all(row["waiting_failure_verdict"] == "empirical_iid_waiting_law_sufficient" for row in rows))
+        self.assertLess(max(float(row["median_empirical_iid_relative_error"]) for row in rows), 0.05)
+        self.assertLess(max(float(row["median_temporal_memory_excess_fraction"]) for row in rows), 0.05)
+        self.assertLess(max(float(row["median_persistent_environment_excess_fraction"]) for row in rows), 0.15)
+        self.assertGreater(min(float(row["collective_covariance_ratio"]) for row in rows), 10.0)
+
+        with threshold_path.open() as handle:
+            threshold_rows = list(csv.DictReader(handle))
+        heldout_diffusion = 2.8751792990172228e-5
+        self.assertTrue(
+            all(float(row["correlated_diffusion_mean"]) / heldout_diffusion < 0.5 for row in threshold_rows)
+        )
+
+        with verdict_path.open() as handle:
+            verdicts = {row["diagnostic"]: row for row in csv.DictReader(handle)}
+        self.assertEqual(verdicts["waiting_marginal"]["verdict"], "empirical_iid_sufficient")
+        self.assertEqual(verdicts["temporal_memory"]["verdict"], "not_required")
+        self.assertEqual(verdicts["persistent_particle_environment"]["verdict"], "secondary")
+        self.assertEqual(verdicts["collective_event_fluctuation"]["verdict"], "cross_particle_covariance_required")
+        self.assertEqual(verdicts["phop_transport_clock"]["verdict"], "rejected")
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in verdicts.values()))
+
     def test_manuscript_contains_no_ascii_control_bytes(self):
         payload = (ROOT / "paper" / "main.tex").read_bytes()
         controls = {byte for byte in payload if byte < 32 and byte not in {9, 10, 13}}

@@ -998,6 +998,57 @@ a completed material-level or thermodynamic glass-transition theory.
   comparisons.}
 \end{figure}
 
+\subsection{Low-temperature waiting-law selection}
+
+Before adding a hidden-state memory model, we test why the stationary gamma
+count closure is imperfect at low temperature.  We use the trajectory source's
+original $p_{\rm hop}$ definition \cite{obadiya2022fluid,candelier2009building}:
+two windows of five time units surround each candidate time, contiguous
+$p_{\rm hop}>p_c$ samples collapse to one peak event, and adjacent
+$A\to B\to A$ returns within radius $\sqrt{p_c}$ are removed.  The threshold
+scan $p_c=0.16,0.18,0.20,0.22,0.24$ is fixed before evaluating transport.
+
+The first result is negative: this extreme-rearrangement label is not a
+transport-complete event clock.  Across the full threshold scan, event-space
+Green--Kubo diffusion is only $28$--$43\%$ of the held-out displacement
+diffusion.  Raising or lowering $p_c$ therefore does not rescue the transport
+closure.  This also explains why waiting statistics from this clock must not be
+silently combined with the earlier cage-center transport clock.
+
+For the single-particle count fluctuations, however, the mechanism-selection
+result is stable.  At $p_c=0.20$, count windows from 512 to 8192 time units give
+Fano factors from $1.28$ to $1.72$.  Stationary renewal simulations using the
+complete empirical waiting-time distribution reproduce these values with
+median relative error $0.96\%$; a moment-matched gamma law has $5.0\%$ error.
+Permuting each particle's waiting-time sequence changes the Fano factor by only
+$0.4$--$2.5\%$.  Although the adjacent-wait correlation is statistically
+nonzero, $r=0.029$, its effect on the count fluctuations is too small to justify
+a two-state temporal-memory model.  Particle-specific iid resampling contributes
+only $5$--$15\%$ beyond pooled iid renewal.  The same verdict,
+\texttt{empirical\_iid\_waiting\_law\_sufficient}, holds at $p_c=0.16$ and
+$0.24$.
+
+In contrast, the variance of the total event count is $15$--$37$ times the sum
+of individual-particle count variances.  Thus the unresolved low-temperature
+fluctuation is collective: a distance- and lag-resolved cross-particle
+covariance is required before introducing a spatial-facilitation rule.  The
+signed decisions are stored in
+\texttt{renewal\_cage\_obadiya\_T045\_waiting\_failure\_verdict.csv}.  They
+select an empirical or minimally shifted iid waiting law, reject temporal
+memory as the primary correction, treat persistent particle environments as
+secondary, and reject $p_{\rm hop}$ as the complete transport clock.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_obadiya_T045_waiting_shuffle.pdf}
+  \caption{Low-temperature waiting-law mechanism selection.  (a) At the
+  nominal threshold, empirical iid renewal reproduces the measured
+  single-particle count Fano curve, while sequence shuffling changes it only
+  weakly.  (b) Empirical-law error, temporal-memory excess, and persistent-rate
+  excess remain below preregistered decision thresholds across the threshold
+  scan.  The large collective covariance is a separate spatial diagnostic.}
+\end{figure}
+
 \section{Asymptotics and Peak Condition}
 
 At short times,

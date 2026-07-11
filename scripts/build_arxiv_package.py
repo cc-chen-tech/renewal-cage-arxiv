@@ -9476,6 +9476,122 @@ def write_obadiya_sota_alignment_pdf(path: Path) -> None:
     c.save()
 
 
+def write_obadiya_waiting_shuffle_pdf(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_obadiya_T045_waiting_shuffle.csv").open() as handle:
+        rows = list(csv.DictReader(handle))
+    nominal = sorted(
+        [row for row in rows if math.isclose(float(row["threshold"]), 0.20)],
+        key=lambda row: float(row["count_window"]),
+    )
+    thresholds = sorted({float(row["threshold"]) for row in rows})
+    threshold_rows = {
+        threshold: next(row for row in rows if float(row["threshold"]) == threshold)
+        for threshold in thresholds
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    page_w, page_h = landscape(letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(42, page_h - 34, "Low-temperature waiting-law and shuffle diagnostic")
+    c.setFont("Helvetica", 8)
+    c.drawString(42, page_h - 49, "T=0.45; p_hop uses fixed 5+5 windows and thresholds 0.16-0.24.")
+
+    left, bottom, panel_w, panel_h = 55.0, 125.0, 320.0, 300.0
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(left, bottom + panel_h + 22, "A. Nominal-threshold jump-count Fano")
+    x_values = np.log2([float(row["count_window"]) for row in nominal])
+    fano_series = [
+        ("actual", np.array([float(row["actual_count_fano"]) for row in nominal]), colors.black),
+        (
+            "sequence shuffle",
+            np.array([float(row["sequence_shuffle_count_fano"]) for row in nominal]),
+            colors.grey,
+        ),
+        (
+            "empirical iid",
+            np.array([float(row["pooled_empirical_iid_count_fano"]) for row in nominal]),
+            colors.HexColor("#047857"),
+        ),
+        (
+            "gamma iid",
+            np.array([float(row["gamma_iid_count_fano"]) for row in nominal]),
+            colors.HexColor("#b45309"),
+        ),
+    ]
+    draw_panel(
+        c,
+        left,
+        bottom,
+        panel_w,
+        panel_h,
+        x_values,
+        fano_series,
+        "",
+        xlabel="log2 count window",
+    )
+
+    right = 430.0
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(right, bottom + panel_h + 22, "B. Threshold-stable decomposition")
+    decomposition = [
+        (
+            "empirical error",
+            np.array(
+                [
+                    float(threshold_rows[threshold]["median_empirical_iid_relative_error"])
+                    for threshold in thresholds
+                ]
+            ),
+            colors.HexColor("#047857"),
+        ),
+        (
+            "memory excess",
+            np.array(
+                [
+                    float(threshold_rows[threshold]["median_temporal_memory_excess_fraction"])
+                    for threshold in thresholds
+                ]
+            ),
+            colors.HexColor("#2563eb"),
+        ),
+        (
+            "environment excess",
+            np.array(
+                [
+                    float(threshold_rows[threshold]["median_persistent_environment_excess_fraction"])
+                    for threshold in thresholds
+                ]
+            ),
+            colors.HexColor("#7c3aed"),
+        ),
+    ]
+    draw_panel(
+        c,
+        right,
+        bottom,
+        panel_w,
+        panel_h,
+        np.array(thresholds),
+        decomposition,
+        "",
+        xlabel="p_hop threshold",
+        y_range=(0.0, 0.20),
+    )
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        73,
+        "Empirical iid predicts single-particle count fluctuations; sequence memory and persistent particle rates are secondary.",
+    )
+    c.drawString(
+        42,
+        59,
+        "Collective event-count covariance remains 15-37x, while this p_hop clock explains less than half of held-out diffusion.",
+    )
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -9485,6 +9601,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     results_pdf = PAPER_FIGURE_DIR / "renewal_cage_results.pdf"
     stationary_finite_flight_pdf = PAPER_FIGURE_DIR / "renewal_cage_stationary_finite_flight.pdf"
     obadiya_sota_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_obadiya_sota_alignment.pdf"
+    obadiya_waiting_shuffle_pdf = PAPER_FIGURE_DIR / "renewal_cage_obadiya_T045_waiting_shuffle.pdf"
     dimensionless_pdf = PAPER_FIGURE_DIR / "renewal_cage_dimensionless.pdf"
     scattering_pdf = PAPER_FIGURE_DIR / "renewal_cage_scattering.pdf"
     temperature_pdf = PAPER_FIGURE_DIR / "renewal_cage_temperature.pdf"
@@ -9825,6 +9942,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_results_pdf(results_pdf)
     write_stationary_finite_flight_pdf(stationary_finite_flight_pdf)
     write_obadiya_sota_alignment_pdf(obadiya_sota_alignment_pdf)
+    write_obadiya_waiting_shuffle_pdf(obadiya_waiting_shuffle_pdf)
     write_dimensionless_pdf(dimensionless_pdf)
     write_scattering_pdf(scattering_pdf)
     write_temperature_pdf(temperature_pdf)
@@ -10123,6 +10241,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             "figures/renewal_cage_obadiya_sota_alignment.pdf",
         )
         archive.write(
+            obadiya_waiting_shuffle_pdf,
+            "figures/renewal_cage_obadiya_T045_waiting_shuffle.pdf",
+        )
+        archive.write(
             DATA_DIR / "renewal_cage_stationary_finite_flight.csv",
             "data/renewal_cage_stationary_finite_flight.csv",
         )
@@ -10130,6 +10252,12 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             DATA_DIR / "renewal_cage_obadiya_sota_alignment.csv",
             "data/renewal_cage_obadiya_sota_alignment.csv",
         )
+        for filename in (
+            "renewal_cage_obadiya_T045_phop_threshold_summary.csv",
+            "renewal_cage_obadiya_T045_waiting_shuffle.csv",
+            "renewal_cage_obadiya_T045_waiting_failure_verdict.csv",
+        ):
+            archive.write(DATA_DIR / filename, f"data/{filename}")
         for temperature_code in ("T070", "T058", "T045"):
             archive.write(
                 DATA_DIR / f"renewal_cage_obadiya_{temperature_code}_block_summary.csv",

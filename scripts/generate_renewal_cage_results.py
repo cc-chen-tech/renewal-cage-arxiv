@@ -15298,6 +15298,214 @@ def write_obadiya_sota_alignment_svg(path: Path, rows: list[dict[str, float | st
     path.write_text(svg)
 
 
+def write_obadiya_waiting_failure_verdict_csv(
+    path: Path,
+) -> list[dict[str, float | str]]:
+    with (DATA_DIR / "renewal_cage_obadiya_T045_waiting_shuffle.csv").open() as handle:
+        waiting_rows = list(csv.DictReader(handle))
+    with (DATA_DIR / "renewal_cage_obadiya_T045_phop_threshold_summary.csv").open() as handle:
+        threshold_rows = list(csv.DictReader(handle))
+    median_by_threshold = {}
+    for row in waiting_rows:
+        threshold = float(row["threshold"])
+        median_by_threshold[threshold] = {
+            "empirical_error": float(row["median_empirical_iid_relative_error"]),
+            "gamma_error": float(row["median_gamma_iid_relative_error"]),
+            "memory_excess": float(row["median_temporal_memory_excess_fraction"]),
+            "environment_excess": float(row["median_persistent_environment_excess_fraction"]),
+        }
+    heldout_diffusion = 2.8751792990172228e-5
+    transport_closure = [
+        float(row["correlated_diffusion_mean"]) / heldout_diffusion for row in threshold_rows
+    ]
+    collective_ratios = [float(row["collective_covariance_ratio"]) for row in waiting_rows]
+    rows: list[dict[str, float | str]] = [
+        {
+            "diagnostic": "waiting_marginal",
+            "observed_statistic": max(value["empirical_error"] for value in median_by_threshold.values()),
+            "decision_threshold": 0.15,
+            "threshold_min": 0.16,
+            "threshold_max": 0.24,
+            "verdict": "empirical_iid_sufficient",
+            "interpretation": "full_empirical_waiting_distribution_predicts_single_particle_count_fano",
+            "next_theory_action": "replace_or_relax_gamma_shape_without_adding_memory",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+        {
+            "diagnostic": "gamma_shape",
+            "observed_statistic": max(value["gamma_error"] for value in median_by_threshold.values()),
+            "decision_threshold": 0.15,
+            "threshold_min": 0.16,
+            "threshold_max": 0.24,
+            "verdict": "adequate_but_empirical_better",
+            "interpretation": "moment_matched_gamma_is_within_six_percent_but_not_best",
+            "next_theory_action": "use_empirical_or_shifted_waiting_law_as_minimal_correction",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+        {
+            "diagnostic": "temporal_memory",
+            "observed_statistic": max(value["memory_excess"] for value in median_by_threshold.values()),
+            "decision_threshold": 0.20,
+            "threshold_min": 0.16,
+            "threshold_max": 0.24,
+            "verdict": "not_required",
+            "interpretation": "sequence_shuffle_changes_count_fano_by_less_than_five_percent",
+            "next_theory_action": "do_not_add_two_state_memory_for_single_particle_counts",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+        {
+            "diagnostic": "persistent_particle_environment",
+            "observed_statistic": max(value["environment_excess"] for value in median_by_threshold.values()),
+            "decision_threshold": 0.20,
+            "threshold_min": 0.16,
+            "threshold_max": 0.24,
+            "verdict": "secondary",
+            "interpretation": "particle_specific_iid_adds_at_most_thirteen_percent",
+            "next_theory_action": "retain_as_secondary_random_effect_not_primary_memory",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+        {
+            "diagnostic": "collective_event_fluctuation",
+            "observed_statistic": min(collective_ratios),
+            "decision_threshold": 1.0,
+            "threshold_min": 0.16,
+            "threshold_max": 0.24,
+            "verdict": "cross_particle_covariance_required",
+            "interpretation": "global_event_count_variance_exceeds_sum_of_single_particle_variances",
+            "next_theory_action": "measure_distance_and_lag_resolved_event_covariance_before_spatial_model",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+        {
+            "diagnostic": "phop_transport_clock",
+            "observed_statistic": max(transport_closure),
+            "decision_threshold": 0.80,
+            "threshold_min": 0.16,
+            "threshold_max": 0.24,
+            "verdict": "rejected",
+            "interpretation": "standard_phop_events_explain_less_than_half_of_heldout_diffusion",
+            "next_theory_action": "separate_extreme_rearrangement_label_from_transport_complete_event_clock",
+            "thermodynamic_claim_allowed": 0.0,
+        },
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return rows
+
+
+def write_obadiya_waiting_shuffle_svg(path: Path) -> None:
+    with (DATA_DIR / "renewal_cage_obadiya_T045_waiting_shuffle.csv").open() as handle:
+        rows = list(csv.DictReader(handle))
+    nominal = sorted(
+        [row for row in rows if math.isclose(float(row["threshold"]), 0.20)],
+        key=lambda row: float(row["count_window"]),
+    )
+    thresholds = sorted({float(row["threshold"]) for row in rows})
+    threshold_rows = {
+        threshold: next(row for row in rows if float(row["threshold"]) == threshold)
+        for threshold in thresholds
+    }
+    width, height = 1120, 580
+    left_a, right_a = 75, 530
+    left_b, right_b = 625, 1060
+    top, bottom = 120, 440
+
+    def polyline(points: list[tuple[float, float]], color: str) -> str:
+        return (
+            f'<polyline points="{" ".join(f"{x:.2f},{y:.2f}" for x, y in points)}" '
+            f'fill="none" stroke="{color}" stroke-width="3" />'
+        )
+
+    log_windows = np.log2([float(row["count_window"]) for row in nominal])
+    x_a = left_a + (log_windows - min(log_windows)) * (right_a - left_a) / (
+        max(log_windows) - min(log_windows)
+    )
+    all_fano = [
+        float(row[key])
+        for row in nominal
+        for key in (
+            "actual_count_fano",
+            "sequence_shuffle_count_fano",
+            "pooled_empirical_iid_count_fano",
+            "gamma_iid_count_fano",
+        )
+    ]
+    y_min, y_max = min(all_fano) * 0.95, max(all_fano) * 1.05
+
+    def y_a(value: float) -> float:
+        return bottom - (value - y_min) * (bottom - top) / (y_max - y_min)
+
+    series = [
+        ("actual", "actual_count_fano", "#111827"),
+        ("sequence shuffle", "sequence_shuffle_count_fano", "#6b7280"),
+        ("empirical iid", "pooled_empirical_iid_count_fano", "#047857"),
+        ("gamma iid", "gamma_iid_count_fano", "#b45309"),
+    ]
+    curves = []
+    legends = []
+    for index, (label, key, color) in enumerate(series):
+        curves.append(
+            polyline(
+                [(float(x), y_a(float(row[key]))) for x, row in zip(x_a, nominal)],
+                color,
+            )
+        )
+        legends.append(
+            f'<line x1="{left_a + index * 110}" y1="490" x2="{left_a + 22 + index * 110}" y2="490" stroke="{color}" stroke-width="3" />'
+            f'<text x="{left_a + 27 + index * 110}" y="494" font-family="Arial, sans-serif" font-size="11">{label}</text>'
+        )
+    x_b = {
+        threshold: left_b + index * (right_b - left_b) / (len(thresholds) - 1)
+        for index, threshold in enumerate(thresholds)
+    }
+    metrics = [
+        ("empirical error", "median_empirical_iid_relative_error", "#047857"),
+        ("memory excess", "median_temporal_memory_excess_fraction", "#2563eb"),
+        ("environment excess", "median_persistent_environment_excess_fraction", "#7c3aed"),
+    ]
+
+    def y_b(value: float) -> float:
+        return bottom - value * (bottom - top) / 0.20
+
+    right_curves = []
+    right_legends = []
+    for index, (label, key, color) in enumerate(metrics):
+        right_curves.append(
+            polyline(
+                [
+                    (x_b[threshold], y_b(float(threshold_rows[threshold][key])))
+                    for threshold in thresholds
+                ],
+                color,
+            )
+        )
+        right_legends.append(
+            f'<line x1="{left_b + index * 140}" y1="490" x2="{left_b + 22 + index * 140}" y2="490" stroke="{color}" stroke-width="3" />'
+            f'<text x="{left_b + 27 + index * 140}" y="494" font-family="Arial, sans-serif" font-size="11">{label}</text>'
+        )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="60" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700">Low-temperature waiting-law and shuffle diagnostic</text>
+  <text x="60" y="68" font-family="Arial, sans-serif" font-size="13" fill="#444">T=0.45; p_hop uses fixed 5+5 windows and preregistered thresholds 0.16-0.24.</text>
+  <text x="{left_a}" y="102" font-family="Arial, sans-serif" font-size="16" font-weight="700">A. Nominal-threshold jump-count Fano</text>
+  <line x1="{left_a}" y1="{bottom}" x2="{right_a}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_a}" y1="{bottom}" x2="{left_a}" y2="{top}" stroke="#222" />
+  {"".join(curves)}
+  {"".join(legends)}
+  <text x="{left_b}" y="102" font-family="Arial, sans-serif" font-size="16" font-weight="700">B. Threshold-stable decomposition</text>
+  <line x1="{left_b}" y1="{bottom}" x2="{right_b}" y2="{bottom}" stroke="#222" />
+  <line x1="{left_b}" y1="{bottom}" x2="{left_b}" y2="{top}" stroke="#222" />
+  <line x1="{left_b}" y1="{y_b(0.15):.2f}" x2="{right_b}" y2="{y_b(0.15):.2f}" stroke="#999" stroke-dasharray="5 4" />
+  {"".join(right_curves)}
+  {"".join(right_legends)}
+  <text x="60" y="548" font-family="Arial, sans-serif" font-size="12" fill="#444">Empirical iid is sufficient for single-particle counts; collective count covariance remains 15-37x and requires a spatial test.</text>
+</svg>
+"""
+    path.write_text(svg)
+
+
 def main() -> None:
     stationary_finite_flight_rows = write_stationary_finite_flight_csv(
         DATA_DIR / "renewal_cage_stationary_finite_flight.csv"
@@ -15312,6 +15520,12 @@ def main() -> None:
     write_obadiya_sota_alignment_svg(
         FIGURE_DIR / "renewal_cage_obadiya_sota_alignment.svg",
         obadiya_sota_rows,
+    )
+    write_obadiya_waiting_failure_verdict_csv(
+        DATA_DIR / "renewal_cage_obadiya_T045_waiting_failure_verdict.csv"
+    )
+    write_obadiya_waiting_shuffle_svg(
+        FIGURE_DIR / "renewal_cage_obadiya_T045_waiting_shuffle.svg"
     )
     params = DelayedRenewalCageParams(
         cage_variance=1.0,

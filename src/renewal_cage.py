@@ -17596,6 +17596,363 @@ def periodic_unwrap_trajectory(positions: np.ndarray, box_lengths: np.ndarray) -
     return unwrapped
 
 
+def phop_values(
+    unwrapped_positions: np.ndarray,
+    *,
+    half_window: int = 5,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Candelier p_hop activity from equal windows before and after each time."""
+
+    positions = np.asarray(unwrapped_positions, dtype=float)
+    if positions.ndim != 3 or positions.shape[2] < 1:
+        raise ValueError("unwrapped_positions must have shape (frames, particles, dimensions)")
+    if isinstance(half_window, bool) or not isinstance(half_window, int) or half_window < 1:
+        raise ValueError("half_window must be a positive integer")
+    if positions.shape[0] < 2 * half_window + 1:
+        raise ValueError("trajectory is shorter than the two p_hop windows")
+    if np.any(~np.isfinite(positions)):
+        raise ValueError("unwrapped_positions must be finite")
+
+    prefix = np.concatenate(
+        [np.zeros((1, positions.shape[1], positions.shape[2])), np.cumsum(positions, axis=0)],
+        axis=0,
+    )
+    squared_radius = np.sum(positions**2, axis=2)
+    squared_prefix = np.concatenate(
+        [np.zeros((1, positions.shape[1])), np.cumsum(squared_radius, axis=0)],
+        axis=0,
+    )
+    times = np.arange(half_window, positions.shape[0] - half_window + 1)
+    left_mean = (prefix[times] - prefix[times - half_window]) / half_window
+    right_mean = (prefix[times + half_window] - prefix[times]) / half_window
+    left_squared = (squared_prefix[times] - squared_prefix[times - half_window]) / half_window
+    right_squared = (squared_prefix[times + half_window] - squared_prefix[times]) / half_window
+    cross = np.sum(left_mean * right_mean, axis=2)
+    left_about_right = left_squared - 2.0 * cross + np.sum(right_mean**2, axis=2)
+    right_about_left = right_squared - 2.0 * cross + np.sum(left_mean**2, axis=2)
+    phop = np.sqrt(np.maximum(left_about_right, 0.0) * np.maximum(right_about_left, 0.0))
+    return times, phop
+
+
+def extract_nonrecrossing_phop_events(
+    unwrapped_positions: np.ndarray,
+    *,
+    threshold: float,
+    half_window: int = 5,
+    recrossing_radius: float | None = None,
+    activity_times: np.ndarray | None = None,
+    activity_values: np.ndarray | None = None,
+) -> dict[str, np.ndarray]:
+    """Collapse contiguous p_hop activity and remove adjacent A-B-A returns."""
+
+    if not math.isfinite(threshold) or threshold <= 0.0:
+        raise ValueError("threshold must be positive and finite")
+    if recrossing_radius is None:
+        recrossing_radius = math.sqrt(threshold)
+    if not math.isfinite(recrossing_radius) or recrossing_radius < 0.0:
+        raise ValueError("recrossing_radius must be nonnegative and finite")
+    positions = np.asarray(unwrapped_positions, dtype=float)
+    if (activity_times is None) != (activity_values is None):
+        raise ValueError("activity_times and activity_values must be supplied together")
+    if activity_times is None:
+        times, activity = phop_values(positions, half_window=half_window)
+    else:
+        times = np.asarray(activity_times, dtype=int)
+        activity = np.asarray(activity_values, dtype=float)
+        expected_shape = (positions.shape[0] - 2 * half_window + 1, positions.shape[1])
+        if times.shape != (expected_shape[0],) or activity.shape != expected_shape:
+            raise ValueError("precomputed p_hop arrays do not match the trajectory")
+    retained: list[tuple[int, int, float, np.ndarray, np.ndarray, np.ndarray]] = []
+    for particle in range(positions.shape[1]):
+        active = np.flatnonzero(activity[:, particle] > threshold)
+        if len(active) == 0:
+            continue
+        breaks = np.flatnonzero(np.diff(active) > 1) + 1
+        groups = np.split(active, breaks)
+        particle_events: list[tuple[int, int, float, np.ndarray, np.ndarray, np.ndarray]] = []
+        for group in groups:
+            peak_index = int(group[np.argmax(activity[group, particle])])
+            event_time = int(times[peak_index])
+            pre_center = np.mean(positions[event_time - half_window : event_time, particle], axis=0)
+            post_center = np.mean(positions[event_time : event_time + half_window, particle], axis=0)
+            event = (
+                particle,
+                event_time,
+                float(activity[peak_index, particle]),
+                post_center - pre_center,
+                pre_center,
+                post_center,
+            )
+            if particle_events and np.linalg.norm(post_center - particle_events[-1][4]) <= recrossing_radius:
+                particle_events.pop()
+            else:
+                particle_events.append(event)
+        retained.extend(particle_events)
+
+    if not retained:
+        dimension = positions.shape[2]
+        return {
+            "particle": np.empty(0, dtype=int),
+            "time": np.empty(0, dtype=int),
+            "phop": np.empty(0, dtype=float),
+            "jump_vector": np.empty((0, dimension), dtype=float),
+            "pre_center": np.empty((0, dimension), dtype=float),
+            "post_center": np.empty((0, dimension), dtype=float),
+        }
+    retained.sort(key=lambda event: (event[0], event[1]))
+    return {
+        "particle": np.array([event[0] for event in retained], dtype=int),
+        "time": np.array([event[1] for event in retained], dtype=int),
+        "phop": np.array([event[2] for event in retained], dtype=float),
+        "jump_vector": np.stack([event[3] for event in retained]),
+        "pre_center": np.stack([event[4] for event in retained]),
+        "post_center": np.stack([event[5] for event in retained]),
+    }
+
+
+def event_clock_statistics(
+    events: dict[str, np.ndarray],
+    *,
+    duration: float,
+    particle_count: int,
+    dimension: int = 3,
+    max_correlation_lag: int = 2,
+) -> dict[str, float]:
+    """Reduce particle event sequences to stationary-clock and transport statistics."""
+
+    if not math.isfinite(duration) or duration <= 0.0:
+        raise ValueError("duration must be positive and finite")
+    if particle_count < 1 or dimension < 1 or max_correlation_lag < 0:
+        raise ValueError("particle_count and dimension must be positive")
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=float)
+    jumps = np.asarray(events["jump_vector"], dtype=float)
+    if particles.ndim != 1 or times.shape != particles.shape:
+        raise ValueError("event particle and time arrays must be one-dimensional and aligned")
+    if jumps.shape != (len(particles), dimension):
+        raise ValueError("jump_vector must align with events and dimension")
+    if len(particles) == 0:
+        raise ValueError("at least one event is required")
+    if np.any(particles < 0) or np.any(particles >= particle_count):
+        raise ValueError("event particle index is out of range")
+    if np.any(~np.isfinite(times)) or np.any(~np.isfinite(jumps)):
+        raise ValueError("event arrays must be finite")
+
+    order = np.lexsort((times, particles))
+    particles = particles[order]
+    times = times[order]
+    jumps = jumps[order]
+    jump_squared = np.sum(jumps**2, axis=1)
+    jump_squared_mean = float(np.mean(jump_squared))
+    event_rate = len(particles) / (particle_count * duration)
+    intervals: list[float] = []
+    correlation_values: dict[int, list[float]] = {
+        lag: [] for lag in range(1, max_correlation_lag + 1)
+    }
+    counts = np.bincount(particles, minlength=particle_count)
+    particles_with_two_events = 0
+    for particle in np.unique(particles):
+        selected = particles == particle
+        particle_times = times[selected]
+        particle_jumps = jumps[selected]
+        if len(particle_times) >= 2:
+            particles_with_two_events += 1
+            intervals.extend(np.diff(particle_times).tolist())
+        for lag in correlation_values:
+            if len(particle_jumps) > lag:
+                correlation_values[lag].extend(
+                    np.sum(particle_jumps[:-lag] * particle_jumps[lag:], axis=1).tolist()
+                )
+    if not intervals:
+        raise ValueError("at least one complete exchange interval is required")
+    interval_array = np.asarray(intervals, dtype=float)
+    exchange_mean = float(np.mean(interval_array))
+    exchange_cv2 = float(np.var(interval_array) / exchange_mean**2)
+    stationary_persistence_mean = float(np.mean(interval_array**2) / (2.0 * exchange_mean))
+    correlations = [
+        float(np.mean(correlation_values[lag])) if correlation_values[lag] else 0.0
+        for lag in range(1, max_correlation_lag + 1)
+    ]
+    uncorrelated_diffusion = event_rate * jump_squared_mean / (2.0 * dimension)
+    correlated_diffusion = event_space_correlated_diffusion(
+        event_rate,
+        jump_squared_mean,
+        correlations,
+        dimension,
+    )
+    mean_count = float(np.mean(counts))
+    return {
+        "event_count": float(len(particles)),
+        "event_rate": event_rate,
+        "particles_with_two_events": float(particles_with_two_events),
+        "exchange_interval_count": float(len(interval_array)),
+        "exchange_mean": exchange_mean,
+        "exchange_cv2": exchange_cv2,
+        "stationary_persistence_mean": stationary_persistence_mean,
+        "persistence_exchange_ratio": stationary_persistence_mean / exchange_mean,
+        "jump_squared_mean": jump_squared_mean,
+        "count_fano": float(np.var(counts) / mean_count) if mean_count > 0.0 else math.nan,
+        "jump_correlation_lag1_over_q": correlations[0] / jump_squared_mean if correlations else 0.0,
+        "jump_correlation_lag2_over_q": correlations[1] / jump_squared_mean if len(correlations) > 1 else 0.0,
+        "uncorrelated_diffusion": uncorrelated_diffusion,
+        "correlated_diffusion": correlated_diffusion,
+    }
+
+
+def waiting_time_shuffle_diagnostics(
+    events: dict[str, np.ndarray],
+    *,
+    duration: float,
+    particle_count: int,
+    count_window: float,
+    shuffle_replicates: int = 64,
+    random_seed: int = 1729,
+) -> dict[str, float]:
+    """Separate waiting-law shape, temporal memory, and persistent particle rates."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=float)
+    if particles.shape != times.shape or particles.ndim != 1:
+        raise ValueError("event particle and time arrays must be aligned vectors")
+    if duration <= 0.0 or count_window <= 0.0 or count_window > duration:
+        raise ValueError("duration and count_window must define at least one window")
+    if particle_count < 1 or shuffle_replicates < 2:
+        raise ValueError("particle_count must be positive and at least two replicates are required")
+    if np.any(particles < 0) or np.any(particles >= particle_count):
+        raise ValueError("event particle index is out of range")
+    if np.any(~np.isfinite(times)) or np.any(times < 0.0) or np.any(times > duration):
+        raise ValueError("event times must lie on the finite observation interval")
+
+    event_lists = [np.sort(times[particles == particle]) for particle in range(particle_count)]
+    interval_lists = [np.diff(values) for values in event_lists]
+    pooled_intervals = np.concatenate([values for values in interval_lists if len(values)])
+    if len(pooled_intervals) < 4 or np.any(pooled_intervals <= 0.0):
+        raise ValueError("at least four positive complete waiting times are required")
+    rng = np.random.default_rng(random_seed)
+    window_count = int(duration // count_window)
+    edges = np.linspace(0.0, window_count * count_window, window_count + 1)
+
+    def count_matrix(lists: Sequence[np.ndarray]) -> np.ndarray:
+        return np.stack([np.histogram(values, bins=edges)[0] for values in lists])
+
+    def count_fano(lists: Sequence[np.ndarray]) -> float:
+        counts = count_matrix(lists).astype(float)
+        mean = float(np.mean(counts))
+        return float(np.var(counts) / mean) if mean > 0.0 else math.nan
+
+    def stationary_iid_events(intervals: np.ndarray) -> np.ndarray:
+        probabilities = intervals / np.sum(intervals)
+        containing_interval = float(rng.choice(intervals, p=probabilities))
+        current = float(rng.uniform(0.0, containing_interval))
+        generated: list[float] = []
+        while current <= duration:
+            generated.append(current)
+            current += float(rng.choice(intervals))
+        return np.asarray(generated, dtype=float)
+
+    interval_mean = float(np.mean(pooled_intervals))
+    interval_cv2 = float(np.var(pooled_intervals) / interval_mean**2)
+
+    def stationary_gamma_events() -> np.ndarray:
+        if interval_cv2 == 0.0:
+            current = float(rng.uniform(0.0, interval_mean))
+            draw = lambda: interval_mean
+        else:
+            shape = 1.0 / interval_cv2
+            scale = interval_mean / shape
+            containing_interval = float(rng.gamma(shape + 1.0, scale))
+            current = float(rng.uniform(0.0, containing_interval))
+            draw = lambda: float(rng.gamma(shape, scale))
+        generated: list[float] = []
+        while current <= duration:
+            generated.append(current)
+            current += draw()
+        return np.asarray(generated, dtype=float)
+
+    lag_left: list[float] = []
+    lag_right: list[float] = []
+    for intervals in interval_lists:
+        if len(intervals) > 1:
+            lag_left.extend(intervals[:-1])
+            lag_right.extend(intervals[1:])
+    waiting_lag1_correlation = float(np.corrcoef(lag_left, lag_right)[0, 1])
+    log_waiting_lag1_correlation = float(
+        np.corrcoef(np.log(lag_left), np.log(lag_right))[0, 1]
+    )
+
+    sequence_fanos = []
+    particle_iid_fanos = []
+    pooled_iid_fanos = []
+    gamma_iid_fanos = []
+    shuffled_correlations = []
+    for _ in range(shuffle_replicates):
+        shuffled_lists = []
+        shuffled_left: list[float] = []
+        shuffled_right: list[float] = []
+        for event_values, intervals in zip(event_lists, interval_lists):
+            if len(intervals):
+                shuffled_intervals = rng.permutation(intervals)
+                shuffled_lists.append(event_values[0] + np.concatenate([[0.0], np.cumsum(shuffled_intervals)]))
+                if len(shuffled_intervals) > 1:
+                    shuffled_left.extend(shuffled_intervals[:-1])
+                    shuffled_right.extend(shuffled_intervals[1:])
+            else:
+                shuffled_lists.append(event_values.copy())
+        sequence_fanos.append(count_fano(shuffled_lists))
+        shuffled_correlations.append(
+            float(np.corrcoef(shuffled_left, shuffled_right)[0, 1])
+            if len(shuffled_left) > 1
+            else 0.0
+        )
+        particle_iid_lists = [
+            stationary_iid_events(intervals) if len(intervals) else values.copy()
+            for values, intervals in zip(event_lists, interval_lists)
+        ]
+        particle_iid_fanos.append(count_fano(particle_iid_lists))
+        pooled_iid_fanos.append(
+            count_fano([stationary_iid_events(pooled_intervals) for _ in range(particle_count)])
+        )
+        gamma_iid_fanos.append(
+            count_fano([stationary_gamma_events() for _ in range(particle_count)])
+        )
+
+    actual_counts = count_matrix(event_lists).astype(float)
+    individual_variance_sum = float(np.sum(np.var(actual_counts, axis=1)))
+    collective_variance = float(np.var(np.sum(actual_counts, axis=0)))
+    actual_fano = count_fano(event_lists)
+    sequence_fano = float(np.mean(sequence_fanos))
+    particle_iid_fano = float(np.mean(particle_iid_fanos))
+    pooled_iid_fano = float(np.mean(pooled_iid_fanos))
+    gamma_iid_fano = float(np.mean(gamma_iid_fanos))
+    return {
+        "count_window": count_window,
+        "window_count": float(window_count),
+        "complete_waiting_time_count": float(len(pooled_intervals)),
+        "particles_with_complete_wait": float(sum(len(values) > 0 for values in interval_lists)),
+        "complete_wait_particle_fraction": float(
+            sum(len(values) > 0 for values in interval_lists) / particle_count
+        ),
+        "waiting_mean": interval_mean,
+        "waiting_cv2": interval_cv2,
+        "waiting_lag1_correlation": waiting_lag1_correlation,
+        "log_waiting_lag1_correlation": log_waiting_lag1_correlation,
+        "shuffle_lag1_correlation_mean": float(np.mean(shuffled_correlations)),
+        "shuffle_lag1_correlation_standard_deviation": float(np.std(shuffled_correlations, ddof=1)),
+        "actual_count_fano": actual_fano,
+        "sequence_shuffle_count_fano": sequence_fano,
+        "particle_iid_count_fano": particle_iid_fano,
+        "pooled_empirical_iid_count_fano": pooled_iid_fano,
+        "gamma_iid_count_fano": gamma_iid_fano,
+        "temporal_memory_excess_fraction": actual_fano / sequence_fano - 1.0,
+        "persistent_environment_excess_fraction": particle_iid_fano / pooled_iid_fano - 1.0,
+        "empirical_iid_relative_error": abs(pooled_iid_fano / actual_fano - 1.0),
+        "gamma_iid_relative_error": abs(gamma_iid_fano / actual_fano - 1.0),
+        "collective_covariance_ratio": collective_variance / individual_variance_sum
+        if individual_variance_sum > 0.0
+        else math.nan,
+    }
+
+
 def block_trajectory_observables(
     unwrapped_positions: np.ndarray,
     *,
