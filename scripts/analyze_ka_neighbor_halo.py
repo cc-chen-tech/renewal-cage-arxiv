@@ -27,6 +27,20 @@ def parse_edges(value: str) -> np.ndarray:
     return np.array([float(item) for item in value.split(",")], dtype=float)
 
 
+def select_event_indices(
+    valid: np.ndarray,
+    sample_events: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    if sample_events < 0:
+        raise ValueError("sample-events must be zero for all events or a positive count")
+    if sample_events == 0:
+        return valid
+    if len(valid) < sample_events:
+        raise ValueError("too few complete events")
+    return np.sort(rng.choice(valid, size=sample_events, replace=False))
+
+
 def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
@@ -76,10 +90,11 @@ def main() -> None:
             (events["time"] >= args.half_window)
             & (events["time"] + args.half_window <= len(positions))
         )
-        if len(valid) < args.sample_events:
-            raise ValueError(f"replicate {replicate_index} has too few complete events")
         rng = np.random.default_rng(args.random_seed + replicate_index)
-        selected = np.sort(rng.choice(valid, size=args.sample_events, replace=False))
+        try:
+            selected = select_event_indices(valid, args.sample_events, rng)
+        except ValueError as error:
+            raise ValueError(f"replicate {replicate_index}: {error}") from error
         event_particles = events["particle"][selected]
         controls = rng.integers(0, positions.shape[1] - 1, size=len(selected))
         controls += controls >= event_particles
@@ -101,7 +116,7 @@ def main() -> None:
                     "threshold": args.threshold,
                     "half_window": float(args.half_window),
                     "heldout_start": float(args.heldout_start),
-                    "control_definition": "same_time_uniform_random_non_event_particle",
+                    "control_definition": "same_time_uniform_random_non_focal_particle",
                     "spatial_measurement_claim_allowed": 1.0,
                     "spatial_model_claim_allowed": 0.0,
                     "thermodynamic_claim_allowed": 0.0,
@@ -116,6 +131,9 @@ def main() -> None:
                 "half_window": float(args.half_window),
                 "heldout_start": float(args.heldout_start),
                 "total_event_count": float(len(events["time"])),
+                "valid_event_count": float(len(valid)),
+                "selected_event_count": float(len(selected)),
+                "event_selection_mode": "all_valid" if args.sample_events == 0 else "fixed_random",
                 "random_seed": float(args.random_seed + replicate_index),
                 "spatial_measurement_claim_allowed": 1.0,
                 "spatial_model_claim_allowed": 0.0,
@@ -143,7 +161,9 @@ def main() -> None:
             "threshold": args.threshold,
             "half_window": float(args.half_window),
             "heldout_start": float(args.heldout_start),
-            "sampled_events_per_replicate": float(args.sample_events),
+            "event_selection_mode": "all_valid" if args.sample_events == 0 else "fixed_random",
+            "selected_events_min": min(row["selected_event_count"] for row in replicate_rows),
+            "selected_events_max": max(row["selected_event_count"] for row in replicate_rows),
         }
     )
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_shell_replicates.csv"), shell_rows)

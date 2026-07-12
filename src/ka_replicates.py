@@ -160,15 +160,19 @@ def summarize_heldout_event_transport(
     *,
     minimum_coverage: float,
     maximum_coverage: float,
+    model_columns: dict[str, str] | None = None,
+    primary_model: str = "correlated_event_clock",
 ) -> tuple[list[dict[str, float | str]], dict[str, float | str]]:
     """Score event-clock diffusion predictions against independent held-out windows."""
 
     if not rows or not 0.0 < minimum_coverage < maximum_coverage:
         raise ValueError("rows and an ordered positive coverage interval are required")
-    models = {
+    models = model_columns or {
         "uncorrelated_event_clock": "uncorrelated_event_diffusion",
         "correlated_event_clock": "correlated_event_diffusion",
     }
+    if not models or primary_model not in models:
+        raise ValueError("primary_model must identify one requested transport model")
     summary: list[dict[str, float | str]] = []
     coverage_by_model: dict[str, np.ndarray] = {}
     for model, key in models.items():
@@ -206,14 +210,14 @@ def summarize_heldout_event_transport(
                 "independent_replicate_count": float(len(coverage)),
             }
         )
-    correlated = coverage_by_model["correlated_event_clock"]
-    passed = bool(np.all((correlated >= minimum_coverage) & (correlated <= maximum_coverage)))
+    primary = coverage_by_model[primary_model]
+    passed = bool(np.all((primary >= minimum_coverage) & (primary <= maximum_coverage)))
     if passed:
         failure = "none"
-    elif float(np.mean(correlated)) < minimum_coverage:
-        failure = "correlated_event_clock_undercoverage"
-    elif float(np.mean(correlated)) > maximum_coverage:
-        failure = "correlated_event_clock_overcoverage"
+    elif float(np.mean(primary)) < minimum_coverage:
+        failure = f"{primary_model}_undercoverage"
+    elif float(np.mean(primary)) > maximum_coverage:
+        failure = f"{primary_model}_overcoverage"
     else:
         failure = "replicate_transport_inconsistency"
     verdict: dict[str, float | str] = {
@@ -221,6 +225,7 @@ def summarize_heldout_event_transport(
         "maximum_coverage": maximum_coverage,
         "heldout_transport_pass": float(passed),
         "primary_failure": failure,
+        "primary_model": primary_model,
         "independent_replicate_count": float(len(rows)),
         "macro_fit_parameter_count": 0.0,
         "finite_memory_model_required": 0.0,
@@ -722,6 +727,90 @@ def event_conditioned_neighbor_displacement(
     return rows, summary
 
 
+def summarize_paired_curve_stability(
+    calibration_rows: Sequence[dict[str, object]],
+    heldout_rows: Sequence[dict[str, object]],
+    *,
+    bin_key: str,
+    metric_key: str,
+    relative_equivalence_margin: float,
+) -> tuple[list[dict[str, float | str]], dict[str, float | str]]:
+    """Test paired split-half shifts and equivalence across independent replicas."""
+
+    if not math.isfinite(relative_equivalence_margin) or not 0.0 < relative_equivalence_margin < 1.0:
+        raise ValueError("relative_equivalence_margin must lie between zero and one")
+
+    def keyed(rows: Sequence[dict[str, object]]) -> dict[tuple[float, float], float]:
+        result: dict[tuple[float, float], float] = {}
+        for row in rows:
+            key = (float(row["replicate"]), float(row[bin_key]))
+            value = float(row[metric_key])
+            if key in result or not math.isfinite(value):
+                raise ValueError("paired curve rows must have unique finite replicate-bin values")
+            result[key] = value
+        return result
+
+    calibration = keyed(calibration_rows)
+    heldout = keyed(heldout_rows)
+    if calibration.keys() != heldout.keys():
+        raise ValueError("calibration and held-out curves must have identical replicate-bin keys")
+    bins = sorted({key[1] for key in calibration})
+    rows: list[dict[str, float | str]] = []
+    for bin_value in bins:
+        keys = sorted(key for key in calibration if key[1] == bin_value)
+        if len(keys) < 2:
+            raise ValueError("paired curve stability requires at least two independent replicas")
+        differences = np.array([heldout[key] - calibration[key] for key in keys])
+        mean = float(np.mean(differences))
+        standard_deviation = float(np.std(differences, ddof=1))
+        standard_error = standard_deviation / math.sqrt(len(differences))
+        ci_low, ci_high, critical = independent_sample_ci95(
+            mean=mean,
+            standard_error=standard_error,
+            sample_count=len(differences),
+        )
+        calibration_mean = float(np.mean([calibration[key] for key in keys]))
+        equivalence_margin = relative_equivalence_margin * abs(calibration_mean)
+        rows.append(
+            {
+                bin_key: bin_value,
+                "calibration_mean": calibration_mean,
+                "heldout_mean": float(np.mean([heldout[key] for key in keys])),
+                "mean_paired_difference": mean,
+                "standard_deviation_paired_difference": standard_deviation,
+                "standard_error_paired_difference": standard_error,
+                "ci95_low_paired_difference": ci_low,
+                "ci95_high_paired_difference": ci_high,
+                "ci95_critical_value": critical,
+                "ci95_method": "student_t_paired_independent_replicates",
+                "independent_replicate_count": float(len(differences)),
+                "paired_difference_ci_includes_zero": float(ci_low <= 0.0 <= ci_high),
+                "relative_equivalence_margin": relative_equivalence_margin,
+                "absolute_equivalence_margin": equivalence_margin,
+                "paired_difference_ci_within_margin": float(
+                    ci_low >= -equivalence_margin and ci_high <= equivalence_margin
+                ),
+            }
+        )
+    shift_not_detected = all(
+        float(row["paired_difference_ci_includes_zero"]) == 1.0 for row in rows
+    )
+    equivalent = all(
+        float(row["paired_difference_ci_within_margin"]) == 1.0 for row in rows
+    )
+    return rows, {
+        "paired_shift_not_detected": float(shift_not_detected),
+        "paired_curve_equivalent": float(equivalent),
+        "relative_equivalence_margin": relative_equivalence_margin,
+        "tested_bin_count": float(len(rows)),
+        "nonequivalent_bin_count": float(
+            sum(float(row["paired_difference_ci_within_margin"]) == 0.0 for row in rows)
+        ),
+        "independent_replicate_count": rows[0]["independent_replicate_count"],
+        "ci95_method": "student_t_paired_independent_replicates",
+    }
+
+
 def summarize_neighbor_halo_replicates(
     shell_rows: Sequence[dict[str, object]],
     replicate_rows: Sequence[dict[str, object]],
@@ -784,6 +873,225 @@ def summarize_neighbor_halo_replicates(
         "thermodynamic_claim_allowed": 0.0,
     }
     return curve, verdict
+
+
+def event_activity_duration_statistics(
+    activity_times: np.ndarray,
+    activity_values: np.ndarray,
+    events: dict[str, np.ndarray],
+    *,
+    threshold: float,
+) -> dict[str, float]:
+    """Measure contiguous above-threshold durations for retained event peaks."""
+
+    times = np.asarray(activity_times, dtype=int)
+    activity = np.asarray(activity_values, dtype=float)
+    particles = np.asarray(events["particle"], dtype=int)
+    event_times = np.asarray(events["time"], dtype=int)
+    if times.ndim != 1 or activity.ndim != 2 or activity.shape[0] != len(times):
+        raise ValueError("activity times and values must have aligned time axes")
+    if particles.shape != event_times.shape or particles.ndim != 1 or len(particles) == 0:
+        raise ValueError("event particle and time arrays must be aligned and nonempty")
+    if np.any(particles < 0) or np.any(particles >= activity.shape[1]):
+        raise ValueError("event particle index is out of range")
+    if not math.isfinite(threshold) or threshold <= 0.0:
+        raise ValueError("threshold must be positive and finite")
+    time_to_index = {int(time): index for index, time in enumerate(times)}
+    durations: list[int] = []
+    for particle, event_time in zip(particles, event_times):
+        if int(event_time) not in time_to_index:
+            raise ValueError("every event time must occur on the activity time axis")
+        index = time_to_index[int(event_time)]
+        if activity[index, particle] <= threshold:
+            raise ValueError("event peak must exceed the activity threshold")
+        lower = index
+        upper = index
+        while lower > 0 and activity[lower - 1, particle] > threshold:
+            lower -= 1
+        while upper + 1 < len(times) and activity[upper + 1, particle] > threshold:
+            upper += 1
+        durations.append(upper - lower + 1)
+    values = np.asarray(durations, dtype=float)
+    median = float(np.median(values))
+    return {
+        "event_count": float(len(values)),
+        "mean_duration": float(np.mean(values)),
+        "median_duration": median,
+        "duration_p75": float(np.quantile(values, 0.75)),
+        "duration_p90": float(np.quantile(values, 0.90)),
+        "duration_p95": float(np.quantile(values, 0.95)),
+        "maximum_duration": float(np.max(values)),
+        "cluster_time_window": float(max(1, math.ceil(median))),
+    }
+
+
+def spatiotemporal_event_cluster_statistics(
+    events: dict[str, np.ndarray],
+    *,
+    box_lengths: np.ndarray,
+    maximum_time_separation: int,
+    maximum_distance: float,
+) -> dict[str, float]:
+    """Cluster events connected within a measured time window and spatial halo."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=float)
+    centers = np.asarray(events["pre_center"], dtype=float)
+    box = np.asarray(box_lengths, dtype=float)
+    if (
+        times.ndim != 1
+        or len(times) == 0
+        or particles.shape != times.shape
+        or centers.shape != (len(times), len(box))
+    ):
+        raise ValueError("event times and centers must be aligned and nonempty")
+    if np.any(~np.isfinite(times)) or np.any(~np.isfinite(centers)):
+        raise ValueError("event times and centers must be finite")
+    if np.any(~np.isfinite(box)) or np.any(box <= 0.0):
+        raise ValueError("box lengths must be positive and finite")
+    if maximum_time_separation < 0 or maximum_distance <= 0.0:
+        raise ValueError("cluster time and distance scales must be nonnegative and positive")
+    order = np.argsort(times)
+    sorted_particles = particles[order]
+    sorted_times = times[order]
+    sorted_centers = centers[order]
+    parent = np.arange(len(order))
+    size = np.ones(len(order), dtype=int)
+
+    def find(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = int(parent[index])
+        return index
+
+    def union(left: int, right: int) -> None:
+        left_root = find(left)
+        right_root = find(right)
+        if left_root == right_root:
+            return
+        if size[left_root] < size[right_root]:
+            left_root, right_root = right_root, left_root
+        parent[right_root] = left_root
+        size[left_root] += size[right_root]
+
+    squared_cutoff = maximum_distance**2
+    for left in range(len(order)):
+        right = left + 1
+        while right < len(order) and sorted_times[right] - sorted_times[left] <= maximum_time_separation:
+            if sorted_particles[right] == sorted_particles[left]:
+                right += 1
+                continue
+            displacement = sorted_centers[right] - sorted_centers[left]
+            displacement -= box * np.rint(displacement / box)
+            if float(np.dot(displacement, displacement)) <= squared_cutoff:
+                union(left, right)
+            right += 1
+    roots = np.array([find(index) for index in range(len(order))])
+    counts = np.array([np.sum(roots == root) for root in np.unique(roots)], dtype=float)
+    return {
+        "event_count": float(len(order)),
+        "cluster_count": float(len(counts)),
+        "mean_cluster_size": float(np.mean(counts)),
+        "event_weighted_cluster_size": float(np.sum(counts**2) / np.sum(counts)),
+        "nontrivial_event_fraction": float(np.sum(counts[counts > 1.0]) / np.sum(counts)),
+        "maximum_cluster_size": float(np.max(counts)),
+        "maximum_time_separation": float(maximum_time_separation),
+        "maximum_distance": float(maximum_distance),
+    }
+
+
+def isolated_event_response_amplitude(
+    unwrapped_positions: np.ndarray,
+    events: dict[str, np.ndarray],
+    *,
+    response_lag: int,
+    half_window: int,
+) -> dict[str, float]:
+    """Measure the persistent displacement projected onto isolated event marks."""
+
+    positions = np.asarray(unwrapped_positions, dtype=float)
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=int)
+    jumps = np.asarray(events["jump_vector"], dtype=float)
+    pre_centers = np.asarray(events["pre_center"], dtype=float)
+    if positions.ndim != 3 or positions.shape[2] < 1:
+        raise ValueError("unwrapped_positions must have shape (frames, particles, dimensions)")
+    if particles.shape != times.shape or jumps.shape != (len(times), positions.shape[2]):
+        raise ValueError("event particle, time, and jump arrays must align")
+    if pre_centers.shape != jumps.shape or len(times) == 0:
+        raise ValueError("event pre-centers must align with a nonempty event table")
+    if response_lag < 0 or half_window < 1:
+        raise ValueError("response_lag and half_window must be nonnegative and positive")
+    next_time = np.full(len(times), np.inf)
+    for particle in np.unique(particles):
+        indices = np.flatnonzero(particles == particle)
+        indices = indices[np.argsort(times[indices])]
+        next_time[indices[:-1]] = times[indices[1:]]
+    jump_squared = np.sum(jumps**2, axis=1)
+    stop = times + response_lag + half_window
+    valid = (
+        (times + response_lag >= 0)
+        & (stop <= len(positions))
+        & (next_time > stop)
+        & (jump_squared > 0.0)
+    )
+    values: list[float] = []
+    for index in np.flatnonzero(valid):
+        time = int(times[index])
+        future = np.mean(
+            positions[
+                time + response_lag : time + response_lag + half_window,
+                particles[index],
+            ],
+            axis=0,
+        )
+        values.append(
+            float(np.dot(future - pre_centers[index], jumps[index]) / jump_squared[index])
+        )
+    if not values:
+        raise ValueError("no isolated events support the requested response lag")
+    response = np.asarray(values, dtype=float)
+    standard_deviation = float(np.std(response, ddof=1)) if len(response) > 1 else 0.0
+    return {
+        "isolated_event_count": float(len(response)),
+        "response_lag": float(response_lag),
+        "mean_response_amplitude": float(np.mean(response)),
+        "median_response_amplitude": float(np.median(response)),
+        "standard_deviation_response_amplitude": standard_deviation,
+        "standard_error_response_amplitude": standard_deviation / math.sqrt(len(response)),
+    }
+
+
+def cooperative_cluster_diffusion_coefficient(
+    *,
+    event_rate: float,
+    self_jump_squared: float,
+    integrated_neighbor_excess: float,
+    response_amplitude: float,
+    mean_cluster_size: float,
+    dimension: int = 3,
+) -> float:
+    """Diffusion from measured cooperative marks after cluster de-duplication."""
+
+    values = (
+        event_rate,
+        self_jump_squared,
+        integrated_neighbor_excess,
+        response_amplitude,
+        mean_cluster_size,
+    )
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("cooperative diffusion inputs must be finite")
+    if event_rate <= 0.0 or self_jump_squared <= 0.0 or mean_cluster_size <= 0.0:
+        raise ValueError("event rate, self mark, and cluster size must be positive")
+    if integrated_neighbor_excess < 0.0 or response_amplitude < 0.0:
+        raise ValueError("halo excess and response amplitude must be nonnegative")
+    if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 1:
+        raise ValueError("dimension must be a positive integer")
+    mark_squared = response_amplitude**2 * (
+        self_jump_squared + integrated_neighbor_excess
+    )
+    return event_rate * mark_squared / (2.0 * dimension * mean_cluster_size)
 
 
 def summarize_replicate_curves(

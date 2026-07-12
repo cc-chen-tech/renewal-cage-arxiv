@@ -15,6 +15,47 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_t045_halo_profile_is_stable_but_transport_closure_is_rejected(self):
+        curve_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_halo_split_stability_curve.csv"
+        )
+        verdict_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_halo_split_stability_verdict.csv"
+        )
+        with curve_path.open() as handle:
+            curve = list(csv.DictReader(handle))
+        self.assertEqual(len(curve), 8)
+        self.assertTrue(
+            all(float(row["paired_difference_ci_includes_zero"]) == 1.0 for row in curve)
+        )
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        self.assertEqual(float(verdict["paired_shift_not_detected"]), 1.0)
+        self.assertEqual(float(verdict["paired_curve_equivalent"]), 1.0)
+        self.assertEqual(float(verdict["relative_equivalence_margin"]), 0.2)
+        self.assertEqual(float(verdict["binary_radius_gate_stable"]), 0.0)
+        self.assertEqual(
+            verdict["radius_difference_interpretation"],
+            "ci_significance_boundary_not_profile_shift",
+        )
+        self.assertEqual(float(verdict["closure_rejection_robust_to_radius_boundary"]), 1.0)
+        self.assertEqual(float(verdict["spatial_measurement_claim_allowed"]), 1.0)
+        self.assertEqual(float(verdict["spatial_model_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_t045_radius4_closure_is_posthoc_and_cannot_enable_model_claim(self):
+        path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_cooperative_closure_radius4_sensitivity_verdict.csv"
+        )
+        with path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        self.assertEqual(verdict["halo_radius_source"], "posthoc_sensitivity")
+        self.assertEqual(float(verdict["posthoc_sensitivity_only"]), 1.0)
+        self.assertEqual(float(verdict["heldout_transport_pass"]), 0.0)
+        self.assertEqual(float(verdict["spatial_model_claim_allowed"]), 0.0)
+
     def test_t045_neighbor_halo_is_replicated_but_model_claim_stays_blocked(self):
         curve_path = (
             ROOT / "data" / "renewal_cage_ka_replicates_T045_neighbor_halo_curve_summary.csv"

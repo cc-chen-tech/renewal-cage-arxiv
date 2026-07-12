@@ -31,6 +31,38 @@ from ka_replicates import (  # noqa: E402
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_neighbor_halo_event_selection_uses_zero_for_all_events(self):
+        script_path = ROOT / "scripts" / "analyze_ka_neighbor_halo.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_neighbor_halo", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        valid = np.array([2, 4, 6, 8])
+
+        np.testing.assert_array_equal(
+            module.select_event_indices(valid, 0, np.random.default_rng(1)),
+            valid,
+        )
+        sampled = module.select_event_indices(valid, 2, np.random.default_rng(1))
+        self.assertEqual(len(sampled), 2)
+        self.assertTrue(set(sampled).issubset(set(valid)))
+        with self.assertRaisesRegex(ValueError, "zero for all events"):
+            module.select_event_indices(valid, -1, np.random.default_rng(1))
+        with self.assertRaisesRegex(ValueError, "too few complete events"):
+            module.select_event_indices(valid, 5, np.random.default_rng(1))
+
+    def test_cooperative_closure_fixed_halo_radius_is_labeled_posthoc(self):
+        script_path = ROOT / "scripts" / "analyze_ka_cooperative_closure.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_cooperative_closure", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        self.assertEqual(module.resolve_halo_radius(5.0, None), (5.0, "calibration_ci"))
+        self.assertEqual(module.resolve_halo_radius(5.0, 4.0), (4.0, "posthoc_sensitivity"))
+        with self.assertRaisesRegex(ValueError, "positive"):
+            module.resolve_halo_radius(5.0, 0.0)
+
     def test_small_sample_confidence_interval_uses_student_t(self):
         interval = getattr(ka_replicates, "independent_sample_ci95", None)
         self.assertIsNotNone(interval)
@@ -516,6 +548,129 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(verdict["spatial_measurement_claim_allowed"], 1.0)
         self.assertEqual(verdict["spatial_model_claim_allowed"], 0.0)
 
+    def test_paired_curve_stability_requires_each_difference_ci_to_include_zero(self):
+        summarize = getattr(ka_replicates, "summarize_paired_curve_stability", None)
+        self.assertIsNotNone(summarize)
+        calibration = []
+        heldout = []
+        for replicate, delta in ((1, -0.1), (2, 0.0), (3, 0.1)):
+            for distance in (1.0, 2.0):
+                calibration.append(
+                    {"replicate": replicate, "distance_midpoint": distance, "value": distance}
+                )
+                heldout.append(
+                    {
+                        "replicate": replicate,
+                        "distance_midpoint": distance,
+                        "value": distance + delta,
+                    }
+                )
+
+        curve, verdict = summarize(
+            calibration,
+            heldout,
+            bin_key="distance_midpoint",
+            metric_key="value",
+            relative_equivalence_margin=0.3,
+        )
+
+        self.assertTrue(all(row["paired_difference_ci_includes_zero"] == 1.0 for row in curve))
+        self.assertTrue(all(row["paired_difference_ci_within_margin"] == 1.0 for row in curve))
+        self.assertEqual(verdict["paired_shift_not_detected"], 1.0)
+        self.assertEqual(verdict["paired_curve_equivalent"], 1.0)
+        shifted = [dict(row, value=float(row["value"]) + 1.0) for row in heldout]
+        _, shifted_verdict = summarize(
+            calibration,
+            shifted,
+            bin_key="distance_midpoint",
+            metric_key="value",
+            relative_equivalence_margin=0.3,
+        )
+        self.assertEqual(shifted_verdict["paired_curve_equivalent"], 0.0)
+
+    def test_event_duration_and_spatiotemporal_clusters_are_data_derived(self):
+        durations = getattr(ka_replicates, "event_activity_duration_statistics", None)
+        clusters = getattr(ka_replicates, "spatiotemporal_event_cluster_statistics", None)
+        self.assertIsNotNone(durations)
+        self.assertIsNotNone(clusters)
+        activity = np.array(
+            [
+                [0.0, 0.0],
+                [0.6, 0.0],
+                [0.8, 0.7],
+                [0.0, 0.0],
+                [0.0, 0.0],
+            ]
+        )
+        events = {
+            "particle": np.array([0, 1, 0]),
+            "time": np.array([3, 3, 10]),
+            "pre_center": np.array(
+                [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+            ),
+        }
+
+        duration = durations(
+            np.arange(1, 6),
+            activity,
+            {"particle": events["particle"][:2], "time": events["time"][:2]},
+            threshold=0.5,
+        )
+        cluster = clusters(
+            events,
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            maximum_time_separation=2,
+            maximum_distance=2.0,
+        )
+        same_particle = clusters(
+            {
+                "particle": np.array([0, 0]),
+                "time": np.array([1, 2]),
+                "pre_center": np.array([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]]),
+            },
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            maximum_time_separation=2,
+            maximum_distance=2.0,
+        )
+
+        self.assertAlmostEqual(duration["median_duration"], 1.5)
+        self.assertEqual(duration["cluster_time_window"], 2.0)
+        self.assertEqual(cluster["cluster_count"], 2.0)
+        self.assertAlmostEqual(cluster["mean_cluster_size"], 1.5)
+        self.assertAlmostEqual(cluster["event_weighted_cluster_size"], 5.0 / 3.0)
+        self.assertAlmostEqual(cluster["nontrivial_event_fraction"], 2.0 / 3.0)
+        self.assertEqual(same_particle["cluster_count"], 2.0)
+        self.assertEqual(same_particle["mean_cluster_size"], 1.0)
+
+    def test_isolated_response_and_cooperative_diffusion_use_micro_inputs(self):
+        response = getattr(ka_replicates, "isolated_event_response_amplitude", None)
+        diffusion = getattr(ka_replicates, "cooperative_cluster_diffusion_coefficient", None)
+        self.assertIsNotNone(response)
+        self.assertIsNotNone(diffusion)
+        trajectory = np.zeros((7, 1, 3), dtype=float)
+        trajectory[2:4, 0, 0] = 1.0
+        trajectory[4:, 0, 0] = 0.8
+        events = {
+            "particle": np.array([0]),
+            "time": np.array([2]),
+            "jump_vector": np.array([[1.0, 0.0, 0.0]]),
+            "pre_center": np.array([[0.0, 0.0, 0.0]]),
+        }
+
+        measured = response(trajectory, events, response_lag=2, half_window=1)
+        predicted = diffusion(
+            event_rate=0.01,
+            self_jump_squared=1.0,
+            integrated_neighbor_excess=2.0,
+            response_amplitude=0.5,
+            mean_cluster_size=2.0,
+            dimension=3,
+        )
+
+        self.assertAlmostEqual(measured["mean_response_amplitude"], 0.8)
+        self.assertEqual(measured["isolated_event_count"], 1.0)
+        self.assertAlmostEqual(predicted, 0.000625)
+
     def test_replicate_curve_summary_uses_between_trajectory_error(self):
         rows = [
             {"replicate": 1.0, "lag": 1.0, "msd": 1.0, "fs_k7p25": 0.8},
@@ -598,6 +753,36 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(verdict["heldout_transport_pass"], 0.0)
         self.assertEqual(verdict["primary_failure"], "correlated_event_clock_undercoverage")
         self.assertEqual(verdict["independent_replicate_count"], 3.0)
+
+    def test_heldout_transport_summary_scores_cooperative_primary_model(self):
+        rows = [
+            {
+                "replicate": float(replicate),
+                "observed_diffusion": 1.0,
+                "correlated_event_diffusion": 0.4,
+                "cooperative_cluster_diffusion": coverage,
+            }
+            for replicate, coverage in ((1, 0.9), (2, 1.0), (3, 1.1))
+        ]
+
+        summary, verdict = ka_replicates.summarize_heldout_event_transport(
+            rows,
+            minimum_coverage=0.8,
+            maximum_coverage=1.2,
+            model_columns={
+                "correlated_event_clock": "correlated_event_diffusion",
+                "cooperative_cluster_response": "cooperative_cluster_diffusion",
+            },
+            primary_model="cooperative_cluster_response",
+        )
+
+        self.assertEqual([row["model"] for row in summary], [
+            "correlated_event_clock",
+            "cooperative_cluster_response",
+        ])
+        self.assertEqual(verdict["primary_model"], "cooperative_cluster_response")
+        self.assertEqual(verdict["heldout_transport_pass"], 1.0)
+        self.assertEqual(verdict["primary_failure"], "none")
 
     def test_load_lammps_dump_reconstructs_unwrapped_positions(self):
         dump = """ITEM: TIMESTEP
