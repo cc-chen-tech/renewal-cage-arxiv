@@ -17840,18 +17840,26 @@ def waiting_time_shuffle_diagnostics(
         mean = float(np.mean(counts))
         return float(np.var(counts) / mean) if mean > 0.0 else math.nan
 
-    def stationary_iid_events(intervals: np.ndarray) -> np.ndarray:
-        probabilities = intervals / np.sum(intervals)
-        containing_interval = float(rng.choice(intervals, p=probabilities))
+    def stationary_iid_events(
+        intervals: np.ndarray,
+        cumulative_interval_lengths: np.ndarray,
+    ) -> np.ndarray:
+        draw = rng.random() * float(cumulative_interval_lengths[-1])
+        containing_index = int(
+            np.searchsorted(cumulative_interval_lengths, draw, side="right")
+        )
+        containing_interval = float(intervals[min(containing_index, len(intervals) - 1)])
         current = float(rng.uniform(0.0, containing_interval))
         generated: list[float] = []
         while current <= duration:
             generated.append(current)
-            current += float(rng.choice(intervals))
+            current += float(intervals[rng.integers(len(intervals))])
         return np.asarray(generated, dtype=float)
 
     interval_mean = float(np.mean(pooled_intervals))
     interval_cv2 = float(np.var(pooled_intervals) / interval_mean**2)
+    interval_cumulative_lists = [np.cumsum(values) for values in interval_lists]
+    pooled_interval_cumulative = np.cumsum(pooled_intervals)
 
     def stationary_gamma_events() -> np.ndarray:
         if interval_cv2 == 0.0:
@@ -17905,12 +17913,21 @@ def waiting_time_shuffle_diagnostics(
             else 0.0
         )
         particle_iid_lists = [
-            stationary_iid_events(intervals) if len(intervals) else values.copy()
-            for values, intervals in zip(event_lists, interval_lists)
+            stationary_iid_events(intervals, cumulative) if len(intervals) else values.copy()
+            for values, intervals, cumulative in zip(
+                event_lists,
+                interval_lists,
+                interval_cumulative_lists,
+            )
         ]
         particle_iid_fanos.append(count_fano(particle_iid_lists))
         pooled_iid_fanos.append(
-            count_fano([stationary_iid_events(pooled_intervals) for _ in range(particle_count)])
+            count_fano(
+                [
+                    stationary_iid_events(pooled_intervals, pooled_interval_cumulative)
+                    for _ in range(particle_count)
+                ]
+            )
         )
         gamma_iid_fanos.append(
             count_fano([stationary_gamma_events() for _ in range(particle_count)])

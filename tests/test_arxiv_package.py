@@ -15,6 +15,54 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_debye_waller_waiting_law_crosses_from_iid_to_persistent_environment(self):
+        high_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T058_debye_waller_waiting_verdict.csv"
+        )
+        low_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_debye_waller_waiting_verdict.csv"
+        )
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        self.assertEqual(high["consensus_verdict"], "empirical_iid_waiting_law_sufficient")
+        self.assertEqual(low["consensus_verdict"], "persistent_particle_environment_required")
+        self.assertEqual(float(high["independent_replicate_count"]), 5.0)
+        self.assertEqual(float(low["independent_replicate_count"]), 3.0)
+        self.assertEqual(float(low["persistent_environment_identifiable"]), 1.0)
+        self.assertEqual(float(low["finite_memory_model_required"]), 0.0)
+        self.assertGreater(
+            float(low["mean_median_persistent_environment_excess_fraction"]),
+            2.8,
+        )
+
+    def test_mobility_identity_decay_selects_finite_exchange_over_static_disorder(self):
+        verdict_path = (
+            ROOT / "data" / "renewal_cage_ka_debye_waller_environment_crossover_verdict.csv"
+        )
+        growth_path = (
+            ROOT / "data" / "renewal_cage_ka_debye_waller_environment_crossover_growth.csv"
+        )
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        with growth_path.open() as handle:
+            growth = list(csv.DictReader(handle))
+        self.assertEqual({float(row["block_size"]) for row in growth}, {20.0, 50.0, 100.0})
+        self.assertTrue(all(float(row["growth_detected"]) == 1.0 for row in growth))
+        self.assertTrue(all(float(row["ci95_low_ratio"]) > 1.0 for row in growth))
+        self.assertEqual(float(verdict["waiting_mechanism_crossover_detected"]), 1.0)
+        self.assertEqual(float(verdict["pure_static_particle_rate_disorder_rejected"]), 1.0)
+        self.assertEqual(float(verdict["finite_exchange_environment_claim_allowed"]), 1.0)
+        self.assertEqual(float(verdict["finite_waiting_sequence_memory_required"]), 0.0)
+        self.assertEqual(float(verdict["spatial_facilitation_claim_allowed"]), 0.0)
+        self.assertGreater(float(verdict["minimum_exchange_time_growth_ci95_low"]), 1.3)
+        self.assertGreater(
+            float(verdict["cross_half_identity_correlation_growth_ci95_low"]),
+            1.6,
+        )
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+
     def test_debye_waller_event_clock_closes_high_temperature_but_not_every_low_replica(self):
         high_summary = (
             ROOT / "data" / "renewal_cage_ka_replicates_T058_debye_waller_heldout_summary.csv"

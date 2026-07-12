@@ -1,0 +1,4 @@
+numerator_mean,denominator_mean,mean_ratio,log_ratio_standard_error,ci95_low_ratio,ci95_high_ratio,ci95_critical_value,ci95_method,numerator_replicate_count,denominator_replicate_count,relative_equivalence_margin,growth_detected,decrease_detected,equivalent_to_unity,block_size,cooling_exchange_time_growth_detected,thermodynamic_claim_allowed
+211.97454529122868,38.88356945738176,5.451519709978346,0.043758128986689786,4.5159626810350355,6.580892989459099,4.302652729911275,conservative_student_t_delta_log_ratio,3.0,5.0,0.2,1.0,0.0,0.0,20.0,1.0,0.0
+355.40045606314425,74.11883234265967,4.795008836891657,0.10280826956242033,3.0809169680696336,7.462748910196994,4.302652729911275,conservative_student_t_delta_log_ratio,3.0,5.0,0.2,1.0,0.0,0.0,50.0,1.0,0.0
+529.8074321774687,178.52737845864615,2.9676536828786326,0.1871832287986341,1.326292166800656,6.640292841921622,4.302652729911275,conservative_student_t_delta_log_ratio,3.0,5.0,0.2,1.0,0.0,0.0,100.0,1.0,0.0

@@ -224,6 +224,157 @@ def jump_vector_correlation_curve(
     return rows
 
 
+def particle_event_count_correlation_curve(
+    events: dict[str, np.ndarray],
+    *,
+    duration: float,
+    particle_count: int,
+    block_size: float,
+    maximum_lag: int,
+) -> list[dict[str, float]]:
+    """Measure persistence of particle mobility identity across event-count blocks."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=float)
+    if particles.ndim != 1 or times.shape != particles.shape:
+        raise ValueError("event particles and times must be aligned vectors")
+    if particle_count < 2 or not math.isfinite(duration) or duration <= 0.0:
+        raise ValueError("particle_count and duration must define a nontrivial ensemble")
+    if not math.isfinite(block_size) or block_size <= 0.0 or block_size > duration / 2.0:
+        raise ValueError("block_size must leave at least two complete blocks")
+    if isinstance(maximum_lag, bool) or not isinstance(maximum_lag, int) or maximum_lag < 1:
+        raise ValueError("maximum_lag must be a positive integer")
+    if np.any(particles < 0) or np.any(particles >= particle_count):
+        raise ValueError("event particle indices are out of range")
+    if np.any(~np.isfinite(times)) or np.any(times < 0.0) or np.any(times > duration):
+        raise ValueError("event times must lie in the observation interval")
+    block_count = int(duration // block_size)
+    if maximum_lag >= block_count:
+        raise ValueError("maximum_lag must be smaller than the complete block count")
+    block_index = np.floor(times / block_size).astype(int)
+    retained = block_index < block_count
+    counts = np.zeros((particle_count, block_count), dtype=float)
+    np.add.at(counts, (particles[retained], block_index[retained]), 1.0)
+    residual = counts - np.mean(counts, axis=0, keepdims=True)
+    rows: list[dict[str, float]] = []
+    for lag in range(1, maximum_lag + 1):
+        left = residual[:, :-lag].ravel()
+        right = residual[:, lag:].ravel()
+        denominator = math.sqrt(float(np.dot(left, left) * np.dot(right, right)))
+        correlation = float(np.dot(left, right) / denominator) if denominator > 0.0 else 0.0
+        rows.append(
+            {
+                "block_lag": float(lag),
+                "lag_time": float(lag * block_size),
+                "block_size": float(block_size),
+                "block_count": float(block_count),
+                "paired_particle_block_count": float(len(left)),
+                "mean_events_per_particle_block": float(np.mean(counts)),
+                "particle_identity_correlation": correlation,
+            }
+        )
+    return rows
+
+
+def particle_event_count_cross_window_correlation(
+    first_events: dict[str, np.ndarray],
+    second_events: dict[str, np.ndarray],
+    *,
+    particle_count: int,
+) -> dict[str, float]:
+    """Correlate particle mobility identities between two disjoint windows."""
+
+    if particle_count < 2:
+        raise ValueError("particle_count must be at least two")
+    first_particles = np.asarray(first_events["particle"], dtype=int)
+    second_particles = np.asarray(second_events["particle"], dtype=int)
+    if first_particles.ndim != 1 or second_particles.ndim != 1:
+        raise ValueError("event particle arrays must be vectors")
+    if (
+        np.any(first_particles < 0)
+        or np.any(first_particles >= particle_count)
+        or np.any(second_particles < 0)
+        or np.any(second_particles >= particle_count)
+    ):
+        raise ValueError("event particle indices are out of range")
+    first_counts = np.bincount(first_particles, minlength=particle_count).astype(float)
+    second_counts = np.bincount(second_particles, minlength=particle_count).astype(float)
+    first_residual = first_counts - np.mean(first_counts)
+    second_residual = second_counts - np.mean(second_counts)
+    denominator = math.sqrt(
+        float(np.dot(first_residual, first_residual) * np.dot(second_residual, second_residual))
+    )
+    correlation = (
+        float(np.dot(first_residual, second_residual) / denominator)
+        if denominator > 0.0
+        else 0.0
+    )
+    return {
+        "particle_identity_correlation": correlation,
+        "first_mean_event_count": float(np.mean(first_counts)),
+        "second_mean_event_count": float(np.mean(second_counts)),
+        "first_event_count_variance": float(np.var(first_counts)),
+        "second_event_count_variance": float(np.var(second_counts)),
+        "particle_count": float(particle_count),
+    }
+
+
+def correlation_efold_crossing(
+    rows: Sequence[dict[str, object]],
+    *,
+    lag_key: str = "lag_time",
+    correlation_key: str = "particle_identity_correlation",
+) -> dict[str, float]:
+    """Locate the first 1/e decay of a positive correlation curve."""
+
+    if len(rows) < 2:
+        raise ValueError("an e-fold crossing requires at least two curve rows")
+    ordered = sorted(rows, key=lambda row: float(row[lag_key]))
+    lags = np.array([float(row[lag_key]) for row in ordered])
+    correlations = np.array([float(row[correlation_key]) for row in ordered])
+    if (
+        np.any(~np.isfinite(lags))
+        or np.any(~np.isfinite(correlations))
+        or np.any(lags <= 0.0)
+        or np.any(np.diff(lags) <= 0.0)
+        or correlations[0] <= 0.0
+    ):
+        raise ValueError("correlation curve must have increasing positive lags and a positive start")
+    target = float(correlations[0] / math.e)
+    candidates = np.flatnonzero(correlations <= target)
+    if len(candidates) == 0:
+        raise ValueError("correlation curve does not reach its 1/e target")
+    upper_index = int(candidates[0])
+    if upper_index == 0:
+        crossing = float(lags[0])
+        lower_lag = float(lags[0])
+    else:
+        lower_index = upper_index - 1
+        lower_lag = float(lags[lower_index])
+        if correlations[upper_index] <= 0.0:
+            crossing = float(lags[upper_index])
+        else:
+            fraction = (
+                math.log(target) - math.log(float(correlations[lower_index]))
+            ) / (
+                math.log(float(correlations[upper_index]))
+                - math.log(float(correlations[lower_index]))
+            )
+            crossing = math.exp(
+                math.log(float(lags[lower_index]))
+                + fraction
+                * (math.log(float(lags[upper_index])) - math.log(float(lags[lower_index])))
+            )
+    return {
+        "initial_lag_time": float(lags[0]),
+        "initial_correlation": float(correlations[0]),
+        "target_correlation": target,
+        "efold_crossing_time": crossing,
+        "crossing_lower_lag": lower_lag,
+        "crossing_upper_lag": float(lags[upper_index]),
+    }
+
+
 def debye_waller_factor_from_msd(
     lags: np.ndarray,
     mean_squared_displacement: np.ndarray,

@@ -117,6 +117,63 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertAlmostEqual(rows[0]["cumulative_green_kubo_factor"], -1.0)
         self.assertAlmostEqual(rows[1]["cumulative_green_kubo_factor"], 1.0)
 
+    def test_particle_event_count_correlation_tracks_mobility_identity(self):
+        correlate = getattr(ka_replicates, "particle_event_count_correlation_curve", None)
+        cross_correlate = getattr(
+            ka_replicates,
+            "particle_event_count_cross_window_correlation",
+            None,
+        )
+        self.assertIsNotNone(correlate)
+        self.assertIsNotNone(cross_correlate)
+        particles = []
+        times = []
+        for block in range(4):
+            particles.extend([0, 0, 2])
+            times.extend([10 * block + 1, 10 * block + 2, 10 * block + 3])
+        persistent = correlate(
+            {"particle": np.array(particles), "time": np.array(times)},
+            duration=40.0,
+            particle_count=3,
+            block_size=10.0,
+            maximum_lag=2,
+        )
+        alternating = correlate(
+            {
+                "particle": np.array([0, 0, 1, 1, 0, 0, 1, 1]),
+                "time": np.array([1, 2, 11, 12, 21, 22, 31, 32]),
+            },
+            duration=40.0,
+            particle_count=2,
+            block_size=10.0,
+            maximum_lag=1,
+        )
+
+        self.assertAlmostEqual(persistent[0]["particle_identity_correlation"], 1.0)
+        self.assertAlmostEqual(persistent[1]["particle_identity_correlation"], 1.0)
+        self.assertAlmostEqual(alternating[0]["particle_identity_correlation"], -1.0)
+        cross = cross_correlate(
+            {"particle": np.array([0, 0, 2])},
+            {"particle": np.array([0, 0, 2])},
+            particle_count=3,
+        )
+        self.assertAlmostEqual(cross["particle_identity_correlation"], 1.0)
+
+    def test_correlation_efold_crossing_interpolates_first_decay(self):
+        crossing = getattr(ka_replicates, "correlation_efold_crossing", None)
+        self.assertIsNotNone(crossing)
+        result = crossing(
+            [
+                {"lag_time": 1.0, "particle_identity_correlation": 1.0},
+                {"lag_time": 2.0, "particle_identity_correlation": 0.5},
+                {"lag_time": 3.0, "particle_identity_correlation": 0.2},
+            ]
+        )
+
+        self.assertGreater(result["efold_crossing_time"], 2.0)
+        self.assertLess(result["efold_crossing_time"], 3.0)
+        self.assertAlmostEqual(result["target_correlation"], 1.0 / np.e)
+
     def test_position_fluctuation_and_cage_jump_segmentation_are_translation_invariant(self):
         fluctuation = getattr(ka_replicates, "position_fluctuation_values", None)
         segment = getattr(ka_replicates, "extract_debye_waller_cage_jumps", None)
