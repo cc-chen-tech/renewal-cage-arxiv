@@ -362,6 +362,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
         spec.loader.exec_module(module)
         passing = {
             "calibration_bic_gain_two_over_one": 15.0,
+            "heldout_mean_relative_error": 0.03,
             "heldout_fano_relative_error": 0.03,
             "heldout_count_tv_distance": 0.02,
             "two_clock_identity_rmse": 0.02,
@@ -378,12 +379,17 @@ class KAReplicatePreparationTests(unittest.TestCase):
         distribution_rejected = module.classify_cox_transfer(
             {**passing, "heldout_count_tv_distance": 0.04}
         )
+        mean_rejected = module.classify_cox_transfer(
+            {**passing, "heldout_mean_relative_error": 0.12}
+        )
 
         self.assertEqual(accepted["two_clock_cox_transfer_pass"], 1.0)
         self.assertEqual(rejected["two_clock_cox_transfer_pass"], 0.0)
         self.assertEqual(rejected["primary_failure"], "count_fano")
         self.assertEqual(distribution_rejected["two_clock_cox_transfer_pass"], 0.0)
         self.assertEqual(distribution_rejected["primary_failure"], "count_distribution")
+        self.assertEqual(mean_rejected["two_clock_cox_transfer_pass"], 0.0)
+        self.assertEqual(mean_rejected["primary_failure"], "mean_count")
 
     def test_gamma_refresh_crossover_selects_second_clock_only_after_cooling(self):
         script_path = ROOT / "scripts" / "summarize_ka_gamma_refresh_crossover.py"
@@ -404,6 +410,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
 
         self.assertEqual(result["cooling_induced_second_refresh_clock_required"], 1.0)
         self.assertAlmostEqual(result["low_temperature_pass_gain"], 2.0 / 6.0)
+        self.assertEqual(result["conditional_shape_crossover_closure"], 1.0)
         self.assertEqual(result["count_moment_crossover_closure"], 1.0)
         self.assertEqual(result["full_count_distribution_claim_allowed"], 0.0)
 
@@ -423,6 +430,113 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["pair_tv_tolerance"], 0.03)
         self.assertEqual(result["gamma_pair_distribution_pass"], 0.0)
         self.assertEqual(result["hmm_pair_distribution_pass"], 1.0)
+
+    def test_two_clock_hmm_mixture_matches_analytic_memory_and_pair_distribution(self):
+        parameterize = getattr(ka_replicates, "two_clock_hmm_mixture_parameters", None)
+        predict = getattr(ka_replicates, "two_clock_hmm_mixture_count_predictions", None)
+        pair_pmf = getattr(ka_replicates, "two_clock_hmm_mixture_pair_pmf", None)
+        simulate = getattr(ka_replicates, "simulate_two_clock_hmm_mixture_counts", None)
+        self.assertIsNotNone(parameterize)
+        self.assertIsNotNone(predict)
+        self.assertIsNotNone(pair_pmf)
+        self.assertIsNotNone(simulate)
+        hmm = {
+            "slow_mean_count": 0.1,
+            "fast_mean_count": 1.6,
+            "stationary_slow_probability": 0.7,
+            "stationary_fast_probability": 0.3,
+        }
+        spectrum = {
+            "fast_amplitude_fraction": 0.6,
+            "fast_time": 3.0,
+            "slow_time": 25.0,
+        }
+        params = parameterize(hmm, spectrum, block_size=1.0)
+        counts = simulate(params, sequence_count=3000, block_count=160, random_seed=9921)
+        rows = predict(params, maximum_lag=2)
+        maximum_count = int(np.max(counts))
+        predicted_pair = pair_pmf(params, maximum_count=maximum_count, block_lag=1)
+        empirical_pair = np.zeros_like(predicted_pair)
+        np.add.at(
+            empirical_pair,
+            (counts[:, :-1].ravel(), counts[:, 1:].ravel()),
+            1.0,
+        )
+        empirical_pair /= np.sum(empirical_pair)
+        empirical_correlation = np.corrcoef(
+            counts[:, :-1].ravel(),
+            counts[:, 1:].ravel(),
+        )[0, 1]
+
+        self.assertAlmostEqual(float(np.mean(counts)), rows[0]["predicted_mean_count"], delta=0.02)
+        self.assertAlmostEqual(
+            float(np.var(counts) / np.mean(counts)),
+            rows[0]["predicted_fano_factor"],
+            delta=0.05,
+        )
+        self.assertAlmostEqual(
+            empirical_correlation,
+            rows[0]["predicted_identity_correlation"],
+            delta=0.02,
+        )
+        self.assertLess(float(np.sum(np.abs(empirical_pair - predicted_pair))), 0.04)
+
+    def test_two_clock_hmm_hybrid_gate_separates_rate_drift_from_shape_closure(self):
+        script_path = ROOT / "scripts" / "analyze_ka_two_clock_hmm_mixture.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_two_clock_hmm_mixture", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        row = {
+            "heldout_mean_relative_error": 0.12,
+            "heldout_fano_relative_error": 0.08,
+            "heldout_count_tv_distance": 0.02,
+            "identity_rmse": 0.03,
+            "late_identity_absolute_error": 0.02,
+            "pair_distribution_pass": 1.0,
+        }
+
+        result = module.classify_hybrid_transfer(row)
+
+        self.assertEqual(result["conditional_shape_distribution_pass"], 1.0)
+        self.assertEqual(result["full_hybrid_transfer_pass"], 0.0)
+        self.assertEqual(result["primary_failure"], "mean_count_drift")
+
+    def test_two_clock_hmm_crossover_selects_hybrid_with_rate_drift_boundary(self):
+        script_path = ROOT / "scripts" / "summarize_ka_two_clock_hmm_crossover.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_two_clock_hmm_crossover", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        result = module.classify_crossover(
+            high_second_clock_selection=0.0,
+            low_second_clock_selection=1.0,
+            low_shape_pass=1.0,
+            low_full_pass=4.0 / 6.0,
+        )
+
+        self.assertEqual(result["cooling_induced_hybrid_clock_selected"], 1.0)
+        self.assertEqual(result["conditional_event_shape_crossover_closure"], 1.0)
+        self.assertEqual(result["absolute_rate_drift_unresolved"], 1.0)
+        self.assertEqual(result["macro_observable_prediction_claim_allowed"], 0.0)
+
+    def test_rate_stability_exact_permutation_detects_monotonic_drift(self):
+        script_path = ROOT / "scripts" / "analyze_ka_rate_stability.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_rate_stability", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        result = module.exact_rate_trend(np.array([1.0, 1.1, 1.2, 1.3, 1.4, 1.5]))
+
+        self.assertGreater(result["normalized_total_linear_change"], 0.4)
+        self.assertLess(result["exact_two_sided_permutation_p_value"], 0.01)
+        self.assertEqual(result["strict_trend_detected"], 1.0)
 
     def test_exchange_spectrum_rejects_nonincreasing_times(self):
         fit = getattr(ka_replicates, "fit_exponential_correlation_spectrum", None)

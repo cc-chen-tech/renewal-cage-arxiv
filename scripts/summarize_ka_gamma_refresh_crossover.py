@@ -40,15 +40,15 @@ def classify_crossover(
 ) -> dict[str, float]:
     selected = bool(
         high_outcome == "single_clock_gamma_refresh_count_moment_closure"
-        and low_outcome == "two_clock_gamma_refresh_count_moment_closure"
+        and low_outcome.startswith("two_clock_gamma_refresh")
         and high_single_transfer == 1.0
-        and low_two_transfer == 1.0
         and low_single_transfer < low_two_transfer
     )
     return {
         "cooling_induced_second_refresh_clock_required": float(selected),
         "low_temperature_pass_gain": low_two_transfer - low_single_transfer,
-        "count_moment_crossover_closure": float(selected),
+        "conditional_shape_crossover_closure": float(selected),
+        "count_moment_crossover_closure": float(selected and low_two_transfer == 1.0),
         "full_count_distribution_claim_allowed": 0.0,
         "heldout_macro_prediction_claim_allowed": 0.0,
         "spatial_facilitation_claim_allowed": 0.0,

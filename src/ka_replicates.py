@@ -1111,6 +1111,200 @@ def simulate_gamma_refresh_cox_counts(
     return counts
 
 
+def two_clock_hmm_mixture_parameters(
+    hmm_fitted: dict[str, object],
+    fitted_spectrum: dict[str, object],
+    *,
+    block_size: float,
+) -> dict[str, float]:
+    """Combine HMM emissions with two finite exchange-rate classes."""
+
+    slow_mean = float(hmm_fitted["slow_mean_count"])
+    fast_mean = float(hmm_fitted["fast_mean_count"])
+    slow_probability = float(hmm_fitted["stationary_slow_probability"])
+    fast_probability = float(hmm_fitted["stationary_fast_probability"])
+    fast_clock_weight = float(fitted_spectrum["fast_amplitude_fraction"])
+    fast_time = float(fitted_spectrum["fast_time"])
+    slow_time = float(fitted_spectrum["slow_time"])
+    values = np.array(
+        [
+            slow_mean,
+            fast_mean,
+            slow_probability,
+            fast_probability,
+            fast_clock_weight,
+            fast_time,
+            slow_time,
+            block_size,
+        ]
+    )
+    if (
+        np.any(~np.isfinite(values))
+        or min(slow_mean, fast_mean) < 0.0
+        or slow_mean > fast_mean
+        or min(slow_probability, fast_probability) <= 0.0
+        or not math.isclose(slow_probability + fast_probability, 1.0, abs_tol=1e-8)
+        or not 0.0 <= fast_clock_weight <= 1.0
+        or min(fast_time, slow_time, block_size) <= 0.0
+        or fast_time > slow_time
+    ):
+        raise ValueError("HMM emissions and exchange spectrum must define two finite clocks")
+    mean_count = slow_probability * slow_mean + fast_probability * fast_mean
+    environment_variance = (
+        slow_probability * fast_probability * (fast_mean - slow_mean) ** 2
+    )
+    count_variance = mean_count + environment_variance
+    return {
+        "slow_mean_count": slow_mean,
+        "fast_mean_count": fast_mean,
+        "stationary_slow_probability": slow_probability,
+        "stationary_fast_probability": fast_probability,
+        "fast_clock_weight": fast_clock_weight,
+        "slow_clock_weight": 1.0 - fast_clock_weight,
+        "fast_clock_time": fast_time,
+        "slow_clock_time": slow_time,
+        "fast_clock_retention": math.exp(-block_size / fast_time),
+        "slow_clock_retention": math.exp(-block_size / slow_time),
+        "block_size": block_size,
+        "mean_count": mean_count,
+        "environment_variance": environment_variance,
+        "count_variance": count_variance,
+        "fano_factor": count_variance / mean_count,
+        "zero_lag_identity_amplitude": environment_variance / count_variance,
+    }
+
+
+def two_clock_hmm_mixture_count_predictions(
+    parameters: dict[str, object],
+    *,
+    maximum_lag: int,
+) -> list[dict[str, float]]:
+    """Exact stationary moments of a two-exchange-rate HMM mixture."""
+
+    if isinstance(maximum_lag, bool) or not isinstance(maximum_lag, int) or maximum_lag < 1:
+        raise ValueError("maximum_lag must be a positive integer")
+    return [
+        {
+            "block_lag": float(lag),
+            "lag_time": lag * float(parameters["block_size"]),
+            "predicted_mean_count": float(parameters["mean_count"]),
+            "predicted_count_variance": float(parameters["count_variance"]),
+            "predicted_fano_factor": float(parameters["fano_factor"]),
+            "predicted_identity_correlation": float(
+                parameters["zero_lag_identity_amplitude"]
+            )
+            * (
+                float(parameters["fast_clock_weight"])
+                * float(parameters["fast_clock_retention"]) ** lag
+                + float(parameters["slow_clock_weight"])
+                * float(parameters["slow_clock_retention"]) ** lag
+            ),
+        }
+        for lag in range(1, maximum_lag + 1)
+    ]
+
+
+def two_clock_hmm_mixture_pair_pmf(
+    parameters: dict[str, object],
+    *,
+    maximum_count: int,
+    block_lag: int,
+) -> np.ndarray:
+    """Exact joint count PMF for the two-exchange-rate HMM mixture."""
+
+    if isinstance(maximum_count, bool) or not isinstance(maximum_count, int) or maximum_count < 0:
+        raise ValueError("maximum_count must be a nonnegative integer")
+    if isinstance(block_lag, bool) or not isinstance(block_lag, int) or block_lag < 1:
+        raise ValueError("block_lag must be a positive integer")
+    stationary = np.array(
+        [
+            float(parameters["stationary_slow_probability"]),
+            float(parameters["stationary_fast_probability"]),
+        ]
+    )
+
+    def poisson(mean: float) -> np.ndarray:
+        values = np.zeros(maximum_count + 1, dtype=float)
+        values[0] = math.exp(-mean)
+        for count in range(1, maximum_count + 1):
+            values[count] = values[count - 1] * mean / count
+        return values
+
+    emissions = [
+        poisson(float(parameters["slow_mean_count"])),
+        poisson(float(parameters["fast_mean_count"])),
+    ]
+
+    def clock_pair(retention: float) -> np.ndarray:
+        lag_retention = retention**block_lag
+        transition = np.array(
+            [
+                [
+                    1.0 - stationary[1] * (1.0 - lag_retention),
+                    stationary[1] * (1.0 - lag_retention),
+                ],
+                [
+                    stationary[0] * (1.0 - lag_retention),
+                    1.0 - stationary[0] * (1.0 - lag_retention),
+                ],
+            ]
+        )
+        return sum(
+            stationary[first]
+            * transition[first, second]
+            * np.outer(emissions[first], emissions[second])
+            for first in range(2)
+            for second in range(2)
+        )
+
+    return (
+        float(parameters["fast_clock_weight"])
+        * clock_pair(float(parameters["fast_clock_retention"]))
+        + float(parameters["slow_clock_weight"])
+        * clock_pair(float(parameters["slow_clock_retention"]))
+    )
+
+
+def simulate_two_clock_hmm_mixture_counts(
+    parameters: dict[str, object],
+    *,
+    sequence_count: int,
+    block_count: int,
+    random_seed: int,
+) -> np.ndarray:
+    """Sample count sequences from HMM emissions with two finite exchange rates."""
+
+    if min(sequence_count, block_count) < 2:
+        raise ValueError("simulation requires at least two sequences and blocks")
+    rng = np.random.default_rng(random_seed)
+    fast_clock = rng.random(sequence_count) < float(parameters["fast_clock_weight"])
+    retention = np.where(
+        fast_clock,
+        float(parameters["fast_clock_retention"]),
+        float(parameters["slow_clock_retention"]),
+    )
+    slow_probability = float(parameters["stationary_slow_probability"])
+    fast_probability = float(parameters["stationary_fast_probability"])
+    state = (rng.random(sequence_count) >= slow_probability).astype(int)
+    means = np.array(
+        [float(parameters["slow_mean_count"]), float(parameters["fast_mean_count"])]
+    )
+    counts = np.empty((sequence_count, block_count), dtype=int)
+    for block in range(block_count):
+        counts[:, block] = rng.poisson(means[state])
+        if block == block_count - 1:
+            continue
+        uniforms = rng.random(sequence_count)
+        slow_to_fast = fast_probability * (1.0 - retention)
+        fast_to_slow = slow_probability * (1.0 - retention)
+        state = np.where(
+            state == 0,
+            uniforms < slow_to_fast,
+            uniforms >= fast_to_slow,
+        ).astype(int)
+    return counts
+
+
 def event_cumulative_trajectory(
     events: dict[str, np.ndarray],
     *,

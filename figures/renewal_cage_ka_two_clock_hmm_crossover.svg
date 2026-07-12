@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="660" viewBox="0 0 920 660">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124;stroke-width:1}.grid{stroke:#DADCE0;stroke-width:1}.obs{fill:none;stroke-width:3}.model{fill:none;stroke-width:2;stroke-dasharray:7 5}</style>
+<text x="460" y="27" text-anchor="middle" font-size="18" font-weight="700">Two exchange clocks reconcile local emissions and long memory</text>
+<line class="grid" x1="70" y1="325.00" x2="425" y2="325.00"/>
+<text x="60" y="329.00" text-anchor="end" font-size="11">0.00</text>
+<line class="grid" x1="70" y1="257.50" x2="425" y2="257.50"/>
+<text x="60" y="261.50" text-anchor="end" font-size="11">0.02</text>
+<line class="grid" x1="70" y1="190.00" x2="425" y2="190.00"/>
+<text x="60" y="194.00" text-anchor="end" font-size="11">0.04</text>
+<line class="grid" x1="70" y1="122.50" x2="425" y2="122.50"/>
+<text x="60" y="126.50" text-anchor="end" font-size="11">0.06</text>
+<line class="grid" x1="70" y1="55.00" x2="425" y2="55.00"/>
+<text x="60" y="59.00" text-anchor="end" font-size="11">0.08</text>
+<line class="axis" x1="70" y1="55" x2="70" y2="325"/>
+<line class="axis" x1="70" y1="325" x2="425" y2="325"/>
+<text x="247.50" y="42" text-anchor="middle" font-size="15" font-weight="700">T = 0.58: identity</text>
+<text x="247.50" y="360" text-anchor="middle" font-size="12">lag time (block size = 50)</text>
+<text x="70.00" y="343" text-anchor="middle" font-size="10">0</text>
+<text x="158.75" y="343" text-anchor="middle" font-size="10">150</text>
+<text x="247.50" y="343" text-anchor="middle" font-size="10">300</text>
+<text x="336.25" y="343" text-anchor="middle" font-size="10">450</text>
+<text x="425.00" y="343" text-anchor="middle" font-size="10">600</text>
+<polyline class="obs" stroke="#202124" points="99.58,119.87 129.17,274.90 158.75,293.63 188.33,303.43 217.92,296.39 247.50,285.77 277.08,293.16 306.67,282.28 336.25,318.11 365.83,340.28 395.42,314.14 425.00,335.76"/>
+<polyline class="model" stroke="#009E73" points="99.58,148.31 129.17,262.66 158.75,301.78 188.33,315.42 217.92,320.34 247.50,322.25 277.08,323.10 306.67,323.54 336.25,323.82 365.83,324.03 395.42,324.19 425.00,324.32"/>
+<polyline class="model" stroke="#0072B2" points="99.58,136.01 129.17,254.78 158.75,298.59 188.33,314.94 217.92,321.12 247.50,323.49 277.08,324.40 306.67,324.76 336.25,324.90 365.83,324.96 395.42,324.98 425.00,324.99"/>
+<line class="grid" x1="515" y1="325.00" x2="870" y2="325.00"/>
+<text x="505" y="329.00" text-anchor="end" font-size="11">0.00</text>
+<line class="grid" x1="515" y1="257.50" x2="870" y2="257.50"/>
+<text x="505" y="261.50" text-anchor="end" font-size="11">0.09</text>
+<line class="grid" x1="515" y1="190.00" x2="870" y2="190.00"/>
+<text x="505" y="194.00" text-anchor="end" font-size="11">0.19</text>
+<line class="grid" x1="515" y1="122.50" x2="870" y2="122.50"/>
+<text x="505" y="126.50" text-anchor="end" font-size="11">0.28</text>
+<line class="grid" x1="515" y1="55.00" x2="870" y2="55.00"/>
+<text x="505" y="59.00" text-anchor="end" font-size="11">0.37</text>
+<line class="axis" x1="515" y1="55" x2="515" y2="325"/>
+<line class="axis" x1="515" y1="325" x2="870" y2="325"/>
+<text x="692.50" y="42" text-anchor="middle" font-size="15" font-weight="700">T = 0.45: identity</text>
+<text x="692.50" y="360" text-anchor="middle" font-size="12">lag time (block size = 50)</text>
+<text x="515.00" y="343" text-anchor="middle" font-size="10">0</text>
+<text x="603.75" y="343" text-anchor="middle" font-size="10">150</text>
+<text x="692.50" y="343" text-anchor="middle" font-size="10">300</text>
+<text x="781.25" y="343" text-anchor="middle" font-size="10">450</text>
+<text x="870.00" y="343" text-anchor="middle" font-size="10">600</text>
+<polyline class="obs" stroke="#202124" points="544.58,75.00 574.17,140.03 603.75,171.40 633.33,194.58 662.92,209.21 692.50,221.12 722.08,230.70 751.67,237.49 781.25,243.51 810.83,249.42 840.42,254.06 870.00,260.48"/>
+<polyline class="model" stroke="#009E73" points="544.58,101.42 574.17,157.10 603.75,189.56 633.33,209.47 662.92,222.53 692.50,231.81 722.08,238.93 751.67,244.78 781.25,249.82 810.83,254.33 840.42,258.44 870.00,262.25"/>
+<polyline class="model" stroke="#0072B2" points="544.58,83.81 574.17,144.64 603.75,190.12 633.33,224.13 662.92,249.56 692.50,268.57 722.08,282.80 751.67,293.43 781.25,301.38 810.83,307.33 840.42,311.78 870.00,315.11"/>
+<line x1="205" y1="365" x2="233" y2="365" stroke="#202124" stroke-width="3"/>
+<text x="241" y="370" font-size="12">held-out</text>
+<line x1="410" y1="365" x2="438" y2="365" stroke="#009E73" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="446" y="370" font-size="12">two-clock HMM</text>
+<line x1="615" y1="365" x2="643" y2="365" stroke="#0072B2" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="651" y="370" font-size="12">single-clock HMM</text>
+<line class="axis" x1="70" y1="430" x2="70" y2="600"/>
+<line class="axis" x1="70" y1="600" x2="425" y2="600"/>
+<text x="247.50" y="416" text-anchor="middle" font-size="14" font-weight="700">Low-T identity RMSE</text>
+<line x1="70" y1="493.75" x2="425" y2="493.75" stroke="#C5221F" stroke-width="1.5" stroke-dasharray="5 4"/>
+<circle cx="92.58" cy="510.93" r="4" fill="#7B61A8"/>
+<circle cx="106.58" cy="563.04" r="4" fill="#009E73"/>
+<text x="99.58" y="616" text-anchor="middle" font-size="9">1/20</text>
+<circle cx="151.75" cy="496.69" r="4" fill="#7B61A8"/>
+<circle cx="165.75" cy="545.19" r="4" fill="#009E73"/>
+<text x="158.75" y="616" text-anchor="middle" font-size="9">2/20</text>
+<circle cx="210.92" cy="542.39" r="4" fill="#7B61A8"/>
+<circle cx="224.92" cy="581.19" r="4" fill="#009E73"/>
+<text x="217.92" y="616" text-anchor="middle" font-size="9">3/20</text>
+<circle cx="270.08" cy="458.42" r="4" fill="#7B61A8"/>
+<circle cx="284.08" cy="555.97" r="4" fill="#009E73"/>
+<text x="277.08" y="616" text-anchor="middle" font-size="9">1/50</text>
+<circle cx="329.25" cy="431.57" r="4" fill="#7B61A8"/>
+<circle cx="343.25" cy="523.05" r="4" fill="#009E73"/>
+<text x="336.25" y="616" text-anchor="middle" font-size="9">2/50</text>
+<circle cx="388.42" cy="513.06" r="4" fill="#7B61A8"/>
+<circle cx="402.42" cy="574.57" r="4" fill="#009E73"/>
+<text x="395.42" y="616" text-anchor="middle" font-size="9">3/50</text>
+<text x="62" y="434" text-anchor="end" font-size="10">0.08</text>
+<text x="62" y="604" text-anchor="end" font-size="10">0</text>
+<line class="axis" x1="515" y1="430" x2="515" y2="600"/>
+<line class="axis" x1="515" y1="600" x2="870" y2="600"/>
+<text x="692.50" y="416" text-anchor="middle" font-size="14" font-weight="700">Low-T lag-1 pair TV</text>
+<line x1="515" y1="536.25" x2="870" y2="536.25" stroke="#C5221F" stroke-width="1.5" stroke-dasharray="5 4"/>
+<circle cx="537.58" cy="560.94" r="4" fill="#7B61A8"/>
+<circle cx="551.58" cy="578.25" r="4" fill="#009E73"/>
+<text x="544.58" y="616" text-anchor="middle" font-size="9">1/20</text>
+<circle cx="596.75" cy="544.92" r="4" fill="#7B61A8"/>
+<circle cx="610.75" cy="558.25" r="4" fill="#009E73"/>
+<text x="603.75" y="616" text-anchor="middle" font-size="9">2/20</text>
+<circle cx="655.92" cy="563.99" r="4" fill="#7B61A8"/>
+<circle cx="669.92" cy="579.38" r="4" fill="#009E73"/>
+<text x="662.92" y="616" text-anchor="middle" font-size="9">3/20</text>
+<circle cx="715.08" cy="498.49" r="4" fill="#7B61A8"/>
+<circle cx="729.08" cy="571.19" r="4" fill="#009E73"/>
+<text x="722.08" y="616" text-anchor="middle" font-size="9">1/50</text>
+<circle cx="774.25" cy="479.85" r="4" fill="#7B61A8"/>
+<circle cx="788.25" cy="536.80" r="4" fill="#009E73"/>
+<text x="781.25" y="616" text-anchor="middle" font-size="9">2/50</text>
+<circle cx="833.42" cy="524.61" r="4" fill="#7B61A8"/>
+<circle cx="847.42" cy="541.70" r="4" fill="#009E73"/>
+<text x="840.42" y="616" text-anchor="middle" font-size="9">3/50</text>
+<text x="507" y="434" text-anchor="end" font-size="10">0.08</text>
+<text x="507" y="604" text-anchor="end" font-size="10">0</text>
+<circle cx="350" cy="635" r="4" fill="#7B61A8"/><text x="360" y="639" font-size="11">single mechanism</text>
+<circle cx="500" cy="635" r="4" fill="#009E73"/><text x="510" y="639" font-size="11">hybrid</text>
+</svg>

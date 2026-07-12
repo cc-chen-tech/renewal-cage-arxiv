@@ -88,6 +88,7 @@ def main() -> None:
     parser.add_argument("--fluctuation-half-window", type=int, default=5)
     parser.add_argument("--block-sizes", type=parse_block_sizes, required=True)
     parser.add_argument("--maximum-lag-time", type=float, required=True)
+    parser.add_argument("--rate-window-count", type=int, default=6)
     parser.add_argument("--output-prefix", type=Path, required=True)
     args = parser.parse_args()
 
@@ -103,6 +104,7 @@ def main() -> None:
     replicate_rows: list[dict[str, object]] = []
     histogram_rows: list[dict[str, object]] = []
     pair_histogram_rows: list[dict[str, object]] = []
+    rate_window_rows: list[dict[str, object]] = []
     temperature = float(manifest["temperature"])
     for replicate in manifest["replicates"]:
         replicate_index = int(replicate["replicate"])
@@ -141,6 +143,31 @@ def main() -> None:
                 particle_count=positions.shape[1],
                 block_size=float(block_size),
             )
+            full_counts = np.concatenate((calibration_counts, heldout_counts), axis=1)
+            if args.rate_window_count < 3 or full_counts.shape[1] < args.rate_window_count:
+                raise ValueError("rate windows require at least three nonempty temporal segments")
+            for window_index, block_indices in enumerate(
+                np.array_split(np.arange(full_counts.shape[1]), args.rate_window_count)
+            ):
+                rate_window_rows.append(
+                    {
+                        "replicate": float(replicate_index),
+                        "temperature": temperature,
+                        "block_size": float(block_size),
+                        "rate_window_index": float(window_index),
+                        "rate_window_count": float(args.rate_window_count),
+                        "first_block_index": float(block_indices[0]),
+                        "last_block_index": float(block_indices[-1]),
+                        "window_block_count": float(len(block_indices)),
+                        "window_midpoint_time": float(
+                            (np.mean(block_indices) + 0.5) * block_size
+                        ),
+                        "mean_count_per_particle_block": float(
+                            np.mean(full_counts[:, block_indices])
+                        ),
+                        "event_count": float(np.sum(full_counts[:, block_indices])),
+                    }
+                )
             maximum_lag = min(
                 int(args.maximum_lag_time // block_size),
                 calibration_counts.shape[1] - 1,
@@ -364,6 +391,10 @@ def main() -> None:
     write_rows(
         args.output_prefix.with_name(args.output_prefix.name + "_count_pair_histogram.csv"),
         pair_histogram_rows,
+    )
+    write_rows(
+        args.output_prefix.with_name(args.output_prefix.name + "_rate_windows.csv"),
+        rate_window_rows,
     )
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_blocks.csv"), block_rows)
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_verdict.csv"), [verdict])

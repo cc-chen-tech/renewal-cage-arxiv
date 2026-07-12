@@ -43,6 +43,7 @@ def classify_cox_transfer(row: dict[str, object]) -> dict[str, float | str]:
 
     checks = [
         ("calibration_model_selection", float(row["calibration_bic_gain_two_over_one"]) >= 6.0),
+        ("mean_count", float(row["heldout_mean_relative_error"]) <= 0.10),
         ("count_fano", float(row["heldout_fano_relative_error"]) <= 0.20),
         ("count_distribution", float(row["heldout_count_tv_distance"]) <= 0.03),
         ("identity_curve", float(row["two_clock_identity_rmse"]) <= 0.05),
@@ -60,6 +61,7 @@ def classify_cox_transfer(row: dict[str, object]) -> dict[str, float | str]:
     failure = next((name for name, passed in checks if not passed), "none")
     return {
         "minimum_bic_gain": 6.0,
+        "maximum_mean_relative_error": 0.10,
         "maximum_fano_relative_error": 0.20,
         "maximum_count_tv_distance": 0.03,
         "maximum_identity_rmse": 0.05,
@@ -419,8 +421,17 @@ def main() -> None:
             }
             row.update(classify_cox_transfer(row))
             row.update(pair_gate)
-            single_pass = bool(
+            row["conditional_moment_marginal_memory_pass"] = float(
                 row["heldout_fano_relative_error"] <= 0.20
+                and row["heldout_count_tv_distance"] <= 0.03
+                and row["two_clock_identity_rmse"] <= 0.05
+                and row["two_clock_identity_rmse"] <= row["single_clock_identity_rmse"]
+                and row["two_clock_late_absolute_error"] <= 0.05
+                and row["slow_time"] < row["maximum_candidate_time"]
+            )
+            single_pass = bool(
+                row["heldout_mean_relative_error"] <= 0.10
+                and row["heldout_fano_relative_error"] <= 0.20
                 and row["single_clock_count_tv_distance"] <= 0.03
                 and row["single_clock_identity_rmse"] <= 0.05
                 and abs(heldout_correlation[-1] - single_clock_prediction[-1]) <= 0.05
@@ -538,8 +549,18 @@ def main() -> None:
     hmm_pair_transfer = float(
         np.mean([float(row["hmm_pair_distribution_pass"]) for row in replicate_rows])
     )
-    if selection_fraction == 1.0 and two_clock_transfer == 1.0:
+    conditional_transfer = float(
+        np.mean(
+            [
+                float(row["conditional_moment_marginal_memory_pass"])
+                for row in replicate_rows
+            ]
+        )
+    )
+    if selection_fraction == 1.0 and two_clock_transfer == 1.0 and gamma_pair_transfer == 1.0:
         outcome = "two_clock_gamma_refresh_count_moment_closure"
+    elif selection_fraction == 1.0 and conditional_transfer == 1.0:
+        outcome = "two_clock_gamma_refresh_conditional_shape_closure"
     elif selection_fraction <= 0.2 and single_clock_transfer == 1.0:
         outcome = "single_clock_gamma_refresh_count_moment_closure"
     else:
@@ -556,6 +577,7 @@ def main() -> None:
         "replica_block_count": float(len(replicate_rows)),
         "two_clock_selection_fraction": selection_fraction,
         "two_clock_transfer_pass_fraction": two_clock_transfer,
+        "conditional_moment_marginal_memory_pass_fraction": conditional_transfer,
         "single_clock_transfer_pass_fraction": single_clock_transfer,
         "maximum_heldout_fano_relative_error": max(
             float(row["heldout_fano_relative_error"]) for row in replicate_rows
@@ -572,7 +594,10 @@ def main() -> None:
             float(row["two_clock_pair_tv_distance"]) for row in replicate_rows
         ),
         "event_level_outcome": outcome,
-        "count_moment_closure_claim_allowed": float(outcome.endswith("closure")),
+        "count_moment_closure_claim_allowed": float(
+            two_clock_transfer == 1.0
+            or (selection_fraction <= 0.2 and single_clock_transfer == 1.0)
+        ),
         "marginal_count_distribution_claim_allowed": float(
             max(float(row["heldout_count_tv_distance"]) for row in replicate_rows) <= 0.03
         ),
@@ -582,7 +607,7 @@ def main() -> None:
             gamma_pair_transfer == 1.0
         ),
         "hybrid_semimarkov_emission_model_required": float(
-            two_clock_transfer == 1.0
+            conditional_transfer == 1.0
             and gamma_pair_transfer < 1.0
             and hmm_pair_transfer == 1.0
         ),

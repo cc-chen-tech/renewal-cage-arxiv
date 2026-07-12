@@ -15,6 +15,61 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_six_window_rate_audit_blocks_new_rate_state_and_macro_claims(self):
+        verdict_path = ROOT / "data" / "renewal_cage_ka_rate_stability_verdict.csv"
+        rows_path = ROOT / "data" / "renewal_cage_ka_rate_stability_rows.csv"
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        with rows_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        low = {
+            int(float(row["replicate"])): row
+            for row in rows
+            if row["temperature_group"] == "low" and float(row["block_size"]) == 20.0
+        }
+
+        self.assertEqual(verdict["failed_absolute_rate_gate_replicates"], "3")
+        self.assertEqual(float(verdict["strict_low_temperature_trend_replicate_count"]), 0.0)
+        self.assertEqual(float(verdict["borderline_low_temperature_trend_replicate_count"]), 1.0)
+        self.assertGreater(float(low[3]["exact_two_sided_permutation_p_value"]), 0.05)
+        self.assertLess(float(low[3]["exact_two_sided_permutation_p_value"]), 0.06)
+        self.assertEqual(float(verdict["systematic_rate_nonstationarity_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["new_rate_state_parameter_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["rate_stationarity_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["macro_observable_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue((ROOT / "figures" / "renewal_cage_ka_rate_stability.svg").is_file())
+
+    def test_two_clock_hmm_hybrid_closes_low_temperature_event_shape_but_not_rate_drift(self):
+        high_path = ROOT / "data" / "renewal_cage_ka_replicates_T058_two_clock_hmm_verdict.csv"
+        low_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_two_clock_hmm_verdict.csv"
+        crossover_path = ROOT / "data" / "renewal_cage_ka_two_clock_hmm_crossover.csv"
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+
+        self.assertEqual(float(high["second_clock_calibration_selection_fraction"]), 0.0)
+        self.assertEqual(float(high["full_hybrid_transfer_pass_fraction"]), 1.0)
+        self.assertEqual(float(low["second_clock_calibration_selection_fraction"]), 1.0)
+        self.assertEqual(float(low["conditional_shape_distribution_pass_fraction"]), 1.0)
+        self.assertAlmostEqual(float(low["full_hybrid_transfer_pass_fraction"]), 4.0 / 6.0)
+        self.assertLess(float(low["maximum_fano_relative_error"]), 0.092)
+        self.assertLess(float(low["maximum_count_tv_distance"]), 0.020)
+        self.assertLess(float(low["maximum_identity_rmse"]), 0.037)
+        self.assertLess(float(low["maximum_pair_tv_distance"]), 0.030)
+        self.assertEqual(float(crossover["cooling_induced_hybrid_clock_selected"]), 1.0)
+        self.assertEqual(float(crossover["conditional_event_shape_crossover_closure"]), 1.0)
+        self.assertEqual(float(crossover["absolute_rate_drift_unresolved"]), 1.0)
+        self.assertEqual(crossover["rate_drift_replicates"], "3")
+        self.assertEqual(float(crossover["macro_observable_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_two_clock_hmm_crossover.svg").is_file()
+        )
+
     def test_gamma_refresh_cox_clock_closes_heldout_count_moments_across_cooling(self):
         high_path = ROOT / "data" / "renewal_cage_ka_replicates_T058_gamma_refresh_cox_verdict.csv"
         low_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_gamma_refresh_cox_verdict.csv"
@@ -33,10 +88,15 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(high["single_clock_transfer_pass_fraction"]), 1.0)
         self.assertEqual(
             low["event_level_outcome"],
-            "two_clock_gamma_refresh_count_moment_closure",
+            "two_clock_gamma_refresh_conditional_shape_closure",
         )
         self.assertEqual(float(low["two_clock_selection_fraction"]), 1.0)
-        self.assertEqual(float(low["two_clock_transfer_pass_fraction"]), 1.0)
+        self.assertAlmostEqual(float(low["two_clock_transfer_pass_fraction"]), 4.0 / 6.0)
+        self.assertEqual(
+            float(low["conditional_moment_marginal_memory_pass_fraction"]),
+            1.0,
+        )
+        self.assertEqual(float(low["count_moment_closure_claim_allowed"]), 0.0)
         self.assertLess(float(low["maximum_heldout_fano_relative_error"]), 0.024)
         self.assertLess(float(low["maximum_two_clock_identity_rmse"]), 0.024)
         self.assertLess(float(low["maximum_heldout_count_tv_distance"]), 0.03)
@@ -47,7 +107,8 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(low["hybrid_semimarkov_emission_model_required"]), 1.0)
         self.assertEqual(float(low["full_count_sequence_likelihood_claim_allowed"]), 0.0)
         self.assertEqual(float(crossover["cooling_induced_second_refresh_clock_required"]), 1.0)
-        self.assertEqual(float(crossover["count_moment_crossover_closure"]), 1.0)
+        self.assertEqual(float(crossover["conditional_shape_crossover_closure"]), 1.0)
+        self.assertEqual(float(crossover["count_moment_crossover_closure"]), 0.0)
         self.assertEqual(float(crossover["positive_intensity_generator"]), 1.0)
         self.assertEqual(float(crossover["finite_recovery_enforced"]), 1.0)
         self.assertEqual(

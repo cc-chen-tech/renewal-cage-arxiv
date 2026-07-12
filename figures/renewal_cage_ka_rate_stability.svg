@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="430" viewBox="0 0 840 430">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124;stroke-width:1}.grid{stroke:#DADCE0;stroke-width:1}</style>
+<text x="420" y="27" text-anchor="middle" font-size="18" font-weight="700">Six-window event-rate stability audit</text>
+<line class="grid" x1="75" y1="340.00" x2="775" y2="340.00"/>
+<text x="65" y="344.00" text-anchor="end" font-size="11">0.78</text>
+<line class="grid" x1="75" y1="268.75" x2="775" y2="268.75"/>
+<text x="65" y="272.75" text-anchor="end" font-size="11">0.89</text>
+<line class="grid" x1="75" y1="197.50" x2="775" y2="197.50"/>
+<text x="65" y="201.50" text-anchor="end" font-size="11">1.00</text>
+<line class="grid" x1="75" y1="126.25" x2="775" y2="126.25"/>
+<text x="65" y="130.25" text-anchor="end" font-size="11">1.11</text>
+<line class="grid" x1="75" y1="55.00" x2="775" y2="55.00"/>
+<text x="65" y="59.00" text-anchor="end" font-size="11">1.22</text>
+<line class="axis" x1="75" y1="55" x2="75" y2="340"/>
+<line class="axis" x1="75" y1="340" x2="775" y2="340"/>
+<text x="425.00" y="370" text-anchor="middle" font-size="13">rate-window index (block size = 20)</text>
+<text x="18" y="200" text-anchor="middle" font-size="13" transform="rotate(-90 18 200)">rate / trajectory mean</text>
+<polyline fill="none" stroke="#7B61A8" stroke-width="2.5" stroke-dasharray="6 4" points="75.00,255.75 215.00,217.94 355.00,187.33 495.00,171.57 635.00,161.98 775.00,190.42"/>
+<polyline fill="none" stroke="#0072B2" stroke-width="2.5" points="75.00,198.20 215.00,211.43 355.00,213.79 495.00,206.87 635.00,138.42 775.00,216.29"/>
+<polyline fill="none" stroke="#D55E00" stroke-width="2.5" points="75.00,124.45 215.00,201.65 355.00,185.25 495.00,274.29 635.00,195.52 775.00,203.85"/>
+<polyline fill="none" stroke="#009E73" stroke-width="2.5" points="75.00,330.44 215.00,210.81 355.00,186.77 495.00,152.39 635.00,118.38 775.00,186.22"/>
+<text x="75.00" y="360" text-anchor="middle" font-size="11">1</text>
+<text x="215.00" y="360" text-anchor="middle" font-size="11">2</text>
+<text x="355.00" y="360" text-anchor="middle" font-size="11">3</text>
+<text x="495.00" y="360" text-anchor="middle" font-size="11">4</text>
+<text x="635.00" y="360" text-anchor="middle" font-size="11">5</text>
+<text x="775.00" y="360" text-anchor="middle" font-size="11">6</text>
+<line x1="105" y1="405" x2="133" y2="405" stroke="#7B61A8" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="140" y="410" font-size="11">high-T mean</text>
+<line x1="280" y1="405" x2="308" y2="405" stroke="#0072B2" stroke-width="3"/>
+<text x="315" y="410" font-size="11">low-T rep 1</text>
+<line x1="455" y1="405" x2="483" y2="405" stroke="#D55E00" stroke-width="3"/>
+<text x="490" y="410" font-size="11">low-T rep 2</text>
+<line x1="630" y1="405" x2="658" y2="405" stroke="#009E73" stroke-width="3"/>
+<text x="665" y="410" font-size="11">low-T rep 3</text>
+</svg>
