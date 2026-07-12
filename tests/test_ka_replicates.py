@@ -159,6 +159,22 @@ class KAReplicatePreparationTests(unittest.TestCase):
         )
         self.assertAlmostEqual(cross["particle_identity_correlation"], 1.0)
 
+    def test_particle_event_count_matrix_keeps_complete_blocks(self):
+        build = getattr(ka_replicates, "particle_event_count_matrix", None)
+        self.assertIsNotNone(build)
+
+        counts = build(
+            {
+                "particle": np.array([0, 0, 1, 1]),
+                "time": np.array([0.0, 9.9, 10.0, 20.0]),
+            },
+            duration=20.0,
+            particle_count=2,
+            block_size=10.0,
+        )
+
+        np.testing.assert_array_equal(counts, [[2, 0], [0, 1]])
+
     def test_correlation_efold_crossing_interpolates_first_decay(self):
         crossing = getattr(ka_replicates, "correlation_efold_crossing", None)
         self.assertIsNotNone(crossing)
@@ -173,6 +189,129 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertGreater(result["efold_crossing_time"], 2.0)
         self.assertLess(result["efold_crossing_time"], 3.0)
         self.assertAlmostEqual(result["target_correlation"], 1.0 / np.e)
+
+    def test_two_state_poisson_hmm_recovers_finite_exchange_clock(self):
+        fit = getattr(ka_replicates, "fit_two_state_poisson_hmm", None)
+        self.assertIsNotNone(fit)
+        rng = np.random.default_rng(49271)
+        transition = np.array([[0.96, 0.04], [0.08, 0.92]])
+        means = np.array([0.20, 1.80])
+        states = np.zeros((320, 180), dtype=int)
+        counts = np.zeros_like(states)
+        states[:, 0] = rng.choice(2, size=len(states), p=[2.0 / 3.0, 1.0 / 3.0])
+        counts[:, 0] = rng.poisson(means[states[:, 0]])
+        for block in range(1, states.shape[1]):
+            uniforms = rng.random(len(states))
+            states[:, block] = np.where(
+                states[:, block - 1] == 0,
+                uniforms >= transition[0, 0],
+                uniforms >= transition[1, 0],
+            )
+            counts[:, block] = rng.poisson(means[states[:, block]])
+
+        result = fit(counts, block_size=5.0, max_iterations=200, tolerance=1e-8)
+
+        self.assertTrue(result["converged"])
+        self.assertAlmostEqual(result["slow_mean_count"], means[0], delta=0.08)
+        self.assertAlmostEqual(result["fast_mean_count"], means[1], delta=0.12)
+        self.assertAlmostEqual(result["slow_to_fast_probability"], 0.04, delta=0.02)
+        self.assertAlmostEqual(result["fast_to_slow_probability"], 0.08, delta=0.025)
+        self.assertGreater(result["exchange_time"], 25.0)
+        self.assertLess(result["exchange_time"], 60.0)
+        self.assertGreater(result["log_likelihood"], result["single_poisson_log_likelihood"])
+
+    def test_two_state_poisson_hmm_rejects_noninteger_counts(self):
+        fit = getattr(ka_replicates, "fit_two_state_poisson_hmm", None)
+        self.assertIsNotNone(fit)
+
+        with self.assertRaisesRegex(ValueError, "nonnegative integer"):
+            fit(np.array([[0.0, 0.5], [1.0, 2.0]]), block_size=1.0)
+
+    def test_two_state_poisson_hmm_scores_heldout_count_statistics(self):
+        predict = getattr(ka_replicates, "two_state_poisson_hmm_count_predictions", None)
+        score = getattr(ka_replicates, "score_two_state_poisson_hmm", None)
+        self.assertIsNotNone(predict)
+        self.assertIsNotNone(score)
+        fitted = {
+            "slow_mean_count": 0.2,
+            "fast_mean_count": 1.8,
+            "slow_to_fast_probability": 0.04,
+            "fast_to_slow_probability": 0.08,
+            "stationary_slow_probability": 2.0 / 3.0,
+            "stationary_fast_probability": 1.0 / 3.0,
+            "exchange_eigenvalue": 0.88,
+        }
+
+        rows = predict(fitted, maximum_lag=2)
+        expected_mean = (2.0 * 0.2 + 1.8) / 3.0
+        expected_environment_variance = (2.0 / 3.0) * (1.0 / 3.0) * 1.6**2
+        expected_variance = expected_mean + expected_environment_variance
+        self.assertAlmostEqual(rows[0]["predicted_mean_count"], expected_mean)
+        self.assertAlmostEqual(rows[0]["predicted_fano_factor"], expected_variance / expected_mean)
+        self.assertAlmostEqual(
+            rows[1]["predicted_particle_identity_correlation"],
+            expected_environment_variance * 0.88**2 / expected_variance,
+        )
+        scored = score(np.array([[0, 1, 0], [2, 1, 3]]), fitted)
+        self.assertTrue(np.isfinite(scored["log_likelihood"]))
+        self.assertEqual(scored["observation_count"], 6.0)
+
+    def test_finite_exchange_hmm_gate_requires_late_identity_prediction(self):
+        script_path = ROOT / "scripts" / "analyze_ka_finite_exchange_hmm.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_finite_exchange_hmm", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        common = {
+            "heldout_mean_relative_error": 0.04,
+            "heldout_fano_relative_error": 0.12,
+            "heldout_identity_correlation_rmse": 0.03,
+            "heldout_hmm_log_likelihood_gain_per_observation": 0.02,
+        }
+
+        passed = module.classify_hmm_transfer({**common, "heldout_late_identity_absolute_error": 0.04})
+        failed = module.classify_hmm_transfer({**common, "heldout_late_identity_absolute_error": 0.08})
+
+        self.assertEqual(passed["finite_exchange_hmm_transfer_pass"], 1.0)
+        self.assertEqual(failed["finite_exchange_hmm_transfer_pass"], 0.0)
+        self.assertEqual(failed["primary_failure"], "late_identity_decay")
+
+    def test_hmm_crossover_selects_broad_low_temperature_exchange(self):
+        script_path = ROOT / "scripts" / "summarize_ka_finite_exchange_hmm.py"
+        spec = importlib.util.spec_from_file_location("summarize_ka_finite_exchange_hmm", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        verdict = module.classify_crossover(
+            {"two_state_poisson_hmm_sufficient": "1", "event_level_outcome": "two_state_poisson_hmm_sufficient"},
+            {"two_state_poisson_hmm_sufficient": "0", "event_level_outcome": "non_single_exponential_exchange_required"},
+            high_positive_late_block_count=0,
+            low_positive_late_block_count=3,
+            common_block_count=3,
+        )
+
+        self.assertEqual(verdict["finite_exchange_spectrum_broadening_detected"], 1.0)
+        self.assertEqual(verdict["single_exchange_time_low_temperature_rejected"], 1.0)
+        self.assertEqual(verdict["spatial_facilitation_claim_allowed"], 0.0)
+
+    def test_hmm_crossover_does_not_call_unresolved_rejection_sufficient(self):
+        script_path = ROOT / "scripts" / "summarize_ka_finite_exchange_hmm.py"
+        spec = importlib.util.spec_from_file_location("summarize_ka_finite_exchange_hmm", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        verdict = module.classify_crossover(
+            {"two_state_poisson_hmm_sufficient": "1", "event_level_outcome": "two_state_poisson_hmm_sufficient"},
+            {"two_state_poisson_hmm_sufficient": "0", "event_level_outcome": "two_state_poisson_hmm_rejected_without_unique_replacement"},
+            high_positive_late_block_count=0,
+            low_positive_late_block_count=0,
+            common_block_count=3,
+        )
+
+        self.assertEqual(verdict["low_temperature_two_state_hmm_sufficient"], 0.0)
+        self.assertEqual(verdict["finite_exchange_spectrum_broadening_detected"], 0.0)
 
     def test_event_cumulative_trajectory_applies_jump_vectors_at_event_times(self):
         reconstruct = getattr(ka_replicates, "event_cumulative_trajectory", None)

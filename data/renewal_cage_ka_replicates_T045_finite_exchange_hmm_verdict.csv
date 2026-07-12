@@ -1,0 +1,2 @@
+temperature,scoring_horizon,independent_replicate_count,block_sizes,replica_block_count,replica_block_pass_fraction,two_state_poisson_hmm_sufficient,non_single_exponential_exchange_required,event_level_outcome,heldout_macro_prediction_claim_allowed,spatial_facilitation_claim_allowed,thermodynamic_claim_allowed
+0.45,600.0,3.0,20;50;100,9.0,0.1111111111111111,0.0,1.0,non_single_exponential_exchange_required,0.0,0.0,0.0

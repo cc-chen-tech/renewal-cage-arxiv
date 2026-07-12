@@ -224,6 +224,35 @@ def jump_vector_correlation_curve(
     return rows
 
 
+def particle_event_count_matrix(
+    events: dict[str, np.ndarray],
+    *,
+    duration: float,
+    particle_count: int,
+    block_size: float,
+) -> np.ndarray:
+    """Bin particle events into complete, consecutive observation blocks."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=float)
+    if particles.ndim != 1 or times.shape != particles.shape:
+        raise ValueError("event particles and times must be aligned vectors")
+    if particle_count < 2 or not math.isfinite(duration) or duration <= 0.0:
+        raise ValueError("particle_count and duration must define a nontrivial ensemble")
+    if not math.isfinite(block_size) or block_size <= 0.0 or block_size > duration / 2.0:
+        raise ValueError("block_size must leave at least two complete blocks")
+    if np.any(particles < 0) or np.any(particles >= particle_count):
+        raise ValueError("event particle indices are out of range")
+    if np.any(~np.isfinite(times)) or np.any(times < 0.0) or np.any(times > duration):
+        raise ValueError("event times must lie in the observation interval")
+    block_count = int(duration // block_size)
+    block_index = np.floor(times / block_size).astype(int)
+    retained = block_index < block_count
+    counts = np.zeros((particle_count, block_count), dtype=int)
+    np.add.at(counts, (particles[retained], block_index[retained]), 1.0)
+    return counts
+
+
 def particle_event_count_correlation_curve(
     events: dict[str, np.ndarray],
     *,
@@ -234,27 +263,17 @@ def particle_event_count_correlation_curve(
 ) -> list[dict[str, float]]:
     """Measure persistence of particle mobility identity across event-count blocks."""
 
-    particles = np.asarray(events["particle"], dtype=int)
-    times = np.asarray(events["time"], dtype=float)
-    if particles.ndim != 1 or times.shape != particles.shape:
-        raise ValueError("event particles and times must be aligned vectors")
-    if particle_count < 2 or not math.isfinite(duration) or duration <= 0.0:
-        raise ValueError("particle_count and duration must define a nontrivial ensemble")
-    if not math.isfinite(block_size) or block_size <= 0.0 or block_size > duration / 2.0:
-        raise ValueError("block_size must leave at least two complete blocks")
     if isinstance(maximum_lag, bool) or not isinstance(maximum_lag, int) or maximum_lag < 1:
         raise ValueError("maximum_lag must be a positive integer")
-    if np.any(particles < 0) or np.any(particles >= particle_count):
-        raise ValueError("event particle indices are out of range")
-    if np.any(~np.isfinite(times)) or np.any(times < 0.0) or np.any(times > duration):
-        raise ValueError("event times must lie in the observation interval")
-    block_count = int(duration // block_size)
+    counts = particle_event_count_matrix(
+        events,
+        duration=duration,
+        particle_count=particle_count,
+        block_size=block_size,
+    )
+    block_count = counts.shape[1]
     if maximum_lag >= block_count:
         raise ValueError("maximum_lag must be smaller than the complete block count")
-    block_index = np.floor(times / block_size).astype(int)
-    retained = block_index < block_count
-    counts = np.zeros((particle_count, block_count), dtype=float)
-    np.add.at(counts, (particles[retained], block_index[retained]), 1.0)
     residual = counts - np.mean(counts, axis=0, keepdims=True)
     rows: list[dict[str, float]] = []
     for lag in range(1, maximum_lag + 1):
@@ -372,6 +391,284 @@ def correlation_efold_crossing(
         "efold_crossing_time": crossing,
         "crossing_lower_lag": lower_lag,
         "crossing_upper_lag": float(lags[upper_index]),
+    }
+
+
+def fit_two_state_poisson_hmm(
+    counts: np.ndarray,
+    *,
+    block_size: float,
+    max_iterations: int = 200,
+    tolerance: float = 1e-8,
+) -> dict[str, float | bool]:
+    """Fit a slow/fast Markov-modulated Poisson clock to count sequences."""
+
+    observations = np.asarray(counts, dtype=float)
+    if (
+        observations.ndim != 2
+        or min(observations.shape) < 2
+        or np.any(~np.isfinite(observations))
+        or np.any(observations < 0.0)
+        or np.any(observations != np.floor(observations))
+    ):
+        raise ValueError("counts must be a matrix of nonnegative integer observations")
+    if float(np.sum(observations)) <= 0.0:
+        raise ValueError("counts must contain at least one event")
+    if not math.isfinite(block_size) or block_size <= 0.0:
+        raise ValueError("block_size must be positive and finite")
+    if isinstance(max_iterations, bool) or not isinstance(max_iterations, int) or max_iterations < 1:
+        raise ValueError("max_iterations must be a positive integer")
+    if not math.isfinite(tolerance) or tolerance <= 0.0:
+        raise ValueError("tolerance must be positive and finite")
+
+    integer_counts = observations.astype(int)
+    log_factorial = np.array(
+        [math.lgamma(value + 1.0) for value in range(int(np.max(integer_counts)) + 1)]
+    )
+    mean_count = float(np.mean(observations))
+    means = np.array(
+        [max(0.25 * mean_count, 1e-4), max(2.0 * mean_count, 0.25)],
+        dtype=float,
+    )
+    transition = np.array([[0.95, 0.05], [0.05, 0.95]], dtype=float)
+    initial = np.array([0.5, 0.5], dtype=float)
+    floor = 1e-12
+
+    def expectation() -> tuple[np.ndarray, np.ndarray, float]:
+        log_emission = np.empty(observations.shape + (2,), dtype=float)
+        for state in range(2):
+            log_emission[:, :, state] = (
+                observations * math.log(means[state])
+                - means[state]
+                - log_factorial[integer_counts]
+            )
+        offsets = np.max(log_emission, axis=2)
+        emission = np.exp(log_emission - offsets[:, :, None])
+        alpha = np.empty_like(emission)
+        scales = np.empty(observations.shape, dtype=float)
+        alpha[:, 0] = initial * emission[:, 0]
+        scales[:, 0] = np.sum(alpha[:, 0], axis=1)
+        alpha[:, 0] /= scales[:, 0, None]
+        for block in range(1, observations.shape[1]):
+            alpha[:, block] = (alpha[:, block - 1] @ transition) * emission[:, block]
+            scales[:, block] = np.sum(alpha[:, block], axis=1)
+            alpha[:, block] /= scales[:, block, None]
+
+        beta = np.ones_like(emission)
+        for block in range(observations.shape[1] - 2, -1, -1):
+            beta[:, block] = (
+                (emission[:, block + 1] * beta[:, block + 1]) @ transition.T
+            ) / scales[:, block + 1, None]
+        posterior = alpha * beta
+        posterior /= np.sum(posterior, axis=2, keepdims=True)
+
+        transition_counts = np.zeros((2, 2), dtype=float)
+        for block in range(observations.shape[1] - 1):
+            pair = (
+                alpha[:, block, :, None]
+                * transition[None, :, :]
+                * emission[:, block + 1, None, :]
+                * beta[:, block + 1, None, :]
+            )
+            pair /= np.sum(pair, axis=(1, 2), keepdims=True)
+            transition_counts += np.sum(pair, axis=0)
+        log_likelihood = float(np.sum(np.log(scales) + offsets))
+        return posterior, transition_counts, log_likelihood
+
+    previous_log_likelihood = -math.inf
+    converged = False
+    iterations = 0
+    for iterations in range(1, max_iterations + 1):
+        posterior, transition_counts, log_likelihood = expectation()
+        if (
+            math.isfinite(previous_log_likelihood)
+            and abs(log_likelihood - previous_log_likelihood)
+            <= tolerance * (1.0 + abs(previous_log_likelihood))
+        ):
+            converged = True
+            break
+        initial = np.maximum(np.mean(posterior[:, 0], axis=0), floor)
+        initial /= np.sum(initial)
+        transition = np.maximum(transition_counts, floor)
+        transition /= np.sum(transition, axis=1, keepdims=True)
+        weights = np.sum(posterior, axis=(0, 1))
+        means = np.maximum(
+            np.sum(posterior * observations[:, :, None], axis=(0, 1)) / weights,
+            floor,
+        )
+        previous_log_likelihood = log_likelihood
+    if not converged:
+        _, _, log_likelihood = expectation()
+
+    order = np.argsort(means)
+    means = means[order]
+    transition = transition[np.ix_(order, order)]
+    initial = initial[order]
+    slow_to_fast = float(transition[0, 1])
+    fast_to_slow = float(transition[1, 0])
+    exchange_eigenvalue = float(1.0 - slow_to_fast - fast_to_slow)
+    exchange_time = (
+        -block_size / math.log(abs(exchange_eigenvalue))
+        if 0.0 < abs(exchange_eigenvalue) < 1.0
+        else 0.0
+    )
+    stationary_slow = fast_to_slow / (slow_to_fast + fast_to_slow)
+    single_poisson_log_likelihood = float(
+        np.sum(
+            observations * math.log(mean_count)
+            - mean_count
+            - log_factorial[integer_counts]
+        )
+    )
+    return {
+        "slow_mean_count": float(means[0]),
+        "fast_mean_count": float(means[1]),
+        "slow_to_fast_probability": slow_to_fast,
+        "fast_to_slow_probability": fast_to_slow,
+        "stationary_slow_probability": stationary_slow,
+        "stationary_fast_probability": 1.0 - stationary_slow,
+        "initial_slow_probability": float(initial[0]),
+        "exchange_eigenvalue": exchange_eigenvalue,
+        "exchange_time": float(exchange_time),
+        "block_size": float(block_size),
+        "log_likelihood": log_likelihood,
+        "single_poisson_log_likelihood": single_poisson_log_likelihood,
+        "log_likelihood_gain_per_observation": (
+            log_likelihood - single_poisson_log_likelihood
+        ) / observations.size,
+        "iterations": float(iterations),
+        "converged": converged,
+    }
+
+
+def two_state_poisson_hmm_count_predictions(
+    fitted: dict[str, object],
+    *,
+    maximum_lag: int,
+) -> list[dict[str, float]]:
+    """Predict stationary count fluctuations and identity decay from a fitted clock."""
+
+    if isinstance(maximum_lag, bool) or not isinstance(maximum_lag, int) or maximum_lag < 1:
+        raise ValueError("maximum_lag must be a positive integer")
+    slow_mean = float(fitted["slow_mean_count"])
+    fast_mean = float(fitted["fast_mean_count"])
+    slow_probability = float(fitted["stationary_slow_probability"])
+    fast_probability = float(fitted["stationary_fast_probability"])
+    eigenvalue = float(fitted["exchange_eigenvalue"])
+    values = np.array(
+        [slow_mean, fast_mean, slow_probability, fast_probability, eigenvalue]
+    )
+    if (
+        np.any(~np.isfinite(values))
+        or min(slow_mean, fast_mean) < 0.0
+        or slow_mean > fast_mean
+        or min(slow_probability, fast_probability) < 0.0
+        or not math.isclose(slow_probability + fast_probability, 1.0, abs_tol=1e-8)
+        or abs(eigenvalue) >= 1.0
+    ):
+        raise ValueError("fitted parameters do not define a stationary two-state clock")
+    mean_count = slow_probability * slow_mean + fast_probability * fast_mean
+    if mean_count <= 0.0:
+        raise ValueError("fitted mean count must be positive")
+    environment_variance = (
+        slow_probability * fast_probability * (fast_mean - slow_mean) ** 2
+    )
+    count_variance = mean_count + environment_variance
+    return [
+        {
+            "block_lag": float(lag),
+            "predicted_mean_count": mean_count,
+            "predicted_count_variance": count_variance,
+            "predicted_fano_factor": count_variance / mean_count,
+            "predicted_environment_variance": environment_variance,
+            "predicted_particle_identity_correlation": (
+                environment_variance * eigenvalue**lag / count_variance
+            ),
+        }
+        for lag in range(1, maximum_lag + 1)
+    ]
+
+
+def score_two_state_poisson_hmm(
+    counts: np.ndarray,
+    fitted: dict[str, object],
+) -> dict[str, float]:
+    """Evaluate count sequences under fixed fitted two-state Poisson-HMM parameters."""
+
+    observations = np.asarray(counts, dtype=float)
+    if (
+        observations.ndim != 2
+        or min(observations.shape) < 2
+        or np.any(~np.isfinite(observations))
+        or np.any(observations < 0.0)
+        or np.any(observations != np.floor(observations))
+    ):
+        raise ValueError("counts must be a matrix of nonnegative integer observations")
+    means = np.array(
+        [float(fitted["slow_mean_count"]), float(fitted["fast_mean_count"])],
+        dtype=float,
+    )
+    transition = np.array(
+        [
+            [
+                1.0 - float(fitted["slow_to_fast_probability"]),
+                float(fitted["slow_to_fast_probability"]),
+            ],
+            [
+                float(fitted["fast_to_slow_probability"]),
+                1.0 - float(fitted["fast_to_slow_probability"]),
+            ],
+        ],
+        dtype=float,
+    )
+    initial = np.array(
+        [
+            float(fitted["stationary_slow_probability"]),
+            float(fitted["stationary_fast_probability"]),
+        ],
+        dtype=float,
+    )
+    if (
+        np.any(~np.isfinite(means))
+        or np.any(means <= 0.0)
+        or np.any(~np.isfinite(transition))
+        or np.any(transition <= 0.0)
+        or np.any(transition >= 1.0)
+        or np.any(~np.isfinite(initial))
+        or np.any(initial <= 0.0)
+        or not np.allclose(np.sum(transition, axis=1), 1.0)
+        or not math.isclose(float(np.sum(initial)), 1.0, abs_tol=1e-8)
+    ):
+        raise ValueError("fitted parameters do not define a positive two-state Poisson HMM")
+
+    integer_counts = observations.astype(int)
+    log_factorial = np.array(
+        [math.lgamma(value + 1.0) for value in range(int(np.max(integer_counts)) + 1)]
+    )
+    log_emission = np.empty(observations.shape + (2,), dtype=float)
+    for state in range(2):
+        log_emission[:, :, state] = (
+            observations * math.log(means[state])
+            - means[state]
+            - log_factorial[integer_counts]
+        )
+    offsets = np.max(log_emission, axis=2)
+    emission = np.exp(log_emission - offsets[:, :, None])
+    alpha = initial * emission[:, 0]
+    scales = np.sum(alpha, axis=1)
+    log_likelihood = float(np.sum(np.log(scales) + offsets[:, 0]))
+    alpha /= scales[:, None]
+    for block in range(1, observations.shape[1]):
+        alpha = (alpha @ transition) * emission[:, block]
+        scales = np.sum(alpha, axis=1)
+        log_likelihood += float(np.sum(np.log(scales) + offsets[:, block]))
+        alpha /= scales[:, None]
+    return {
+        "log_likelihood": log_likelihood,
+        "mean_log_likelihood": log_likelihood / observations.size,
+        "observation_count": float(observations.size),
+        "sequence_count": float(observations.shape[0]),
+        "block_count": float(observations.shape[1]),
     }
 
 

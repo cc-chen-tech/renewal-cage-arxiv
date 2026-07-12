@@ -15,6 +15,37 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_finite_exchange_hmm_is_sufficient_high_but_requires_broad_low_spectrum(self):
+        high_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T058_finite_exchange_hmm_verdict.csv"
+        )
+        low_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_finite_exchange_hmm_verdict.csv"
+        )
+        crossover_path = ROOT / "data" / "renewal_cage_ka_finite_exchange_hmm_crossover.csv"
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+
+        self.assertEqual(float(high["replica_block_pass_fraction"]), 1.0)
+        self.assertEqual(float(high["two_state_poisson_hmm_sufficient"]), 1.0)
+        self.assertEqual(float(high["scoring_horizon"]), 600.0)
+        self.assertEqual(float(low["scoring_horizon"]), 600.0)
+        self.assertLess(float(low["replica_block_pass_fraction"]), 0.25)
+        self.assertEqual(float(low["non_single_exponential_exchange_required"]), 1.0)
+        self.assertEqual(float(crossover["high_positive_late_excess_block_count"]), 0.0)
+        self.assertEqual(float(crossover["low_positive_late_excess_block_count"]), 3.0)
+        self.assertEqual(float(crossover["finite_exchange_spectrum_broadening_detected"]), 1.0)
+        self.assertEqual(float(crossover["spatial_facilitation_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["heldout_macro_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_finite_exchange_hmm_crossover.svg").is_file()
+        )
+
     def test_calibration_jump_cage_channels_transfer_ensemble_observables_without_macro_fit(self):
         path = (
             ROOT

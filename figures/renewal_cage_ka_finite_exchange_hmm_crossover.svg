@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="430" viewBox="0 0 920 430">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124;stroke-width:1}.grid{stroke:#DADCE0;stroke-width:1}.obs{fill:none;stroke-width:3}.model{fill:none;stroke-width:2;stroke-dasharray:7 5}</style>
+<text x="460" y="27" text-anchor="middle" font-size="18" font-weight="700">Calibration-only finite-exchange clock: held-out identity decay</text>
+<line class="grid" x1="70" y1="345.00" x2="425" y2="345.00"/>
+<text x="60" y="349.00" text-anchor="end" font-size="11">0.00</text>
+<line class="grid" x1="70" y1="272.50" x2="425" y2="272.50"/>
+<text x="60" y="276.50" text-anchor="end" font-size="11">0.02</text>
+<line class="grid" x1="70" y1="200.00" x2="425" y2="200.00"/>
+<text x="60" y="204.00" text-anchor="end" font-size="11">0.04</text>
+<line class="grid" x1="70" y1="127.50" x2="425" y2="127.50"/>
+<text x="60" y="131.50" text-anchor="end" font-size="11">0.06</text>
+<line class="grid" x1="70" y1="55.00" x2="425" y2="55.00"/>
+<text x="60" y="59.00" text-anchor="end" font-size="11">0.08</text>
+<line class="axis" x1="70" y1="55" x2="70" y2="345"/>
+<line class="axis" x1="70" y1="345" x2="425" y2="345"/>
+<text x="247.50" y="42" text-anchor="middle" font-size="15" font-weight="700">T = 0.58</text>
+<text x="247.50" y="395" text-anchor="middle" font-size="13">block lag (block size = 50)</text>
+<text x="70.00" y="365" text-anchor="middle" font-size="11">0</text>
+<text x="158.75" y="365" text-anchor="middle" font-size="11">3</text>
+<text x="247.50" y="365" text-anchor="middle" font-size="11">6</text>
+<text x="336.25" y="365" text-anchor="middle" font-size="11">9</text>
+<text x="425.00" y="365" text-anchor="middle" font-size="11">12</text>
+<polyline class="obs" stroke="#202124" points="99.58,124.67 129.17,291.19 158.75,311.30 188.33,321.84 217.92,314.28 247.50,302.86 277.08,310.80 306.67,299.11 336.25,337.60 365.83,361.41 395.42,333.33 425.00,356.55"/>
+<polyline class="model" stroke="#0072B2" points="99.58,142.01 129.17,269.57 158.75,316.63 188.33,334.20 217.92,340.83 247.50,343.37 277.08,344.36 306.67,344.74 336.25,344.90 365.83,344.96 395.42,344.98 425.00,344.99"/>
+<polyline class="model" stroke="#D55E00" points="99.58,259.07 129.17,259.07 158.75,259.07 188.33,259.07 217.92,259.07 247.50,259.07 277.08,259.07 306.67,259.07 336.25,259.07 365.83,259.07 395.42,259.07 425.00,259.07"/>
+<polyline class="model" stroke="#8A8D91" points="99.58,345.00 129.17,345.00 158.75,345.00 188.33,345.00 217.92,345.00 247.50,345.00 277.08,345.00 306.67,345.00 336.25,345.00 365.83,345.00 395.42,345.00 425.00,345.00"/>
+<line class="grid" x1="515" y1="345.00" x2="870" y2="345.00"/>
+<text x="505" y="349.00" text-anchor="end" font-size="11">0.00</text>
+<line class="grid" x1="515" y1="272.50" x2="870" y2="272.50"/>
+<text x="505" y="276.50" text-anchor="end" font-size="11">0.09</text>
+<line class="grid" x1="515" y1="200.00" x2="870" y2="200.00"/>
+<text x="505" y="204.00" text-anchor="end" font-size="11">0.19</text>
+<line class="grid" x1="515" y1="127.50" x2="870" y2="127.50"/>
+<text x="505" y="131.50" text-anchor="end" font-size="11">0.28</text>
+<line class="grid" x1="515" y1="55.00" x2="870" y2="55.00"/>
+<text x="505" y="59.00" text-anchor="end" font-size="11">0.37</text>
+<line class="axis" x1="515" y1="55" x2="515" y2="345"/>
+<line class="axis" x1="515" y1="345" x2="870" y2="345"/>
+<text x="692.50" y="42" text-anchor="middle" font-size="15" font-weight="700">T = 0.45</text>
+<text x="692.50" y="395" text-anchor="middle" font-size="13">block lag (block size = 50)</text>
+<text x="515.00" y="365" text-anchor="middle" font-size="11">0</text>
+<text x="603.75" y="365" text-anchor="middle" font-size="11">3</text>
+<text x="692.50" y="365" text-anchor="middle" font-size="11">6</text>
+<text x="781.25" y="365" text-anchor="middle" font-size="11">9</text>
+<text x="870.00" y="365" text-anchor="middle" font-size="11">12</text>
+<polyline class="obs" stroke="#202124" points="544.58,76.48 574.17,146.32 603.75,180.03 633.33,204.91 662.92,220.64 692.50,233.43 722.08,243.72 751.67,251.01 781.25,257.47 810.83,263.82 840.42,268.81 870.00,275.70"/>
+<polyline class="model" stroke="#0072B2" points="544.58,85.94 574.17,151.28 603.75,200.13 633.33,236.66 662.92,263.97 692.50,284.39 722.08,299.67 751.67,311.09 781.25,319.64 810.83,326.02 840.42,330.80 870.00,334.38"/>
+<polyline class="model" stroke="#D55E00" points="544.58,251.62 574.17,251.62 603.75,251.62 633.33,251.62 662.92,251.62 692.50,251.62 722.08,251.62 751.67,251.62 781.25,251.62 810.83,251.62 840.42,251.62 870.00,251.62"/>
+<polyline class="model" stroke="#8A8D91" points="544.58,345.00 574.17,345.00 603.75,345.00 633.33,345.00 662.92,345.00 692.50,345.00 722.08,345.00 751.67,345.00 781.25,345.00 810.83,345.00 840.42,345.00 870.00,345.00"/>
+<line x1="180" y1="402" x2="208" y2="402" stroke="#202124" stroke-width="3"/>
+<text x="216" y="407" font-size="12">held-out</text>
+<line x1="350" y1="402" x2="378" y2="402" stroke="#0072B2" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="386" y="407" font-size="12">two-state HMM</text>
+<line x1="520" y1="402" x2="548" y2="402" stroke="#D55E00" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="556" y="407" font-size="12">static disorder</text>
+<line x1="690" y1="402" x2="718" y2="402" stroke="#8A8D91" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="726" y="407" font-size="12">Poisson</text>
+</svg>
