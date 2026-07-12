@@ -1,5 +1,8 @@
 import json
+import importlib.util
 import pickle
+import csv
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,6 +12,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+
+import ka_replicates
 
 from ka_replicates import (  # noqa: E402
     distance_resolved_event_count_covariance,
@@ -26,6 +31,298 @@ from ka_replicates import (  # noqa: E402
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_small_sample_confidence_interval_uses_student_t(self):
+        interval = getattr(ka_replicates, "independent_sample_ci95", None)
+        self.assertIsNotNone(interval)
+
+        low, high, critical = interval(mean=5.0, standard_error=2.0, sample_count=3)
+
+        self.assertAlmostEqual(critical, 4.302652729911275)
+        self.assertAlmostEqual(low, 5.0 - 2.0 * critical)
+        self.assertAlmostEqual(high, 5.0 + 2.0 * critical)
+
+    def test_spatial_script_aggregates_independent_replicates_without_enabling_model_claim(self):
+        script_path = ROOT / "scripts" / "analyze_ka_spatial_covariance.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_spatial_covariance", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        aggregate = getattr(module, "aggregate_block_rows", None)
+        self.assertIsNotNone(aggregate)
+        rows = []
+        for replicate, length in ((1.0, 1.0), (2.0, 2.0)):
+            for block in (0.0, 1.0):
+                for distance in (1.0, 2.0, 3.0, 4.0):
+                    rows.append(
+                        {
+                            "replicate": replicate,
+                            "block_index": block,
+                            "distance_midpoint": distance,
+                            "covariance_excess_over_all_pairs": 2.0 * np.exp(-distance / length),
+                        }
+                    )
+
+        _, summary, _, fit_summary = aggregate(rows, minimum_distance=1.0)
+
+        self.assertEqual(summary[0]["uncertainty_scope"], "independent_replicates")
+        self.assertEqual(fit_summary["spatial_measurement_claim_allowed"], 1.0)
+        self.assertEqual(fit_summary["spatial_model_claim_allowed"], 0.0)
+        self.assertEqual(fit_summary["independent_replicate_count"], 2.0)
+
+    def test_spatial_cli_aggregate_mode_does_not_require_temperature(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            inputs = []
+            for replicate, length in ((1, 1.0), (2, 2.0)):
+                path = root / f"replicate_{replicate}.csv"
+                rows = [
+                    {
+                        "block_index": block,
+                        "distance_midpoint": distance,
+                        "covariance_excess_over_all_pairs": 2.0 * np.exp(-distance / length),
+                    }
+                    for block in (0, 1)
+                    for distance in (1.0, 2.0, 3.0, 4.0)
+                ]
+                with path.open("w", newline="") as handle:
+                    writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+                    writer.writeheader()
+                    writer.writerows(rows)
+                inputs.append(path)
+            output = root / "ensemble"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "analyze_ka_spatial_covariance.py"),
+                    "--aggregate-block-files",
+                    *(str(path) for path in inputs),
+                    "--fit-minimum-distance",
+                    "1.0",
+                    "--output-prefix",
+                    str(output),
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((root / "ensemble_fit_summary.csv").is_file())
+
+    def test_binned_metric_summary_uses_replicate_means_for_uncertainty(self):
+        summarize = getattr(ka_replicates, "summarize_replicate_binned_metric", None)
+        self.assertIsNotNone(summarize)
+        rows = [
+            {"replicate": 1.0, "distance": 1.0, "block": 0.0, "covariance": 2.0},
+            {"replicate": 1.0, "distance": 1.0, "block": 1.0, "covariance": 4.0},
+            {"replicate": 2.0, "distance": 1.0, "block": 0.0, "covariance": 6.0},
+            {"replicate": 2.0, "distance": 1.0, "block": 1.0, "covariance": 8.0},
+            {"replicate": 1.0, "distance": 2.0, "block": 0.0, "covariance": 1.0},
+            {"replicate": 2.0, "distance": 2.0, "block": 0.0, "covariance": 3.0},
+        ]
+
+        replicate_rows, summary_rows = summarize(
+            rows,
+            bin_key="distance",
+            metric_key="covariance",
+        )
+
+        first_bin_replicates = [row for row in replicate_rows if row["distance"] == 1.0]
+        first_bin_summary = next(row for row in summary_rows if row["distance"] == 1.0)
+        self.assertEqual([row["covariance"] for row in first_bin_replicates], [3.0, 7.0])
+        self.assertAlmostEqual(first_bin_summary["mean"], 5.0)
+        self.assertAlmostEqual(first_bin_summary["standard_error"], 2.0)
+        self.assertEqual(first_bin_summary["independent_replicate_count"], 2.0)
+        self.assertEqual(first_bin_summary["within_replicate_block_count_min"], 2.0)
+        self.assertEqual(first_bin_summary["within_replicate_block_count_max"], 2.0)
+
+    def test_spatial_covariance_ensemble_fits_lengths_per_replicate(self):
+        summarize = getattr(ka_replicates, "summarize_spatial_covariance_replicates", None)
+        self.assertIsNotNone(summarize)
+        rows = []
+        for replicate, length in ((1.0, 1.0), (2.0, 2.0)):
+            for block in (0.0, 1.0):
+                for distance in (1.0, 2.0, 3.0, 4.0):
+                    rows.append(
+                        {
+                            "replicate": replicate,
+                            "block_index": block,
+                            "distance_midpoint": distance,
+                            "covariance_excess_over_all_pairs": 2.0 * np.exp(-distance / length),
+                        }
+                    )
+
+        _, curve, fits, fit_summary = summarize(rows, minimum_distance=1.0)
+
+        self.assertEqual(len(curve), 4)
+        self.assertEqual([row["replicate"] for row in fits], [1.0, 2.0])
+        self.assertAlmostEqual(fits[0]["correlation_length"], 1.0)
+        self.assertAlmostEqual(fits[1]["correlation_length"], 2.0)
+        self.assertAlmostEqual(fit_summary["mean_correlation_length"], 1.5)
+        self.assertAlmostEqual(fit_summary["standard_error_correlation_length"], 0.5)
+        self.assertEqual(fit_summary["independent_replicate_count"], 2.0)
+
+    def test_overlap_s4_replicate_gate_rejects_one_invalid_oz_fit(self):
+        summarize = getattr(ka_replicates, "summarize_overlap_s4_replicates", None)
+        self.assertIsNotNone(summarize)
+        rows = []
+        for replicate in (1.0, 2.0):
+            rows.append({"replicate": replicate, "integer_squared": 0.0, "wave_number": 0.0, "s4": 2.0})
+        for q, valid_s4, invalid_s4 in (
+            (0.2, 10.0 / 1.16, 25.0),
+            (0.3, 10.0 / 1.36, 4.5),
+            (0.4, 10.0 / 1.64, 2.0),
+            (0.5, 10.0 / 2.0, 1.1),
+        ):
+            rows.append({"replicate": 1.0, "integer_squared": q, "wave_number": q, "s4": valid_s4})
+            rows.append({"replicate": 2.0, "integer_squared": q, "wave_number": q, "s4": invalid_s4})
+
+        _, fits, verdict = summarize(rows, ensemble_correction_available=False)
+
+        self.assertEqual(sum(not row["fit_valid"] for row in fits), 1)
+        self.assertEqual(verdict["invalid_replicate_fit_count"], 1.0)
+        self.assertEqual(verdict["raw_oz_fit_reproducible"], 0.0)
+        self.assertEqual(verdict["xi4_identifiable"], 0.0)
+        self.assertEqual(verdict["xi4_claim_allowed"], 0.0)
+
+    def test_overlap_s4_script_preserves_missing_ensemble_correction_gate(self):
+        script_path = ROOT / "scripts" / "analyze_ka_overlap_s4.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_overlap_s4", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        aggregate = getattr(module, "aggregate_curve_rows", None)
+        self.assertIsNotNone(aggregate)
+        rows = []
+        for replicate in (1.0, 2.0):
+            rows.append({"replicate": replicate, "integer_squared": 0.0, "wave_number": 0.0, "s4": 2.0})
+            for q in (0.2, 0.3, 0.4, 0.5):
+                rows.append(
+                    {
+                        "replicate": replicate,
+                        "integer_squared": q,
+                        "wave_number": q,
+                        "s4": 10.0 / (1.0 + (2.0 * q) ** 2),
+                    }
+                )
+
+        _, _, verdict = aggregate(rows)
+
+        self.assertEqual(verdict["raw_oz_fit_reproducible"], 1.0)
+        self.assertEqual(verdict["ensemble_correction_available"], 0.0)
+        self.assertEqual(verdict["xi4_identifiable"], 0.0)
+        self.assertEqual(verdict["xi4_claim_allowed"], 0.0)
+
+    def test_overlap_s4_cli_aggregate_mode_does_not_require_temperature_or_lag(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            inputs = []
+            for replicate in (1, 2):
+                path = root / f"replicate_{replicate}.csv"
+                rows = [{"integer_squared": 0.0, "wave_number": 0.0, "s4": 2.0}]
+                rows.extend(
+                    {
+                        "integer_squared": q,
+                        "wave_number": q,
+                        "s4": 10.0 / (1.0 + (2.0 * q) ** 2),
+                    }
+                    for q in (0.2, 0.3, 0.4, 0.5)
+                )
+                with path.open("w", newline="") as handle:
+                    writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+                    writer.writeheader()
+                    writer.writerows(rows)
+                inputs.append(path)
+            output = root / "ensemble"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "analyze_ka_overlap_s4.py"),
+                    "--aggregate-curve-files",
+                    *(str(path) for path in inputs),
+                    "--output-prefix",
+                    str(output),
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((root / "ensemble_verdict.csv").is_file())
+
+    def test_temperature_event_trend_reports_unequal_replicate_counts(self):
+        script_path = ROOT / "scripts" / "summarize_ka_replicate_scan.py"
+        spec = importlib.util.spec_from_file_location("summarize_ka_replicate_scan", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        metrics = (
+            "event_rate",
+            "exchange_mean",
+            "stationary_persistence_mean",
+            "persistence_exchange_ratio",
+            "count_fano",
+            "correlated_diffusion",
+        )
+        high = [
+            {"metric": metric, "mean": 2.0, "ci95_low": 1.8, "ci95_high": 2.2, "independent_replicate_count": 5.0}
+            for metric in metrics
+        ]
+        low = [
+            {"metric": metric, "mean": 1.0, "ci95_low": 0.8, "ci95_high": 1.2, "independent_replicate_count": 3.0}
+            for metric in metrics
+        ]
+
+        rows = module.event_temperature_trends(high, low)
+
+        self.assertEqual(rows[0]["high_temperature_replicate_count"], 5.0)
+        self.assertEqual(rows[0]["low_temperature_replicate_count"], 3.0)
+        self.assertNotIn("independent_replicates_per_temperature", rows[0])
+
+    def test_waiting_diagnostic_summary_requires_replica_consensus(self):
+        script_path = ROOT / "scripts" / "analyze_ka_replicates.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_replicates", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        summarize = getattr(module, "summarize_waiting_diagnostic_rows", None)
+        self.assertIsNotNone(summarize)
+        rows = []
+        for replicate in (1.0, 2.0, 3.0):
+            for window in (512.0, 1024.0):
+                rows.append(
+                    {
+                        "replicate": replicate,
+                        "count_window": window,
+                        "empirical_iid_relative_error": 0.08,
+                        "gamma_iid_relative_error": 0.30,
+                        "temporal_memory_excess_fraction": 0.03,
+                        "persistent_environment_excess_fraction": 0.25,
+                        "waiting_lag1_correlation": 0.01,
+                        "shuffle_lag1_correlation_mean": 0.0,
+                        "shuffle_lag1_correlation_standard_deviation": 0.02,
+                        "complete_wait_particle_fraction": 0.5,
+                        "complete_waiting_time_count": 200.0,
+                        "particles_with_complete_wait": 100.0,
+                        "window_count": 8.0,
+                        "collective_covariance_ratio": 4.0,
+                    }
+                )
+
+        replicate_rows, verdict = summarize(rows)
+
+        self.assertEqual(len(replicate_rows), 3)
+        self.assertTrue(all(row["waiting_failure_verdict"] == "empirical_iid_waiting_law_sufficient" for row in replicate_rows))
+        self.assertEqual(verdict["consensus_verdict"], "empirical_iid_waiting_law_sufficient")
+        self.assertEqual(verdict["consensus_replicate_count"], 3.0)
+        self.assertEqual(verdict["independent_replicate_count"], 3.0)
+        self.assertTrue(all(row["persistent_environment_identifiable"] == 0.0 for row in replicate_rows))
+        self.assertEqual(verdict["persistent_environment_identifiable"], 0.0)
+        self.assertEqual(verdict["collective_covariance_replicate_count"], 3.0)
+        self.assertEqual(verdict["spatial_cooperation_test_required"], 1.0)
+        self.assertEqual(verdict["spatial_cooperation_proven"], 0.0)
+
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
         valid_rows = [
             {"wave_number": q, "s4": 10.0 / (1.0 + (2.0 * q) ** 2)}
@@ -141,8 +438,9 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(msd_lag_one["independent_replicate_count"], 2.0)
         self.assertAlmostEqual(msd_lag_one["mean"], 2.0)
         self.assertAlmostEqual(msd_lag_one["standard_error"], 1.0)
-        self.assertAlmostEqual(msd_lag_one["ci95_low"], 0.04)
-        self.assertAlmostEqual(msd_lag_one["ci95_high"], 3.96)
+        self.assertAlmostEqual(msd_lag_one["ci95_low"], 2.0 - 12.706204736432095)
+        self.assertAlmostEqual(msd_lag_one["ci95_high"], 2.0 + 12.706204736432095)
+        self.assertEqual(msd_lag_one["ci95_method"], "student_t_independent_replicates")
 
     def test_temperature_scan_requires_nonoverlapping_directional_intervals(self):
         high = [
@@ -170,6 +468,42 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(ngp["effect"], "cooling_growth")
         self.assertAlmostEqual(ngp["effect_ratio"], 1.5)
         self.assertTrue(ngp["directional_ci95_separated"])
+
+    def test_diffusion_estimate_uses_only_requested_heldout_origins(self):
+        estimate = getattr(ka_replicates, "trajectory_diffusion_estimate", None)
+        self.assertIsNotNone(estimate)
+        positions = np.zeros((5, 2, 3), dtype=float)
+        positions[:, :, 0] = np.arange(5)[:, None]
+
+        diffusion = estimate(
+            positions,
+            lag=2,
+            origin_stride=2,
+            particle_mask=np.array([True, False]),
+        )
+
+        self.assertAlmostEqual(diffusion, 4.0 / 12.0)
+
+    def test_heldout_transport_summary_rejects_event_clock_undercoverage(self):
+        summarize = getattr(ka_replicates, "summarize_heldout_event_transport", None)
+        self.assertIsNotNone(summarize)
+        rows = [
+            {
+                "replicate": float(replicate),
+                "observed_diffusion": observed,
+                "uncorrelated_event_diffusion": 0.3 * observed,
+                "correlated_event_diffusion": 0.4 * observed,
+            }
+            for replicate, observed in ((1, 1.0), (2, 1.1), (3, 0.9))
+        ]
+
+        summary, verdict = summarize(rows, minimum_coverage=0.8, maximum_coverage=1.2)
+
+        correlated = next(row for row in summary if row["model"] == "correlated_event_clock")
+        self.assertAlmostEqual(correlated["mean_coverage"], 0.4)
+        self.assertEqual(verdict["heldout_transport_pass"], 0.0)
+        self.assertEqual(verdict["primary_failure"], "correlated_event_clock_undercoverage")
+        self.assertEqual(verdict["independent_replicate_count"], 3.0)
 
     def test_load_lammps_dump_reconstructs_unwrapped_positions(self):
         dump = """ITEM: TIMESTEP

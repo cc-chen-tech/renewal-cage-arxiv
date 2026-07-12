@@ -16,6 +16,7 @@ from ka_replicates import (  # noqa: E402
     fit_ornstein_zernike_structure_factor,
     load_lammps_custom_trajectory,
     overlap_four_point_structure_factor,
+    summarize_overlap_s4_replicates,
 )
 
 
@@ -27,17 +28,70 @@ def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
+def read_rows(path: Path) -> list[dict[str, object]]:
+    with path.open() as handle:
+        return list(csv.DictReader(handle))
+
+
+def aggregate_curve_rows(
+    rows: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]], dict[str, object]]:
+    summary, fits, verdict = summarize_overlap_s4_replicates(
+        rows,
+        ensemble_correction_available=False,
+    )
+    for row in summary:
+        row.update(
+            {
+                "uncertainty_scope": "independent_replicates",
+                "ensemble_correction_available": 0.0,
+                "xi4_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+    for row in fits:
+        row.update(
+            {
+                "fit_status": "independent_replicate_raw_OZ_fit",
+                "ensemble_correction_available": 0.0,
+                "xi4_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+    verdict["uncertainty_scope"] = "independent_replicates"
+    return summary, fits, verdict
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("trajectory", type=Path)
-    parser.add_argument("--temperature", type=float, required=True)
-    parser.add_argument("--lag", type=int, required=True)
+    parser.add_argument("trajectory", type=Path, nargs="?")
+    parser.add_argument("--temperature", type=float)
+    parser.add_argument("--lag", type=int)
     parser.add_argument("--overlap-radius", type=float, default=0.3)
     parser.add_argument("--origin-stride", type=int, default=32)
     parser.add_argument("--maximum-integer-squared", type=int, default=6)
     parser.add_argument("--block-size", type=int, default=2000)
+    parser.add_argument("--aggregate-curve-files", type=Path, nargs="+")
     parser.add_argument("--output-prefix", type=Path, required=True)
     args = parser.parse_args()
+
+    if args.aggregate_curve_files:
+        if args.trajectory is not None:
+            parser.error("trajectory and --aggregate-curve-files are mutually exclusive")
+        combined: list[dict[str, object]] = []
+        for replicate, path in enumerate(args.aggregate_curve_files, start=1):
+            for row in read_rows(path):
+                row["replicate"] = float(replicate)
+                combined.append(row)
+        summary, fits, verdict = aggregate_curve_rows(combined)
+        write_rows(args.output_prefix.with_name(args.output_prefix.name + "_summary.csv"), summary)
+        write_rows(args.output_prefix.with_name(args.output_prefix.name + "_fits.csv"), fits)
+        write_rows(args.output_prefix.with_name(args.output_prefix.name + "_verdict.csv"), [verdict])
+        return
+    if args.trajectory is None or args.temperature is None or args.lag is None:
+        parser.error(
+            "trajectory, --temperature, and --lag are required unless --aggregate-curve-files is used"
+        )
 
     trajectory = load_lammps_custom_trajectory(args.trajectory)
     rows = overlap_four_point_structure_factor(

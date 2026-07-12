@@ -1,0 +1,4 @@
+inverse_intercept,inverse_slope,amplitude,correlation_length,inverse_space_r_squared,fit_shell_count,fit_wave_number_min,fit_wave_number_max,fit_valid,replicate,fit_status,ensemble_correction_available,xi4_claim_allowed,thermodynamic_claim_allowed
+-0.14805206298030468,0.9568392745971533,nan,nan,0.9786939771729627,6.0,0.41730503688538984,1.0221844074625182,False,1.0,independent_replicate_raw_OZ_fit,0.0,0.0,0.0
+-0.1237998327267393,0.8726601584541294,nan,nan,0.9607130707383138,6.0,0.41730503688538984,1.0221844074625182,False,2.0,independent_replicate_raw_OZ_fit,0.0,0.0,0.0
+-0.1347949385179168,0.880088273539802,nan,nan,0.9304021836104075,6.0,0.41730503688538984,1.0221844074625182,False,3.0,independent_replicate_raw_OZ_fit,0.0,0.0,0.0

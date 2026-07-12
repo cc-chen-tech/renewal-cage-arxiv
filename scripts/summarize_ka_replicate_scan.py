@@ -22,9 +22,16 @@ def read_rows(path: Path) -> list[dict[str, str]]:
 
 def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def independent_replicate_count(rows: list[dict[str, str]]) -> float:
+    counts = {float(row["independent_replicate_count"]) for row in rows}
+    if len(counts) != 1:
+        raise ValueError("summary rows disagree on independent replicate count")
+    return counts.pop()
 
 
 def protocol_comparison(
@@ -103,6 +110,8 @@ def event_temperature_trends(
 ) -> list[dict[str, object]]:
     high = {row["metric"]: row for row in high_rows}
     low = {row["metric"]: row for row in low_rows}
+    high_count = independent_replicate_count(high_rows)
+    low_count = independent_replicate_count(low_rows)
     directions = {
         "event_rate": "decrease",
         "exchange_mean": "increase",
@@ -133,7 +142,8 @@ def event_temperature_trends(
                 "effect_ratio": ratio,
                 "directional_ci95_separated": separated,
                 "trend_pass": ratio > 1.0 and separated,
-                "independent_replicates_per_temperature": 5,
+                "high_temperature_replicate_count": high_count,
+                "low_temperature_replicate_count": low_count,
                 "thermodynamic_claim_allowed": False,
             }
         )
@@ -161,10 +171,13 @@ def main() -> None:
     high = read_rows(args.high_summary)
     low = read_rows(args.low_summary)
     trend = temperature_scan_verdict(high, low)
+    high_count = independent_replicate_count(high)
+    low_count = independent_replicate_count(low)
     for row in trend:
         row["high_temperature"] = args.high_temperature
         row["low_temperature"] = args.low_temperature
-        row["independent_replicates_per_temperature"] = 5
+        row["high_temperature_replicate_count"] = high_count
+        row["low_temperature_replicate_count"] = low_count
         row["independence_class"] = "decorrelated_parent_frames_plus_velocity_seeds"
     protocol = protocol_comparison(
         args.high_temperature,

@@ -1,0 +1,2 @@
+independent_replicate_count,invalid_replicate_fit_count,aggregate_fit_valid,aggregate_correlation_length,raw_oz_fit_reproducible,ensemble_correction_available,xi4_identifiable,xi4_claim_allowed,thermodynamic_claim_allowed,verdict,uncertainty_scope
+3.0,3.0,0.0,nan,0.0,0.0,0.0,0.0,0.0,xi4_not_identifiable,independent_replicates

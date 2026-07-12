@@ -1,0 +1,4 @@
+diffusion,alpha_relaxation_time,diffusion_alpha_product,ngp_peak,ngp_peak_time,overlap_chi4_peak,overlap_chi4_peak_time,replicate,temperature,independence_class,thermodynamic_claim_allowed
+2.6735844950645452e-05,1375.351132215129,0.03677117462359836,2.1588393654879625,512.0,4.67078780265859,512.0,1.0,0.45,decorrelated_parent_frames_plus_velocity_seeds,0.0
+2.4650965124247163e-05,1625.0388680422186,0.040058776461654816,2.2711455665535505,512.0,11.7301911862663,1024.0,2.0,0.45,decorrelated_parent_frames_plus_velocity_seeds,0.0
+3.050329866864418e-05,1147.1243510172176,0.034991076689152814,2.0225674333459147,256.0,14.656331841713692,1024.0,3.0,0.45,decorrelated_parent_frames_plus_velocity_seeds,0.0

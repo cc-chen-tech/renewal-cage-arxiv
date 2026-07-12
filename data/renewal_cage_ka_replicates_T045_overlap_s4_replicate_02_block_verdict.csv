@@ -1,0 +1,2 @@
+temperature,lag,block_size,block_count,mean_minimum_q_to_raw_q0_ratio,standard_error_minimum_q_to_raw_q0_ratio,ci95_low_minimum_q_to_raw_q0_ratio,ci95_high_minimum_q_to_raw_q0_ratio,blocks_all_minimum_q_directions_exceed_raw_q0,invalid_OZ_fit_count,xi4_identifiable,verdict,uncertainty_scope,independent_replicate_count,xi4_claim_allowed,thermodynamic_claim_allowed
+0.45,1375.0,2000.0,5.0,22.869025421468955,7.419871562482649,8.326077159002963,37.411973683934946,4.0,4.0,0.0,xi4_not_identifiable_across_time_blocks,single_trajectory_nonoverlapping_time_blocks,1.0,0.0,0.0

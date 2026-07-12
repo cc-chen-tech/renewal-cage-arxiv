@@ -18,6 +18,7 @@ from ka_replicates import (  # noqa: E402
     distance_resolved_event_count_covariance,
     fit_spatial_covariance_length,
     load_lammps_custom_trajectory,
+    summarize_spatial_covariance_replicates,
 )
 from renewal_cage import extract_nonrecrossing_phop_events, phop_values  # noqa: E402
 
@@ -29,9 +30,67 @@ def parse_edges(value: str) -> np.ndarray:
 def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def read_rows(path: Path) -> list[dict[str, object]]:
+    with path.open() as handle:
+        return list(csv.DictReader(handle))
+
+
+def aggregate_block_rows(
+    rows: list[dict[str, object]],
+    *,
+    minimum_distance: float,
+) -> tuple[
+    list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
+    dict[str, object],
+]:
+    replicate_rows, summary_rows, fits, fit_summary = summarize_spatial_covariance_replicates(
+        rows,
+        minimum_distance=minimum_distance,
+    )
+    for row in replicate_rows:
+        row.update(
+            {
+                "uncertainty_scope": "within_trajectory_block_average",
+                "spatial_measurement_claim_allowed": 1.0,
+                "spatial_model_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+    for row in summary_rows:
+        row.update(
+            {
+                "uncertainty_scope": "independent_replicates",
+                "spatial_measurement_claim_allowed": 1.0,
+                "spatial_model_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+    for row in fits:
+        row.update(
+            {
+                "fit_status": "independent_replicate_fit",
+                "spatial_measurement_claim_allowed": 1.0,
+                "spatial_model_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+    fit_summary.update(
+        {
+            "fit_status": "between_replicate_uncertainty",
+            "uncertainty_scope": "independent_replicates",
+            "spatial_measurement_claim_allowed": 1.0,
+            "spatial_model_claim_allowed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+    )
+    return replicate_rows, summary_rows, fits, fit_summary
 
 
 def analyze(
@@ -125,16 +184,43 @@ def analyze(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("trajectory", type=Path)
-    parser.add_argument("--temperature", type=float, required=True)
+    parser.add_argument("trajectory", type=Path, nargs="?")
+    parser.add_argument("--temperature", type=float)
     parser.add_argument("--spatial-block", type=int, default=1000)
     parser.add_argument("--count-window", type=int, default=100)
     parser.add_argument("--distance-edges", type=parse_edges, default=parse_edges("0,1.1,1.4,1.8,2.5,3.5,5,7.5,13.1"))
     parser.add_argument("--threshold", type=float, default=0.2)
     parser.add_argument("--half-window", type=int, default=5)
     parser.add_argument("--fit-minimum-distance", type=float, default=1.1)
+    parser.add_argument("--aggregate-block-files", type=Path, nargs="+")
     parser.add_argument("--output-prefix", type=Path, required=True)
     args = parser.parse_args()
+
+    if args.aggregate_block_files:
+        if args.trajectory is not None:
+            parser.error("trajectory and --aggregate-block-files are mutually exclusive")
+        combined: list[dict[str, object]] = []
+        for replicate, path in enumerate(args.aggregate_block_files, start=1):
+            for row in read_rows(path):
+                row["replicate"] = float(replicate)
+                combined.append(row)
+        replicate_rows, summary, fits, fit_summary = aggregate_block_rows(
+            combined,
+            minimum_distance=args.fit_minimum_distance,
+        )
+        write_rows(
+            args.output_prefix.with_name(args.output_prefix.name + "_replicate_curves.csv"),
+            replicate_rows,
+        )
+        write_rows(args.output_prefix.with_name(args.output_prefix.name + "_summary.csv"), summary)
+        write_rows(args.output_prefix.with_name(args.output_prefix.name + "_fits.csv"), fits)
+        write_rows(
+            args.output_prefix.with_name(args.output_prefix.name + "_fit_summary.csv"),
+            [fit_summary],
+        )
+        return
+    if args.trajectory is None or args.temperature is None:
+        parser.error("trajectory and --temperature are required unless --aggregate-block-files is used")
 
     blocks, summary = analyze(
         args.trajectory,

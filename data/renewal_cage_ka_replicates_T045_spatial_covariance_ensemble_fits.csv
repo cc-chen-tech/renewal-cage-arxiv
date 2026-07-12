@@ -1,0 +1,4 @@
+amplitude,correlation_length,log_space_r_squared,fit_point_count,fit_distance_min,fit_distance_max,replicate,fit_status,spatial_measurement_claim_allowed,spatial_model_claim_allowed,thermodynamic_claim_allowed
+0.005807413367598488,0.7421212776810243,0.9966581268681838,5.0,1.25,4.25,1.0,independent_replicate_fit,1.0,0.0,0.0
+0.008958247522056591,0.5820361431817388,0.9757222234176541,5.0,1.25,4.25,2.0,independent_replicate_fit,1.0,0.0,0.0
+0.0055145024621623675,0.7614772184485669,0.998062091457849,5.0,1.25,4.25,3.0,independent_replicate_fit,1.0,0.0,0.0

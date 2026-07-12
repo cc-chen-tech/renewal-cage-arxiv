@@ -15,6 +15,67 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_t045_independent_waiting_and_heldout_transport_gates(self):
+        waiting_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_waiting_verdict.csv"
+        with waiting_path.open() as handle:
+            waiting = next(csv.DictReader(handle))
+        self.assertEqual(waiting["consensus_verdict"], "empirical_iid_waiting_law_sufficient")
+        self.assertEqual(float(waiting["independent_replicate_count"]), 3.0)
+        self.assertEqual(float(waiting["finite_memory_model_required"]), 0.0)
+        self.assertEqual(float(waiting["persistent_environment_identifiable"]), 0.0)
+        self.assertEqual(float(waiting["collective_covariance_replicate_count"]), 3.0)
+        self.assertEqual(float(waiting["spatial_cooperation_test_required"]), 1.0)
+        self.assertEqual(float(waiting["spatial_cooperation_proven"]), 0.0)
+
+        paths = {
+            0.15: ROOT / "data" / "renewal_cage_ka_replicates_T045_heldout_transport_threshold_0p15_summary.csv",
+            0.20: ROOT / "data" / "renewal_cage_ka_replicates_T045_heldout_transport_summary.csv",
+            0.25: ROOT / "data" / "renewal_cage_ka_replicates_T045_heldout_transport_threshold_0p25_summary.csv",
+        }
+        coverage = {}
+        for threshold, path in paths.items():
+            with path.open() as handle:
+                rows = {row["model"]: row for row in csv.DictReader(handle)}
+            correlated = rows["correlated_event_clock"]
+            coverage[threshold] = float(correlated["mean_coverage"])
+            self.assertEqual(float(correlated["replicates_within_tolerance"]), 0.0)
+            self.assertLess(float(correlated["ci95_high_coverage"]), 0.8)
+            self.assertEqual(float(correlated["independent_replicate_count"]), 3.0)
+        self.assertGreater(coverage[0.15], coverage[0.20])
+        self.assertGreater(coverage[0.20], coverage[0.25])
+
+    def test_t045_spatial_length_replicates_but_overlap_xi4_does_not(self):
+        spatial_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_spatial_covariance_ensemble_fit_summary.csv"
+        )
+        with spatial_path.open() as handle:
+            spatial = next(csv.DictReader(handle))
+        self.assertEqual(float(spatial["independent_replicate_count"]), 3.0)
+        self.assertGreater(float(spatial["ci95_low_correlation_length"]), 0.4)
+        self.assertLess(float(spatial["ci95_high_correlation_length"]), 1.0)
+        self.assertEqual(spatial["ci95_method"], "student_t_independent_replicates")
+        self.assertEqual(float(spatial["spatial_measurement_claim_allowed"]), 1.0)
+        self.assertEqual(float(spatial["spatial_model_claim_allowed"]), 0.0)
+
+        s4_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_ensemble_verdict.csv"
+        with s4_path.open() as handle:
+            s4 = next(csv.DictReader(handle))
+        self.assertEqual(float(s4["independent_replicate_count"]), 3.0)
+        self.assertEqual(float(s4["invalid_replicate_fit_count"]), 3.0)
+        self.assertEqual(float(s4["xi4_identifiable"]), 0.0)
+        self.assertEqual(float(s4["xi4_claim_allowed"]), 0.0)
+
+    def test_three_temperature_replicate_trends_keep_chi4_uncertainty_failure(self):
+        path = ROOT / "data" / "renewal_cage_ka_replicates_T058_T045_trend.csv"
+        with path.open() as handle:
+            rows = {row["metric"]: row for row in csv.DictReader(handle)}
+        for metric in ("diffusion", "alpha_relaxation_time", "diffusion_alpha_product", "ngp_peak"):
+            self.assertEqual(rows[metric]["trend_pass"], "True")
+        self.assertEqual(rows["overlap_chi4_peak"]["trend_pass"], "False")
+        self.assertEqual(float(rows["diffusion"]["high_temperature_replicate_count"]), 5.0)
+        self.assertEqual(float(rows["diffusion"]["low_temperature_replicate_count"]), 3.0)
+        self.assertTrue(all(row["thermodynamic_claim_allowed"] == "False" for row in rows.values()))
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
@@ -123,9 +184,8 @@ class ArxivPackageTests(unittest.TestCase):
             },
         )
         self.assertTrue(all(row["trend_pass"] == "True" for row in trends.values()))
-        self.assertTrue(
-            all(int(row["independent_replicates_per_temperature"]) == 5 for row in trends.values())
-        )
+        self.assertTrue(all(int(float(row["high_temperature_replicate_count"])) == 5 for row in trends.values()))
+        self.assertTrue(all(int(float(row["low_temperature_replicate_count"])) == 5 for row in trends.values()))
 
         with provenance_path.open() as handle:
             provenance = list(csv.DictReader(handle))
@@ -154,7 +214,7 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(len(protocol), 10)
         diffusion = [row for row in protocol if row["metric"] == "diffusion"]
         self.assertEqual(len(diffusion), 2)
-        self.assertTrue(all(row["ci95_overlap"] == "False" for row in diffusion))
+        self.assertTrue(all(row["ci95_overlap"] == "True" for row in diffusion))
         self.assertTrue(
             all(
                 row["interpretation"]

@@ -15,6 +15,220 @@ import numpy as np
 SOURCE_DOI = "10.5281/zenodo.7469766"
 
 
+def independent_sample_ci95(
+    *,
+    mean: float,
+    standard_error: float,
+    sample_count: int,
+) -> tuple[float, float, float]:
+    """Two-sided 95% Student-t interval for a mean of independent samples."""
+
+    if sample_count < 2 or not math.isfinite(mean) or not math.isfinite(standard_error):
+        raise ValueError("a finite mean, standard error, and at least two samples are required")
+    if standard_error < 0.0:
+        raise ValueError("standard_error must be nonnegative")
+    critical_by_df = {
+        1: 12.706204736432095,
+        2: 4.302652729911275,
+        3: 3.182446305284263,
+        4: 2.7764451051977987,
+        5: 2.570581835636314,
+        6: 2.446911848791681,
+        7: 2.3646242510102993,
+        8: 2.3060041350333704,
+        9: 2.2621571628540993,
+        10: 2.2281388519649385,
+        11: 2.200985160082949,
+        12: 2.1788128296634177,
+        13: 2.1603686564610127,
+        14: 2.1447866879169273,
+        15: 2.131449545559323,
+        16: 2.1199052992210112,
+        17: 2.1098155778331806,
+        18: 2.10092204024096,
+        19: 2.093024054408263,
+        20: 2.0859634472658364,
+        21: 2.079613844727662,
+        22: 2.0738730679040147,
+        23: 2.0686576104190406,
+        24: 2.0638985616280205,
+        25: 2.059538552753294,
+        26: 2.055529438642871,
+        27: 2.0518305164802833,
+        28: 2.048407141795244,
+        29: 2.045229642132703,
+        30: 2.0422724563012373,
+    }
+    critical = critical_by_df.get(sample_count - 1, 1.959963984540054)
+    margin = critical * standard_error
+    return mean - margin, mean + margin, critical
+
+
+def summarize_replicate_binned_metric(
+    rows: Sequence[dict[str, object]],
+    *,
+    bin_key: str,
+    metric_key: str,
+    replicate_key: str = "replicate",
+) -> tuple[list[dict[str, float]], list[dict[str, float]]]:
+    """Average time blocks within replicas, then estimate error between replicas."""
+
+    if not rows:
+        raise ValueError("at least one binned replicate row is required")
+    required = {bin_key, metric_key, replicate_key}
+    if any(not required.issubset(row) for row in rows):
+        raise ValueError("every row must contain bin, metric, and replicate keys")
+
+    grouped: dict[tuple[float, float], list[float]] = {}
+    for row in rows:
+        key = (float(row[bin_key]), float(row[replicate_key]))
+        value = float(row[metric_key])
+        if not all(math.isfinite(item) for item in (*key, value)):
+            raise ValueError("bin, metric, and replicate values must be finite")
+        grouped.setdefault(key, []).append(value)
+
+    replicate_rows = [
+        {
+            bin_key: bin_value,
+            replicate_key: replicate,
+            metric_key: float(np.mean(values)),
+            "within_replicate_block_count": float(len(values)),
+        }
+        for (bin_value, replicate), values in sorted(grouped.items())
+    ]
+    summary_rows: list[dict[str, float]] = []
+    for bin_value in sorted({float(row[bin_key]) for row in replicate_rows}):
+        selected = [row for row in replicate_rows if float(row[bin_key]) == bin_value]
+        values = np.array([float(row[metric_key]) for row in selected])
+        if len(values) < 2:
+            raise ValueError("at least two independent replicas are required per bin")
+        standard_deviation = float(np.std(values, ddof=1))
+        standard_error = standard_deviation / math.sqrt(len(values))
+        block_counts = [float(row["within_replicate_block_count"]) for row in selected]
+        mean = float(np.mean(values))
+        ci_low, ci_high, critical = independent_sample_ci95(
+            mean=mean,
+            standard_error=standard_error,
+            sample_count=len(values),
+        )
+        summary_rows.append(
+            {
+                bin_key: bin_value,
+                "mean": mean,
+                "standard_deviation": standard_deviation,
+                "standard_error": standard_error,
+                "ci95_low": ci_low,
+                "ci95_high": ci_high,
+                "ci95_critical_value": critical,
+                "ci95_method": "student_t_independent_replicates",
+                "independent_replicate_count": float(len(values)),
+                "within_replicate_block_count_min": min(block_counts),
+                "within_replicate_block_count_max": max(block_counts),
+            }
+        )
+    return replicate_rows, summary_rows
+
+
+def trajectory_diffusion_estimate(
+    unwrapped_positions: np.ndarray,
+    *,
+    lag: int,
+    origin_stride: int,
+    particle_mask: np.ndarray | None = None,
+) -> float:
+    """Estimate diffusion from a fixed lag using only origins in one trajectory window."""
+
+    positions = np.asarray(unwrapped_positions)
+    if positions.ndim != 3 or positions.shape[2] < 1:
+        raise ValueError("unwrapped_positions must have shape (frames, particles, dimensions)")
+    if lag < 1 or lag >= len(positions) or origin_stride < 1:
+        raise ValueError("lag and origin_stride must define at least one valid displacement")
+    if particle_mask is None:
+        mask = np.ones(positions.shape[1], dtype=bool)
+    else:
+        mask = np.asarray(particle_mask, dtype=bool)
+        if mask.shape != (positions.shape[1],) or not np.any(mask):
+            raise ValueError("particle_mask must select at least one particle")
+    origins = np.arange(0, len(positions) - lag, origin_stride, dtype=int)
+    displacement = positions[origins + lag][:, mask] - positions[origins][:, mask]
+    msd = float(np.mean(np.sum(displacement**2, axis=2)))
+    return msd / (2.0 * positions.shape[2] * lag)
+
+
+def summarize_heldout_event_transport(
+    rows: Sequence[dict[str, object]],
+    *,
+    minimum_coverage: float,
+    maximum_coverage: float,
+) -> tuple[list[dict[str, float | str]], dict[str, float | str]]:
+    """Score event-clock diffusion predictions against independent held-out windows."""
+
+    if not rows or not 0.0 < minimum_coverage < maximum_coverage:
+        raise ValueError("rows and an ordered positive coverage interval are required")
+    models = {
+        "uncorrelated_event_clock": "uncorrelated_event_diffusion",
+        "correlated_event_clock": "correlated_event_diffusion",
+    }
+    summary: list[dict[str, float | str]] = []
+    coverage_by_model: dict[str, np.ndarray] = {}
+    for model, key in models.items():
+        observed = np.array([float(row["observed_diffusion"]) for row in rows])
+        predicted = np.array([float(row[key]) for row in rows])
+        if np.any(~np.isfinite(observed)) or np.any(~np.isfinite(predicted)):
+            raise ValueError("held-out diffusion values must be finite")
+        if np.any(observed <= 0.0) or np.any(predicted <= 0.0):
+            raise ValueError("held-out diffusion values must be positive")
+        coverage = predicted / observed
+        coverage_by_model[model] = coverage
+        standard_deviation = float(np.std(coverage, ddof=1))
+        standard_error = standard_deviation / math.sqrt(len(coverage))
+        mean = float(np.mean(coverage))
+        ci_low, ci_high, critical = independent_sample_ci95(
+            mean=mean,
+            standard_error=standard_error,
+            sample_count=len(coverage),
+        )
+        summary.append(
+            {
+                "model": model,
+                "mean_observed_diffusion": float(np.mean(observed)),
+                "mean_predicted_diffusion": float(np.mean(predicted)),
+                "mean_coverage": mean,
+                "standard_deviation_coverage": standard_deviation,
+                "standard_error_coverage": standard_error,
+                "ci95_low_coverage": ci_low,
+                "ci95_high_coverage": ci_high,
+                "ci95_critical_value": critical,
+                "ci95_method": "student_t_independent_replicates",
+                "replicates_within_tolerance": float(
+                    np.sum((coverage >= minimum_coverage) & (coverage <= maximum_coverage))
+                ),
+                "independent_replicate_count": float(len(coverage)),
+            }
+        )
+    correlated = coverage_by_model["correlated_event_clock"]
+    passed = bool(np.all((correlated >= minimum_coverage) & (correlated <= maximum_coverage)))
+    if passed:
+        failure = "none"
+    elif float(np.mean(correlated)) < minimum_coverage:
+        failure = "correlated_event_clock_undercoverage"
+    elif float(np.mean(correlated)) > maximum_coverage:
+        failure = "correlated_event_clock_overcoverage"
+    else:
+        failure = "replicate_transport_inconsistency"
+    verdict: dict[str, float | str] = {
+        "minimum_coverage": minimum_coverage,
+        "maximum_coverage": maximum_coverage,
+        "heldout_transport_pass": float(passed),
+        "primary_failure": failure,
+        "independent_replicate_count": float(len(rows)),
+        "macro_fit_parameter_count": 0.0,
+        "finite_memory_model_required": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+    return summary, verdict
+
+
 def fit_ornstein_zernike_structure_factor(
     rows: Sequence[dict[str, object]],
 ) -> dict[str, float | bool]:
@@ -45,6 +259,68 @@ def fit_ornstein_zernike_structure_factor(
         "fit_wave_number_max": float(np.max(q[selected])),
         "fit_valid": fit_valid,
     }
+
+
+def summarize_overlap_s4_replicates(
+    rows: Sequence[dict[str, object]],
+    *,
+    ensemble_correction_available: bool,
+) -> tuple[list[dict[str, float]], list[dict[str, float | bool]], dict[str, float | str]]:
+    """Gate an overlap-S4 length using fits repeated across independent replicas."""
+
+    _, summary_rows = summarize_replicate_binned_metric(
+        rows,
+        bin_key="integer_squared",
+        metric_key="s4",
+    )
+    for summary in summary_rows:
+        shell = float(summary["integer_squared"])
+        selected = [row for row in rows if float(row["integer_squared"]) == shell]
+        summary["wave_number"] = float(np.mean([float(row["wave_number"]) for row in selected]))
+
+    fits: list[dict[str, float | bool]] = []
+    for replicate in sorted({float(row["replicate"]) for row in rows}):
+        selected = [row for row in rows if float(row["replicate"]) == replicate]
+        shell_rows: list[dict[str, float]] = []
+        for shell in sorted({float(row["integer_squared"]) for row in selected}):
+            shell_selected = [row for row in selected if float(row["integer_squared"]) == shell]
+            shell_rows.append(
+                {
+                    "wave_number": float(np.mean([float(row["wave_number"]) for row in shell_selected])),
+                    "s4": float(np.mean([float(row["s4"]) for row in shell_selected])),
+                }
+            )
+        fit = fit_ornstein_zernike_structure_factor(
+            [row for row in shell_rows if row["wave_number"] > 0.0]
+        )
+        fit["replicate"] = replicate
+        fits.append(fit)
+
+    aggregate_fit = fit_ornstein_zernike_structure_factor(
+        [
+            {"wave_number": row["wave_number"], "s4": row["mean"]}
+            for row in summary_rows
+            if float(row["wave_number"]) > 0.0
+        ]
+    )
+    invalid_count = sum(not bool(row["fit_valid"]) for row in fits)
+    reproducible = invalid_count == 0 and bool(aggregate_fit["fit_valid"])
+    identifiable = reproducible and ensemble_correction_available
+    verdict: dict[str, float | str] = {
+        "independent_replicate_count": float(len(fits)),
+        "invalid_replicate_fit_count": float(invalid_count),
+        "aggregate_fit_valid": float(bool(aggregate_fit["fit_valid"])),
+        "aggregate_correlation_length": float(aggregate_fit["correlation_length"]),
+        "raw_oz_fit_reproducible": float(reproducible),
+        "ensemble_correction_available": float(ensemble_correction_available),
+        "xi4_identifiable": float(identifiable),
+        "xi4_claim_allowed": float(identifiable),
+        "thermodynamic_claim_allowed": 0.0,
+        "verdict": "xi4_identifiable_with_replicate_and_ensemble_gate"
+        if identifiable
+        else "xi4_not_identifiable",
+    }
+    return summary_rows, fits, verdict
 
 
 def overlap_four_point_structure_factor(
@@ -168,6 +444,63 @@ def fit_spatial_covariance_length(
     }
 
 
+def summarize_spatial_covariance_replicates(
+    rows: Sequence[dict[str, object]],
+    *,
+    minimum_distance: float,
+) -> tuple[
+    list[dict[str, float]],
+    list[dict[str, float]],
+    list[dict[str, float]],
+    dict[str, float],
+]:
+    """Estimate event-covariance curves and lengths using independent replicas."""
+
+    replicate_rows, summary_rows = summarize_replicate_binned_metric(
+        rows,
+        bin_key="distance_midpoint",
+        metric_key="covariance_excess_over_all_pairs",
+    )
+    fits: list[dict[str, float]] = []
+    for replicate in sorted({float(row["replicate"]) for row in replicate_rows}):
+        selected = [row for row in replicate_rows if float(row["replicate"]) == replicate]
+        fit = fit_spatial_covariance_length(
+            [
+                {
+                    "distance_midpoint": row["distance_midpoint"],
+                    "mean_covariance_excess": row["covariance_excess_over_all_pairs"],
+                }
+                for row in selected
+            ],
+            minimum_distance=minimum_distance,
+        )
+        fit["replicate"] = replicate
+        fits.append(fit)
+
+    lengths = np.array([float(row["correlation_length"]) for row in fits])
+    if len(lengths) < 2:
+        raise ValueError("at least two independent spatial-covariance fits are required")
+    standard_deviation = float(np.std(lengths, ddof=1))
+    standard_error = standard_deviation / math.sqrt(len(lengths))
+    mean = float(np.mean(lengths))
+    ci_low, ci_high, critical = independent_sample_ci95(
+        mean=mean,
+        standard_error=standard_error,
+        sample_count=len(lengths),
+    )
+    fit_summary = {
+        "mean_correlation_length": mean,
+        "standard_deviation_correlation_length": standard_deviation,
+        "standard_error_correlation_length": standard_error,
+        "ci95_low_correlation_length": ci_low,
+        "ci95_high_correlation_length": ci_high,
+        "ci95_critical_value": critical,
+        "ci95_method": "student_t_independent_replicates",
+        "independent_replicate_count": float(len(lengths)),
+    }
+    return replicate_rows, summary_rows, fits, fit_summary
+
+
 def distance_resolved_event_count_covariance(
     events: dict[str, np.ndarray],
     reference_positions: np.ndarray,
@@ -284,6 +617,11 @@ def summarize_replicate_curves(
             mean = float(np.mean(values))
             standard_deviation = float(np.std(values, ddof=1))
             standard_error = standard_deviation / math.sqrt(len(values))
+            ci_low, ci_high, critical = independent_sample_ci95(
+                mean=mean,
+                standard_error=standard_error,
+                sample_count=len(values),
+            )
             summary.append(
                 {
                     "lag": lag,
@@ -291,8 +629,10 @@ def summarize_replicate_curves(
                     "mean": mean,
                     "standard_deviation": standard_deviation,
                     "standard_error": standard_error,
-                    "ci95_low": mean - 1.96 * standard_error,
-                    "ci95_high": mean + 1.96 * standard_error,
+                    "ci95_low": ci_low,
+                    "ci95_high": ci_high,
+                    "ci95_critical_value": critical,
+                    "ci95_method": "student_t_independent_replicates",
                     "independent_replicate_count": float(len(values)),
                 }
             )
