@@ -15,6 +15,34 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_oracle_jump_cage_factorization_closes_low_temperature_multobservables(self):
+        low_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_event_oracle_factorization_verdict.csv"
+        )
+        high_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T058_event_oracle_factorization_verdict.csv"
+        )
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        self.assertEqual(float(low["oracle_jump_cage_factorization_supported"]), 1.0)
+        self.assertLess(float(low["maximum_msd_relative_error"]), 0.1)
+        self.assertLess(float(low["maximum_ngp_absolute_error"]), 0.3)
+        self.assertLess(float(low["maximum_fs_absolute_error"]), 0.03)
+        self.assertEqual(float(low["independent_replicate_count"]), 3.0)
+        self.assertEqual(float(low["lag_count"]), 9.0)
+        self.assertEqual(float(low["wave_number_count"]), 3.0)
+        self.assertEqual(float(high["oracle_jump_cage_factorization_supported"]), 0.0)
+        self.assertGreater(float(high["maximum_msd_relative_error"]), 0.3)
+        self.assertEqual(float(low["calibration_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(low["gate_scope"], "posthoc_oracle_representation_diagnostic")
+        self.assertEqual(float(low["thermodynamic_claim_allowed"]), 0.0)
+
     def test_debye_waller_waiting_law_crosses_from_iid_to_persistent_environment(self):
         high_path = (
             ROOT / "data" / "renewal_cage_ka_replicates_T058_debye_waller_waiting_verdict.csv"

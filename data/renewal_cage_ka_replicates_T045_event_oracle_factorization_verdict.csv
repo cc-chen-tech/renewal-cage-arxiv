@@ -1,0 +1,2 @@
+temperature,independent_replicate_count,lag_count,wave_number_count,maximum_msd_relative_error,maximum_ngp_absolute_error,maximum_fs_absolute_error,msd_tolerance,ngp_tolerance,fs_tolerance,oracle_jump_cage_factorization_supported,gate_scope,calibration_prediction_claim_allowed,thermodynamic_claim_allowed
+0.45,3.0,9.0,3.0,0.09690618281797914,0.23397265772499454,0.029658453254663875,0.1,0.3,0.03,1.0,posthoc_oracle_representation_diagnostic,0.0,0.0

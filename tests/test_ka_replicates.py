@@ -174,6 +174,44 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertLess(result["efold_crossing_time"], 3.0)
         self.assertAlmostEqual(result["target_correlation"], 1.0 / np.e)
 
+    def test_event_cumulative_trajectory_applies_jump_vectors_at_event_times(self):
+        reconstruct = getattr(ka_replicates, "event_cumulative_trajectory", None)
+        self.assertIsNotNone(reconstruct)
+        events = {
+            "particle": np.array([0, 0, 1]),
+            "time": np.array([2, 4, 3]),
+            "jump_vector": np.array(
+                [[1.0, 0.0], [0.0, 2.0], [-1.0, 0.0]]
+            ),
+        }
+
+        trajectory = reconstruct(
+            events,
+            frame_count=6,
+            particle_count=2,
+            dimension=2,
+        )
+
+        np.testing.assert_allclose(trajectory[1], [[0.0, 0.0], [0.0, 0.0]])
+        np.testing.assert_allclose(trajectory[2], [[1.0, 0.0], [0.0, 0.0]])
+        np.testing.assert_allclose(trajectory[3], [[1.0, 0.0], [-1.0, 0.0]])
+        np.testing.assert_allclose(trajectory[5], [[1.0, 2.0], [-1.0, 0.0]])
+
+    def test_independent_isotropic_channel_convolution_preserves_gaussianity(self):
+        combine = getattr(ka_replicates, "independent_isotropic_channel_moments", None)
+        self.assertIsNotNone(combine)
+        result = combine(
+            first_msd=2.0,
+            first_ngp=0.0,
+            second_msd=3.0,
+            second_ngp=0.0,
+            dimension=3,
+        )
+
+        self.assertAlmostEqual(result["combined_msd"], 5.0)
+        self.assertAlmostEqual(result["combined_ngp"], 0.0)
+        self.assertAlmostEqual(result["combined_fourth_moment"], 125.0 / 3.0)
+
     def test_position_fluctuation_and_cage_jump_segmentation_are_translation_invariant(self):
         fluctuation = getattr(ka_replicates, "position_fluctuation_values", None)
         segment = getattr(ka_replicates, "extract_debye_waller_cage_jumps", None)

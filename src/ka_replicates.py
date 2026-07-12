@@ -375,6 +375,80 @@ def correlation_efold_crossing(
     }
 
 
+def event_cumulative_trajectory(
+    events: dict[str, np.ndarray],
+    *,
+    frame_count: int,
+    particle_count: int,
+    dimension: int,
+) -> np.ndarray:
+    """Construct the event-space path obtained by accumulating jump vectors."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=int)
+    jumps = np.asarray(events["jump_vector"], dtype=float)
+    if frame_count < 1 or particle_count < 1 or dimension < 1:
+        raise ValueError("trajectory dimensions must be positive")
+    if particles.ndim != 1 or times.shape != particles.shape:
+        raise ValueError("event particles and times must be aligned vectors")
+    if jumps.shape != (len(particles), dimension):
+        raise ValueError("jump vectors must align with events and dimension")
+    if (
+        np.any(particles < 0)
+        or np.any(particles >= particle_count)
+        or np.any(times < 0)
+        or np.any(times >= frame_count)
+        or np.any(~np.isfinite(jumps))
+    ):
+        raise ValueError("event arrays contain out-of-range or nonfinite values")
+    increments = np.zeros((frame_count, particle_count, dimension), dtype=float)
+    np.add.at(increments, (times, particles), jumps)
+    return np.cumsum(increments, axis=0)
+
+
+def independent_isotropic_channel_moments(
+    *,
+    first_msd: float,
+    first_ngp: float,
+    second_msd: float,
+    second_ngp: float,
+    dimension: int,
+) -> dict[str, float]:
+    """Convolve second and fourth moments of independent isotropic displacement channels."""
+
+    values = (first_msd, first_ngp, second_msd, second_ngp)
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("channel moments must be finite")
+    if first_msd < 0.0 or second_msd < 0.0:
+        raise ValueError("channel MSD values must be nonnegative")
+    if first_ngp < -1.0 or second_ngp < -1.0:
+        raise ValueError("channel NGP values cannot be smaller than minus one")
+    if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 1:
+        raise ValueError("dimension must be a positive integer")
+    prefactor = (dimension + 2.0) / dimension
+    first_fourth = prefactor * (1.0 + first_ngp) * first_msd**2
+    second_fourth = prefactor * (1.0 + second_ngp) * second_msd**2
+    cross = 2.0 * (1.0 + 2.0 / dimension) * first_msd * second_msd
+    combined_msd = first_msd + second_msd
+    combined_fourth = first_fourth + second_fourth + cross
+    combined_ngp = (
+        dimension
+        * combined_fourth
+        / ((dimension + 2.0) * combined_msd**2)
+        - 1.0
+        if combined_msd > 0.0
+        else 0.0
+    )
+    return {
+        "first_fourth_moment": first_fourth,
+        "second_fourth_moment": second_fourth,
+        "cross_fourth_moment": cross,
+        "combined_msd": combined_msd,
+        "combined_fourth_moment": combined_fourth,
+        "combined_ngp": combined_ngp,
+    }
+
+
 def debye_waller_factor_from_msd(
     lags: np.ndarray,
     mean_squared_displacement: np.ndarray,
