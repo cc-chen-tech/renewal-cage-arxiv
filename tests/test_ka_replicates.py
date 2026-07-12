@@ -256,6 +256,85 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertTrue(np.isfinite(scored["log_likelihood"]))
         self.assertEqual(scored["observation_count"], 6.0)
 
+    def test_two_mode_exchange_spectrum_recovers_broad_finite_decay(self):
+        fit = getattr(ka_replicates, "fit_exponential_correlation_spectrum", None)
+        predict = getattr(ka_replicates, "exponential_correlation_spectrum", None)
+        self.assertIsNotNone(fit)
+        self.assertIsNotNone(predict)
+        times = np.arange(1.0, 61.0)
+        correlations = 0.24 * np.exp(-times / 3.0) + 0.11 * np.exp(-times / 28.0)
+
+        single = fit(times, correlations, component_count=1, grid_size=80)
+        broad = fit(times, correlations, component_count=2, grid_size=80)
+        reconstructed = predict(times, broad)
+
+        self.assertLess(broad["rmse"], 0.002)
+        self.assertLess(broad["bic"], single["bic"])
+        self.assertGreater(broad["slow_time"] / broad["fast_time"], 4.0)
+        self.assertGreater(broad["slow_amplitude"], 0.05)
+        np.testing.assert_allclose(reconstructed, correlations, atol=0.006)
+
+    def test_exchange_spectrum_rejects_nonincreasing_times(self):
+        fit = getattr(ka_replicates, "fit_exponential_correlation_spectrum", None)
+        self.assertIsNotNone(fit)
+
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            fit(np.array([1.0, 2.0, 2.0]), np.array([0.3, 0.2, 0.1]), component_count=2)
+
+        with self.assertRaisesRegex(ValueError, "at least five"):
+            fit(
+                np.array([1.0, 2.0, 3.0, 4.0]),
+                np.array([0.4, 0.3, 0.2, 0.1]),
+                component_count=2,
+            )
+
+    def test_exchange_spectrum_gate_requires_selection_and_heldout_transfer(self):
+        script_path = ROOT / "scripts" / "analyze_ka_exchange_spectrum.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_exchange_spectrum", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        passing = {
+            "calibration_bic_gain_two_over_one": 12.0,
+            "two_mode_heldout_rmse": 0.03,
+            "single_mode_heldout_rmse": 0.07,
+            "two_mode_late_absolute_error": 0.02,
+            "slow_time": 400.0,
+            "maximum_candidate_time": 6000.0,
+        }
+
+        accepted = module.classify_spectrum_transfer(passing)
+        rejected = module.classify_spectrum_transfer(
+            {**passing, "two_mode_late_absolute_error": 0.06}
+        )
+
+        self.assertEqual(accepted["two_mode_calibration_selected"], 1.0)
+        self.assertEqual(accepted["two_mode_heldout_transfer_pass"], 1.0)
+        self.assertEqual(rejected["two_mode_heldout_transfer_pass"], 0.0)
+        self.assertEqual(rejected["primary_failure"], "late_identity_decay")
+
+    def test_exchange_spectrum_crossover_requires_high_simple_low_broad_pattern(self):
+        script_path = ROOT / "scripts" / "summarize_ka_exchange_spectrum_crossover.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_exchange_spectrum_crossover", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        result = module.classify_crossover(
+            high_outcome="single_mode_exchange_sufficient",
+            low_outcome="two_mode_finite_exchange_spectrum_closure",
+            low_selection_fraction=1.0,
+            low_transfer_fraction=1.0,
+            low_hmm_transfer_fraction=1.0 / 6.0,
+        )
+
+        self.assertEqual(result["cooling_induced_exchange_spectrum_broadening"], 1.0)
+        self.assertAlmostEqual(result["heldout_pass_gain_over_markov_hmm"], 5.0 / 6.0)
+        self.assertEqual(result["semi_markov_generator_required"], 1.0)
+        self.assertEqual(result["heldout_macro_prediction_claim_allowed"], 0.0)
+
     def test_finite_exchange_hmm_gate_requires_late_identity_prediction(self):
         script_path = ROOT / "scripts" / "analyze_ka_finite_exchange_hmm.py"
         spec = importlib.util.spec_from_file_location("analyze_ka_finite_exchange_hmm", script_path)

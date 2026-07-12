@@ -672,6 +672,122 @@ def score_two_state_poisson_hmm(
     }
 
 
+def exponential_correlation_spectrum(
+    times: np.ndarray,
+    fitted: dict[str, object],
+) -> np.ndarray:
+    """Evaluate a one- or two-mode finite exponential relaxation spectrum."""
+
+    values = np.asarray(times, dtype=float)
+    if np.any(~np.isfinite(values)) or np.any(values < 0.0):
+        raise ValueError("times must be finite and nonnegative")
+    fast_amplitude = float(fitted["fast_amplitude"])
+    fast_time = float(fitted["fast_time"])
+    slow_amplitude = float(fitted["slow_amplitude"])
+    slow_time = float(fitted["slow_time"])
+    parameters = np.array([fast_amplitude, fast_time, slow_amplitude, slow_time])
+    if (
+        np.any(~np.isfinite(parameters))
+        or min(fast_amplitude, slow_amplitude) < 0.0
+        or min(fast_time, slow_time) <= 0.0
+        or fast_time > slow_time
+    ):
+        raise ValueError("fitted spectrum must have nonnegative amplitudes and ordered times")
+    return (
+        fast_amplitude * np.exp(-values / fast_time)
+        + slow_amplitude * np.exp(-values / slow_time)
+    )
+
+
+def fit_exponential_correlation_spectrum(
+    times: np.ndarray,
+    correlations: np.ndarray,
+    *,
+    component_count: int,
+    grid_size: int = 80,
+) -> dict[str, float]:
+    """Fit a nonnegative finite relaxation spectrum by deterministic grid search."""
+
+    lag_times = np.asarray(times, dtype=float)
+    observed = np.asarray(correlations, dtype=float)
+    if (
+        lag_times.ndim != 1
+        or observed.shape != lag_times.shape
+        or len(lag_times) < 3
+        or np.any(~np.isfinite(lag_times))
+        or np.any(~np.isfinite(observed))
+        or np.any(lag_times <= 0.0)
+        or np.any(np.diff(lag_times) <= 0.0)
+    ):
+        raise ValueError("times must be a strictly increasing positive vector aligned with correlations")
+    if component_count not in (1, 2):
+        raise ValueError("component_count must be one or two")
+    if component_count == 2 and len(lag_times) < 5:
+        raise ValueError("two-component spectra require at least five correlation points")
+    if isinstance(grid_size, bool) or not isinstance(grid_size, int) or grid_size < 20:
+        raise ValueError("grid_size must be an integer of at least twenty")
+
+    minimum_spacing = float(np.min(np.diff(np.concatenate(([0.0], lag_times)))))
+    time_grid = np.geomspace(minimum_spacing / 4.0, float(lag_times[-1]) * 20.0, grid_size)
+    basis = np.exp(-lag_times[:, None] / time_grid[None, :])
+    best_rss = math.inf
+    best_indices = (0, 0)
+    best_amplitudes = np.zeros(2, dtype=float)
+
+    def score_columns(columns: np.ndarray) -> tuple[float, np.ndarray]:
+        unconstrained = np.linalg.lstsq(columns, observed, rcond=None)[0]
+        candidates = [np.maximum(unconstrained, 0.0)]
+        for index in range(columns.shape[1]):
+            amplitudes = np.zeros(columns.shape[1], dtype=float)
+            denominator = float(np.dot(columns[:, index], columns[:, index]))
+            amplitudes[index] = max(float(np.dot(columns[:, index], observed)) / denominator, 0.0)
+            candidates.append(amplitudes)
+        best_local = min(
+            candidates,
+            key=lambda amplitudes: float(np.sum((observed - columns @ amplitudes) ** 2)),
+        )
+        residual = observed - columns @ best_local
+        return float(np.dot(residual, residual)), best_local
+
+    if component_count == 1:
+        for index in range(grid_size):
+            rss, amplitudes = score_columns(basis[:, index : index + 1])
+            if rss < best_rss:
+                best_rss = rss
+                best_indices = (index, index)
+                best_amplitudes = np.array([amplitudes[0], 0.0])
+    else:
+        for fast_index in range(grid_size - 1):
+            for slow_index in range(fast_index + 1, grid_size):
+                rss, amplitudes = score_columns(basis[:, [fast_index, slow_index]])
+                if rss < best_rss:
+                    best_rss = rss
+                    best_indices = (fast_index, slow_index)
+                    best_amplitudes = amplitudes
+
+    fast_time = float(time_grid[best_indices[0]])
+    slow_time = float(time_grid[best_indices[1]])
+    parameter_count = 2 * component_count
+    mean_squared_error = best_rss / len(observed)
+    return {
+        "component_count": float(component_count),
+        "fast_amplitude": float(best_amplitudes[0]),
+        "fast_time": fast_time,
+        "slow_amplitude": float(best_amplitudes[1]),
+        "slow_time": slow_time,
+        "total_amplitude": float(np.sum(best_amplitudes)),
+        "time_scale_ratio": slow_time / fast_time,
+        "rss": best_rss,
+        "rmse": math.sqrt(mean_squared_error),
+        "bic": len(observed) * math.log(max(mean_squared_error, 1e-300))
+        + parameter_count * math.log(len(observed)),
+        "fit_point_count": float(len(observed)),
+        "grid_size": float(grid_size),
+        "minimum_candidate_time": float(time_grid[0]),
+        "maximum_candidate_time": float(time_grid[-1]),
+    }
+
+
 def event_cumulative_trajectory(
     events: dict[str, np.ndarray],
     *,

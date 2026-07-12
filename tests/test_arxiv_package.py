@@ -15,6 +15,41 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_cooling_selects_two_mode_finite_exchange_spectrum_without_full_closure(self):
+        high_path = ROOT / "data" / "renewal_cage_ka_replicates_T058_exchange_spectrum_verdict.csv"
+        low_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_exchange_spectrum_verdict.csv"
+        crossover_path = ROOT / "data" / "renewal_cage_ka_exchange_spectrum_crossover.csv"
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+
+        self.assertEqual(high["event_level_outcome"], "single_mode_exchange_sufficient")
+        self.assertEqual(float(high["two_mode_calibration_selection_fraction"]), 0.0)
+        self.assertEqual(
+            low["event_level_outcome"],
+            "two_mode_finite_exchange_spectrum_closure",
+        )
+        self.assertEqual(float(low["two_mode_calibration_selection_fraction"]), 1.0)
+        self.assertEqual(float(low["two_mode_heldout_transfer_pass_fraction"]), 1.0)
+        self.assertEqual(float(low["identity_spectrum_closure_claim_allowed"]), 1.0)
+        self.assertEqual(float(low["full_event_clock_closure_claim_allowed"]), 0.0)
+        self.assertEqual(low["excluded_underidentified_block_sizes"], "100")
+        self.assertEqual(float(crossover["low_two_mode_pass_count"]), 6.0)
+        self.assertEqual(float(crossover["low_markov_hmm_pass_count"]), 1.0)
+        self.assertEqual(float(crossover["cooling_induced_exchange_spectrum_broadening"]), 1.0)
+        self.assertEqual(float(crossover["semi_markov_generator_required"]), 1.0)
+        self.assertEqual(float(crossover["identified_resolution_closure"]), 1.0)
+        self.assertEqual(float(crossover["full_resolution_scope"]), 0.0)
+        self.assertEqual(float(crossover["full_event_clock_closure_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["heldout_macro_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_exchange_spectrum_crossover.svg").is_file()
+        )
+
     def test_finite_exchange_hmm_is_sufficient_high_but_requires_broad_low_spectrum(self):
         high_path = (
             ROOT / "data" / "renewal_cage_ka_replicates_T058_finite_exchange_hmm_verdict.csv"
