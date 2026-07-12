@@ -50,6 +50,7 @@ def main() -> None:
     parser.add_argument("ensemble_directory", type=Path)
     parser.add_argument("--heldout-replicates", type=Path, required=True)
     parser.add_argument("--calibration-time", type=int, required=True)
+    parser.add_argument("--window", choices=("calibration", "heldout"), default="heldout")
     parser.add_argument("--fluctuation-half-window", type=int, default=5)
     parser.add_argument("--phop-threshold", type=float, default=0.15)
     parser.add_argument("--phop-half-window", type=int, default=5)
@@ -76,21 +77,27 @@ def main() -> None:
         threshold = float(calibration_rows[replicate_index]["debye_waller_factor"])
         trajectory = load_lammps_custom_trajectory(directory / "trajectory.lammpstrj")
         positions = trajectory["unwrapped_positions"][:, trajectory["particle_types"] == 0]
-        heldout = np.asarray(positions[args.calibration_time :], dtype=float)
+        if args.window == "calibration":
+            analysis_window = np.asarray(positions[: args.calibration_time + 1], dtype=float)
+        else:
+            analysis_window = np.asarray(positions[args.calibration_time :], dtype=float)
         fluctuation_times, fluctuation = position_fluctuation_values(
-            heldout,
+            analysis_window,
             half_window=args.fluctuation_half_window,
         )
         dw_events = extract_debye_waller_cage_jumps(
-            heldout,
+            analysis_window,
             debye_waller_factor=threshold,
             half_window=args.fluctuation_half_window,
             activity_times=fluctuation_times,
             activity_values=fluctuation,
         )
-        phop_times, phop = phop_values(heldout, half_window=args.phop_half_window)
+        phop_times, phop = phop_values(
+            analysis_window,
+            half_window=args.phop_half_window,
+        )
         phop_events = extract_nonrecrossing_phop_events(
-            heldout,
+            analysis_window,
             threshold=args.phop_threshold,
             half_window=args.phop_half_window,
             recrossing_radius=math.sqrt(args.phop_threshold),
@@ -99,19 +106,19 @@ def main() -> None:
         )
         dw_path = event_cumulative_trajectory(
             dw_events,
-            frame_count=len(heldout),
-            particle_count=heldout.shape[1],
-            dimension=heldout.shape[2],
+            frame_count=len(analysis_window),
+            particle_count=analysis_window.shape[1],
+            dimension=analysis_window.shape[2],
         )
         phop_path = event_cumulative_trajectory(
             phop_events,
-            frame_count=len(heldout),
-            particle_count=heldout.shape[1],
-            dimension=heldout.shape[2],
+            frame_count=len(analysis_window),
+            particle_count=analysis_window.shape[1],
+            dimension=analysis_window.shape[2],
         )
-        residual = heldout - dw_path
+        residual = analysis_window - dw_path
         representations = {
-            "observed_trajectory": heldout,
+            "observed_trajectory": analysis_window,
             "oracle_debye_waller_event_path": dw_path,
             "oracle_phop_event_path": phop_path,
             "debye_waller_residual_path": residual,
@@ -132,10 +139,12 @@ def main() -> None:
                         "temperature": float(manifest["temperature"]),
                         "representation": representation,
                         "calibration_debye_waller_factor": threshold,
-                        "heldout_dw_event_count": float(len(dw_events["time"])),
-                        "heldout_phop_event_count": float(len(phop_events["time"])),
+                        "analysis_window": args.window,
+                        "window_dw_event_count": float(len(dw_events["time"])),
+                        "window_phop_event_count": float(len(phop_events["time"])),
                         "oracle_uses_heldout_events": float(
-                            representation != "observed_trajectory"
+                            args.window == "heldout"
+                            and representation != "observed_trajectory"
                         ),
                         "prediction_claim_allowed": 0.0,
                         "thermodynamic_claim_allowed": 0.0,

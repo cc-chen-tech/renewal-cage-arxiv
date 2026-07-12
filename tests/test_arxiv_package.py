@@ -15,6 +15,53 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_calibration_jump_cage_channels_transfer_ensemble_observables_without_macro_fit(self):
+        path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_calibration_channel_transfer_verdict.csv"
+        )
+        with path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        high_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T058_calibration_channel_transfer_verdict.csv"
+        )
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        self.assertEqual(float(verdict["retrospective_ensemble_transfer_candidate_pass"]), 1.0)
+        self.assertLess(float(verdict["maximum_ensemble_msd_relative_error"]), 0.1)
+        self.assertLess(float(verdict["maximum_ensemble_ngp_absolute_error"]), 0.3)
+        self.assertLess(float(verdict["maximum_ensemble_fs_absolute_error"]), 0.03)
+        self.assertEqual(float(verdict["lag_count"]), 9.0)
+        self.assertEqual(float(verdict["wave_number_count"]), 3.0)
+        self.assertEqual(float(verdict["calibration_only_microchannel_input"]), 1.0)
+        self.assertEqual(float(verdict["heldout_events_used_in_prediction"]), 0.0)
+        self.assertEqual(float(verdict["macro_fit_parameter_count"]), 0.0)
+        self.assertEqual(float(verdict["individual_trajectory_forecast_pass"]), 0.0)
+        self.assertEqual(float(verdict["early_ngp_significant_mismatch_lag_count"]), 3.0)
+        self.assertEqual(float(verdict["preregistered_heldout_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(
+            verdict["next_required_test"],
+            "new_independent_trajectory_preregistered_channel_transfer",
+        )
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(high["retrospective_ensemble_transfer_candidate_pass"]), 0.0)
+        self.assertGreater(float(high["maximum_ensemble_msd_relative_error"]), 0.3)
+        crossover_path = ROOT / "data" / "renewal_cage_ka_channel_transfer_crossover.csv"
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+        self.assertEqual(
+            float(crossover["jump_cage_scale_separation_emerges_on_cooling"]),
+            1.0,
+        )
+        self.assertEqual(float(crossover["heldout_events_used_in_prediction"]), 0.0)
+        self.assertEqual(
+            float(crossover["preregistered_heldout_prediction_claim_allowed"]),
+            0.0,
+        )
+
     def test_oracle_jump_cage_factorization_closes_low_temperature_multobservables(self):
         low_path = (
             ROOT
