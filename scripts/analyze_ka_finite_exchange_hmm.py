@@ -101,6 +101,8 @@ def main() -> None:
     }
     curve_rows: list[dict[str, object]] = []
     replicate_rows: list[dict[str, object]] = []
+    histogram_rows: list[dict[str, object]] = []
+    pair_histogram_rows: list[dict[str, object]] = []
     temperature = float(manifest["temperature"])
     for replicate in manifest["replicates"]:
         replicate_index = int(replicate["replicate"])
@@ -160,6 +162,8 @@ def main() -> None:
             )
             heldout_score = score_two_state_poisson_hmm(heldout_counts, fitted)
             calibration_mean = float(np.mean(calibration_counts))
+            calibration_variance = float(np.var(calibration_counts))
+            calibration_fano = calibration_variance / calibration_mean
             heldout_mean = float(np.mean(heldout_counts))
             heldout_variance = float(np.var(heldout_counts))
             heldout_fano = heldout_variance / heldout_mean
@@ -189,6 +193,9 @@ def main() -> None:
                 "calibration_event_count": float(np.sum(calibration_counts)),
                 "heldout_event_count": float(np.sum(heldout_counts)),
                 **fitted,
+                "calibration_mean_count": calibration_mean,
+                "calibration_count_variance": calibration_variance,
+                "calibration_fano_factor": calibration_fano,
                 "heldout_mean_count": heldout_mean,
                 "heldout_count_variance": heldout_variance,
                 "heldout_fano_factor": heldout_fano,
@@ -224,6 +231,51 @@ def main() -> None:
             }
             row.update(classify_hmm_transfer(row))
             replicate_rows.append(row)
+            for window_name, counts in (
+                ("calibration", calibration_counts),
+                ("heldout", heldout_counts),
+            ):
+                frequencies = np.bincount(counts.ravel())
+                for count_value, frequency in enumerate(frequencies):
+                    histogram_rows.append(
+                        {
+                            "replicate": float(replicate_index),
+                            "temperature": temperature,
+                            "block_size": float(block_size),
+                            "window": window_name,
+                            "count_value": float(count_value),
+                            "frequency": float(frequency),
+                            "probability": float(frequency / counts.size),
+                            "observation_count": float(counts.size),
+                        }
+                    )
+                first_counts = counts[:, :-1].ravel()
+                second_counts = counts[:, 1:].ravel()
+                maximum_pair_count = int(max(np.max(first_counts), np.max(second_counts)))
+                encoded = first_counts * (maximum_pair_count + 1) + second_counts
+                pair_frequencies = np.bincount(
+                    encoded,
+                    minlength=(maximum_pair_count + 1) ** 2,
+                ).reshape(maximum_pair_count + 1, maximum_pair_count + 1)
+                for first_count in range(maximum_pair_count + 1):
+                    for second_count in range(maximum_pair_count + 1):
+                        frequency = int(pair_frequencies[first_count, second_count])
+                        if frequency == 0:
+                            continue
+                        pair_histogram_rows.append(
+                            {
+                                "replicate": float(replicate_index),
+                                "temperature": temperature,
+                                "block_size": float(block_size),
+                                "window": window_name,
+                                "block_lag": 1.0,
+                                "first_count": float(first_count),
+                                "second_count": float(second_count),
+                                "frequency": float(frequency),
+                                "probability": float(frequency / len(first_counts)),
+                                "pair_observation_count": float(len(first_counts)),
+                            }
+                        )
             for observed_row, predicted_row in zip(observed, predicted):
                 curve_rows.append(
                     {
@@ -305,6 +357,14 @@ def main() -> None:
     }
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_curve.csv"), curve_rows)
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_replicates.csv"), replicate_rows)
+    write_rows(
+        args.output_prefix.with_name(args.output_prefix.name + "_count_histogram.csv"),
+        histogram_rows,
+    )
+    write_rows(
+        args.output_prefix.with_name(args.output_prefix.name + "_count_pair_histogram.csv"),
+        pair_histogram_rows,
+    )
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_blocks.csv"), block_rows)
     write_rows(args.output_prefix.with_name(args.output_prefix.name + "_verdict.csv"), [verdict])
 

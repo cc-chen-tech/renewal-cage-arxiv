@@ -274,6 +274,156 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertGreater(broad["slow_amplitude"], 0.05)
         np.testing.assert_allclose(reconstructed, correlations, atol=0.006)
 
+    def test_fano_anchored_exchange_spectrum_recovers_two_refresh_clocks(self):
+        fit = getattr(ka_replicates, "fit_anchored_exponential_correlation_spectrum", None)
+        predict = getattr(ka_replicates, "exponential_correlation_spectrum", None)
+        self.assertIsNotNone(fit)
+        self.assertIsNotNone(predict)
+        times = np.arange(1.0, 61.0)
+        correlations = 0.35 * (
+            0.65 * np.exp(-times / 4.0) + 0.35 * np.exp(-times / 32.0)
+        )
+
+        fitted = fit(
+            times,
+            correlations,
+            total_amplitude=0.35,
+            component_count=2,
+            grid_size=80,
+        )
+        reconstructed = predict(times, fitted)
+
+        self.assertAlmostEqual(fitted["total_amplitude"], 0.35)
+        self.assertAlmostEqual(fitted["fast_amplitude_fraction"], 0.65, delta=0.08)
+        self.assertGreater(fitted["slow_time"] / fitted["fast_time"], 4.0)
+        np.testing.assert_allclose(reconstructed, correlations, atol=0.006)
+
+    def test_gamma_refresh_cox_generator_matches_analytic_count_moments(self):
+        parameterize = getattr(ka_replicates, "gamma_refresh_cox_parameters", None)
+        simulate = getattr(ka_replicates, "simulate_gamma_refresh_cox_counts", None)
+        predict = getattr(ka_replicates, "gamma_refresh_cox_count_predictions", None)
+        count_pmf = getattr(ka_replicates, "gamma_refresh_cox_count_pmf", None)
+        pair_pmf = getattr(ka_replicates, "gamma_refresh_cox_pair_pmf", None)
+        self.assertIsNotNone(parameterize)
+        self.assertIsNotNone(simulate)
+        self.assertIsNotNone(predict)
+        self.assertIsNotNone(count_pmf)
+        self.assertIsNotNone(pair_pmf)
+        spectrum = {
+            "fast_amplitude": 0.20,
+            "fast_time": 4.0,
+            "slow_amplitude": 0.10,
+            "slow_time": 30.0,
+            "total_amplitude": 0.30,
+        }
+        params = parameterize(
+            mean_count=0.8,
+            fano_factor=1.0 / 0.7,
+            block_size=1.0,
+            fitted_spectrum=spectrum,
+        )
+        counts = simulate(params, sequence_count=2400, block_count=180, random_seed=8291)
+        rows = predict(params, maximum_lag=3)
+        left = counts[:, :-1].ravel()
+        right = counts[:, 1:].ravel()
+        empirical_correlation = np.corrcoef(left, right)[0, 1]
+        pmf = count_pmf(params, maximum_count=int(np.max(counts)))
+        empirical_pmf = np.bincount(counts.ravel(), minlength=len(pmf)) / counts.size
+        maximum_pair_count = int(np.max(counts))
+        predicted_pair = pair_pmf(params, maximum_count=maximum_pair_count, block_lag=1)
+        empirical_pair = np.zeros_like(predicted_pair)
+        np.add.at(
+            empirical_pair,
+            (counts[:, :-1].ravel(), counts[:, 1:].ravel()),
+            1.0,
+        )
+        empirical_pair /= np.sum(empirical_pair)
+
+        self.assertTrue(np.all(counts >= 0))
+        self.assertAlmostEqual(float(np.mean(counts)), 0.8, delta=0.02)
+        self.assertAlmostEqual(
+            float(np.var(counts) / np.mean(counts)),
+            1.0 / 0.7,
+            delta=0.06,
+        )
+        self.assertAlmostEqual(
+            empirical_correlation,
+            rows[0]["predicted_identity_correlation"],
+            delta=0.02,
+        )
+        self.assertLess(float(np.sum(np.abs(empirical_pmf - pmf))), 0.025)
+        self.assertLess(float(np.sum(np.abs(empirical_pair - predicted_pair))), 0.04)
+
+    def test_gamma_refresh_cox_gate_requires_count_and_identity_transfer(self):
+        script_path = ROOT / "scripts" / "analyze_ka_gamma_refresh_cox.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_gamma_refresh_cox", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        passing = {
+            "calibration_bic_gain_two_over_one": 15.0,
+            "heldout_fano_relative_error": 0.03,
+            "heldout_count_tv_distance": 0.02,
+            "two_clock_identity_rmse": 0.02,
+            "single_clock_identity_rmse": 0.06,
+            "two_clock_late_absolute_error": 0.02,
+            "slow_time": 500.0,
+            "maximum_candidate_time": 6000.0,
+        }
+
+        accepted = module.classify_cox_transfer(passing)
+        rejected = module.classify_cox_transfer(
+            {**passing, "heldout_fano_relative_error": 0.25}
+        )
+        distribution_rejected = module.classify_cox_transfer(
+            {**passing, "heldout_count_tv_distance": 0.04}
+        )
+
+        self.assertEqual(accepted["two_clock_cox_transfer_pass"], 1.0)
+        self.assertEqual(rejected["two_clock_cox_transfer_pass"], 0.0)
+        self.assertEqual(rejected["primary_failure"], "count_fano")
+        self.assertEqual(distribution_rejected["two_clock_cox_transfer_pass"], 0.0)
+        self.assertEqual(distribution_rejected["primary_failure"], "count_distribution")
+
+    def test_gamma_refresh_crossover_selects_second_clock_only_after_cooling(self):
+        script_path = ROOT / "scripts" / "summarize_ka_gamma_refresh_crossover.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_gamma_refresh_crossover", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        result = module.classify_crossover(
+            high_outcome="single_clock_gamma_refresh_count_moment_closure",
+            low_outcome="two_clock_gamma_refresh_count_moment_closure",
+            high_single_transfer=1.0,
+            low_single_transfer=4.0 / 6.0,
+            low_two_transfer=1.0,
+        )
+
+        self.assertEqual(result["cooling_induced_second_refresh_clock_required"], 1.0)
+        self.assertAlmostEqual(result["low_temperature_pass_gain"], 2.0 / 6.0)
+        self.assertEqual(result["count_moment_crossover_closure"], 1.0)
+        self.assertEqual(result["full_count_distribution_claim_allowed"], 0.0)
+
+    def test_joint_count_pair_gate_uses_empirical_split_half_resolution(self):
+        script_path = ROOT / "scripts" / "analyze_ka_gamma_refresh_cox.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_gamma_refresh_cox", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        result = module.classify_pair_transfer(
+            gamma_pair_tv=0.05,
+            hmm_pair_tv=0.015,
+            empirical_split_half_tv=0.01,
+        )
+
+        self.assertEqual(result["pair_tv_tolerance"], 0.03)
+        self.assertEqual(result["gamma_pair_distribution_pass"], 0.0)
+        self.assertEqual(result["hmm_pair_distribution_pass"], 1.0)
+
     def test_exchange_spectrum_rejects_nonincreasing_times(self):
         fit = getattr(ka_replicates, "fit_exponential_correlation_spectrum", None)
         self.assertIsNotNone(fit)

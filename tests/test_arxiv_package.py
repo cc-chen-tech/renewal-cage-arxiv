@@ -15,6 +15,61 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_gamma_refresh_cox_clock_closes_heldout_count_moments_across_cooling(self):
+        high_path = ROOT / "data" / "renewal_cage_ka_replicates_T058_gamma_refresh_cox_verdict.csv"
+        low_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_gamma_refresh_cox_verdict.csv"
+        crossover_path = ROOT / "data" / "renewal_cage_ka_gamma_refresh_crossover.csv"
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+
+        self.assertEqual(
+            high["event_level_outcome"],
+            "single_clock_gamma_refresh_count_moment_closure",
+        )
+        self.assertEqual(float(high["single_clock_transfer_pass_fraction"]), 1.0)
+        self.assertEqual(
+            low["event_level_outcome"],
+            "two_clock_gamma_refresh_count_moment_closure",
+        )
+        self.assertEqual(float(low["two_clock_selection_fraction"]), 1.0)
+        self.assertEqual(float(low["two_clock_transfer_pass_fraction"]), 1.0)
+        self.assertLess(float(low["maximum_heldout_fano_relative_error"]), 0.024)
+        self.assertLess(float(low["maximum_two_clock_identity_rmse"]), 0.024)
+        self.assertLess(float(low["maximum_heldout_count_tv_distance"]), 0.03)
+        self.assertEqual(float(low["marginal_count_distribution_claim_allowed"]), 1.0)
+        self.assertAlmostEqual(float(low["gamma_pair_distribution_pass_fraction"]), 4.0 / 6.0)
+        self.assertEqual(float(low["hmm_pair_distribution_pass_fraction"]), 1.0)
+        self.assertEqual(float(low["joint_count_pair_distribution_claim_allowed"]), 0.0)
+        self.assertEqual(float(low["hybrid_semimarkov_emission_model_required"]), 1.0)
+        self.assertEqual(float(low["full_count_sequence_likelihood_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["cooling_induced_second_refresh_clock_required"]), 1.0)
+        self.assertEqual(float(crossover["count_moment_crossover_closure"]), 1.0)
+        self.assertEqual(float(crossover["positive_intensity_generator"]), 1.0)
+        self.assertEqual(float(crossover["finite_recovery_enforced"]), 1.0)
+        self.assertEqual(
+            float(crossover["marginal_count_distribution_crossover_closure"]),
+            1.0,
+        )
+        self.assertLess(float(crossover["low_maximum_count_tv_distance"]), 0.03)
+        self.assertEqual(
+            float(crossover["full_count_sequence_likelihood_claim_allowed"]),
+            0.0,
+        )
+        self.assertAlmostEqual(float(crossover["low_gamma_pair_pass_fraction"]), 4.0 / 6.0)
+        self.assertEqual(float(crossover["low_hmm_pair_pass_fraction"]), 1.0)
+        self.assertEqual(float(crossover["joint_count_pair_crossover_closure"]), 0.0)
+        self.assertEqual(float(crossover["hybrid_semimarkov_emission_model_required"]), 1.0)
+        self.assertEqual(float(crossover["full_count_distribution_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["heldout_macro_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_gamma_refresh_crossover.svg").is_file()
+        )
+
     def test_cooling_selects_two_mode_finite_exchange_spectrum_without_full_closure(self):
         high_path = ROOT / "data" / "renewal_cage_ka_replicates_T058_exchange_spectrum_verdict.csv"
         low_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_exchange_spectrum_verdict.csv"

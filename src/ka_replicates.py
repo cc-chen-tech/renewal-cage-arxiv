@@ -788,6 +788,329 @@ def fit_exponential_correlation_spectrum(
     }
 
 
+def fit_anchored_exponential_correlation_spectrum(
+    times: np.ndarray,
+    correlations: np.ndarray,
+    *,
+    total_amplitude: float,
+    component_count: int,
+    grid_size: int = 80,
+) -> dict[str, float]:
+    """Fit finite relaxation times with zero-lag amplitude fixed by count Fano."""
+
+    lag_times = np.asarray(times, dtype=float)
+    observed = np.asarray(correlations, dtype=float)
+    if (
+        lag_times.ndim != 1
+        or observed.shape != lag_times.shape
+        or len(lag_times) < 3
+        or np.any(~np.isfinite(lag_times))
+        or np.any(~np.isfinite(observed))
+        or np.any(lag_times <= 0.0)
+        or np.any(np.diff(lag_times) <= 0.0)
+    ):
+        raise ValueError("times must be a strictly increasing positive vector aligned with correlations")
+    if not math.isfinite(total_amplitude) or not 0.0 < total_amplitude < 1.0:
+        raise ValueError("total_amplitude must lie strictly between zero and one")
+    if component_count not in (1, 2):
+        raise ValueError("component_count must be one or two")
+    if component_count == 2 and len(lag_times) < 5:
+        raise ValueError("two-component spectra require at least five correlation points")
+    if isinstance(grid_size, bool) or not isinstance(grid_size, int) or grid_size < 20:
+        raise ValueError("grid_size must be an integer of at least twenty")
+
+    minimum_spacing = float(np.min(np.diff(np.concatenate(([0.0], lag_times)))))
+    time_grid = np.geomspace(minimum_spacing / 4.0, float(lag_times[-1]) * 20.0, grid_size)
+    basis = np.exp(-lag_times[:, None] / time_grid[None, :])
+    best_rss = math.inf
+    best_indices = (0, 0)
+    best_fast_fraction = 1.0
+    if component_count == 1:
+        for index in range(grid_size):
+            residual = observed - total_amplitude * basis[:, index]
+            rss = float(np.dot(residual, residual))
+            if rss < best_rss:
+                best_rss = rss
+                best_indices = (index, index)
+    else:
+        for fast_index in range(grid_size - 1):
+            fast = basis[:, fast_index]
+            for slow_index in range(fast_index + 1, grid_size):
+                slow = basis[:, slow_index]
+                direction = total_amplitude * (fast - slow)
+                denominator = float(np.dot(direction, direction))
+                fraction = float(
+                    np.clip(
+                        np.dot(direction, observed - total_amplitude * slow) / denominator,
+                        0.0,
+                        1.0,
+                    )
+                )
+                prediction = total_amplitude * (
+                    fraction * fast + (1.0 - fraction) * slow
+                )
+                residual = observed - prediction
+                rss = float(np.dot(residual, residual))
+                if rss < best_rss:
+                    best_rss = rss
+                    best_indices = (fast_index, slow_index)
+                    best_fast_fraction = fraction
+
+    fast_time = float(time_grid[best_indices[0]])
+    slow_time = float(time_grid[best_indices[1]])
+    fast_amplitude = total_amplitude * best_fast_fraction
+    slow_amplitude = total_amplitude - fast_amplitude
+    parameter_count = 1 if component_count == 1 else 3
+    mean_squared_error = best_rss / len(observed)
+    return {
+        "component_count": float(component_count),
+        "fast_amplitude": fast_amplitude,
+        "fast_amplitude_fraction": best_fast_fraction,
+        "fast_time": fast_time,
+        "slow_amplitude": slow_amplitude,
+        "slow_amplitude_fraction": 1.0 - best_fast_fraction,
+        "slow_time": slow_time,
+        "total_amplitude": total_amplitude,
+        "time_scale_ratio": slow_time / fast_time,
+        "rss": best_rss,
+        "rmse": math.sqrt(mean_squared_error),
+        "bic": len(observed) * math.log(max(mean_squared_error, 1e-300))
+        + parameter_count * math.log(len(observed)),
+        "fit_point_count": float(len(observed)),
+        "grid_size": float(grid_size),
+        "minimum_candidate_time": float(time_grid[0]),
+        "maximum_candidate_time": float(time_grid[-1]),
+    }
+
+
+def gamma_refresh_cox_parameters(
+    *,
+    mean_count: float,
+    fano_factor: float,
+    block_size: float,
+    fitted_spectrum: dict[str, object],
+) -> dict[str, float]:
+    """Map an anchored finite spectrum to a positive gamma-refresh Cox clock."""
+
+    values = np.array([mean_count, fano_factor, block_size], dtype=float)
+    if np.any(~np.isfinite(values)) or mean_count <= 0.0 or fano_factor <= 1.0 or block_size <= 0.0:
+        raise ValueError("mean, super-Poisson Fano factor, and block size must be positive")
+    fast_amplitude = float(fitted_spectrum["fast_amplitude"])
+    slow_amplitude = float(fitted_spectrum["slow_amplitude"])
+    fast_time = float(fitted_spectrum["fast_time"])
+    slow_time = float(fitted_spectrum["slow_time"])
+    total_amplitude = fast_amplitude + slow_amplitude
+    fano_amplitude = 1.0 - 1.0 / fano_factor
+    if (
+        min(fast_amplitude, slow_amplitude) < 0.0
+        or min(fast_time, slow_time) <= 0.0
+        or not math.isclose(total_amplitude, fano_amplitude, rel_tol=1e-8, abs_tol=1e-10)
+    ):
+        raise ValueError("spectrum amplitude must be anchored by the supplied Fano factor")
+
+    environment_variance = mean_count * (fano_factor - 1.0)
+    fast_variance = environment_variance * fast_amplitude / total_amplitude
+    slow_variance = environment_variance * slow_amplitude / total_amplitude
+    standard_deviation_sum = math.sqrt(fast_variance) + math.sqrt(slow_variance)
+    fast_mean = mean_count * math.sqrt(fast_variance) / standard_deviation_sum
+    slow_mean = mean_count - fast_mean
+
+    def gamma_parameters(mean: float, variance: float) -> tuple[float, float]:
+        if variance == 0.0:
+            return 0.0, 0.0
+        return mean * mean / variance, variance / mean
+
+    fast_shape, fast_scale = gamma_parameters(fast_mean, fast_variance)
+    slow_shape, slow_scale = gamma_parameters(slow_mean, slow_variance)
+    return {
+        "mean_count": mean_count,
+        "count_variance": mean_count * fano_factor,
+        "fano_factor": fano_factor,
+        "block_size": block_size,
+        "fast_amplitude": fast_amplitude,
+        "fast_time": fast_time,
+        "fast_retention_probability": math.exp(-block_size / fast_time),
+        "fast_intensity_mean": fast_mean,
+        "fast_intensity_variance": fast_variance,
+        "fast_gamma_shape": fast_shape,
+        "fast_gamma_scale": fast_scale,
+        "slow_amplitude": slow_amplitude,
+        "slow_time": slow_time,
+        "slow_retention_probability": math.exp(-block_size / slow_time),
+        "slow_intensity_mean": slow_mean,
+        "slow_intensity_variance": slow_variance,
+        "slow_gamma_shape": slow_shape,
+        "slow_gamma_scale": slow_scale,
+        "total_amplitude": total_amplitude,
+    }
+
+
+def gamma_refresh_cox_count_predictions(
+    parameters: dict[str, object],
+    *,
+    maximum_lag: int,
+) -> list[dict[str, float]]:
+    """Return exact stationary count moments for a gamma-refresh Cox clock."""
+
+    if isinstance(maximum_lag, bool) or not isinstance(maximum_lag, int) or maximum_lag < 1:
+        raise ValueError("maximum_lag must be a positive integer")
+    fast_amplitude = float(parameters["fast_amplitude"])
+    slow_amplitude = float(parameters["slow_amplitude"])
+    fast_retention = float(parameters["fast_retention_probability"])
+    slow_retention = float(parameters["slow_retention_probability"])
+    return [
+        {
+            "block_lag": float(lag),
+            "lag_time": lag * float(parameters["block_size"]),
+            "predicted_mean_count": float(parameters["mean_count"]),
+            "predicted_count_variance": float(parameters["count_variance"]),
+            "predicted_fano_factor": float(parameters["fano_factor"]),
+            "predicted_identity_correlation": (
+                fast_amplitude * fast_retention**lag
+                + slow_amplitude * slow_retention**lag
+            ),
+        }
+        for lag in range(1, maximum_lag + 1)
+    ]
+
+
+def gamma_refresh_cox_count_pmf(
+    parameters: dict[str, object],
+    *,
+    maximum_count: int,
+) -> np.ndarray:
+    """Exact stationary marginal count PMF from convolved Poisson-gamma channels."""
+
+    if isinstance(maximum_count, bool) or not isinstance(maximum_count, int) or maximum_count < 0:
+        raise ValueError("maximum_count must be a nonnegative integer")
+
+    def channel_pmf(prefix: str) -> np.ndarray:
+        variance = float(parameters[f"{prefix}_intensity_variance"])
+        values = np.zeros(maximum_count + 1, dtype=float)
+        if variance == 0.0:
+            values[0] = 1.0
+            return values
+        shape = float(parameters[f"{prefix}_gamma_shape"])
+        scale = float(parameters[f"{prefix}_gamma_scale"])
+        ratio = scale / (1.0 + scale)
+        values[0] = (1.0 + scale) ** (-shape)
+        for count in range(1, maximum_count + 1):
+            values[count] = (
+                values[count - 1]
+                * (count - 1.0 + shape)
+                / count
+                * ratio
+            )
+        return values
+
+    fast = channel_pmf("fast")
+    slow = channel_pmf("slow")
+    return np.convolve(fast, slow)[: maximum_count + 1]
+
+
+def gamma_refresh_cox_pair_pmf(
+    parameters: dict[str, object],
+    *,
+    maximum_count: int,
+    block_lag: int,
+) -> np.ndarray:
+    """Exact joint PMF of two counts separated by a finite block lag."""
+
+    if isinstance(maximum_count, bool) or not isinstance(maximum_count, int) or maximum_count < 0:
+        raise ValueError("maximum_count must be a nonnegative integer")
+    if isinstance(block_lag, bool) or not isinstance(block_lag, int) or block_lag < 1:
+        raise ValueError("block_lag must be a positive integer")
+
+    def channel_pair(prefix: str) -> np.ndarray:
+        variance = float(parameters[f"{prefix}_intensity_variance"])
+        if variance == 0.0:
+            result = np.zeros((maximum_count + 1, maximum_count + 1), dtype=float)
+            result[0, 0] = 1.0
+            return result
+        shape = float(parameters[f"{prefix}_gamma_shape"])
+        scale = float(parameters[f"{prefix}_gamma_scale"])
+        marginal = np.zeros(maximum_count + 1, dtype=float)
+        marginal[0] = (1.0 + scale) ** (-shape)
+        ratio = scale / (1.0 + scale)
+        for count in range(1, maximum_count + 1):
+            marginal[count] = (
+                marginal[count - 1]
+                * (count - 1.0 + shape)
+                / count
+                * ratio
+            )
+        shared = np.empty((maximum_count + 1, maximum_count + 1), dtype=float)
+        for first in range(maximum_count + 1):
+            for second in range(maximum_count + 1):
+                shared[first, second] = math.exp(
+                    math.lgamma(shape + first + second)
+                    - math.lgamma(shape)
+                    - math.lgamma(first + 1.0)
+                    - math.lgamma(second + 1.0)
+                    + (first + second) * math.log(scale)
+                    - (shape + first + second) * math.log1p(2.0 * scale)
+                )
+        retained = float(parameters[f"{prefix}_retention_probability"]) ** block_lag
+        return retained * shared + (1.0 - retained) * np.outer(marginal, marginal)
+
+    fast = channel_pair("fast")
+    slow = channel_pair("slow")
+    result = np.zeros(
+        (2 * maximum_count + 1, 2 * maximum_count + 1),
+        dtype=float,
+    )
+    for first in range(maximum_count + 1):
+        for second in range(maximum_count + 1):
+            result[
+                first : first + maximum_count + 1,
+                second : second + maximum_count + 1,
+            ] += fast[first, second] * slow
+    return result[: maximum_count + 1, : maximum_count + 1]
+
+
+def simulate_gamma_refresh_cox_counts(
+    parameters: dict[str, object],
+    *,
+    sequence_count: int,
+    block_count: int,
+    random_seed: int,
+) -> np.ndarray:
+    """Sample stationary event counts from two positive finite-refresh channels."""
+
+    if min(sequence_count, block_count) < 2:
+        raise ValueError("simulation requires at least two sequences and blocks")
+    rng = np.random.default_rng(random_seed)
+
+    def initialize(prefix: str) -> np.ndarray:
+        variance = float(parameters[f"{prefix}_intensity_variance"])
+        if variance == 0.0:
+            return np.zeros(sequence_count, dtype=float)
+        return rng.gamma(
+            shape=float(parameters[f"{prefix}_gamma_shape"]),
+            scale=float(parameters[f"{prefix}_gamma_scale"]),
+            size=sequence_count,
+        )
+
+    fast = initialize("fast")
+    slow = initialize("slow")
+    counts = np.empty((sequence_count, block_count), dtype=int)
+    for block in range(block_count):
+        counts[:, block] = rng.poisson(fast + slow)
+        if block == block_count - 1:
+            continue
+        for prefix, channel in (("fast", fast), ("slow", slow)):
+            refresh = rng.random(sequence_count) > float(
+                parameters[f"{prefix}_retention_probability"]
+            )
+            if np.any(refresh) and float(parameters[f"{prefix}_intensity_variance"]) > 0.0:
+                channel[refresh] = rng.gamma(
+                    shape=float(parameters[f"{prefix}_gamma_shape"]),
+                    scale=float(parameters[f"{prefix}_gamma_scale"]),
+                    size=int(np.sum(refresh)),
+                )
+    return counts
+
+
 def event_cumulative_trajectory(
     events: dict[str, np.ndarray],
     *,

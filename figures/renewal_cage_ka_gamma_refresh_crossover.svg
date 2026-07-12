@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="680" viewBox="0 0 920 680">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124;stroke-width:1}.grid{stroke:#DADCE0;stroke-width:1}.obs{fill:none;stroke-width:3}.model{fill:none;stroke-width:2;stroke-dasharray:7 5}</style>
+<text x="460" y="27" text-anchor="middle" font-size="18" font-weight="700">A second finite refresh clock emerges on cooling</text>
+<line class="grid" x1="70" y1="325.00" x2="425" y2="325.00"/>
+<text x="60" y="329.00" text-anchor="end" font-size="11">0.00</text>
+<line class="grid" x1="70" y1="257.50" x2="425" y2="257.50"/>
+<text x="60" y="261.50" text-anchor="end" font-size="11">0.02</text>
+<line class="grid" x1="70" y1="190.00" x2="425" y2="190.00"/>
+<text x="60" y="194.00" text-anchor="end" font-size="11">0.04</text>
+<line class="grid" x1="70" y1="122.50" x2="425" y2="122.50"/>
+<text x="60" y="126.50" text-anchor="end" font-size="11">0.06</text>
+<line class="grid" x1="70" y1="55.00" x2="425" y2="55.00"/>
+<text x="60" y="59.00" text-anchor="end" font-size="11">0.08</text>
+<line class="axis" x1="70" y1="55" x2="70" y2="325"/>
+<line class="axis" x1="70" y1="325" x2="425" y2="325"/>
+<text x="247.50" y="42" text-anchor="middle" font-size="15" font-weight="700">T = 0.58: identity</text>
+<text x="247.50" y="361" text-anchor="middle" font-size="12">lag time (block size = 50)</text>
+<text x="70.00" y="343" text-anchor="middle" font-size="10">0</text>
+<text x="158.75" y="343" text-anchor="middle" font-size="10">150</text>
+<text x="247.50" y="343" text-anchor="middle" font-size="10">300</text>
+<text x="336.25" y="343" text-anchor="middle" font-size="10">450</text>
+<text x="425.00" y="343" text-anchor="middle" font-size="10">600</text>
+<polyline class="obs" stroke="#202124" points="99.58,119.87 129.17,274.90 158.75,293.63 188.33,303.43 217.92,296.39 247.50,285.77 277.08,293.16 306.67,282.28 336.25,318.11 365.83,340.28 395.42,314.14 425.00,335.76"/>
+<polyline class="model" stroke="#0072B2" points="99.58,142.68 129.17,262.21 158.75,303.25 188.33,317.42 217.92,322.35 247.50,324.07 277.08,324.67 306.67,324.88 336.25,324.96 365.83,324.99 395.42,324.99 425.00,325.00"/>
+<polyline class="model" stroke="#009E73" points="99.58,141.97 129.17,260.42 158.75,300.96 188.33,315.09 217.92,320.19 247.50,322.17 277.08,323.04 306.67,323.50 336.25,323.79 365.83,324.00 395.42,324.17 425.00,324.31"/>
+<polyline class="model" stroke="#D55E00" points="99.58,245.00 129.17,245.00 158.75,245.00 188.33,245.00 217.92,245.00 247.50,245.00 277.08,245.00 306.67,245.00 336.25,245.00 365.83,245.00 395.42,245.00 425.00,245.00"/>
+<line class="grid" x1="515" y1="325.00" x2="870" y2="325.00"/>
+<text x="505" y="329.00" text-anchor="end" font-size="11">0.00</text>
+<line class="grid" x1="515" y1="257.50" x2="870" y2="257.50"/>
+<text x="505" y="261.50" text-anchor="end" font-size="11">0.10</text>
+<line class="grid" x1="515" y1="190.00" x2="870" y2="190.00"/>
+<text x="505" y="194.00" text-anchor="end" font-size="11">0.20</text>
+<line class="grid" x1="515" y1="122.50" x2="870" y2="122.50"/>
+<text x="505" y="126.50" text-anchor="end" font-size="11">0.30</text>
+<line class="grid" x1="515" y1="55.00" x2="870" y2="55.00"/>
+<text x="505" y="59.00" text-anchor="end" font-size="11">0.41</text>
+<line class="axis" x1="515" y1="55" x2="515" y2="325"/>
+<line class="axis" x1="515" y1="325" x2="870" y2="325"/>
+<text x="692.50" y="42" text-anchor="middle" font-size="15" font-weight="700">T = 0.45: identity</text>
+<text x="692.50" y="361" text-anchor="middle" font-size="12">lag time (block size = 50)</text>
+<text x="515.00" y="343" text-anchor="middle" font-size="10">0</text>
+<text x="603.75" y="343" text-anchor="middle" font-size="10">150</text>
+<text x="692.50" y="343" text-anchor="middle" font-size="10">300</text>
+<text x="781.25" y="343" text-anchor="middle" font-size="10">450</text>
+<text x="870.00" y="343" text-anchor="middle" font-size="10">600</text>
+<polyline class="obs" stroke="#202124" points="544.58,96.10 574.17,155.64 603.75,184.37 633.33,205.58 662.92,218.99 692.50,229.89 722.08,238.66 751.67,244.88 781.25,250.38 810.83,255.80 840.42,260.05 870.00,265.92"/>
+<polyline class="model" stroke="#0072B2" points="544.58,75.00 574.17,133.47 603.75,178.24 633.33,212.54 662.92,238.82 692.50,258.95 722.08,274.37 751.67,286.19 781.25,295.24 810.83,302.19 840.42,307.51 870.00,311.59"/>
+<polyline class="model" stroke="#009E73" points="544.58,98.79 574.17,155.13 603.75,187.96 633.33,208.10 662.92,221.33 692.50,230.71 722.08,237.92 751.67,243.83 781.25,248.93 810.83,253.49 840.42,257.66 870.00,261.51"/>
+<polyline class="model" stroke="#D55E00" points="544.58,245.40 574.17,245.40 603.75,245.40 633.33,245.40 662.92,245.40 692.50,245.40 722.08,245.40 751.67,245.40 781.25,245.40 810.83,245.40 840.42,245.40 870.00,245.40"/>
+<line class="axis" x1="70" y1="405" x2="70" y2="610"/>
+<line class="axis" x1="70" y1="610" x2="425" y2="610"/>
+<text x="247.50" y="390" text-anchor="middle" font-size="14" font-weight="700">T = 0.58: count Fano</text>
+<line x1="70" y1="610" x2="425" y2="405" stroke="#8A8D91" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="247.50" y="658" text-anchor="middle" font-size="12">calibration Fano</text>
+<circle cx="161.18" cy="571.56" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="367.00" cy="479.25" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="148.61" cy="570.33" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="335.74" cy="467.43" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="165.05" cy="580.78" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="318.14" cy="490.75" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="164.18" cy="568.67" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="341.78" cy="459.86" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="151.49" cy="565.73" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="329.47" cy="465.09" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<text x="58" y="409" text-anchor="end" font-size="10">1.24</text>
+<text x="58" y="614" text-anchor="end" font-size="10">1.02</text>
+<text x="70" y="628" text-anchor="middle" font-size="10">1.02</text>
+<text x="425" y="628" text-anchor="middle" font-size="10">1.24</text>
+<line class="axis" x1="515" y1="405" x2="515" y2="610"/>
+<line class="axis" x1="515" y1="610" x2="870" y2="610"/>
+<text x="692.50" y="390" text-anchor="middle" font-size="14" font-weight="700">T = 0.45: count Fano</text>
+<line x1="515" y1="610" x2="870" y2="405" stroke="#8A8D91" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="692.50" y="658" text-anchor="middle" font-size="12">calibration Fano</text>
+<circle cx="538.29" cy="592.09" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="821.48" cy="427.26" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="541.52" cy="591.37" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="826.75" cy="423.63" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="548.04" cy="596.24" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<circle cx="836.37" cy="438.45" r="4.5" fill="#009E73" stroke="#ffffff" stroke-width="1"/>
+<text x="503" y="409" text-anchor="end" font-size="10">2.04</text>
+<text x="503" y="614" text-anchor="end" font-size="10">1.38</text>
+<text x="515" y="628" text-anchor="middle" font-size="10">1.38</text>
+<text x="870" y="628" text-anchor="middle" font-size="10">2.04</text>
+<line x1="155" y1="365" x2="183" y2="365" stroke="#202124" stroke-width="3"/>
+<text x="191" y="370" font-size="12">held-out</text>
+<line x1="340" y1="365" x2="368" y2="365" stroke="#0072B2" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="376" y="370" font-size="12">one clock</text>
+<line x1="525" y1="365" x2="553" y2="365" stroke="#009E73" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="561" y="370" font-size="12">two clocks</text>
+<line x1="710" y1="365" x2="738" y2="365" stroke="#D55E00" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="746" y="370" font-size="12">static disorder</text>
+</svg>
