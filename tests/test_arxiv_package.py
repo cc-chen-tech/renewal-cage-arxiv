@@ -15,6 +15,68 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_debye_waller_event_clock_closes_high_temperature_but_not_every_low_replica(self):
+        high_summary = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T058_debye_waller_heldout_summary.csv"
+        )
+        low_summary = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_debye_waller_heldout_summary.csv"
+        )
+        with high_summary.open() as handle:
+            high = {row["model"]: row for row in csv.DictReader(handle)}
+        with low_summary.open() as handle:
+            low = {row["model"]: row for row in csv.DictReader(handle)}
+        high_dw = high["debye_waller_direction_correlated"]
+        low_dw = low["debye_waller_direction_correlated"]
+        self.assertEqual(float(high_dw["replicates_within_tolerance"]), 5.0)
+        self.assertGreater(float(high_dw["mean_coverage"]), 0.8)
+        self.assertLess(float(high_dw["mean_coverage"]), 1.2)
+        self.assertEqual(float(low_dw["replicates_within_tolerance"]), 1.0)
+        self.assertAlmostEqual(float(low_dw["mean_coverage"]), 0.9779045410378439)
+        self.assertGreater(
+            float(low["debye_waller_uncorrelated"]["mean_coverage"]),
+            1.9,
+        )
+        self.assertLess(float(low["fixed_phop_direction_correlated"]["mean_coverage"]), 0.5)
+
+    def test_debye_waller_directional_crossover_is_sota_aligned_but_full_closure_stays_blocked(self):
+        verdict_path = ROOT / "data" / "renewal_cage_ka_debye_waller_crossover_verdict.csv"
+        convergence_path = ROOT / "data" / "renewal_cage_ka_debye_waller_crossover_convergence.csv"
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        with convergence_path.open() as handle:
+            convergence = {row["temperature_group"]: row for row in csv.DictReader(handle)}
+        self.assertEqual(float(verdict["lag1_positive_to_negative_reversal"]), 1.0)
+        self.assertGreater(float(verdict["lag1_high_ci95_low_over_q"]), 0.0)
+        self.assertLess(float(verdict["lag1_low_ci95_high_over_q"]), 0.0)
+        self.assertEqual(float(verdict["low_temperature_backtracking_required"]), 1.0)
+        self.assertEqual(float(verdict["directional_crossover_claim_allowed"]), 1.0)
+        self.assertEqual(float(verdict["cross_temperature_transport_closure_claim_allowed"]), 0.0)
+        self.assertEqual(
+            verdict["primary_remaining_failure"],
+            "low_temperature_replicate_transport_inconsistency",
+        )
+        self.assertTrue(
+            all(
+                float(row["equivalent_within_twenty_percent"]) == 1.0
+                for row in convergence.values()
+            )
+        )
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_phop_cage_jump_sota_audit_exposes_reversed_decoupling_order(self):
+        path = ROOT / "data" / "renewal_cage_ka_cage_jump_sota_audit_verdict.csv"
+        with path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        self.assertEqual(float(verdict["low_temperature_ctwr_failure_consistent"]), 1.0)
+        self.assertEqual(float(verdict["microscopic_invariant_consistent"]), 1.0)
+        self.assertEqual(float(verdict["relative_decoupling_order_consistent"]), 0.0)
+        self.assertEqual(float(verdict["current_phop_elementary_cage_jump_claim_allowed"]), 0.0)
+        self.assertEqual(
+            verdict["primary_mismatch"],
+            "microscopic_decoupling_weaker_than_macroscopic",
+        )
+
     def test_t045_halo_profile_is_stable_but_transport_closure_is_rejected(self):
         curve_path = (
             ROOT / "data" / "renewal_cage_ka_replicates_T045_halo_split_stability_curve.csv"

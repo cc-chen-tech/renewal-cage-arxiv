@@ -1,0 +1,3 @@
+temperature_group,primary_correlation_lag,diagnostic_correlation_lag,mean_diagnostic_over_primary_green_kubo_factor,standard_error_ratio,ci95_low_ratio,ci95_high_ratio,ci95_critical_value,ci95_method,independent_replicate_count,equivalent_within_twenty_percent,thermodynamic_claim_allowed
+high,2.0,10.0,1.0172732245456828,0.013395503335246637,0.9800813448788765,1.054465104212489,2.7764451051977987,student_t_independent_replicates,5.0,1.0,0.0
+low,2.0,10.0,0.8915400096185709,0.008577549852765157,0.8546337913286208,0.928446227908521,4.302652729911275,student_t_independent_replicates,3.0,1.0,0.0

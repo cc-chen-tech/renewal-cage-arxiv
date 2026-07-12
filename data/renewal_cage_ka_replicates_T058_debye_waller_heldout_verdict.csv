@@ -1,0 +1,2 @@
+minimum_coverage,maximum_coverage,heldout_transport_pass,primary_failure,primary_model,independent_replicate_count,macro_fit_parameter_count,finite_memory_model_required,thermodynamic_claim_allowed,temperature,calibration_time,heldout_time,fluctuation_half_window,phop_threshold,event_definition_claim_allowed,sota_algorithm_alignment
+0.8,1.2,1.0,none,debye_waller_direction_correlated,5.0,0.0,0.0,0.0,0.58,750.0,750.0,5.0,0.15,1.0,basic_debye_waller_variance_without_high_temperature_noise_correction

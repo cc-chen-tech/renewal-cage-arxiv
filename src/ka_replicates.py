@@ -64,6 +64,315 @@ def independent_sample_ci95(
     return mean - margin, mean + margin, critical
 
 
+def independent_group_ratio(
+    numerator_values: np.ndarray,
+    denominator_values: np.ndarray,
+    *,
+    relative_equivalence_margin: float,
+) -> dict[str, float | str]:
+    """Compare positive independent-group means on a conservative log-ratio scale."""
+
+    numerator = np.asarray(numerator_values, dtype=float)
+    denominator = np.asarray(denominator_values, dtype=float)
+    if numerator.ndim != 1 or denominator.ndim != 1 or min(len(numerator), len(denominator)) < 2:
+        raise ValueError("each independent group must be a vector with at least two values")
+    if np.any(~np.isfinite(numerator)) or np.any(~np.isfinite(denominator)):
+        raise ValueError("independent group values must be finite")
+    if np.any(numerator <= 0.0) or np.any(denominator <= 0.0):
+        raise ValueError("independent group values must be positive")
+    if not math.isfinite(relative_equivalence_margin) or not 0.0 < relative_equivalence_margin < 1.0:
+        raise ValueError("relative_equivalence_margin must lie between zero and one")
+    numerator_mean = float(np.mean(numerator))
+    denominator_mean = float(np.mean(denominator))
+    numerator_se = float(np.std(numerator, ddof=1) / math.sqrt(len(numerator)))
+    denominator_se = float(np.std(denominator, ddof=1) / math.sqrt(len(denominator)))
+    log_ratio = math.log(numerator_mean / denominator_mean)
+    log_standard_error = math.sqrt(
+        (numerator_se / numerator_mean) ** 2
+        + (denominator_se / denominator_mean) ** 2
+    )
+    numerator_critical = independent_sample_ci95(
+        mean=0.0,
+        standard_error=1.0,
+        sample_count=len(numerator),
+    )[2]
+    denominator_critical = independent_sample_ci95(
+        mean=0.0,
+        standard_error=1.0,
+        sample_count=len(denominator),
+    )[2]
+    critical = max(numerator_critical, denominator_critical)
+    lower = math.exp(log_ratio - critical * log_standard_error)
+    upper = math.exp(log_ratio + critical * log_standard_error)
+    return {
+        "numerator_mean": numerator_mean,
+        "denominator_mean": denominator_mean,
+        "mean_ratio": numerator_mean / denominator_mean,
+        "log_ratio_standard_error": log_standard_error,
+        "ci95_low_ratio": lower,
+        "ci95_high_ratio": upper,
+        "ci95_critical_value": critical,
+        "ci95_method": "conservative_student_t_delta_log_ratio",
+        "numerator_replicate_count": float(len(numerator)),
+        "denominator_replicate_count": float(len(denominator)),
+        "relative_equivalence_margin": relative_equivalence_margin,
+        "growth_detected": float(lower > 1.0),
+        "decrease_detected": float(upper < 1.0),
+        "equivalent_to_unity": float(
+            lower >= 1.0 - relative_equivalence_margin
+            and upper <= 1.0 + relative_equivalence_margin
+        ),
+    }
+
+
+def signed_temperature_separation(
+    high_temperature_values: np.ndarray,
+    low_temperature_values: np.ndarray,
+) -> dict[str, float | str]:
+    """Compare signed observables between independent high- and low-temperature replicas."""
+
+    high = np.asarray(high_temperature_values, dtype=float)
+    low = np.asarray(low_temperature_values, dtype=float)
+    if high.ndim != 1 or low.ndim != 1 or min(len(high), len(low)) < 2:
+        raise ValueError("each temperature group must be a vector with at least two values")
+    if np.any(~np.isfinite(high)) or np.any(~np.isfinite(low)):
+        raise ValueError("temperature-group values must be finite")
+
+    def summarize(values: np.ndarray) -> tuple[float, float, float, float, float]:
+        mean = float(np.mean(values))
+        standard_deviation = float(np.std(values, ddof=1))
+        standard_error = standard_deviation / math.sqrt(len(values))
+        ci_low, ci_high, critical = independent_sample_ci95(
+            mean=mean,
+            standard_error=standard_error,
+            sample_count=len(values),
+        )
+        return mean, standard_error, ci_low, ci_high, critical
+
+    high_mean, high_se, high_low, high_high, high_critical = summarize(high)
+    low_mean, low_se, low_low, low_high, low_critical = summarize(low)
+    return {
+        "high_mean": high_mean,
+        "high_standard_error": high_se,
+        "high_ci95_low": high_low,
+        "high_ci95_high": high_high,
+        "low_mean": low_mean,
+        "low_standard_error": low_se,
+        "low_ci95_low": low_low,
+        "low_ci95_high": low_high,
+        "high_ci95_critical_value": high_critical,
+        "low_ci95_critical_value": low_critical,
+        "ci95_method": "student_t_independent_replicates",
+        "high_replicate_count": float(len(high)),
+        "low_replicate_count": float(len(low)),
+        "confidence_intervals_separated": float(
+            high_low > low_high or low_low > high_high
+        ),
+        "positive_high_negative_low_reversal": float(high_low > 0.0 and low_high < 0.0),
+    }
+
+
+def jump_vector_correlation_curve(
+    events: dict[str, np.ndarray],
+    *,
+    maximum_lag: int,
+) -> list[dict[str, float]]:
+    """Resolve event-indexed jump-vector memory and cumulative Green-Kubo factors."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=float)
+    jumps = np.asarray(events["jump_vector"], dtype=float)
+    if particles.ndim != 1 or times.shape != particles.shape:
+        raise ValueError("event particles and times must be aligned vectors")
+    if jumps.ndim != 2 or jumps.shape[0] != len(particles) or jumps.shape[1] < 1:
+        raise ValueError("jump vectors must align with events")
+    if len(particles) == 0 or np.any(~np.isfinite(times)) or np.any(~np.isfinite(jumps)):
+        raise ValueError("event arrays must be nonempty and finite")
+    if isinstance(maximum_lag, bool) or not isinstance(maximum_lag, int) or maximum_lag < 1:
+        raise ValueError("maximum_lag must be a positive integer")
+    order = np.lexsort((times, particles))
+    particles = particles[order]
+    jumps = jumps[order]
+    jump_squared_mean = float(np.mean(np.sum(jumps**2, axis=1)))
+    if jump_squared_mean <= 0.0:
+        raise ValueError("mean squared jump length must be positive")
+    cumulative = 0.0
+    rows: list[dict[str, float]] = []
+    for lag in range(1, maximum_lag + 1):
+        values: list[float] = []
+        for particle in np.unique(particles):
+            particle_jumps = jumps[particles == particle]
+            if len(particle_jumps) > lag:
+                values.extend(
+                    np.sum(particle_jumps[:-lag] * particle_jumps[lag:], axis=1).tolist()
+                )
+        if not values:
+            raise ValueError("maximum_lag exceeds all supported particle event sequences")
+        correlation = float(np.mean(values))
+        cumulative += correlation
+        rows.append(
+            {
+                "event_lag": float(lag),
+                "pair_count": float(len(values)),
+                "jump_squared_mean": jump_squared_mean,
+                "jump_dot_correlation": correlation,
+                "correlation_over_q": correlation / jump_squared_mean,
+                "cumulative_green_kubo_factor": 1.0
+                + 2.0 * cumulative / jump_squared_mean,
+            }
+        )
+    return rows
+
+
+def debye_waller_factor_from_msd(
+    lags: np.ndarray,
+    mean_squared_displacement: np.ndarray,
+) -> dict[str, float]:
+    """Select the Debye-Waller time at the minimum logarithmic MSD slope."""
+
+    lag = np.asarray(lags, dtype=float)
+    msd = np.asarray(mean_squared_displacement, dtype=float)
+    if lag.ndim != 1 or msd.shape != lag.shape or len(lag) < 5:
+        raise ValueError("lags and MSD must be aligned vectors with at least five values")
+    if np.any(~np.isfinite(lag)) or np.any(~np.isfinite(msd)):
+        raise ValueError("lags and MSD must be finite")
+    if np.any(lag <= 0.0) or np.any(msd <= 0.0) or np.any(np.diff(lag) <= 0.0):
+        raise ValueError("lags and MSD must be positive and lags strictly increasing")
+    slope = np.gradient(np.log(msd), np.log(lag))
+    index = int(np.argmin(slope[1:-1]) + 1)
+    return {
+        "debye_waller_lag": float(lag[index]),
+        "debye_waller_factor": float(msd[index]),
+        "minimum_log_msd_slope": float(slope[index]),
+        "candidate_lag_count": float(len(lag)),
+    }
+
+
+def position_fluctuation_values(
+    unwrapped_positions: np.ndarray,
+    *,
+    half_window: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Rolling positional variance used by Debye-Waller cage segmentation."""
+
+    positions = np.asarray(unwrapped_positions, dtype=float)
+    if positions.ndim != 3 or positions.shape[2] < 1:
+        raise ValueError("unwrapped_positions must have shape (frames, particles, dimensions)")
+    if isinstance(half_window, bool) or not isinstance(half_window, int) or half_window < 1:
+        raise ValueError("half_window must be a positive integer")
+    if len(positions) < 2 * half_window + 3 or np.any(~np.isfinite(positions)):
+        raise ValueError("trajectory must be finite and longer than the fluctuation window")
+    width = 2 * half_window + 1
+    times = np.arange(half_window, len(positions) - half_window)
+    prefix = np.concatenate(
+        [np.zeros((1, positions.shape[1], positions.shape[2])), np.cumsum(positions, axis=0)],
+        axis=0,
+    )
+    squared = np.sum(positions**2, axis=2)
+    squared_prefix = np.concatenate(
+        [np.zeros((1, positions.shape[1])), np.cumsum(squared, axis=0)],
+        axis=0,
+    )
+    mean = (prefix[times + half_window + 1] - prefix[times - half_window]) / width
+    mean_squared = (
+        squared_prefix[times + half_window + 1] - squared_prefix[times - half_window]
+    ) / width
+    fluctuation = np.maximum(mean_squared - np.sum(mean**2, axis=2), 0.0)
+    return times, fluctuation
+
+
+def extract_debye_waller_cage_jumps(
+    unwrapped_positions: np.ndarray,
+    *,
+    debye_waller_factor: float,
+    half_window: int,
+    activity_times: np.ndarray | None = None,
+    activity_values: np.ndarray | None = None,
+) -> dict[str, np.ndarray]:
+    """Segment finite-duration jumps between adjacent inactive cage intervals."""
+
+    positions = np.asarray(unwrapped_positions, dtype=float)
+    if positions.ndim != 3 or positions.shape[2] < 1 or np.any(~np.isfinite(positions)):
+        raise ValueError("unwrapped_positions must be a finite trajectory array")
+    if not math.isfinite(debye_waller_factor) or debye_waller_factor <= 0.0:
+        raise ValueError("debye_waller_factor must be positive and finite")
+    if (activity_times is None) != (activity_values is None):
+        raise ValueError("activity_times and activity_values must be supplied together")
+    if activity_times is None:
+        times, activity = position_fluctuation_values(positions, half_window=half_window)
+    else:
+        times = np.asarray(activity_times, dtype=int)
+        activity = np.asarray(activity_values, dtype=float)
+        expected_length = len(positions) - 2 * half_window
+        if times.shape != (expected_length,) or activity.shape != (
+            expected_length,
+            positions.shape[1],
+        ):
+            raise ValueError("precomputed fluctuation arrays do not match the trajectory")
+    if np.any(~np.isfinite(activity)):
+        raise ValueError("position fluctuation values must be finite")
+    retained: list[tuple[object, ...]] = []
+    for particle in range(positions.shape[1]):
+        active = np.flatnonzero(activity[:, particle] > debye_waller_factor)
+        if len(active) == 0:
+            continue
+        groups = np.split(active, np.flatnonzero(np.diff(active) > 1) + 1)
+        for group_index, group in enumerate(groups):
+            previous_end = int(groups[group_index - 1][-1] + 1) if group_index else 0
+            next_start = int(groups[group_index + 1][0]) if group_index + 1 < len(groups) else len(times)
+            pre_indices = np.arange(previous_end, int(group[0]))
+            post_indices = np.arange(int(group[-1] + 1), next_start)
+            if len(pre_indices) == 0 or len(post_indices) == 0:
+                continue
+            pre_center = np.mean(positions[times[pre_indices], particle], axis=0)
+            post_center = np.mean(positions[times[post_indices], particle], axis=0)
+            peak_index = int(group[np.argmax(activity[group, particle])])
+            retained.append(
+                (
+                    particle,
+                    int(times[peak_index]),
+                    float(activity[peak_index, particle]),
+                    post_center - pre_center,
+                    pre_center,
+                    post_center,
+                    int(times[group[0]]),
+                    int(times[group[-1]]),
+                    float(len(group)),
+                    float(len(pre_indices)),
+                    float(len(post_indices)),
+                )
+            )
+    dimension = positions.shape[2]
+    if not retained:
+        return {
+            "particle": np.empty(0, dtype=int),
+            "time": np.empty(0, dtype=int),
+            "activity": np.empty(0, dtype=float),
+            "jump_vector": np.empty((0, dimension), dtype=float),
+            "pre_center": np.empty((0, dimension), dtype=float),
+            "post_center": np.empty((0, dimension), dtype=float),
+            "jump_start": np.empty(0, dtype=int),
+            "jump_end": np.empty(0, dtype=int),
+            "jump_duration": np.empty(0, dtype=float),
+            "pre_cage_duration": np.empty(0, dtype=float),
+            "post_cage_duration": np.empty(0, dtype=float),
+        }
+    retained.sort(key=lambda event: (int(event[0]), int(event[1])))
+    return {
+        "particle": np.array([event[0] for event in retained], dtype=int),
+        "time": np.array([event[1] for event in retained], dtype=int),
+        "activity": np.array([event[2] for event in retained], dtype=float),
+        "jump_vector": np.stack([event[3] for event in retained]),
+        "pre_center": np.stack([event[4] for event in retained]),
+        "post_center": np.stack([event[5] for event in retained]),
+        "jump_start": np.array([event[6] for event in retained], dtype=int),
+        "jump_end": np.array([event[7] for event in retained], dtype=int),
+        "jump_duration": np.array([event[8] for event in retained], dtype=float),
+        "pre_cage_duration": np.array([event[9] for event in retained], dtype=float),
+        "post_cage_duration": np.array([event[10] for event in retained], dtype=float),
+    }
+
+
 def summarize_replicate_binned_metric(
     rows: Sequence[dict[str, object]],
     *,

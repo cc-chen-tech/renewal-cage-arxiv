@@ -31,6 +31,124 @@ from ka_replicates import (  # noqa: E402
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_independent_group_ratio_reports_growth_and_equivalence_separately(self):
+        compare = getattr(ka_replicates, "independent_group_ratio", None)
+        self.assertIsNotNone(compare)
+
+        growth = compare(
+            np.array([2.0, 2.1, 1.9]),
+            np.array([1.0, 1.05, 0.95]),
+            relative_equivalence_margin=0.2,
+        )
+        equivalent = compare(
+            np.array([1.02, 1.00, 0.98]),
+            np.array([1.00, 1.01, 0.99]),
+            relative_equivalence_margin=0.2,
+        )
+
+        self.assertAlmostEqual(growth["mean_ratio"], 2.0)
+        self.assertGreater(growth["ci95_low_ratio"], 1.0)
+        self.assertEqual(growth["growth_detected"], 1.0)
+        self.assertEqual(growth["equivalent_to_unity"], 0.0)
+        self.assertEqual(equivalent["growth_detected"], 0.0)
+        self.assertEqual(equivalent["equivalent_to_unity"], 1.0)
+
+    def test_cage_jump_sota_alignment_rejects_reversed_decoupling_order(self):
+        script_path = ROOT / "scripts" / "audit_ka_cage_jump_sota.py"
+        spec = importlib.util.spec_from_file_location("audit_ka_cage_jump_sota", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        verdict = module.classify_alignment(
+            microscopic_growth={"ci95_low_ratio": 1.05, "ci95_high_ratio": 1.20},
+            macroscopic_growth={"ci95_low_ratio": 1.90, "ci95_high_ratio": 2.50},
+            microscopic_invariant={"equivalent_to_unity": 1.0},
+            jump_length={"decrease_detected": 1.0, "mean_ratio": 0.96},
+            low_temperature_ctwr_pass=0.0,
+        )
+
+        self.assertEqual(verdict["low_temperature_ctwr_failure_consistent"], 1.0)
+        self.assertEqual(verdict["microscopic_invariant_consistent"], 1.0)
+        self.assertEqual(verdict["relative_decoupling_order_consistent"], 0.0)
+        self.assertEqual(verdict["current_phop_elementary_cage_jump_claim_allowed"], 0.0)
+
+    def test_debye_waller_factor_selects_minimum_log_msd_slope(self):
+        select = getattr(ka_replicates, "debye_waller_factor_from_msd", None)
+        self.assertIsNotNone(select)
+        result = select(
+            np.array([1.0, 2.0, 4.0, 8.0, 16.0]),
+            np.array([1.0, 1.8, 2.0, 2.1, 4.0]),
+        )
+
+        self.assertEqual(result["debye_waller_lag"], 4.0)
+        self.assertEqual(result["debye_waller_factor"], 2.0)
+        self.assertGreater(result["minimum_log_msd_slope"], 0.0)
+
+    def test_signed_temperature_separation_detects_positive_to_negative_reversal(self):
+        compare = getattr(ka_replicates, "signed_temperature_separation", None)
+        self.assertIsNotNone(compare)
+        result = compare(
+            np.array([0.02, 0.03, 0.04, 0.03, 0.025]),
+            np.array([-0.22, -0.24, -0.26]),
+        )
+
+        self.assertGreater(result["high_ci95_low"], 0.0)
+        self.assertLess(result["low_ci95_high"], 0.0)
+        self.assertEqual(result["positive_high_negative_low_reversal"], 1.0)
+        self.assertEqual(result["confidence_intervals_separated"], 1.0)
+
+    def test_jump_vector_correlation_curve_tracks_green_kubo_convergence(self):
+        curve = getattr(ka_replicates, "jump_vector_correlation_curve", None)
+        self.assertIsNotNone(curve)
+        events = {
+            "particle": np.array([0, 0, 0, 0]),
+            "time": np.array([1, 2, 3, 4]),
+            "jump_vector": np.array(
+                [[1.0, 0.0], [-1.0, 0.0], [1.0, 0.0], [-1.0, 0.0]]
+            ),
+        }
+
+        rows = curve(events, maximum_lag=2)
+
+        self.assertEqual(rows[0]["pair_count"], 3.0)
+        self.assertAlmostEqual(rows[0]["correlation_over_q"], -1.0)
+        self.assertAlmostEqual(rows[1]["correlation_over_q"], 1.0)
+        self.assertAlmostEqual(rows[0]["cumulative_green_kubo_factor"], -1.0)
+        self.assertAlmostEqual(rows[1]["cumulative_green_kubo_factor"], 1.0)
+
+    def test_position_fluctuation_and_cage_jump_segmentation_are_translation_invariant(self):
+        fluctuation = getattr(ka_replicates, "position_fluctuation_values", None)
+        segment = getattr(ka_replicates, "extract_debye_waller_cage_jumps", None)
+        self.assertIsNotNone(fluctuation)
+        self.assertIsNotNone(segment)
+        trajectory = np.zeros((13, 1, 3), dtype=float)
+        trajectory[6:, 0, 0] = 1.0
+        times = np.arange(1, 12)
+        activity = np.zeros((11, 1), dtype=float)
+        activity[4:7, 0] = 2.0
+
+        measured_times, measured = fluctuation(trajectory, half_window=1)
+        shifted_times, shifted = fluctuation(
+            trajectory + np.array([10.0, -4.0, 3.0]),
+            half_window=1,
+        )
+        events = segment(
+            trajectory,
+            debye_waller_factor=1.0,
+            half_window=1,
+            activity_times=times,
+            activity_values=activity,
+        )
+
+        np.testing.assert_array_equal(measured_times, shifted_times)
+        np.testing.assert_allclose(measured, shifted, atol=1e-12)
+        self.assertEqual(len(events["time"]), 1)
+        np.testing.assert_allclose(events["jump_vector"], [[1.0, 0.0, 0.0]])
+        self.assertEqual(events["jump_duration"][0], 3.0)
+        self.assertEqual(events["pre_cage_duration"][0], 4.0)
+        self.assertEqual(events["post_cage_duration"][0], 4.0)
+
     def test_neighbor_halo_event_selection_uses_zero_for_all_events(self):
         script_path = ROOT / "scripts" / "analyze_ka_neighbor_halo.py"
         spec = importlib.util.spec_from_file_location("analyze_ka_neighbor_halo", script_path)
