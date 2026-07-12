@@ -586,6 +586,206 @@ def distance_resolved_event_count_covariance(
     return rows
 
 
+def event_conditioned_neighbor_displacement(
+    unwrapped_positions: np.ndarray,
+    events: dict[str, np.ndarray],
+    *,
+    box_lengths: np.ndarray,
+    distance_edges: np.ndarray,
+    half_window: int,
+    event_indices: np.ndarray,
+    control_particles: np.ndarray,
+    integration_max_distance: float,
+) -> tuple[list[dict[str, float]], dict[str, float]]:
+    """Compare neighbor motion around events with same-time random-center controls."""
+
+    positions = np.asarray(unwrapped_positions, dtype=float)
+    box = np.asarray(box_lengths, dtype=float)
+    edges = np.asarray(distance_edges, dtype=float)
+    selected = np.asarray(event_indices, dtype=int)
+    controls = np.asarray(control_particles, dtype=int)
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=int)
+    jumps = np.asarray(events["jump_vector"], dtype=float)
+    if positions.ndim != 3 or positions.shape[2] != len(box):
+        raise ValueError("unwrapped_positions must have shape (frames, particles, dimensions)")
+    if np.any(~np.isfinite(positions)) or np.any(~np.isfinite(box)) or np.any(box <= 0.0):
+        raise ValueError("positions and positive box lengths must be finite")
+    if edges.ndim != 1 or len(edges) < 2 or np.any(~np.isfinite(edges)) or np.any(np.diff(edges) <= 0.0):
+        raise ValueError("distance_edges must be a strictly increasing finite sequence")
+    if half_window < 1 or not math.isfinite(integration_max_distance) or integration_max_distance <= 0.0:
+        raise ValueError("half_window and integration_max_distance must be positive")
+    if particles.shape != times.shape or jumps.shape != (len(particles), positions.shape[2]):
+        raise ValueError("event particle, time, and jump arrays must align")
+    if selected.ndim != 1 or len(selected) == 0 or controls.shape != selected.shape:
+        raise ValueError("event_indices and control_particles must be aligned nonempty vectors")
+    if np.any(selected < 0) or np.any(selected >= len(particles)):
+        raise ValueError("event_indices are out of range")
+    if np.any(controls < 0) or np.any(controls >= positions.shape[1]):
+        raise ValueError("control_particles are out of range")
+    selected_times = times[selected]
+    if np.any(selected_times < half_window) or np.any(selected_times + half_window > len(positions)):
+        raise ValueError("selected events lack complete pre/post windows")
+
+    bin_count = len(edges) - 1
+    event_count = np.zeros(bin_count, dtype=np.int64)
+    control_count = np.zeros(bin_count, dtype=np.int64)
+    event_squared_sum = np.zeros(bin_count, dtype=float)
+    control_squared_sum = np.zeros(bin_count, dtype=float)
+    event_projection_sum = np.zeros(bin_count, dtype=float)
+    control_projection_sum = np.zeros(bin_count, dtype=float)
+    for event_index, control in zip(selected, controls):
+        time = int(times[event_index])
+        particle = int(particles[event_index])
+        jump = jumps[event_index]
+        jump_squared = float(np.dot(jump, jump))
+        if jump_squared <= 0.0 or not math.isfinite(jump_squared):
+            raise ValueError("selected event jump vectors must have positive finite norm")
+        pre = np.mean(positions[time - half_window : time], axis=0)
+        post = np.mean(positions[time : time + half_window], axis=0)
+        displacement = post - pre
+        squared_displacement = np.sum(displacement**2, axis=1)
+        projection = displacement @ jump / jump_squared
+
+        event_separation = pre - pre[particle]
+        event_separation -= box * np.rint(event_separation / box)
+        event_bin = np.searchsorted(edges, np.linalg.norm(event_separation, axis=1), side="right") - 1
+        retained = (
+            (np.arange(len(pre)) != particle)
+            & (event_bin >= 0)
+            & (event_bin < bin_count)
+        )
+        event_count += np.bincount(event_bin[retained], minlength=bin_count)
+        event_squared_sum += np.bincount(
+            event_bin[retained], weights=squared_displacement[retained], minlength=bin_count
+        )
+        event_projection_sum += np.bincount(
+            event_bin[retained], weights=projection[retained], minlength=bin_count
+        )
+
+        control_separation = pre - pre[control]
+        control_separation -= box * np.rint(control_separation / box)
+        control_bin = np.searchsorted(edges, np.linalg.norm(control_separation, axis=1), side="right") - 1
+        retained = (
+            (np.arange(len(pre)) != control)
+            & (control_bin >= 0)
+            & (control_bin < bin_count)
+        )
+        control_count += np.bincount(control_bin[retained], minlength=bin_count)
+        control_squared_sum += np.bincount(
+            control_bin[retained], weights=squared_displacement[retained], minlength=bin_count
+        )
+        control_projection_sum += np.bincount(
+            control_bin[retained], weights=projection[retained], minlength=bin_count
+        )
+
+    if np.any(event_count == 0) or np.any(control_count == 0):
+        raise ValueError("every distance bin must contain event and control pairs")
+    event_mean = event_squared_sum / event_count
+    control_mean = control_squared_sum / control_count
+    rows: list[dict[str, float]] = []
+    for index in range(bin_count):
+        rows.append(
+            {
+                "distance_low": float(edges[index]),
+                "distance_high": float(edges[index + 1]),
+                "distance_midpoint": float(0.5 * (edges[index] + edges[index + 1])),
+                "event_pair_count": float(event_count[index]),
+                "control_pair_count": float(control_count[index]),
+                "event_mean_squared_displacement": float(event_mean[index]),
+                "control_mean_squared_displacement": float(control_mean[index]),
+                "event_to_control_squared_ratio": float(event_mean[index] / control_mean[index])
+                if control_mean[index] > 0.0
+                else math.inf,
+                "event_mean_longitudinal_projection": float(
+                    event_projection_sum[index] / event_count[index]
+                ),
+                "control_mean_longitudinal_projection": float(
+                    control_projection_sum[index] / control_count[index]
+                ),
+            }
+        )
+    integrated = np.array([edges[index + 1] <= integration_max_distance for index in range(bin_count)])
+    if not np.any(integrated):
+        raise ValueError("integration_max_distance must include at least one complete bin")
+    excess_per_event = event_count / len(selected) * (event_mean - control_mean)
+    mean_self_jump_squared = float(np.mean(np.sum(jumps[selected] ** 2, axis=1)))
+    integrated_excess = float(np.sum(excess_per_event[integrated]))
+    summary = {
+        "sampled_event_count": float(len(selected)),
+        "mean_self_jump_squared": mean_self_jump_squared,
+        "integration_max_distance": float(integration_max_distance),
+        "integrated_neighbor_excess": integrated_excess,
+        "integrated_neighbor_excess_over_self_jump_squared": integrated_excess
+        / mean_self_jump_squared,
+    }
+    return rows, summary
+
+
+def summarize_neighbor_halo_replicates(
+    shell_rows: Sequence[dict[str, object]],
+    replicate_rows: Sequence[dict[str, object]],
+) -> tuple[list[dict[str, float | str]], dict[str, float | str]]:
+    """Attach independent-replicate uncertainty to an event-conditioned halo."""
+
+    _, curve = summarize_replicate_binned_metric(
+        shell_rows,
+        bin_key="distance_midpoint",
+        metric_key="event_to_control_squared_ratio",
+    )
+    for row in curve:
+        midpoint = float(row["distance_midpoint"])
+        selected = [source for source in shell_rows if float(source["distance_midpoint"]) == midpoint]
+        lows = {float(source["distance_low"]) for source in selected}
+        highs = {float(source["distance_high"]) for source in selected}
+        if len(lows) != 1 or len(highs) != 1:
+            raise ValueError("distance-bin edges must agree across replicas")
+        row["distance_low"] = lows.pop()
+        row["distance_high"] = highs.pop()
+        row["halo_detected_in_shell"] = float(float(row["ci95_low"]) > 1.0)
+        row["uncertainty_scope"] = "independent_replicates"
+
+    halo_radius = 0.0
+    contiguous = True
+    for row in sorted(curve, key=lambda item: float(item["distance_low"])):
+        if contiguous and float(row["halo_detected_in_shell"]) == 1.0:
+            halo_radius = float(row["distance_high"])
+        else:
+            contiguous = False
+
+    values = np.array(
+        [float(row["integrated_neighbor_excess_over_self_jump_squared"]) for row in replicate_rows]
+    )
+    replicates = [float(row["replicate"]) for row in replicate_rows]
+    if len(values) < 2 or len(set(replicates)) != len(values):
+        raise ValueError("at least two unique independent replicate halo summaries are required")
+    if np.any(~np.isfinite(values)):
+        raise ValueError("integrated halo ratios must be finite")
+    mean = float(np.mean(values))
+    standard_deviation = float(np.std(values, ddof=1))
+    standard_error = standard_deviation / math.sqrt(len(values))
+    ci_low, ci_high, critical = independent_sample_ci95(
+        mean=mean,
+        standard_error=standard_error,
+        sample_count=len(values),
+    )
+    verdict: dict[str, float | str] = {
+        "halo_radius_lower_bound": halo_radius,
+        "mean_integrated_neighbor_excess_over_self_jump_squared": mean,
+        "standard_deviation_integrated_neighbor_excess_over_self_jump_squared": standard_deviation,
+        "standard_error_integrated_neighbor_excess_over_self_jump_squared": standard_error,
+        "ci95_low_integrated_neighbor_excess_over_self_jump_squared": ci_low,
+        "ci95_high_integrated_neighbor_excess_over_self_jump_squared": ci_high,
+        "ci95_critical_value": critical,
+        "ci95_method": "student_t_independent_replicates",
+        "independent_replicate_count": float(len(values)),
+        "spatial_measurement_claim_allowed": float(halo_radius > 0.0 and ci_low > 0.0),
+        "spatial_model_claim_allowed": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+    return curve, verdict
+
+
 def summarize_replicate_curves(
     rows: Sequence[dict[str, object]],
     *,

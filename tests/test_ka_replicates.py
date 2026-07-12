@@ -422,6 +422,100 @@ class KAReplicatePreparationTests(unittest.TestCase):
             0.0,
         )
 
+    def test_event_conditioned_neighbor_halo_detects_cooperative_motion(self):
+        measure = getattr(ka_replicates, "event_conditioned_neighbor_displacement", None)
+        self.assertIsNotNone(measure)
+        frame0 = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [10.0, 0.0, 0.0],
+                [11.0, 0.0, 0.0],
+            ]
+        )
+        frame1 = frame0.copy()
+        frame2 = frame1.copy()
+        frame2[0, 0] += 1.0
+        frame2[1, 0] += 0.5
+        frame2[3, 0] += 0.1
+        frame3 = frame2.copy()
+        trajectory = np.stack([frame0, frame1, frame2, frame3])
+        events = {
+            "particle": np.array([0]),
+            "time": np.array([2]),
+            "jump_vector": np.array([[1.0, 0.0, 0.0]]),
+        }
+
+        rows, summary = measure(
+            trajectory,
+            events,
+            box_lengths=np.array([100.0, 100.0, 100.0]),
+            distance_edges=np.array([0.0, 2.0, 20.0]),
+            half_window=1,
+            event_indices=np.array([0]),
+            control_particles=np.array([2]),
+            integration_max_distance=2.0,
+        )
+        shifted, _ = measure(
+            trajectory + np.array([100.0, -100.0, 200.0]),
+            events,
+            box_lengths=np.array([100.0, 100.0, 100.0]),
+            distance_edges=np.array([0.0, 2.0, 20.0]),
+            half_window=1,
+            event_indices=np.array([0]),
+            control_particles=np.array([2]),
+            integration_max_distance=2.0,
+        )
+
+        self.assertAlmostEqual(rows[0]["event_mean_squared_displacement"], 0.25)
+        self.assertAlmostEqual(rows[0]["control_mean_squared_displacement"], 0.01)
+        self.assertAlmostEqual(rows[0]["event_to_control_squared_ratio"], 25.0)
+        self.assertGreater(summary["integrated_neighbor_excess_over_self_jump_squared"], 0.0)
+        np.testing.assert_allclose(
+            [row["event_to_control_squared_ratio"] for row in rows],
+            [row["event_to_control_squared_ratio"] for row in shifted],
+        )
+
+    def test_neighbor_halo_replicate_summary_requires_ci_above_control(self):
+        summarize = getattr(ka_replicates, "summarize_neighbor_halo_replicates", None)
+        self.assertIsNotNone(summarize)
+        shell_rows = []
+        for replicate, first, second in ((1, 2.0, 1.1), (2, 2.1, 1.0), (3, 1.9, 0.9)):
+            shell_rows.extend(
+                [
+                    {
+                        "replicate": float(replicate),
+                        "distance_low": 0.0,
+                        "distance_high": 2.0,
+                        "distance_midpoint": 1.0,
+                        "event_to_control_squared_ratio": first,
+                    },
+                    {
+                        "replicate": float(replicate),
+                        "distance_low": 2.0,
+                        "distance_high": 4.0,
+                        "distance_midpoint": 3.0,
+                        "event_to_control_squared_ratio": second,
+                    },
+                ]
+            )
+        replicate_rows = [
+            {
+                "replicate": float(replicate),
+                "integrated_neighbor_excess_over_self_jump_squared": value,
+            }
+            for replicate, value in ((1, 5.0), (2, 6.0), (3, 5.5))
+        ]
+
+        curve, verdict = summarize(shell_rows, replicate_rows)
+
+        self.assertEqual(curve[0]["halo_detected_in_shell"], 1.0)
+        self.assertEqual(curve[1]["halo_detected_in_shell"], 0.0)
+        self.assertEqual(verdict["halo_radius_lower_bound"], 2.0)
+        self.assertAlmostEqual(verdict["mean_integrated_neighbor_excess_over_self_jump_squared"], 5.5)
+        self.assertEqual(verdict["spatial_measurement_claim_allowed"], 1.0)
+        self.assertEqual(verdict["spatial_model_claim_allowed"], 0.0)
+
     def test_replicate_curve_summary_uses_between_trajectory_error(self):
         rows = [
             {"replicate": 1.0, "lag": 1.0, "msd": 1.0, "fs_k7p25": 0.8},

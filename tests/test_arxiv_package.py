@@ -15,6 +15,51 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_t045_neighbor_halo_is_replicated_but_model_claim_stays_blocked(self):
+        curve_path = (
+            ROOT / "data" / "renewal_cage_ka_replicates_T045_neighbor_halo_curve_summary.csv"
+        )
+        verdict_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_neighbor_halo_verdict.csv"
+        with curve_path.open() as handle:
+            curve = list(csv.DictReader(handle))
+        self.assertEqual([float(row["halo_detected_in_shell"]) for row in curve[:4]], [1.0] * 4)
+        self.assertEqual(float(curve[4]["halo_detected_in_shell"]), 0.0)
+        self.assertGreater(float(curve[0]["ci95_low"]), 4.0)
+        self.assertGreater(float(curve[3]["ci95_low"]), 1.0)
+        self.assertLess(float(curve[4]["ci95_low"]), 1.0)
+        self.assertTrue(all(row["ci95_method"] == "student_t_independent_replicates" for row in curve))
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        self.assertEqual(float(verdict["halo_radius_lower_bound"]), 4.0)
+        self.assertEqual(float(verdict["independent_replicate_count"]), 3.0)
+        self.assertGreater(
+            float(verdict["ci95_low_integrated_neighbor_excess_over_self_jump_squared"]),
+            4.0,
+        )
+        self.assertEqual(float(verdict["spatial_measurement_claim_allowed"]), 1.0)
+        self.assertEqual(float(verdict["spatial_model_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_neighbor_halo_sota_ledger_blocks_numeric_and_xi4_overclaim(self):
+        path = ROOT / "data" / "renewal_cage_ka_neighbor_halo_sota_alignment.csv"
+        with path.open() as handle:
+            rows = {row["source_id"]: row for row in csv.DictReader(handle)}
+        self.assertEqual(
+            set(rows),
+            {
+                "gokhale_nagamanasa_ganapathy_sood_2014",
+                "pastore_coniglio_pica_ciamarra_2015",
+                "ortlieb_royall_et_al_2023",
+                "keys_hedges_garrahan_glotzer_chandler_2011",
+            },
+        )
+        self.assertTrue(
+            all(float(row["numerical_comparison_allowed"]) == 0.0 for row in rows.values())
+        )
+        self.assertTrue(all(float(row["thermodynamic_claim_allowed"]) == 0.0 for row in rows.values()))
+        self.assertIn("direct_model_and_temperature", rows["pastore_coniglio_pica_ciamarra_2015"]["definition_alignment"])
+        self.assertIn("different_dimension", rows["gokhale_nagamanasa_ganapathy_sood_2014"]["definition_alignment"])
+
     def test_t045_independent_waiting_and_heldout_transport_gates(self):
         waiting_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_waiting_verdict.csv"
         with waiting_path.open() as handle:

@@ -1,0 +1,4 @@
+sampled_event_count,mean_self_jump_squared,integration_max_distance,integrated_neighbor_excess,integrated_neighbor_excess_over_self_jump_squared,replicate,temperature,threshold,half_window,heldout_start,total_event_count,random_seed,spatial_measurement_claim_allowed,spatial_model_claim_allowed,thermodynamic_claim_allowed
+1200.0,0.21256688409962796,4.0,1.3094674884600965,6.160261011524082,1.0,0.45,0.15,5.0,5000.0,5041.0,4518.0,1.0,0.0,0.0
+1200.0,0.21935363121768262,4.0,1.1677508033833979,5.323599143998409,2.0,0.45,0.15,5.0,5000.0,4158.0,4519.0,1.0,0.0,0.0
+1200.0,0.21569586674608787,4.0,1.166214738065513,5.406755148620227,3.0,0.45,0.15,5.0,5000.0,5644.0,4520.0,1.0,0.0,0.0
