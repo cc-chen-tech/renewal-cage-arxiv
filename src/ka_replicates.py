@@ -2519,6 +2519,111 @@ def extract_debye_waller_cage_jumps(
     }
 
 
+def consecutive_cage_anchor_returns(
+    events: dict[str, np.ndarray],
+    *,
+    debye_waller_factor: float,
+    radius_scale: float,
+) -> dict[str, float]:
+    """Measure consecutive cage-center returns against a length-preserving null."""
+
+    if not math.isfinite(debye_waller_factor) or debye_waller_factor <= 0.0:
+        raise ValueError("debye_waller_factor must be positive and finite")
+    if not math.isfinite(radius_scale) or radius_scale <= 0.0:
+        raise ValueError("radius_scale must be positive and finite")
+    try:
+        particles = np.asarray(events["particle"])
+        times = np.asarray(events["time"], dtype=float)
+        jumps = np.asarray(events["jump_vector"], dtype=float)
+    except KeyError as error:
+        raise ValueError(f"events must contain {error.args[0]!r}") from error
+    if (
+        particles.ndim != 1
+        or times.shape != particles.shape
+        or jumps.shape != (len(particles), 3)
+        or len(particles) < 2
+    ):
+        raise ValueError("events must contain aligned particle, time, and three-dimensional jump vectors")
+    if not np.issubdtype(particles.dtype, np.integer) or np.any(particles < 0):
+        raise ValueError("event particles must be nonnegative integers")
+    if np.any(~np.isfinite(times)) or np.any(~np.isfinite(jumps)):
+        raise ValueError("event times and jump vectors must be finite")
+    if np.any(np.diff(particles) < 0):
+        raise ValueError("events must be grouped by particle")
+    adjacent = particles[:-1] == particles[1:]
+    if np.any(np.diff(times)[adjacent] <= 0.0):
+        raise ValueError("event times must increase within each particle")
+    pair_indices = np.flatnonzero(adjacent)
+    if len(pair_indices) == 0:
+        raise ValueError("at least one consecutive same-particle event pair is required")
+
+    first = jumps[pair_indices]
+    second = jumps[pair_indices + 1]
+    first_length = np.linalg.norm(first, axis=1)
+    second_length = np.linalg.norm(second, axis=1)
+    if np.any(first_length <= 0.0) or np.any(second_length <= 0.0):
+        raise ValueError("consecutive jump vectors must be nonzero")
+    threshold = radius_scale * math.sqrt(debye_waller_factor)
+    returned = np.linalg.norm(first + second, axis=1) <= threshold
+    cosine_limit = (
+        threshold**2 - first_length**2 - second_length**2
+    ) / (2.0 * first_length * second_length)
+    isotropic_probability = np.clip((cosine_limit + 1.0) / 2.0, 0.0, 1.0)
+
+    run_lengths: list[int] = []
+    run_durations: list[float] = []
+    run_start: int | None = None
+    previous_pair_index: int | None = None
+    for pair_index, is_return in zip(pair_indices, returned):
+        if is_return and (previous_pair_index is None or pair_index == previous_pair_index + 1):
+            if run_start is None:
+                run_start = int(pair_index)
+        elif is_return:
+            if run_start is not None:
+                run_length = previous_pair_index - run_start + 1
+                run_lengths.append(run_length)
+                run_durations.append(float(times[previous_pair_index + 1] - times[run_start]))
+            run_start = int(pair_index)
+        elif run_start is not None:
+            run_length = previous_pair_index - run_start + 1
+            run_lengths.append(run_length)
+            run_durations.append(float(times[previous_pair_index + 1] - times[run_start]))
+            run_start = None
+        previous_pair_index = int(pair_index) if is_return else None
+    if run_start is not None and previous_pair_index is not None:
+        run_length = previous_pair_index - run_start + 1
+        run_lengths.append(run_length)
+        run_durations.append(float(times[previous_pair_index + 1] - times[run_start]))
+
+    return_fraction = float(np.mean(returned))
+    isotropic_null_fraction = float(np.mean(isotropic_probability))
+    return_run_mean = float(np.mean(run_lengths)) if run_lengths else 0.0
+    geometric_return_run_mean = (
+        math.inf if return_fraction == 1.0 else 1.0 / (1.0 - return_fraction)
+    )
+    duration_values = np.asarray(run_durations, dtype=float)
+    return {
+        "radius_threshold": threshold,
+        "pair_count": float(len(pair_indices)),
+        "return_count": float(np.sum(returned)),
+        "return_fraction": return_fraction,
+        "isotropic_null_fraction": isotropic_null_fraction,
+        "return_excess_ratio": (
+            return_fraction / isotropic_null_fraction
+            if isotropic_null_fraction > 0.0
+            else 0.0
+        ),
+        "return_run_count": float(len(run_lengths)),
+        "return_run_mean": return_run_mean,
+        "geometric_return_run_mean": geometric_return_run_mean,
+        "mean_return_run_duration": float(np.mean(duration_values)) if len(duration_values) else 0.0,
+        "return_run_duration_p50": float(np.quantile(duration_values, 0.50)) if len(duration_values) else 0.0,
+        "return_run_duration_p75": float(np.quantile(duration_values, 0.75)) if len(duration_values) else 0.0,
+        "return_run_duration_p90": float(np.quantile(duration_values, 0.90)) if len(duration_values) else 0.0,
+        "return_run_duration_p95": float(np.quantile(duration_values, 0.95)) if len(duration_values) else 0.0,
+    }
+
+
 def summarize_replicate_binned_metric(
     rows: Sequence[dict[str, object]],
     *,

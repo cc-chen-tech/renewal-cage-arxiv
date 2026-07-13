@@ -142,6 +142,79 @@ from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E4
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_cage_anchor_returns_detect_exact_backtrack_and_analytic_null(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        events = {
+            "particle": np.array([0, 0, 0]),
+            "time": np.array([1.0, 2.0, 3.0]),
+            "jump_vector": np.array(
+                [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]]
+            ),
+            "jump_duration": np.array([1.0, 1.0, 1.0]),
+        }
+
+        result = measure(events, debye_waller_factor=0.04, radius_scale=1.0)
+
+        self.assertEqual(result["return_count"], 2.0)
+        self.assertAlmostEqual(result["isotropic_null_fraction"], 0.01)
+        self.assertGreater(result["return_fraction"], result["isotropic_null_fraction"])
+
+    def test_cage_anchor_returns_respect_particle_boundaries_and_summarize_runs(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        events = {
+            "particle": np.array([0, 0, 0, 0, 1, 1]),
+            "time": np.array([1.0, 3.0, 8.0, 21.0, 2.0, 6.0]),
+            "jump_vector": np.array(
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0],
+                    [2.0, 0.0, 0.0],
+                    [2.0, 0.0, 0.0],
+                ]
+            ),
+        }
+
+        result = measure(events, debye_waller_factor=0.04, radius_scale=1.0)
+
+        self.assertEqual(result["pair_count"], 4.0)
+        self.assertEqual(result["return_count"], 2.0)
+        self.assertAlmostEqual(result["return_fraction"], 0.5)
+        self.assertEqual(result["return_run_count"], 1.0)
+        self.assertEqual(result["return_run_mean"], 2.0)
+        self.assertEqual(result["geometric_return_run_mean"], 2.0)
+        self.assertEqual(result["return_run_duration_p50"], 7.0)
+        self.assertEqual(result["return_run_duration_p95"], 7.0)
+
+    def test_cage_anchor_returns_reject_malformed_or_unsupported_events(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        valid = {
+            "particle": np.array([0, 0]),
+            "time": np.array([1.0, 2.0]),
+            "jump_vector": np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]),
+        }
+
+        with self.assertRaisesRegex(ValueError, "nonzero"):
+            measure(
+                {**valid, "jump_vector": np.zeros((2, 3))},
+                debye_waller_factor=0.04,
+                radius_scale=1.0,
+            )
+        with self.assertRaisesRegex(ValueError, "at least one consecutive"):
+            measure(
+                {**valid, "particle": np.array([0, 1])},
+                debye_waller_factor=0.04,
+                radius_scale=1.0,
+            )
+        with self.assertRaisesRegex(ValueError, "debye_waller_factor"):
+            measure(valid, debye_waller_factor=0.0, radius_scale=1.0)
+        with self.assertRaisesRegex(ValueError, "radius_scale"):
+            measure(valid, debye_waller_factor=0.04, radius_scale=float("nan"))
+
     def test_independent_group_ratio_reports_growth_and_equivalence_separately(self):
         compare = getattr(ka_replicates, "independent_group_ratio", None)
         self.assertIsNotNone(compare)
