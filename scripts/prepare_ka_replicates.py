@@ -29,6 +29,12 @@ def main() -> None:
     parser.add_argument("--maximum-absolute-fs", type=float, default=0.1)
     parser.add_argument("--equilibration-time", type=float, default=100.0)
     parser.add_argument("--production-time", type=float, default=5000.0)
+    parser.add_argument("--dynamics", choices=("nvt", "langevin"), default="nvt")
+    parser.add_argument("--langevin-damping", type=float)
+    parser.add_argument("--langevin-seeds", type=parse_integers)
+    parser.add_argument("--dump-interval-time", type=float, default=1.0)
+    parser.add_argument("--high-resolution-duration", type=float, default=0.0)
+    parser.add_argument("--high-resolution-dump-interval", type=float)
     args = parser.parse_args()
 
     manifest = prepare_replicate_ensemble(
@@ -41,6 +47,12 @@ def main() -> None:
         maximum_absolute_fs=args.maximum_absolute_fs,
         equilibration_time=args.equilibration_time,
         production_time=args.production_time,
+        dynamics=args.dynamics,
+        langevin_damping=args.langevin_damping,
+        langevin_seeds=args.langevin_seeds,
+        dump_interval_time=args.dump_interval_time,
+        high_resolution_duration=args.high_resolution_duration,
+        high_resolution_dump_interval=args.high_resolution_dump_interval,
     )
     print(json.dumps(manifest, indent=2, sort_keys=True))
 

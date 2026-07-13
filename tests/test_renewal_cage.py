@@ -273,9 +273,119 @@ from renewal_cage import (  # noqa: E402
     translation_rotation_inversion_protocol,
     translation_rotation_rotational_relaxation_time,
 )
+from prl_event_clock_closure import (  # noqa: E402
+    causal_event_cage_response_normal_equations,
+    causal_event_cage_response_prediction,
+    event_age_bin_lower_edges,
+    event_age_since_active_increment,
+    event_cage_cross_memory,
+    p_hop_increment_partition,
+    summarize_threshold_ensemble,
+    time_split_event_clock_closure,
+)
 
 
 class DelayedRenewalCageTests(unittest.TestCase):
+    def test_phop_increment_partition_is_an_exact_active_cage_path_decomposition(self):
+        positions = np.zeros((8, 1, 3), dtype=float)
+        positions[3:, 0, 0] = 1.0
+
+        result = p_hop_increment_partition(positions, threshold=0.1, half_window=1)
+
+        self.assertTrue(bool(result["active_increment_mask"][2, 0]))
+        np.testing.assert_allclose(result["active_positions"] + result["cage_positions"], positions - positions[:1])
+        np.testing.assert_allclose(result["active_positions"][-1, 0], [1.0, 0.0, 0.0])
+        np.testing.assert_allclose(result["cage_positions"][-1, 0], [0.0, 0.0, 0.0])
+
+    def test_event_cage_cross_memory_reconstructs_two_step_cross_msd(self):
+        active = np.array([[[0.0, 0.0, 0.0]], [[1.0, 0.0, 0.0]], [[1.0, 0.0, 0.0]], [[1.0, 0.0, 0.0]]])
+        cage = np.array([[[0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0]], [[-0.5, 0.0, 0.0]], [[-0.5, 0.0, 0.0]]])
+
+        result = event_cage_cross_memory(active, cage, lags=np.array([2]), max_lag=1)
+
+        np.testing.assert_array_equal(result["kernel_lags"], [-1, 0, 1])
+        np.testing.assert_allclose(result["direct_cross_msd"], [-0.5])
+        np.testing.assert_allclose(result["stationary_cross_msd"], [-0.5])
+
+    def test_causal_event_cage_response_recovers_delayed_linear_backflow(self):
+        generator = np.random.default_rng(112)
+        active = generator.normal(size=(80, 7, 3))
+        cage = np.zeros_like(active)
+        cage[2:] = -0.35 * active[1:-1] + 0.20 * active[:-2]
+
+        normal = causal_event_cage_response_normal_equations(active, cage, start=2, stop=60, history_order=2)
+        coefficient = np.linalg.solve(normal["gram_matrix"], normal["right_hand_side"])
+        predicted = causal_event_cage_response_prediction(active, coefficient)
+
+        np.testing.assert_allclose(coefficient, [-0.35, 0.20], atol=1e-12)
+        np.testing.assert_allclose(predicted[2:], cage[2:], atol=1e-12)
+
+    def test_event_age_since_active_increment_resets_and_caps_per_particle(self):
+        active = np.array(
+            [[False, False], [True, False], [True, False], [False, True], [False, False], [False, False], [False, False]]
+        )
+
+        age = event_age_since_active_increment(active, maximum_age=4)
+
+        np.testing.assert_array_equal(age[:, 0], [4, 0, 0, 1, 2, 3, 4])
+        np.testing.assert_array_equal(age[:, 1], [4, 4, 4, 0, 1, 2, 3])
+
+    def test_event_age_bin_lower_edges_match_right_inclusive_digitize_bins(self):
+        lower_edges = event_age_bin_lower_edges(np.array([0, 4, 16, 64]))
+
+        np.testing.assert_array_equal(lower_edges, [0, 1, 5, 17, 65])
+
+    def test_threshold_ensemble_summary_keeps_all_failed_thresholds(self):
+        summary = summarize_threshold_ensemble(
+            [
+                {"threshold": 0.08, "D_relerr": 0.40, "ngp_rmse": 1.8},
+                {"threshold": 0.08, "D_relerr": 0.50, "ngp_rmse": 2.0},
+                {"threshold": 0.20, "D_relerr": 0.70, "ngp_rmse": 3.0},
+            ],
+            metric_keys=("D_relerr", "ngp_rmse"),
+        )
+
+        self.assertEqual([row["threshold"] for row in summary], [0.08, 0.20])
+        self.assertEqual(float(summary[0]["replicate_count"]), 2.0)
+        self.assertAlmostEqual(float(summary[0]["D_relerr"]), 0.45)
+        self.assertGreater(float(summary[0]["D_relerr_se"]), 0.0)
+        self.assertEqual(float(summary[1]["all_observables_pass"]), 0.0)
+
+    def test_time_split_event_clock_closure_uses_only_training_microstatistics(self):
+        frame_count = 161
+        particle_count = 12
+        positions = np.zeros((frame_count, particle_count, 3), dtype=float)
+        for particle in range(particle_count):
+            jump_times = np.arange(16 + particle % 3, frame_count, 18 + particle % 2)
+            for event_time in jump_times:
+                positions[event_time:, particle, 0] += 0.9
+        result = time_split_event_clock_closure(
+            positions,
+            train_stop=80,
+            threshold=0.08,
+            half_window=3,
+            lags=np.array([3, 6, 12, 24, 36]),
+            wave_numbers=np.array([1.0, 1.6]),
+            overlap_radius=0.3,
+            origin_stride=1,
+        )
+
+        self.assertEqual(result["event_definition"], "candelier_phop_contiguous_peak_recursive_ABA_removal")
+        self.assertEqual(float(result["train_stop"]), 80.0)
+        self.assertEqual(float(result["fit_parameters_from_macro_observables"]), 0.0)
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+        self.assertGreater(float(result["train_event_count"]), 10.0)
+        self.assertEqual(
+            set(result["variants"]),
+            {"full_event_clock", "constant_rate_ctrw", "static_rate_disorder", "uncorrelated_jumps", "instantaneous_flight"},
+        )
+        self.assertIn("full_event_clock", result["variant_scores"])
+        self.assertIn("predicted_diffusion", result["variant_scores"]["full_event_clock"])
+        self.assertEqual(
+            len(result["variant_scores"]["full_event_clock"]["predicted_ngp"]),
+            len(result["observed_lags"]),
+        )
+
     def test_waiting_time_shuffle_diagnostics_detect_temporal_memory(self):
         particles = []
         times = []

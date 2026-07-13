@@ -13,6 +13,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 import ka_replicates
 
@@ -25,10 +26,93 @@ from ka_replicates import (  # noqa: E402
     overlap_four_point_structure_factor,
     prepare_replicate,
     prepare_replicate_ensemble,
+    prepare_isoconfigurational_langevin_clones,
     summarize_replicate_curves,
     temperature_scan_verdict,
     validate_initial_frame_independence,
 )
+from ka_local_cage import (  # noqa: E402
+    frozen_minimum_environment_response,
+    frozen_minimum_shell_environment_response,
+    ensemble_displacement_observables,
+    ka_frozen_neighbor_multistart_minima,
+    driven_tagged_langevin_trajectory,
+    driven_active_cluster_langevin_trajectory,
+    active_cluster_source_velocity_ensemble,
+    active_cluster_langevin_residual,
+    nonlinear_core_harmonic_bath_langevin_trajectory,
+    local_harmonic_displacement_memory_kernel,
+    infer_causal_position_memory_kernel,
+    finite_memory_position_response_holdout,
+    fit_pair_force_response_auxiliary_embedding,
+    fit_linear_response_auxiliary_embedding,
+    ensemble_symmetric_response_summary,
+    shared_response_prefix_length,
+    propagate_causal_position_memory_response,
+    symmetric_finite_difference_response,
+    time_split_driven_response_conditioned_innovation_diagnostic,
+    time_split_driven_response_empirical_innovation_diagnostic,
+    time_split_graph_conditioned_increment_diagnostic,
+    time_split_knn_state_conditioned_increment_diagnostic,
+    time_split_force_auxiliary_markov_diagnostic,
+    ka_local_cluster_hessian,
+    ka_local_cluster_soft_mode_features,
+    ka_local_cluster_anharmonic_barrier_features,
+    frozen_minimum_response_jacobian,
+    minimum_response_diagnostic,
+    projected_overdamped_diffusion_tensor,
+    projected_diffusion_increment_association,
+    projected_overdamped_mixture_ngp,
+    response_residual_memory_diagnostic,
+    segmented_cage_center_event_statistics,
+    ka_lj_local_energy_force_hessian,
+    ka_lj_force_and_isotropic_curvature,
+    ka_lj_force_generator_observables,
+    ka_lj_shell_forces,
+    precursor_event_hazard_diagnostic,
+    isoconfigurational_first_passage_diagnostic,
+    isoconfigurational_state_rate_diagnostic,
+    grouped_binomial_logistic_committor_diagnostic,
+    heterogeneous_marked_poisson_prediction,
+    underdamped_ou_cage_prediction,
+    fit_underdamped_ou_cage_from_msd,
+    hybrid_structural_clock_underdamped_cage_prediction,
+    independent_gaussian_cage_marked_poisson_prediction,
+    free_exponential_memory_gle_prediction,
+    fit_free_exponential_memory_gle_from_msd,
+    static_neighbor_cage_displacement,
+    dynamic_neighbor_cage_displacement,
+    hysteretic_neighbor_cage_displacement,
+    local_bond_orientational_features,
+    lagged_coordinate_increment_history,
+    residual_ar1_memory_diagnostic,
+    state_dependent_increment_diagnostic,
+    time_split_empirical_increment_levy_diagnostic,
+    time_split_ar1_empirical_innovation_diagnostic,
+    time_split_arp_empirical_innovation_diagnostic,
+    time_split_lagged_response_embedding_diagnostic,
+    time_split_center_gle_diagnostic,
+)
+from ka_collective_memory import (  # noqa: E402
+    discrete_volterra_memory_kernel,
+    propagate_free_gle_velocity_correlation,
+    long_wavelength_displacement_field,
+    fourier_density_current_field,
+    symmetric_quadratic_mode_products,
+    local_affine_nonaffine_state,
+    local_neighbor_velocity_field,
+    local_neighbor_particle_velocity_field,
+    discrete_mori_zwanzig_operators,
+    simulate_discrete_mz_empirical_innovations,
+    simulate_discrete_mz_block_innovations,
+    time_split_shell_response_embedding_diagnostic,
+    time_split_collective_velocity_diagnostic,
+    time_split_affine_environment_embedding_diagnostic,
+    time_split_collective_field_embedding_diagnostic,
+    fixed_bath_particle_state,
+    nearest_outer_bath_state,
+)
+from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E402
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
@@ -1786,6 +1870,1631 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
         self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+    def test_nearest_outer_bath_state_excludes_active_particles_and_uses_minimum_image(self):
+        positions = np.array(
+            [
+                [
+                    [9.8, 0.0, 0.0],
+                    [9.9, 0.0, 0.0],
+                    [0.2, 0.0, 0.0],
+                    [4.0, 0.0, 0.0],
+                    [8.9, 0.0, 0.0],
+                ],
+                [
+                    [9.8, 0.0, 0.0],
+                    [9.9, 0.0, 0.0],
+                    [0.4, 0.0, 0.0],
+                    [4.0, 0.0, 0.0],
+                    [9.4, 0.0, 0.0],
+                ],
+            ]
+        )
+        velocities = np.array(
+            [
+                [[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0], [4.0, 0.0, 0.0]],
+                [[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0], [4.0, 0.0, 0.0]],
+            ]
+        )
+
+        state = nearest_outer_bath_state(
+            positions,
+            velocities=velocities,
+            target_index=0,
+            active_indices=np.array([0, 1]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+            neighbor_count=2,
+        )
+
+        np.testing.assert_array_equal(state["particle_indices"], [[2, 4], [4, 2]])
+        np.testing.assert_allclose(state["relative_positions"][0, :, 0], [0.4, -0.9])
+        np.testing.assert_allclose(state["relative_positions"][1, :, 0], [-0.4, 0.6])
+        np.testing.assert_allclose(state["relative_velocities"][0, :, 0], [1.0, 3.0])
+
+    def test_fixed_bath_particle_state_keeps_labels_and_uses_minimum_image(self):
+        positions = np.array(
+            [
+                [[9.8, 0.0, 0.0], [0.2, 0.0, 0.0], [8.9, 0.0, 0.0]],
+                [[9.7, 0.0, 0.0], [0.4, 0.0, 0.0], [8.6, 0.0, 0.0]],
+            ]
+        )
+        velocities = np.array(
+            [
+                [[1.0, 0.0, 0.0], [2.0, 0.0, 0.0], [4.0, 0.0, 0.0]],
+                [[1.5, 0.0, 0.0], [2.5, 0.0, 0.0], [4.5, 0.0, 0.0]],
+            ]
+        )
+
+        state = fixed_bath_particle_state(
+            positions,
+            velocities=velocities,
+            target_index=0,
+            particle_indices=np.array([2, 1]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+        )
+
+        np.testing.assert_array_equal(state["particle_indices"], [2, 1])
+        np.testing.assert_allclose(state["relative_positions"][:, :, 0], [[-0.9, 0.4], [-1.1, 0.7]])
+        np.testing.assert_allclose(state["relative_velocities"][:, :, 0], [[3.0, 1.0], [3.0, 1.0]])
+
+    def test_ka_lj_shell_forces_sum_to_exact_pair_force(self):
+        positions = np.array([[0.0, 0.0, 0.0], [1.1, 0.0, 0.0], [1.8, 0.0, 0.0]])
+        types = np.array([0, 0, 1])
+        target = np.array([0])
+        pair_force, _ = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=types,
+            box_lengths=np.array([12.0, 12.0, 12.0]),
+            target_indices=target,
+        )
+
+        shell_force = ka_lj_shell_forces(
+            positions,
+            particle_types=types,
+            box_lengths=np.array([12.0, 12.0, 12.0]),
+            target_indices=target,
+            shell_edges=np.array([0.0, 1.5, 2.5]),
+        )
+
+        np.testing.assert_allclose(np.sum(shell_force, axis=1), pair_force, atol=1e-12)
+
+    def test_force_auxiliary_markov_diagnostic_recovers_synthetic_colored_force_process(self):
+        rng = np.random.default_rng(959)
+        frames, particles = 180, 500
+        state = np.zeros((frames, particles, 2, 3))
+        transition = np.array([[0.78, 0.06], [-0.22, 0.71]])
+        for index in range(frames - 1):
+            state[index + 1] = np.einsum("ab,pbc->pac", transition, state[index])
+            state[index + 1] += rng.normal(scale=np.array([0.025, 0.06])[None, :, None], size=(particles, 2, 3))
+        velocity, force = state[:, :, 0], state[:, :, 1]
+        positions = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(velocity[:-1], axis=0)], axis=0)
+
+        result = time_split_force_auxiliary_markov_diagnostic(
+            positions,
+            velocity,
+            force,
+            train_stop=90,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8]),
+            wave_numbers=np.array([0.5, 1.0]),
+            simulation_count=3000,
+            seed=960,
+        )
+
+        np.testing.assert_allclose(result["transition_matrix"], transition, atol=0.04)
+        self.assertGreater(float(result["heldout_state_r_squared"]), 0.35)
+        self.assertLess(float(result["diffusion_relative_error"]), 0.15)
+
+    def test_discrete_volterra_memory_kernel_recovers_causal_trapezoid_kernel(self):
+        frame_time = 0.05
+        expected_kernel = np.array([1.4, 0.6, -0.15, 0.04, 0.0])
+        correlation = propagate_free_gle_velocity_correlation(
+            expected_kernel,
+            frame_time=frame_time,
+            output_count=24,
+        )
+
+        result = discrete_volterra_memory_kernel(correlation, frame_time=frame_time, kernel_count=len(expected_kernel))
+
+        np.testing.assert_allclose(result["kernel"], expected_kernel, rtol=1e-10, atol=1e-10)
+        np.testing.assert_allclose(result["reconstructed_correlation"], correlation[: len(expected_kernel) + 1], rtol=1e-10, atol=1e-10)
+
+    def test_lagged_coordinate_increment_history_is_causal_and_orders_recent_first(self):
+        centers = np.array(
+            [
+                [[0.0, 0.0, 0.0]],
+                [[1.0, 0.0, 0.0]],
+                [[1.0, 2.0, 0.0]],
+                [[1.0, 2.0, 3.0]],
+            ]
+        )
+
+        history = lagged_coordinate_increment_history(centers, order=2)
+
+        self.assertTrue(np.isnan(history[:2]).all())
+        np.testing.assert_allclose(history[2, 0], [0.0, 2.0, 0.0, 1.0, 0.0, 0.0])
+        np.testing.assert_allclose(history[3, 0], [0.0, 0.0, 3.0, 0.0, 2.0, 0.0])
+
+    def test_knn_state_conditioned_increment_diagnostic_recovers_continuous_state_law(self):
+        rng = np.random.default_rng(947)
+        frames, particles = 180, 80
+        state = rng.normal(size=(frames, particles, 2))
+        scale = 0.015 + 0.04 / (1.0 + np.exp(-state[:-1, :, :1]))
+        drift = np.concatenate([0.02 * state[:-1, :, :1], np.zeros((frames - 1, particles, 2))], axis=2)
+        increments = drift + rng.normal(size=(frames - 1, particles, 3)) * scale
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(increments, axis=0)])
+        result = time_split_knn_state_conditioned_increment_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            state,
+            train_stop=90,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8]),
+            wave_numbers=np.array([0.5, 1.0]),
+            neighbor_count=24,
+            seed=948,
+        )
+
+        self.assertLess(float(result["diffusion_relative_error"]), 0.15)
+        self.assertLess(float(result["knn_state_fs_max_relative_error"]), 0.10)
+        self.assertLess(float(result["knn_state_ngp_max_absolute_error"]), 0.12)
+
+    def test_graph_conditioned_increment_diagnostic_recovers_state_dependent_independent_increments(self):
+        rng = np.random.default_rng(945)
+        frames, particles = 260, 600
+        state = rng.random((frames, particles)) < 0.25
+        increments = rng.normal(size=(frames - 1, particles, 3)) * np.where(state[:-1, :, None], 0.07, 0.02)
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(increments, axis=0)])
+        result = time_split_graph_conditioned_increment_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            state.astype(float),
+            train_stop=130,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8, 16]),
+            wave_numbers=np.array([0.5, 1.0]),
+            seed=946,
+        )
+
+        self.assertLess(float(result["diffusion_relative_error"]), 0.12)
+        self.assertLess(float(result["graph_conditioned_fs_max_relative_error"]), 0.08)
+        self.assertLess(float(result["graph_conditioned_ngp_max_absolute_error"]), 0.10)
+
+    def test_driven_response_conditioned_innovation_recovers_response_dependent_noise(self):
+        rng = np.random.default_rng(943)
+        frames, particles = 260, 700
+        response = rng.normal(scale=0.04, size=(frames - 1, particles, 3))
+        amplitude = np.linalg.norm(response, axis=2, keepdims=True)
+        innovation = 0.25 * response + rng.normal(size=response.shape) * (0.01 + 0.20 * amplitude)
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(response + innovation, axis=0)])
+        result = time_split_driven_response_conditioned_innovation_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            response,
+            np.ones(response.shape[:2], dtype=bool),
+            train_stop=130,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8, 16]),
+            wave_numbers=np.array([0.5, 1.0]),
+            bin_count=4,
+            seed=944,
+        )
+
+        self.assertLess(float(result["diffusion_relative_error"]), 0.12)
+        self.assertLess(float(result["driven_response_fs_max_relative_error"]), 0.08)
+        self.assertLess(float(result["driven_response_ngp_max_absolute_error"]), 0.10)
+
+    def test_driven_response_empirical_innovation_recovers_iid_response_plus_noise(self):
+        rng = np.random.default_rng(941)
+        frames, particles = 220, 500
+        response = rng.normal(scale=0.04, size=(frames - 1, particles, 3))
+        innovation = rng.normal(scale=0.025, size=(frames - 1, particles, 3))
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(response + innovation, axis=0)])
+        result = time_split_driven_response_empirical_innovation_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            response,
+            np.ones(response.shape[:2], dtype=bool),
+            train_stop=110,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8, 16]),
+            wave_numbers=np.array([0.5, 1.0]),
+            seed=942,
+        )
+
+        self.assertLess(float(result["diffusion_relative_error"]), 0.10)
+        self.assertLess(float(result["driven_response_fs_max_relative_error"]), 0.05)
+        self.assertLess(float(result["driven_response_ngp_max_absolute_error"]), 0.05)
+
+    def test_local_harmonic_memory_kernel_recovers_one_mode_green_function(self):
+        hessian = np.zeros((6, 6))
+        hessian[:3, :3] = 5.0 * np.eye(3)
+        hessian[3:, 3:] = 2.0 * np.eye(3)
+        hessian[0, 3] = hessian[3, 0] = 1.0
+        times = np.array([0.0, 0.1])
+        result = local_harmonic_displacement_memory_kernel(
+            hessian,
+            target_local_index=0,
+            times=times,
+            mass=1.0,
+            damping=0.0,
+        )
+
+        expected = math.sin(math.sqrt(2.0) * 0.1) / math.sqrt(2.0)
+        np.testing.assert_allclose(result["memory_kernel"][0], np.zeros((3, 3)), atol=1e-12)
+        self.assertAlmostEqual(float(result["memory_kernel"][1, 0, 0]), expected, delta=1e-12)
+        np.testing.assert_allclose(result["memory_kernel"][1, 1:, :], np.zeros((2, 3)), atol=1e-12)
+        np.testing.assert_allclose(result["adiabatic_effective_hessian"], np.diag([4.5, 5.0, 5.0]), atol=1e-12)
+
+    def test_symmetric_finite_difference_response_recovers_odd_linear_response(self):
+        baseline = np.array(
+            [
+                [[1.0, -2.0, 0.5], [0.2, 0.1, -0.3]],
+                [[0.4, 0.8, -0.6], [1.3, -0.7, 0.9]],
+            ]
+        )
+        kernel = np.array(
+            [
+                [[2.0, 0.0, -1.0], [0.5, -1.5, 0.25]],
+                [[-0.2, 0.7, 1.2], [0.8, 0.4, -0.9]],
+            ]
+        )
+        displacement = 2.5e-3
+        result = symmetric_finite_difference_response(
+            baseline + displacement * kernel,
+            baseline - displacement * kernel,
+            displacement=displacement,
+        )
+
+        np.testing.assert_allclose(result["response"], kernel, atol=1e-12)
+        np.testing.assert_allclose(result["even_component"], baseline, atol=1e-12)
+
+    def test_ensemble_symmetric_response_summary_returns_mean_and_standard_error(self):
+        responses = np.array(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[3.0, 6.0], [5.0, 8.0]],
+                [[5.0, 10.0], [7.0, 12.0]],
+            ]
+        )
+
+        result = ensemble_symmetric_response_summary(responses)
+
+        np.testing.assert_allclose(result["mean"], [[3.0, 6.0], [5.0, 8.0]], atol=1e-12)
+        expected_sem = np.std(responses, axis=0, ddof=1) / math.sqrt(3.0)
+        np.testing.assert_allclose(result["standard_error"], expected_sem, atol=1e-12)
+        self.assertEqual(int(result["member_count"]), 3)
+
+    def test_shared_response_prefix_length_accepts_one_member_with_a_longer_tail(self):
+        length = shared_response_prefix_length(
+            [
+                np.array([0.0, 1.0, 2.0, 3.0, 4.0]),
+                np.array([0.0, 1.0, 2.0]),
+                np.array([0.0, 1.0, 2.0, 3.0]),
+            ]
+        )
+
+        self.assertEqual(length, 3)
+
+    def test_causal_position_memory_inference_recovers_discrete_kernel(self):
+        frame_time = 0.1
+        curvature = 2.0
+        position_response = np.array([1.0, 0.92, 0.75, 0.51, 0.23])
+        expected_memory = np.array([0.0, 0.7, -0.2, 0.15, 0.05])
+        force_response = -curvature * position_response
+        for frame in range(1, len(position_response)):
+            force_response[frame] += frame_time * np.dot(
+                expected_memory[1 : frame + 1], position_response[frame - 1 :: -1]
+            )
+
+        result = infer_causal_position_memory_kernel(
+            position_response,
+            force_response,
+            frame_time=frame_time,
+        )
+
+        self.assertAlmostEqual(float(result["instantaneous_curvature"]), curvature, delta=1e-12)
+        np.testing.assert_allclose(result["memory_kernel"], expected_memory, atol=1e-12)
+
+    def test_position_memory_propagator_recovers_harmonic_limit(self):
+        frame_time = 1e-3
+        result = propagate_causal_position_memory_response(
+            instantaneous_curvature=4.0,
+            memory_kernel=np.zeros(2),
+            frame_time=frame_time,
+            mass=1.0,
+            friction=0.0,
+            initial_position_response=1.0,
+            initial_velocity_response=0.0,
+            frame_count=201,
+        )
+
+        times = np.arange(201) * frame_time
+        np.testing.assert_allclose(result["position_response"], np.cos(2.0 * times), atol=2e-6)
+        np.testing.assert_allclose(result["velocity_response"], -2.0 * np.sin(2.0 * times), atol=5e-6)
+
+    def test_finite_memory_holdout_recovers_zero_memory_harmonic_response(self):
+        generated = propagate_causal_position_memory_response(
+            instantaneous_curvature=4.0,
+            memory_kernel=np.zeros(2),
+            frame_time=1e-3,
+            mass=1.0,
+            friction=1.0,
+            frame_count=101,
+        )
+        result = finite_memory_position_response_holdout(
+            generated["position_response"],
+            -4.0 * generated["position_response"],
+            frame_time=1e-3,
+            mass=1.0,
+            friction=1.0,
+            fit_frames=20,
+        )
+
+        self.assertLess(float(result["heldout_relative_l2_error"]), 1e-12)
+        self.assertLess(float(result["heldout_maximum_absolute_error"]), 1e-12)
+
+    def test_pair_force_response_auxiliary_embedding_recovers_stable_linear_system(self):
+        transition = np.array(
+            [
+                [0.95, 0.03, 0.00],
+                [-0.10, 0.90, 0.02],
+                [-0.30, 0.08, 0.75],
+            ]
+        )
+        states = np.empty((80, 3))
+        states[0] = [1.0, 0.0, -2.0]
+        for frame in range(1, len(states)):
+            states[frame] = transition @ states[frame - 1]
+
+        result = fit_pair_force_response_auxiliary_embedding(states, fit_frames=30)
+
+        np.testing.assert_allclose(result["transition_matrix"], transition, atol=1e-10)
+        np.testing.assert_allclose(result["predicted_state_response"], states, atol=1e-9)
+        self.assertLess(float(result["heldout_position_relative_l2_error"]), 1e-10)
+
+    def test_linear_response_auxiliary_embedding_recovers_four_coordinate_system(self):
+        transition = np.array(
+            [
+                [0.94, 0.04, 0.00, 0.00],
+                [-0.08, 0.88, 0.03, 0.00],
+                [-0.20, 0.05, 0.70, 0.06],
+                [0.10, -0.03, -0.15, 0.66],
+            ]
+        )
+        states = np.empty((90, 4))
+        states[0] = [1.0, 0.1, -2.0, 0.5]
+        for frame in range(1, len(states)):
+            states[frame] = transition @ states[frame - 1]
+
+        result = fit_linear_response_auxiliary_embedding(states, fit_frames=35)
+
+        np.testing.assert_allclose(result["transition_matrix"], transition, atol=1e-10)
+        np.testing.assert_allclose(result["predicted_state_response"], states, atol=1e-9)
+
+    def test_driven_tagged_langevin_recovers_force_free_ballistic_limit(self):
+        bath = np.array(
+            [
+                [[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]],
+                [[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]],
+                [[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]],
+            ]
+        )
+        result = driven_tagged_langevin_trajectory(
+            bath,
+            particle_types=np.array([0, 0]),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            target_index=0,
+            initial_positions=np.array([[0.0, 0.0, 0.0]]),
+            initial_velocities=np.array([[1.0, 0.0, 0.0]]),
+            saved_frame_time=0.1,
+            integration_time_step=0.01,
+            mass=1.0,
+            friction=0.0,
+            temperature=0.0,
+            rng=np.random.default_rng(101),
+        )
+
+        np.testing.assert_allclose(result["positions"][:, 0, 0], [0.0, 0.1, 0.2], atol=1e-12)
+        np.testing.assert_allclose(result["velocities"][:, 0, 0], 1.0, atol=1e-12)
+
+    def test_driven_active_cluster_langevin_recovers_force_free_ballistic_limit(self):
+        external_bath = np.array(
+            [
+                [[8.0, 0.0, 0.0]],
+                [[8.0, 0.0, 0.0]],
+                [[8.0, 0.0, 0.0]],
+            ]
+        )
+        result = driven_active_cluster_langevin_trajectory(
+            external_bath,
+            active_particle_types=np.array([0, 0]),
+            external_particle_types=np.array([0]),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            initial_positions=np.array([[[0.0, 0.0, 0.0], [4.0, 0.0, 0.0]]]),
+            initial_velocities=np.array([[[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]]),
+            saved_frame_time=0.1,
+            integration_time_step=0.01,
+            mass=1.0,
+            friction=0.0,
+            temperature=0.0,
+            rng=np.random.default_rng(102),
+        )
+
+        np.testing.assert_allclose(result["positions"][:, 0, :, 0], [[0.0, 4.0], [0.1, 3.9], [0.2, 3.8]], atol=1e-12)
+
+    def test_active_cluster_source_velocity_ensemble_repeats_selected_source_velocities(self):
+        source_velocity = np.array(
+            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], dtype=float
+        )
+
+        initial = active_cluster_source_velocity_ensemble(source_velocity, np.array([2, 0]), replicas=3)
+
+        self.assertEqual(initial.shape, (3, 2, 3))
+        np.testing.assert_allclose(initial[:, 0], np.repeat([[7.0, 8.0, 9.0]], 3, axis=0))
+        np.testing.assert_allclose(initial[:, 1], np.repeat([[1.0, 2.0, 3.0]], 3, axis=0))
+
+    def test_ensemble_displacement_observables_uses_all_samples_for_ngp_and_axis_averaged_fs(self):
+        displacement = np.array(
+            [[[1.0, 0.0, 0.0]], [[-1.0, 0.0, 0.0]], [[0.0, 2.0, 0.0]], [[0.0, -2.0, 0.0]]]
+        )
+
+        result = ensemble_displacement_observables(displacement, wave_numbers=np.array([1.0]))
+
+        self.assertAlmostEqual(float(result["msd"]), 2.5)
+        self.assertAlmostEqual(float(result["ngp"]), -0.184)
+        self.assertAlmostEqual(float(result["fs_k_1"]), (4.0 + math.cos(1.0) + math.cos(2.0)) / 6.0)
+
+    def test_active_cluster_langevin_residual_separates_included_and_omitted_forces(self):
+        positions = np.repeat(
+            np.array([[[0.0, 0.0, 0.0], [1.2, 0.0, 0.0], [7.0, 0.0, 0.0]]]),
+            3,
+            axis=0,
+        )
+        velocities = np.zeros_like(positions)
+        common = {
+            "positions": positions,
+            "velocities": velocities,
+            "particle_types": np.array([0, 0, 0]),
+            "box_lengths": np.array([20.0, 20.0, 20.0]),
+            "active_indices": np.array([0]),
+            "frame_time": 0.1,
+            "friction": 0.0,
+        }
+
+        included = active_cluster_langevin_residual(
+            external_indices=np.array([1, 2]), **common
+        )
+        omitted_neighbor = active_cluster_langevin_residual(
+            external_indices=np.array([2]), **common
+        )
+
+        np.testing.assert_allclose(included["omitted_force"], 0.0, atol=1e-12)
+        np.testing.assert_allclose(
+            omitted_neighbor["omitted_force"], omitted_neighbor["full_force"], atol=1e-12
+        )
+
+    def test_chunked_active_cluster_residual_keeps_force_and_residual_time_axes_aligned(self):
+        positions = np.zeros((6, 2, 3))
+        positions[:, 1, 0] = 8.0
+        result = concatenate_residuals(
+            positions,
+            np.zeros_like(positions),
+            particle_types=np.array([0, 0]),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            active_indices=np.array([0]),
+            external_indices=np.empty(0, dtype=int),
+            frame_time=0.1,
+            friction=0.0,
+            chunk_frames=2,
+        )
+
+        self.assertEqual(result["full_force"].shape[0], 6)
+        self.assertEqual(result["omitted_force"].shape[0], 6)
+        self.assertEqual(result["full_residual"].shape[0], 5)
+        self.assertEqual(result["retained_residual"].shape[0], 5)
+
+    def test_nonlinear_core_harmonic_bath_recovers_force_free_ballistic_limit(self):
+        result = nonlinear_core_harmonic_bath_langevin_trajectory(
+            np.empty((0, 3)),
+            core_particle_types=np.array([0]),
+            bath_particle_types=np.array([0]),
+            fixed_outer_particle_types=np.empty(0, dtype=int),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            initial_core_positions=np.array([[[0.0, 0.0, 0.0]]]),
+            initial_bath_positions=np.array([[[8.0, 0.0, 0.0]]]),
+            initial_core_velocities=np.array([[[1.0, 0.0, 0.0]]]),
+            initial_bath_velocities=np.zeros((1, 1, 3)),
+            bath_initial_forces=np.zeros((1, 3)),
+            bath_core_hessian=np.zeros((3, 3)),
+            bath_hessian=np.zeros((3, 3)),
+            saved_frame_time=0.1,
+            integration_time_step=0.01,
+            mass=1.0,
+            friction=0.0,
+            temperature=0.0,
+            rng=np.random.default_rng(145),
+        )
+
+        np.testing.assert_allclose(result["core_positions"][:, 0, 0], [[0.0, 0.0, 0.0], [0.1, 0.0, 0.0], [0.2, 0.0, 0.0]], atol=1e-12)
+
+    def test_frozen_neighbor_multistart_recovers_one_symmetric_local_minimum(self):
+        radius = 2.0 ** (1.0 / 6.0)
+        environment = np.vstack(
+            [
+                np.zeros(3),
+                radius * np.eye(3),
+                -radius * np.eye(3),
+            ]
+        )
+        result = ka_frozen_neighbor_multistart_minima(
+            environment,
+            particle_types=np.zeros(len(environment), dtype=int),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            target_index=0,
+            seed_offsets=np.vstack([np.zeros(3), 0.08 * np.eye(3), -0.08 * np.eye(3)]),
+        )
+
+        self.assertEqual(int(result["minimum_count"]), 1)
+        np.testing.assert_allclose(result["centers"][0], np.zeros(3), atol=1e-8)
+        self.assertAlmostEqual(float(result["energies"][0]), -6.0, delta=1e-8)
+        np.testing.assert_array_equal(result["seed_minimum_index"], np.zeros(7, dtype=int))
+
+    def test_affine_environment_embedding_recovers_synthetic_causal_coupling(self):
+        rng = np.random.default_rng(877)
+        frames, particles = 420, 160
+        affine = rng.normal(scale=0.08, size=(frames - 1, particles, 3, 3))
+        d2min = np.exp(rng.normal(scale=0.25, size=(frames - 1, particles)))
+        velocity = np.zeros((frames - 1, particles, 3))
+        for index in range(1, len(velocity) - 1):
+            velocity[index + 1] = (
+                0.2 * velocity[index]
+                + 0.7 * affine[index - 1, :, :, 0]
+                + 0.12 * np.log(d2min[index - 1])[:, None]
+                + rng.normal(scale=0.01, size=(particles, 3))
+            )
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(velocity, axis=0)])
+        result = time_split_affine_environment_embedding_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            affine,
+            d2min,
+            np.ones(d2min.shape, dtype=bool),
+            train_stop=210,
+        )
+
+        self.assertGreater(float(result["heldout_affine_r_squared"]), 0.9)
+        self.assertGreater(float(result["heldout_affine_r_squared_gain"]), 0.8)
+
+    def test_local_bond_orientational_features_recovers_even_order_axial_pair(self):
+        positions = np.array(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [4.0, 0.0, 0.0]]
+        )
+        result = local_bond_orientational_features(
+            positions,
+            particle_types=np.array([0, 0, 1, 1]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+            target_indices=np.array([0]),
+            cutoff=1.5,
+            orders=(4, 6, 8),
+        )
+
+        self.assertEqual(result["feature_names"], ("coordination_A", "coordination_B", "Q4", "Q6", "Q8"))
+        np.testing.assert_allclose(result["features"][0], [1.0, 1.0, 1.0, 1.0, 1.0])
+
+    def test_free_exponential_memory_gle_fit_recovers_synthetic_cage_msd(self):
+        times = np.array([0.05, 0.1, 0.2, 0.4, 0.8, 1.5, 3.0, 8.0, 20.0])
+        expected = free_exponential_memory_gle_prediction(
+            times,
+            temperature=0.58,
+            mass=14.0,
+            memory_amplitude=95.0,
+            memory_rate=3.5,
+        )
+
+        fit = fit_free_exponential_memory_gle_from_msd(
+            times,
+            expected["predicted_msd"],
+            temperature=0.58,
+        )
+
+        np.testing.assert_allclose(fit["predicted_msd"], expected["predicted_msd"], rtol=0.03)
+        self.assertLess(float(fit["relative_mse"]), 1e-3)
+
+    def test_static_neighbor_cage_displacement_tracks_initial_neighbor_motion(self):
+        positions = np.array(
+            [
+                [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [4.0, 0.0, 0.0]],
+                [[0.1, 0.0, 0.0], [1.3, 0.0, 0.0], [4.4, 0.0, 0.0]],
+            ]
+        )
+        result = static_neighbor_cage_displacement(
+            positions,
+            target_indices=np.array([0]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+            cutoff=1.5,
+        )
+
+        np.testing.assert_allclose(result["cage_displacement"][:, 0, 0], [0.0, 0.3])
+        np.testing.assert_allclose(result["relative_displacement"][:, 0, 0], [0.0, -0.2])
+        self.assertEqual(int(result["neighbor_count"][0]), 1)
+
+    def test_dynamic_neighbor_cage_displacement_tracks_current_neighbor_graph(self):
+        positions = np.array(
+            [
+                [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [3.0, 0.0, 0.0]],
+                [[0.1, 0.0, 0.0], [2.3, 0.0, 0.0], [1.2, 0.0, 0.0]],
+            ]
+        )
+        result = dynamic_neighbor_cage_displacement(
+            positions,
+            target_indices=np.array([0]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+            cutoff=1.5,
+        )
+
+        np.testing.assert_allclose(result["cage_displacement"][:, 0, 0], [0.0, 0.2])
+        np.testing.assert_allclose(result["relative_displacement"][:, 0, 0], [0.0, -0.1])
+        np.testing.assert_allclose(
+            result["tagged_displacement"], result["cage_displacement"] + result["relative_displacement"], atol=1e-12
+        )
+        np.testing.assert_array_equal(result["neighbor_count"][:, 0], [1, 1])
+
+    def test_hysteretic_neighbor_cage_retains_neighbor_until_outer_cutoff(self):
+        positions = np.array(
+            [
+                [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+                [[0.0, 0.0, 0.0], [1.5, 0.0, 0.0], [1.4, 0.0, 0.0]],
+                [[0.0, 0.0, 0.0], [1.7, 0.0, 0.0], [1.2, 0.0, 0.0]],
+            ]
+        )
+        result = hysteretic_neighbor_cage_displacement(
+            positions,
+            target_indices=np.array([0]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+            inner_cutoff=1.3,
+            outer_cutoff=1.6,
+        )
+
+        np.testing.assert_allclose(result["cage_displacement"][:, 0, 0], [0.0, 0.5, 0.2])
+        np.testing.assert_allclose(
+            result["tagged_displacement"], result["cage_displacement"] + result["relative_displacement"], atol=1e-12
+        )
+        np.testing.assert_array_equal(result["neighbor_count"][:, 0], [1, 1, 1])
+        np.testing.assert_array_equal(result["neighbor_membership_change_count"][:, 0], [0, 0, 2])
+
+    def test_underdamped_ou_fit_recovers_synthetic_cage_msd(self):
+        times = np.array([0.05, 0.1, 0.2, 0.4, 0.8, 1.2])
+        expected = underdamped_ou_cage_prediction(
+            times,
+            temperature=0.58,
+            mass=1.0,
+            stiffness=3.2,
+            damping=1.1,
+        )
+
+        fit = fit_underdamped_ou_cage_from_msd(
+            times,
+            expected["predicted_msd"],
+            temperature=0.58,
+            mass=1.0,
+        )
+
+        self.assertAlmostEqual(float(fit["stiffness"]), 3.2, delta=0.35)
+        self.assertAlmostEqual(float(fit["damping"]), 1.1, delta=0.20)
+        np.testing.assert_allclose(fit["predicted_msd"], expected["predicted_msd"], rtol=0.02)
+
+    def test_hybrid_clock_cage_prediction_composes_independent_displacements(self):
+        rates = np.array([0.2])
+        marks = np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]])
+        times = np.array([1.0])
+        wave_numbers = np.array([1.0])
+        jump = heterogeneous_marked_poisson_prediction(rates, marks, times=times, wave_numbers=wave_numbers)
+        cage = underdamped_ou_cage_prediction(
+            times,
+            temperature=0.58,
+            mass=1.0,
+            stiffness=3.2,
+            damping=1.1,
+        )
+
+        hybrid = hybrid_structural_clock_underdamped_cage_prediction(
+            rates,
+            marks,
+            times=times,
+            wave_numbers=wave_numbers,
+            temperature=0.58,
+            mass=1.0,
+            stiffness=3.2,
+            damping=1.1,
+        )
+
+        coordinate_variance = float(cage["coordinate_displacement_variance"][0])
+        self.assertAlmostEqual(float(hybrid["predicted_msd"][0]), float(jump["predicted_msd"][0]) + float(cage["predicted_msd"][0]))
+        self.assertAlmostEqual(
+            float(hybrid["predicted_fs"][1.0][0]),
+            float(jump["predicted_fs"][1.0][0]) * np.exp(-0.5 * coordinate_variance),
+        )
+        self.assertGreater(float(hybrid["predicted_fourth"][0]), float(jump["predicted_fourth"][0]))
+
+    def test_empirical_gaussian_cage_composes_with_structural_marked_clock(self):
+        rates = np.array([0.2])
+        marks = np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]])
+        times = np.array([1.0])
+        wave_numbers = np.array([1.0])
+        jump = heterogeneous_marked_poisson_prediction(rates, marks, times=times, wave_numbers=wave_numbers)
+        prediction = independent_gaussian_cage_marked_poisson_prediction(
+            rates,
+            marks,
+            times=times,
+            wave_numbers=wave_numbers,
+            cage_coordinate_variance=np.array([0.2]),
+        )
+
+        self.assertAlmostEqual(float(prediction["predicted_msd"][0]), float(jump["predicted_msd"][0]) + 0.6)
+        self.assertAlmostEqual(
+            float(prediction["predicted_fs"][1.0][0]),
+            float(jump["predicted_fs"][1.0][0]) * np.exp(-0.1),
+        )
+
+    def test_heterogeneous_marked_poisson_prediction_matches_analytic_moments(self):
+        rates = np.array([0.1, 0.3])
+        marks = np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]])
+        result = heterogeneous_marked_poisson_prediction(
+            rates,
+            marks,
+            times=np.array([2.0]),
+            wave_numbers=np.array([1.0]),
+        )
+
+        self.assertAlmostEqual(float(result["predicted_msd"][0]), 0.4)
+        self.assertAlmostEqual(
+            float(result["predicted_fs"][1.0][0]),
+            0.5
+            * (
+                np.exp(0.2 * ((np.cos(1.0) + 2.0) / 3.0 - 1.0))
+                + np.exp(0.6 * ((np.cos(1.0) + 2.0) / 3.0 - 1.0))
+            ),
+        )
+        expected_fourth = 0.4 + (5.0 / 3.0) * 4.0 * (0.1**2 + 0.3**2) / 2.0
+        expected_ngp = 3.0 * expected_fourth / (5.0 * 0.4**2) - 1.0
+        self.assertAlmostEqual(float(result["predicted_ngp"][0]), expected_ngp)
+    def test_grouped_binomial_logistic_committor_generalizes_across_parent_groups(self):
+        rng = np.random.default_rng(859)
+        groups = np.repeat(np.arange(5), 400)
+        feature = rng.normal(size=(len(groups), 2))
+        probability = 1.0 / (1.0 + np.exp(-(-0.3 + 1.1 * feature[:, 0] - 0.7 * feature[:, 1])))
+        trials = np.full(len(groups), 12)
+        success = rng.binomial(trials, probability)
+        result = grouped_binomial_logistic_committor_diagnostic(
+            feature,
+            success,
+            trials,
+            groups,
+            l2_regularization=1.0,
+        )
+
+        self.assertGreater(float(result["mean_heldout_brier_skill"]), 0.10)
+        self.assertGreater(float(result["mean_heldout_log_likelihood_gain_per_trial"]), 0.02)
+    def test_isoconfigurational_state_rate_recovers_heldout_state_dependent_escape(self):
+        rng = np.random.default_rng(853)
+        clones, particles, horizon = 20, 1000, 12.0
+        state = np.exp(rng.normal(scale=0.65, size=particles))
+        rate = 0.025 * state**0.8
+        first_passage = rng.exponential(1.0 / rate[None, :], size=(clones, particles))
+        first_passage[first_passage > horizon] = np.inf
+        train_mask = np.arange(particles) % 2 == 0
+        result = isoconfigurational_state_rate_diagnostic(
+            state,
+            first_passage,
+            train_mask=train_mask,
+            horizon=horizon,
+            bin_count=5,
+        )
+
+        self.assertGreater(float(result["heldout_brier_skill"]), 0.05)
+        self.assertGreater(float(result["heldout_high_to_low_rate_ratio"]), 2.0)
+        self.assertGreater(float(result["state_rate_log_slope"]), 0.4)
+    def test_isoconfigurational_first_passage_recovers_censored_exponential_clock(self):
+        rng = np.random.default_rng(839)
+        rate, horizon = 0.08, 20.0
+        first_passage = rng.exponential(1.0 / rate, size=(24, 1000))
+        first_passage[first_passage > horizon] = np.inf
+        result = isoconfigurational_first_passage_diagnostic(
+            first_passage,
+            horizon=horizon,
+            survival_times=np.array([2.0, 5.0, 10.0, 20.0]),
+        )
+
+        self.assertAlmostEqual(float(result["escape_rate_mle"]), rate, delta=0.004)
+        self.assertLess(float(result["survival_max_absolute_error"]), 0.025)
+        self.assertGreater(float(result["committor_mean"]), 0.7)
+    def test_prepare_isoconfigurational_langevin_clones_reuses_one_restart_and_varies_noise(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            restart = root / "parent.restart"
+            restart.write_bytes(b"synthetic restart payload")
+            output = root / "clones"
+
+            manifest = prepare_isoconfigurational_langevin_clones(
+                restart,
+                output,
+                temperature=0.58,
+                velocity_seeds=[101, 103],
+                langevin_seeds=[107, 109],
+                damping=1.0,
+                duration=2.0,
+                dump_interval=0.05,
+            )
+
+            self.assertEqual(manifest["clone_count"], 2)
+            self.assertEqual(manifest["parent_restart_path"], str(restart.resolve()))
+            self.assertEqual(manifest["axis_semantics"], "isoconfigurational_langevin_clones")
+            first = (output / "clone_001" / "in.clone").read_text()
+            second = (output / "clone_002" / "in.clone").read_text()
+            self.assertIn(f"read_restart {restart.resolve()}", first)
+            self.assertIn("velocity all create 0.58 101", first)
+            self.assertIn("fix bath all langevin 0.58 0.58 1 107", first)
+            self.assertIn("velocity all create 0.58 103", second)
+            self.assertIn("fix bath all langevin 0.58 0.58 1 109", second)
+
+    def test_prepare_isoconfigurational_langevin_clones_can_dump_velocity_and_force(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            restart = root / "parent.restart"
+            restart.write_bytes(b"synthetic restart payload")
+            output = root / "clones"
+
+            manifest = prepare_isoconfigurational_langevin_clones(
+                restart,
+                output,
+                temperature=0.58,
+                velocity_seeds=[101, 103],
+                langevin_seeds=[107, 109],
+                damping=1.0,
+                duration=2.0,
+                dump_interval=0.05,
+                dump_velocity_force=True,
+            )
+
+            self.assertTrue(manifest["dump_velocity_force"])
+            input_text = (output / "clone_001" / "in.clone").read_text()
+            self.assertIn("id type x y z ix iy iz vx vy vz fx fy fz", input_text)
+    def test_precursor_event_hazard_recovers_heldout_ready_escape_enrichment(self):
+        rng = np.random.default_rng(827)
+        frames, particles, precursor_lag = 240, 400, 2
+        state = np.exp(rng.normal(scale=0.7, size=(frames, particles)))
+        ready = state[:-precursor_lag] >= np.quantile(state[:120], 0.75)
+        event_times: list[int] = []
+        event_particles: list[int] = []
+        for source_time in range(frames - precursor_lag):
+            probability = np.where(ready[source_time], 0.30, 0.01)
+            selected = np.flatnonzero(rng.random(particles) < probability)
+            event_times.extend([source_time + precursor_lag] * len(selected))
+            event_particles.extend(selected.tolist())
+
+        result = precursor_event_hazard_diagnostic(
+            state,
+            np.asarray(event_particles),
+            np.asarray(event_times),
+            train_stop=120,
+            precursor_lag=precursor_lag,
+            frame_time=1.0,
+            bin_count=4,
+            held_source_start=130,
+        )
+
+        self.assertGreater(float(result["heldout_ready_to_unready_hazard_ratio"]), 10.0)
+        self.assertGreater(float(result["heldout_brier_skill"]), 0.10)
+        self.assertGreater(float(result["heldout_log_likelihood_gain_per_event"]), 0.10)
+        self.assertGreater(float(result["training_ready_to_unready_hazard_ratio"]), 10.0)
+    def test_arp_empirical_innovation_recovers_synthetic_two_step_memory(self):
+        rng = np.random.default_rng(801)
+        velocity = np.zeros((160, 500, 3))
+        for index in range(2, len(velocity)):
+            velocity[index] = (
+                -0.35 * velocity[index - 1]
+                + 0.22 * velocity[index - 2]
+                + rng.normal(scale=0.06, size=(500, 3))
+            )
+        centers = np.concatenate([np.zeros((1, 500, 3)), np.cumsum(velocity, axis=0)])
+        result = time_split_arp_empirical_innovation_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            train_stop=80,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8, 16]),
+            wave_numbers=np.array([0.5, 1.0]),
+            memory_order=2,
+            simulation_count=12000,
+            seed=803,
+        )
+
+        self.assertAlmostEqual(float(result["kernel_lag_1"]), -0.35, delta=0.04)
+        self.assertAlmostEqual(float(result["kernel_lag_2"]), 0.22, delta=0.04)
+        self.assertGreater(float(result["heldout_one_step_r_squared"]), 0.1)
+        self.assertLess(float(result["diffusion_relative_error"]), 0.15)
+
+    def test_arp_empirical_innovation_excludes_invalid_increment_endpoint(self):
+        rng = np.random.default_rng(811)
+        velocity = rng.normal(scale=0.04, size=(100, 200, 3))
+        centers = np.concatenate([np.zeros((1, 200, 3)), np.cumsum(velocity, axis=0)])
+        valid = np.ones(centers.shape[:2], dtype=bool)
+        valid[30, 0] = False
+        centers[30, 0] = np.nan
+
+        result = time_split_arp_empirical_innovation_diagnostic(
+            centers,
+            valid,
+            train_stop=50,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8]),
+            wave_numbers=np.array([0.5, 1.0]),
+            memory_order=2,
+            simulation_count=1000,
+            seed=813,
+        )
+
+        self.assertTrue(np.isfinite(float(result["kernel_lag_1"])))
+        self.assertTrue(np.isfinite(float(result["heldout_one_step_r_squared"])))
+
+    def test_long_wavelength_displacement_field_reconstructs_plane_wave_at_target(self):
+        box = np.array([8.0, 8.0, 8.0])
+        x = np.array([0.0, 2.0, 4.0, 6.0])
+        positions = np.zeros((2, 4, 3))
+        positions[0, :, 0] = x
+        positions[1] = positions[0]
+        positions[1, :, 1] = 0.2 * np.cos(2.0 * np.pi * x / box[0])
+        field = long_wavelength_displacement_field(
+            positions,
+            target_indices=np.array([0]),
+            box_lengths=box,
+            integer_vectors=np.array([[1, 0, 0]]),
+        )
+
+        self.assertAlmostEqual(float(field[0, 0, 0, 1]), 0.2, delta=1e-12)
+
+    def test_fourier_density_current_field_is_translation_covariant_at_tagged_particle(self):
+        box = np.array([8.0, 8.0, 8.0])
+        positions = np.zeros((1, 4, 3))
+        positions[0, :, 0] = [0.0, 1.0, 3.0, 6.0]
+        velocities = np.array([[[1.0, 0.2, 0.0], [-0.5, 0.0, 0.1], [0.25, 0.4, -0.2], [0.75, -0.3, 0.0]]])
+        modes = np.array([[1, 0, 0]])
+        original = fourier_density_current_field(
+            positions,
+            velocities=velocities,
+            target_indices=np.array([0]),
+            box_lengths=box,
+            integer_vectors=modes,
+        )
+        shifted = fourier_density_current_field(
+            np.mod(positions + np.array([0.37, 0.0, 0.0]), box),
+            velocities=velocities,
+            target_indices=np.array([0]),
+            box_lengths=box,
+            integer_vectors=modes,
+        )
+        phase = 2.0 * np.pi * positions[0, :, 0] / box[0]
+        rho = np.mean(np.exp(-1j * phase))
+        current = np.mean(velocities[0] * np.exp(-1j * phase)[:, None], axis=0)
+
+        self.assertAlmostEqual(float(original["density"][0, 0, 0]), float(2.0 * np.real(rho)), delta=1e-12)
+        np.testing.assert_allclose(original["current"][0, 0, 0], 2.0 * np.real(current), atol=1e-12)
+        np.testing.assert_allclose(shifted["density"], original["density"], atol=1e-12)
+        np.testing.assert_allclose(shifted["current"], original["current"], atol=1e-12)
+
+    def test_symmetric_quadratic_mode_products_retains_each_unique_density_pair(self):
+        modes = np.array([[[2.0, -3.0, 5.0]]])
+
+        products = symmetric_quadratic_mode_products(modes)
+
+        np.testing.assert_allclose(products[0, 0], [4.0, -6.0, 10.0, 9.0, -15.0, 25.0])
+
+    def test_local_neighbor_particle_velocity_field_excludes_the_tagged_velocity(self):
+        positions = np.array(
+            [
+                [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [4.0, 0.0, 0.0]],
+                [[0.1, 0.0, 0.0], [1.1, 0.0, 0.0], [4.1, 0.0, 0.0]],
+            ]
+        )
+        velocities = np.array(
+            [
+                [[9.0, 0.0, 0.0], [1.5, -0.5, 0.25], [-2.0, 0.0, 0.0]],
+                [[8.0, 0.0, 0.0], [2.0, 0.0, 0.0], [-1.0, 0.0, 0.0]],
+            ]
+        )
+
+        field, coordination = local_neighbor_particle_velocity_field(
+            positions,
+            velocities=velocities,
+            target_indices=np.array([0]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+            cutoff=1.5,
+        )
+
+        self.assertEqual(coordination.tolist(), [[1], [1]])
+        np.testing.assert_allclose(field[:, 0], velocities[:, 1])
+
+    def test_discrete_mori_zwanzig_operators_reconstruct_training_correlations(self):
+        rng = np.random.default_rng(901)
+        samples, frames = 10000, 10
+        state = np.empty((frames, samples, 1))
+        state[0] = rng.normal(size=(samples, 1))
+        state[1] = 0.6 * state[0] + rng.normal(scale=0.4, size=(samples, 1))
+        for time in range(2, frames):
+            state[time] = 0.5 * state[time - 1] - 0.2 * state[time - 2] + rng.normal(scale=0.4, size=(samples, 1))
+
+        result = discrete_mori_zwanzig_operators(state, memory_order=4)
+
+        np.testing.assert_allclose(
+            result["reconstructed_correlation"],
+            result["correlation"][:6],
+            rtol=1e-10,
+            atol=1e-10,
+        )
+
+    def test_simulate_discrete_mz_empirical_innovations_respects_finite_memory_recursion(self):
+        states = simulate_discrete_mz_empirical_innovations(
+            np.array([[[2.0], [1.0]]]),
+            np.array([[[0.5]], [[0.25]]]),
+            np.zeros((1, 1)),
+            output_count=3,
+            rng=np.random.default_rng(902),
+        )
+
+        np.testing.assert_allclose(states[:, :, 0], [[1.0, 1.0, 0.75]])
+
+    def test_simulate_discrete_mz_block_innovations_preserves_source_block_order(self):
+        states = simulate_discrete_mz_block_innovations(
+            np.array([[[0.0]]]),
+            np.array([[[0.0]]]),
+            np.array([[[1.0]], [[2.0]]]),
+            output_count=5,
+            block_length=2,
+            rng=np.random.default_rng(903),
+        )
+
+        np.testing.assert_allclose(states[:, :, 0], [[0.0, 1.0, 2.0, 1.0, 2.0]])
+
+    def test_local_cluster_hessian_is_symmetric_and_has_isolated_translation_mode(self):
+        positions = np.array([[0.0, 0.0, 0.0], [1.2, 0.0, 0.0]])
+        result = ka_local_cluster_hessian(
+            positions,
+            particle_types=np.array([0, 0]),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            target_index=0,
+            cluster_cutoff=2.0,
+        )
+
+        hessian = result["hessian"]
+        self.assertEqual(result["cluster_indices"].tolist(), [0, 1])
+        np.testing.assert_allclose(hessian, hessian.T, atol=1e-12)
+        np.testing.assert_allclose(hessian @ np.tile(np.eye(3), (2, 1)), 0.0, atol=1e-12)
+
+    def test_local_cluster_soft_mode_features_are_target_symmetric_for_a_pair(self):
+        features, names = ka_local_cluster_soft_mode_features(
+            np.array([[0.0, 0.0, 0.0], [1.2, 0.0, 0.0]]),
+            particle_types=np.array([0, 0]),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            target_indices=np.array([0, 1]),
+            cluster_cutoff=2.0,
+            ranks=(0,),
+            eigenvalue_floor=1e-8,
+        )
+
+        self.assertEqual(names, ("inverse_eigenvalue_rank_0", "target_weighted_softness_rank_0"))
+        self.assertEqual(features.shape, (2, 2))
+        self.assertTrue(np.all(np.isfinite(features)))
+        self.assertTrue(np.all(features > 0.0))
+        np.testing.assert_allclose(features[0], features[1], rtol=1e-12, atol=1e-12)
+
+    def test_local_cluster_anharmonic_barrier_features_are_positive_and_pair_symmetric(self):
+        features, names = ka_local_cluster_anharmonic_barrier_features(
+            np.array([[0.0, 0.0, 0.0], [1.2, 0.0, 0.0]]),
+            particle_types=np.array([0, 0]),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            target_indices=np.array([0, 1]),
+            cluster_cutoff=2.0,
+            ranks=(2,),
+            eigenvalue_floor=1e-8,
+            finite_difference_step=2e-3,
+        )
+
+        self.assertEqual(names, ("cubic_magnitude_rank_2", "anharmonic_barrier_proxy_rank_2"))
+        self.assertEqual(features.shape, (2, 2))
+        self.assertTrue(np.all(np.isfinite(features)))
+        self.assertTrue(np.all(features > 0.0))
+        np.testing.assert_allclose(features[0], features[1], rtol=1e-10, atol=1e-10)
+
+    def test_local_affine_nonaffine_state_recovers_pure_affine_neighbor_motion(self):
+        reference = np.array(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, -1.0]]
+        )
+        gradient = np.array([[0.1, 0.03, 0.0], [0.0, -0.04, 0.02], [0.0, 0.0, 0.05]])
+        displaced = reference.copy()
+        displaced[1:] += reference[1:] @ gradient.T
+        result = local_affine_nonaffine_state(
+            np.stack([reference, displaced]),
+            target_indices=np.array([0]),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            cutoff=1.5,
+        )
+
+        self.assertTrue(result["valid"][0, 0])
+        np.testing.assert_allclose(result["affine_gradient"][0, 0], gradient, atol=1e-12)
+        self.assertLess(float(result["d2min"][0, 0]), 1e-20)
+
+    def test_shell_response_embedding_recovers_synthetic_spatial_coefficients(self):
+        rng = np.random.default_rng(701)
+        frames, particles, shells = 500, 150, 3
+        shell_response = rng.normal(scale=0.1, size=(frames - 1, particles, shells, 3))
+        velocity = np.zeros((frames - 1, particles, 3))
+        for index in range(2, len(velocity)):
+            velocity[index] = (
+                0.1 * velocity[index - 1]
+                + 0.7 * shell_response[index - 2, :, 0]
+                - 0.45 * shell_response[index - 2, :, 1]
+                + rng.normal(scale=0.015, size=(particles, 3))
+            )
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(velocity, axis=0)])
+        result = time_split_shell_response_embedding_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            shell_response,
+            np.ones(shell_response.shape[:3], dtype=bool),
+            train_stop=250,
+        )
+
+        self.assertAlmostEqual(float(result["shell_0_coefficient"]), 0.7, delta=0.04)
+        self.assertAlmostEqual(float(result["shell_1_coefficient"]), -0.45, delta=0.04)
+        self.assertGreater(float(result["heldout_shell_r_squared_gain"]), 0.75)
+
+    def test_lagged_response_embedding_recovers_synthetic_collective_state(self):
+        rng = np.random.default_rng(611)
+        frames, particles = 500, 200
+        response = rng.normal(scale=0.12, size=(frames - 1, particles, 3))
+        velocity = np.zeros_like(response)
+        for index in range(1, len(velocity)):
+            velocity[index] = (
+                0.15 * velocity[index - 1]
+                + 0.8 * response[index - 2]
+                + rng.normal(scale=0.02, size=(particles, 3))
+            )
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(velocity, axis=0)])
+        result = time_split_lagged_response_embedding_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            response,
+            np.ones(response.shape[:2], dtype=bool),
+            train_stop=250,
+        )
+
+        self.assertAlmostEqual(float(result["lagged_response_coefficient"]), 0.8, delta=0.04)
+        self.assertGreater(float(result["heldout_response_r_squared_gain"]), 0.7)
+
+    def test_ar1_empirical_innovation_diagnostic_recovers_synthetic_underdamped_walk(self):
+        rng = np.random.default_rng(515)
+        velocity = np.zeros((140, 600, 3))
+        for index in range(1, len(velocity)):
+            velocity[index] = -0.35 * velocity[index - 1] + rng.normal(
+                scale=0.08, size=(600, 3)
+            )
+        centers = np.concatenate([np.zeros((1, 600, 3)), np.cumsum(velocity, axis=0)])
+        result = time_split_ar1_empirical_innovation_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            train_stop=70,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8, 16]),
+            wave_numbers=np.array([0.5, 1.0]),
+            simulation_count=12000,
+            seed=517,
+        )
+
+        self.assertAlmostEqual(float(result["ar1_coefficient"]), -0.35, delta=0.03)
+        self.assertLess(float(result["diffusion_relative_error"]), 0.12)
+        self.assertLess(float(result["ar1_fs_max_relative_error"]), 0.08)
+        self.assertLess(float(result["ar1_ngp_max_absolute_error"]), 0.05)
+
+    def test_empirical_increment_levy_diagnostic_recovers_iid_gaussian_walk(self):
+        rng = np.random.default_rng(417)
+        increments = rng.normal(scale=0.08, size=(120, 1500, 3))
+        centers = np.concatenate([np.zeros((1, 1500, 3)), np.cumsum(increments, axis=0)])
+        result = time_split_empirical_increment_levy_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            train_stop=60,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8, 16]),
+            wave_numbers=np.array([0.5, 1.0]),
+        )
+
+        self.assertLess(float(result["diffusion_relative_error"]), 0.08)
+        self.assertLess(float(result["levy_fs_max_relative_error"]), 0.05)
+        self.assertLess(float(result["levy_ngp_max_absolute_error"]), 0.04)
+        self.assertEqual(float(result["fit_parameters_from_macro_observables"]), 0.0)
+
+    def test_response_residual_memory_diagnostic_recovers_white_gaussian_force(self):
+        rng = np.random.default_rng(392)
+        residual = rng.normal(scale=0.03, size=(800, 40, 3))
+        centers = np.concatenate([np.zeros((1, 40, 3)), np.cumsum(residual, axis=0)])
+        result = response_residual_memory_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            np.zeros_like(residual),
+            np.ones(residual.shape[:2], dtype=bool),
+            frame_time=0.05,
+        )
+
+        self.assertEqual(float(result["white_noise_candidate"]), 1.0)
+        self.assertLess(abs(float(result["response_residual_ngp"])), 0.04)
+
+    def test_precursor_hazard_uses_only_explicitly_valid_state_exposure(self):
+        frames, particles = 80, 4
+        state = np.exp(0.25 * np.sin(0.31 * np.arange(frames)[:, None]) + 0.03 * np.arange(particles)[None, :])
+        valid = np.ones((frames, particles), dtype=bool)
+        valid[12:18, 0] = False
+        state[~valid] = np.nan
+        events = [(particle, time) for particle in range(particles) for time in (16, 28, 44, 60)]
+        result = precursor_event_hazard_diagnostic(
+            state,
+            np.array([particle for particle, _ in events]),
+            np.array([time for _, time in events]),
+            train_stop=36,
+            precursor_lag=4,
+            frame_time=0.1,
+            state_valid=valid,
+        )
+
+        self.assertLess(float(result["training_state_valid_fraction"]), 1.0)
+        self.assertEqual(float(result["heldout_state_valid_fraction"]), 1.0)
+
+    def test_projected_diffusion_increment_association_detects_monotone_conditional_mobility(self):
+        tensor = np.array([scale * np.eye(3) for scale in (1.0, 2.0, 3.0, 4.0, 5.0)])
+        increment = np.array([[np.sqrt(scale), 0.0, 0.0] for scale in (1.0, 2.0, 3.0, 4.0, 5.0)])
+
+        result = projected_diffusion_increment_association(tensor, increment, tail_fraction=0.2)
+
+        self.assertAlmostEqual(float(result["rank_correlation"]), 1.0)
+        self.assertGreater(float(result["upper_tail_increment_ratio"]), 1.0)
+
+    def test_projected_overdamped_mixture_ngp_recovers_isotropic_diffusing_diffusivity_limit(self):
+        tensor = np.array([np.eye(3), 2.0 * np.eye(3)])
+
+        result = projected_overdamped_mixture_ngp(tensor)
+
+        self.assertAlmostEqual(float(result["predicted_infinitesimal_ngp"]), 2.5 / 1.5**2 - 1.0)
+
+    def test_projected_overdamped_diffusion_tensor_follows_ito_jacobian_rule(self):
+        jacobian = np.zeros((1, 1, 2, 3, 3))
+        jacobian[0, 0, 0] = np.eye(3)
+        jacobian[0, 0, 1] = 2.0 * np.eye(3)
+
+        result = projected_overdamped_diffusion_tensor(
+            jacobian, temperature=0.6, bare_mobility=1.5
+        )
+        flattened = projected_overdamped_diffusion_tensor(
+            jacobian[0, 0], temperature=0.6, bare_mobility=1.5
+        )
+
+        np.testing.assert_allclose(result["diffusion_tensor"][0, 0], 4.5 * np.eye(3))
+        np.testing.assert_allclose(flattened["diffusion_tensor"], 4.5 * np.eye(3))
+        self.assertAlmostEqual(float(result["isotropic_diffusion"][0, 0]), 4.5)
+        self.assertAlmostEqual(float(result["anisotropy_ratio"][0, 0]), 1.0)
+
+    def test_frozen_minimum_response_jacobian_obeys_translation_sum_rule(self):
+        environment = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.1, 0.0, 0.0],
+                [-1.1, 0.0, 0.0],
+                [0.0, 1.1, 0.0],
+                [0.0, -1.1, 0.0],
+                [0.0, 0.0, 1.1],
+                [0.0, 0.0, -1.1],
+            ]
+        )
+        result = frozen_minimum_response_jacobian(
+            np.stack([environment, environment]),
+            centers=np.zeros((2, 1, 3)),
+            valid=np.ones((2, 1), dtype=bool),
+            particle_types=np.zeros(len(environment), dtype=int),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            target_indices=np.array([0]),
+        )
+
+        self.assertTrue(result["response_valid"][0, 0])
+        self.assertAlmostEqual(float(np.linalg.norm(result["jacobian"][0, 0, 0])), 0.0)
+        np.testing.assert_allclose(
+            np.sum(result["jacobian"][0, 0], axis=0), np.eye(3), atol=1e-12
+        )
+
+    def test_minimum_response_diagnostic_recovers_parameter_free_linear_response(self):
+        rng = np.random.default_rng(120)
+        increments = rng.normal(scale=0.1, size=(300, 80, 3))
+        centers = np.concatenate([np.zeros((1, 80, 3)), np.cumsum(increments, axis=0)])
+        response = increments + rng.normal(scale=0.005, size=increments.shape)
+        result = minimum_response_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            response,
+            np.ones(response.shape[:2], dtype=bool),
+            train_stop=150,
+        )
+
+        self.assertGreater(float(result["heldout_response_r_squared"]), 0.99)
+        self.assertLess(abs(float(result["heldout_response_scale"])-1.0), 0.02)
+        self.assertEqual(float(result["fit_parameters_from_macro_observables"]), 0.0)
+
+    def test_frozen_minimum_response_tracks_uniform_environment_translation(self):
+        environment = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.1, 0.0, 0.0],
+                [-1.1, 0.0, 0.0],
+                [0.0, 1.1, 0.0],
+                [0.0, -1.1, 0.0],
+                [0.0, 0.0, 1.1],
+                [0.0, 0.0, -1.1],
+            ]
+        )
+        translation = np.array([2e-5, -3e-5, 1e-5])
+        positions = np.stack([environment, environment + translation])
+        result = frozen_minimum_environment_response(
+            positions,
+            centers=np.zeros((2, 1, 3)),
+            valid=np.ones((2, 1), dtype=bool),
+            particle_types=np.zeros(len(environment), dtype=int),
+            box_lengths=np.array([20.0, 20.0, 20.0]),
+            target_indices=np.array([0]),
+        )
+
+        self.assertTrue(result["response_valid"][0, 0])
+        np.testing.assert_allclose(result["predicted_center_increment"][0, 0], translation, atol=1e-12)
+
+    def test_frozen_minimum_shell_response_sums_to_exact_total_response(self):
+        environment = np.array(
+            [[0.0, 0.0, 0.0], [1.1, 0.0, 0.0], [-1.1, 0.0, 0.0], [0.0, 1.1, 0.0], [0.0, -1.1, 0.0]]
+        )
+        translation = np.array([2e-5, -3e-5, 1e-5])
+        positions = np.stack([environment, environment + translation])
+        common = {
+            "centers": np.zeros((2, 1, 3)),
+            "valid": np.ones((2, 1), dtype=bool),
+            "particle_types": np.zeros(len(environment), dtype=int),
+            "box_lengths": np.array([20.0, 20.0, 20.0]),
+            "target_indices": np.array([0]),
+        }
+        total = frozen_minimum_environment_response(positions, **common)
+        shell = frozen_minimum_shell_environment_response(
+            positions, shell_edges=np.array([0.0, 1.5, 2.5]), **common
+        )
+
+        self.assertTrue(shell["response_valid"][0, 0])
+        np.testing.assert_allclose(
+            np.sum(shell["shell_response"][0, 0], axis=0),
+            total["predicted_center_increment"][0, 0],
+            atol=1e-12,
+        )
+
+    def test_local_neighbor_velocity_field_excludes_tagged_and_distant_particles(self):
+        positions = np.array(
+            [
+                [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [4.0, 0.0, 0.0]],
+                [[0.1, 0.0, 0.0], [1.3, 0.0, 0.0], [4.5, 0.0, 0.0]],
+                [[0.2, 0.0, 0.0], [1.5, 0.0, 0.0], [5.0, 0.0, 0.0]],
+            ]
+        )
+        mean_velocity, coordination = local_neighbor_velocity_field(
+            positions,
+            target_indices=np.array([0]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+            cutoff=2.0,
+        )
+
+        np.testing.assert_allclose(mean_velocity[:, 0, 0], [0.3, 0.2])
+        np.testing.assert_array_equal(coordination[:, 0], [1, 1])
+
+    def test_collective_velocity_embedding_recovers_synthetic_environment_coupling(self):
+        rng = np.random.default_rng(811)
+        frames, particles = 500, 300
+        neighbor_velocity = rng.normal(scale=0.12, size=(frames - 1, particles, 3))
+        center_velocity = np.zeros((frames - 1, particles, 3))
+        for index in range(1, len(center_velocity)):
+            center_velocity[index] = (
+                0.25 * center_velocity[index - 1]
+                + 0.85 * neighbor_velocity[index - 1]
+                + rng.normal(scale=0.02, size=(particles, 3))
+            )
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(center_velocity, axis=0)])
+        result = time_split_collective_velocity_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            neighbor_velocity,
+            train_stop=250,
+        )
+
+        self.assertAlmostEqual(float(result["collective_velocity_coefficient"]), 0.85, delta=0.04)
+        self.assertGreater(float(result["heldout_collective_r_squared"]), 0.9)
+        self.assertLess(abs(float(result["collective_residual_ngp"])), 0.05)
+
+    def test_collective_field_embedding_recovers_synthetic_causal_coupling(self):
+        rng = np.random.default_rng(157)
+        frames, particles, modes = 460, 180, 4
+        field = rng.normal(scale=0.09, size=(frames - 1, particles, modes, 3))
+        velocity = np.zeros((frames - 1, particles, 3))
+        coupling = np.array([0.65, -0.35, 0.22, -0.11])
+        for index in range(1, len(velocity) - 1):
+            velocity[index + 1] = (
+                0.18 * velocity[index]
+                + np.einsum("pmc,m->pc", field[index - 1], coupling)
+                + rng.normal(scale=0.015, size=(particles, 3))
+            )
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(velocity, axis=0)])
+        result = time_split_collective_field_embedding_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            field,
+            train_stop=230,
+        )
+
+        self.assertGreater(float(result["heldout_collective_field_r_squared"]), 0.9)
+        self.assertGreater(float(result["heldout_collective_field_r_squared_gain"]), 0.85)
+
+    def test_state_dependent_increment_diagnostic_recovers_diffusing_diffusivity_mixture(self):
+        rng = np.random.default_rng(119)
+        frames, particles = 400, 600
+        state = np.exp(rng.normal(scale=0.45, size=(frames, particles)))
+        q = 0.03 * state[:-1] ** -0.8
+        increments = rng.normal(scale=np.sqrt(q[:, :, None] / 3.0), size=(frames - 1, particles, 3))
+        centers = np.concatenate([np.zeros((1, particles, 3)), np.cumsum(increments, axis=0)])
+        result = state_dependent_increment_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            state,
+            train_stop=200,
+            frame_time=1.0,
+        )
+
+        self.assertLess(float(result["diffusion_relative_error"]), 0.06)
+        self.assertLess(float(result["mixture_ngp_absolute_error"]), 0.03)
+        self.assertLess(float(result["state_mobility_log_slope"]), -0.5)
+        self.assertEqual(float(result["fit_parameters_from_macro_observables"]), 0.0)
+
+    def test_time_split_center_gle_recovers_brownian_transport_and_gaussian_scattering(self):
+        rng = np.random.default_rng(73)
+        increments = rng.normal(scale=0.1, size=(480, 320, 3))
+        centers = np.concatenate([np.zeros((1, 320, 3)), np.cumsum(increments, axis=0)])
+        result = time_split_center_gle_diagnostic(
+            centers,
+            np.ones(centers.shape[:2], dtype=bool),
+            train_stop=240,
+            frame_time=1.0,
+            lags=np.array([1, 2, 4, 8, 16]),
+            wave_numbers=np.array([0.5, 1.0]),
+        )
+
+        self.assertLess(float(result["diffusion_relative_error"]), 0.12)
+        self.assertLess(float(result["gaussian_fs_max_relative_error"]), 0.04)
+        self.assertLess(abs(float(result["observed_heldout_ngp_peak"])), 0.05)
+        self.assertEqual(float(result["fit_parameters_from_macro_observables"]), 0.0)
+
+    def test_segmented_cage_center_clock_uses_only_valid_exposure(self):
+        centers = np.zeros((13, 1, 3))
+        centers[2:5, 0, 0] = 1.0
+        centers[10:, 0, 0] = 1.0
+        valid = np.ones((13, 1), dtype=bool)
+        valid[5:8, 0] = False
+
+        result = segmented_cage_center_event_statistics(
+            centers,
+            valid,
+            threshold=0.1,
+            half_window=1,
+            frame_time=2.0,
+        )
+
+        self.assertEqual(float(result["segment_count"]), 2.0)
+        self.assertEqual(float(result["valid_exposure_time"]), 16.0)
+        self.assertEqual(float(result["event_count"]), 2.0)
+        self.assertAlmostEqual(float(result["event_rate"]), 0.125)
+
+    def test_frozen_neighbor_energy_explicitly_excludes_moved_tagged_particle_self_pair(self):
+        environment = np.array([[0.0, 0.0, 0.0], [1.2, 0.0, 0.0]])
+        candidate = np.array([[0.1, 0.0, 0.0]])
+        energy, force, hessian = ka_lj_local_energy_force_hessian(
+            candidate,
+            environment_positions=environment,
+            target_indices=np.array([0]),
+            particle_types=np.array([0, 0]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+        )
+
+        distance = 1.1
+        self.assertAlmostEqual(energy[0], 4.0 * (distance**-12 - distance**-6))
+        self.assertTrue(np.all(np.isfinite(force)))
+        self.assertTrue(np.all(np.isfinite(hessian)))
+        self.assertLess(float(np.max(np.abs(hessian))), 1e6)
+        self.assertLess(force[0, 0], 0.0)
+
+    def test_ka_pair_force_and_isotropic_curvature_match_analytic_pair_formula(self):
+        positions = np.array([[0.0, 0.0, 0.0], [1.2, 0.0, 0.0]])
+        forces, curvature = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=np.array([0, 0]),
+            box_lengths=np.array([10.0, 10.0, 10.0]),
+        )
+
+        distance = 1.2
+        force_magnitude = 24.0 * (2.0 / distance**13 - 1.0 / distance**7)
+        expected_curvature = 8.0 * (22.0 / distance**14 - 5.0 / distance**8)
+        self.assertAlmostEqual(forces[0, 0], -force_magnitude)
+        self.assertAlmostEqual(forces[1, 0], force_magnitude)
+        self.assertAlmostEqual(curvature[0], expected_curvature)
+        self.assertAlmostEqual(curvature[1], expected_curvature)
+
+    def test_ka_force_generator_matches_directional_force_derivative_and_hessian_noise(self):
+        positions = np.array([[0.0, 0.0, 0.0], [1.13, 0.17, -0.08]])
+        velocities = np.array([[0.4, -0.2, 0.1], [-0.3, 0.5, -0.4]])
+        particle_types = np.array([0, 1])
+        box_lengths = np.array([20.0, 20.0, 20.0])
+        target = np.array([0])
+        result = ka_lj_force_generator_observables(
+            positions,
+            velocities=velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            temperature=0.58,
+        )
+        step = 1e-6
+        force_plus = ka_lj_force_and_isotropic_curvature(
+            positions + step * velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+        )[0]
+        force_minus = ka_lj_force_and_isotropic_curvature(
+            positions - step * velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+        )[0]
+        np.testing.assert_allclose(
+            result["force_generator"],
+            (force_plus - force_minus) / (2.0 * step),
+            rtol=2e-8,
+            atol=2e-8,
+        )
+        cluster = ka_local_cluster_hessian(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_index=0,
+            cluster_cutoff=5.0,
+        )["hessian"]
+        target_row = cluster[:3]
+        expected_covariance_rate = 2.0 * 1.0 * 0.58 * target_row @ target_row.T
+        np.testing.assert_allclose(
+            result["force_generator_noise_covariance_rate"][0],
+            expected_covariance_rate,
+            rtol=1e-12,
+            atol=1e-12,
+        )
+
+    def test_residual_ar1_memory_diagnostic_recovers_white_innovation_limit(self):
+        rng = np.random.default_rng(91)
+        residual = np.zeros((4000, 2, 3))
+        for frame in range(1, len(residual)):
+            residual[frame] = 0.7 * residual[frame - 1] + rng.normal(
+                scale=0.4, size=(2, 3)
+            )
+
+        result = residual_ar1_memory_diagnostic(residual, frame_time=0.5)
+
+        self.assertAlmostEqual(result["ar1_coefficient"], 0.7, delta=0.03)
+        self.assertLess(abs(result["innovation_lag1_correlation"]), 0.04)
+        self.assertEqual(result["white_noise_candidate"], 1.0)
 
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
         valid_rows = [
@@ -2256,6 +3965,28 @@ ITEM: ATOMS id type x y z ix iy iz
         np.testing.assert_array_equal(limited["timesteps"], [0])
         self.assertEqual(limited["unwrapped_positions"].shape, (1, 2, 3))
 
+    def test_load_lammps_dump_reads_optional_velocity_and_force_columns(self):
+        dump = """ITEM: TIMESTEP
+0
+ITEM: NUMBER OF ATOMS
+2
+ITEM: BOX BOUNDS pp pp pp
+-2 2
+-2 2
+-2 2
+ITEM: ATOMS id type x y z ix iy iz vx vy vz fx fy fz
+1 1 1.5 0 0 0 0 0 0.1 0.2 0.3 1.1 1.2 1.3
+2 2 -1.5 1 0 0 0 0 -0.1 -0.2 -0.3 -1.1 -1.2 -1.3
+"""
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "trajectory.lammpstrj"
+            path.write_text(dump)
+
+            trajectory = load_lammps_custom_trajectory(path)
+
+        np.testing.assert_allclose(trajectory["velocities"][0, 0], [0.1, 0.2, 0.3])
+        np.testing.assert_allclose(trajectory["forces"][0, 1], [-1.1, -1.2, -1.3])
+
     def test_initial_configuration_fs_uses_minimum_images_and_a_particles(self):
         box = np.array([10.0, 10.0, 10.0])
         reference = np.array([[4.9, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
@@ -2341,6 +4072,55 @@ ITEM: ATOMS id type x y z ix iy iz
             self.assertEqual(stored["particle_counts"], {"A": 3, "B": 1, "total": 4})
             self.assertEqual(len(stored["source_sha256"]), 64)
 
+    def test_prepare_replicate_writes_high_resolution_langevin_protocol(self):
+        box = np.array([[4.0, 4.0, 4.0]])
+        types = np.array([[0, 0, 0, 1]])
+        positions = [
+            np.array(
+                [
+                    [-1.0, -1.0, -1.0],
+                    [1.0, -1.0, 1.0],
+                    [-1.0, 1.0, 1.0],
+                    [1.0, 1.0, -1.0],
+                ],
+                dtype=np.float32,
+            )
+        ]
+        payload = {"Box_size": box, "Particle_types": types, "Positions": positions}
+
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            source = root / "source.pkl"
+            with source.open("wb") as handle:
+                pickle.dump(payload, handle, protocol=4)
+            output = root / "replicate"
+
+            manifest = prepare_replicate(
+                source,
+                output,
+                temperature=0.58,
+                frame_index=0,
+                velocity_seed=45117,
+                dynamics="langevin",
+                langevin_damping=1.0,
+                langevin_seed=99173,
+                equilibration_time=1.0,
+                production_time=2.0,
+                dump_interval_time=1.0,
+                high_resolution_duration=0.5,
+                high_resolution_dump_interval=0.05,
+            )
+
+            lammps_input = (output / "in.production").read_text()
+            self.assertIn("fix integrator all nve", lammps_input)
+            self.assertIn("fix bath all langevin 0.58 0.58 1 99173", lammps_input)
+            self.assertNotIn("fix thermostat all nvt", lammps_input)
+            self.assertIn("dump high_resolution all custom 50 high_resolution.lammpstrj", lammps_input)
+            self.assertIn("run 500", lammps_input)
+            self.assertIn("undump high_resolution", lammps_input)
+            self.assertEqual(manifest["ensemble"], "NVE_plus_Langevin")
+            self.assertEqual(manifest["high_resolution_saved_frame_interval_tau"], 0.05)
+
     def test_prepare_ensemble_records_pairwise_decorrelation(self):
         rng = np.random.default_rng(17)
         payload = {
@@ -2374,6 +4154,38 @@ ITEM: ATOMS id type x y z ix iy iz
                 json.loads((root / "ensemble" / "ensemble_manifest.json").read_text()),
                 manifest,
             )
+
+    def test_prepare_ensemble_propagates_langevin_protocol(self):
+        rng = np.random.default_rng(29)
+        payload = {
+            "Box_size": np.array([[20.0, 20.0, 20.0]]),
+            "Particle_types": np.array([[0] * 16 + [1] * 4]),
+            "Positions": [rng.uniform(-10.0, 10.0, size=(20, 3)) for _ in range(2)],
+        }
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            source = root / "source.pkl"
+            with source.open("wb") as handle:
+                pickle.dump(payload, handle, protocol=4)
+            manifest = prepare_replicate_ensemble(
+                source,
+                root / "ensemble",
+                temperature=0.58,
+                frame_indices=[0, 1],
+                velocity_seeds=[90117, 90139],
+                maximum_absolute_fs=0.5,
+                equilibration_time=0.1,
+                production_time=1.0,
+                dynamics="langevin",
+                langevin_damping=1.0,
+                langevin_seeds=[99173, 99191],
+                high_resolution_duration=0.05,
+                high_resolution_dump_interval=0.01,
+            )
+
+            input_text = (root / "ensemble" / "replicate_01" / "in.production").read_text()
+            self.assertEqual(manifest["dynamics"], "langevin")
+            self.assertIn("fix bath all langevin 0.58 0.58 1 99173", input_text)
 
 
 if __name__ == "__main__":
