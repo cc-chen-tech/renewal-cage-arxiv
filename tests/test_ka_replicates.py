@@ -46,6 +46,7 @@ from ka_local_cage import (  # noqa: E402
     finite_memory_position_response_holdout,
     fit_pair_force_response_auxiliary_embedding,
     fit_linear_response_auxiliary_embedding,
+    force_generator_increment_diagnostic,
     ensemble_symmetric_response_summary,
     shared_response_prefix_length,
     propagate_causal_position_memory_response,
@@ -68,6 +69,7 @@ from ka_local_cage import (  # noqa: E402
     ka_lj_local_energy_force_hessian,
     ka_lj_force_and_isotropic_curvature,
     ka_lj_force_generator_observables,
+    ka_lj_second_force_generator,
     ka_lj_shell_forces,
     precursor_event_hazard_diagnostic,
     isoconfigurational_first_passage_diagnostic,
@@ -111,6 +113,12 @@ from ka_collective_memory import (  # noqa: E402
     time_split_collective_field_embedding_diagnostic,
     fixed_bath_particle_state,
     nearest_outer_bath_state,
+)
+from ka_generator_response import (  # noqa: E402
+    extract_generator_response_path,
+    fit_generator_constrained_response,
+    generator_response_lammps_input,
+    matched_generator_response,
 )
 from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E402
 
@@ -3482,6 +3490,280 @@ class KAReplicatePreparationTests(unittest.TestCase):
             atol=1e-12,
         )
 
+    def test_ka_second_force_generator_matches_first_generator_drift(self):
+        positions = np.array([[0.0, 0.0, 0.0], [1.13, 0.17, -0.08]])
+        velocities = np.array([[0.4, -0.2, 0.1], [-0.3, 0.5, -0.4]])
+        particle_types = np.array([0, 1])
+        box_lengths = np.array([20.0, 20.0, 20.0])
+        target = np.array([0])
+        result = ka_lj_second_force_generator(
+            positions,
+            velocities=velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            directional_step=1e-5,
+        )
+        force = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+        )[0]
+        acceleration = force - velocities
+        step = 2e-6
+        plus = ka_lj_force_generator_observables(
+            positions + step * velocities,
+            velocities=velocities + step * acceleration,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            temperature=0.0,
+        )["force_generator"]
+        minus = ka_lj_force_generator_observables(
+            positions - step * velocities,
+            velocities=velocities - step * acceleration,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            temperature=0.0,
+        )["force_generator"]
+        np.testing.assert_allclose(result, (plus - minus) / (2.0 * step), rtol=2e-5, atol=2e-5)
+
+        step_results = [
+            ka_lj_second_force_generator(
+                positions,
+                velocities=velocities,
+                particle_types=particle_types,
+                box_lengths=box_lengths,
+                target_indices=target,
+                friction=1.0,
+                directional_step=directional_step,
+            )
+            for directional_step in (3e-6, 1e-5, 3e-5)
+        ]
+        reference_norm = float(np.linalg.norm(step_results[1]))
+        for current in (step_results[0], step_results[2]):
+            self.assertLess(float(np.linalg.norm(current - step_results[1]) / reference_norm), 2e-5)
+
+    def test_force_generator_increment_diagnostic_recovers_exact_derivative_and_known_innovation(self):
+        frame_time = 0.1
+        force = np.zeros((5, 3))
+        force[:, 0] = [0.0, 0.0, 0.2, 0.0, 0.0]
+        force_generator = np.zeros((5, 3))
+        force_generator[:, 0] = [0.0, 1.0, 0.0, -1.0, 0.0]
+        second_force_generator = np.zeros((5, 3))
+        covariance_rate = np.repeat((np.eye(3) / frame_time)[None, :, :], 5, axis=0)
+
+        result = force_generator_increment_diagnostic(
+            force,
+            force_generator,
+            second_force_generator,
+            covariance_rate,
+            frame_time=frame_time,
+        )
+
+        self.assertLess(float(result["force_derivative_relative_l2"]), 1e-12)
+        self.assertAlmostEqual(float(result["force_derivative_correlation"]), 1.0, delta=1e-12)
+        self.assertAlmostEqual(float(result["innovation_trace_variance_ratio"]), 1.0 / 3.0, delta=1e-12)
+        self.assertAlmostEqual(float(result["innovation_mean_squared_mahalanobis"]), 1.0, delta=1e-12)
+        self.assertLess(float(result["innovation_normalized_mean"]), 1e-12)
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_force_generator_cli_exposes_microscopic_controls(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "analyze_ka_force_generator.py"), "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in (
+            "--target-id",
+            "--temperature",
+            "--friction",
+            "--integration-time-step",
+            "--directional-step",
+            "--stochastic-frame-limit",
+        ):
+            self.assertIn(option, completed.stdout)
+
+    def test_generator_response_lammps_input_fixes_common_noise_and_full_state_dump(self):
+        text = generator_response_lammps_input(
+            parent_restart=Path("/tmp/parent.restart"),
+            target_id=821,
+            displacement=0.001,
+            temperature=0.58,
+            friction=1.0,
+            velocity_seed=82101,
+            langevin_seed=83101,
+            run_steps=1000,
+            dump_interval_steps=5,
+            trajectory_name="trajectory.lammpstrj",
+        )
+
+        self.assertIn("displace_atoms tagged move 0.001 0 0 units box", text)
+        self.assertIn("velocity all create 0.58 82101", text)
+        self.assertIn("fix bath all langevin 0.58 0.58 1 83101", text)
+        self.assertIn(
+            "dump trajectory all custom 5 trajectory.lammpstrj id type x y z ix iy iz vx vy vz",
+            text,
+        )
+        self.assertIn("dump_modify trajectory sort id", text)
+        self.assertIn("run 1000", text)
+
+    def test_extract_generator_response_path_reads_full_microscopic_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trajectory.lammpstrj"
+            blocks = []
+            for frame, timestep in enumerate((0, 5, 10, 15, 20)):
+                first = np.array([1.0 + 0.01 * frame, 2.0 + 0.005 * frame, 3.0])
+                second = np.array([2.13 - 0.002 * frame, 2.17, 2.92])
+                blocks.append(
+                    "\n".join(
+                        [
+                            "ITEM: TIMESTEP",
+                            str(timestep),
+                            "ITEM: NUMBER OF ATOMS",
+                            "2",
+                            "ITEM: BOX BOUNDS pp pp pp",
+                            "0 20",
+                            "0 20",
+                            "0 20",
+                            "ITEM: ATOMS id type x y z ix iy iz vx vy vz fx fy fz",
+                            f"1 1 {first[0]} {first[1]} {first[2]} 0 0 0 0.4 -0.2 0.1 0 0 0",
+                            f"2 2 {second[0]} {second[1]} {second[2]} 0 0 0 -0.3 0.5 -0.4 0 0 0",
+                        ]
+                    )
+                )
+            path.write_text("\n".join(blocks) + "\n")
+
+            result = extract_generator_response_path(
+                path,
+                target_id=1,
+                temperature=0.58,
+                friction=1.0,
+                integration_time_step=0.001,
+                directional_step=1e-5,
+            )
+
+        np.testing.assert_allclose(result["time"], np.arange(5) * 0.005)
+        for key in ("position", "velocity", "force", "force_generator", "second_force_generator"):
+            self.assertEqual(np.asarray(result[key]).shape, (5, 3))
+            self.assertTrue(np.all(np.isfinite(result[key])))
+        self.assertEqual(np.asarray(result["force_generator_noise_covariance_rate"]).shape, (5, 3, 3))
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_generator_response_runner_exposes_low_disk_protocol_controls(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "run_ka_generator_response.py"), "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in (
+            "--lammps-binary",
+            "--parent-restart",
+            "--output-directory",
+            "--velocity-seeds",
+            "--langevin-seeds",
+            "--epsilons",
+            "--duration",
+            "--dump-interval",
+            "--retain-audit-raw",
+        ):
+            self.assertIn(option, completed.stdout)
+
+    def test_generator_constrained_response_recovers_exact_stable_krylov_system(self):
+        friction = 1.0
+        coefficient_blocks = [[] for _ in range(4)]
+        for roots in (
+            (-0.5, -0.8, -1.1, -1.4),
+            (-0.6, -0.9, -1.2, -1.5),
+            (-0.7, -1.0, -1.3, -1.6),
+        ):
+            polynomial = np.poly(roots)
+            a_g = friction - polynomial[1]
+            a_f = -polynomial[2] - friction * a_g
+            a_v = -polynomial[3] - friction * a_f
+            a_x = -polynomial[4]
+            for block, value in zip(coefficient_blocks, (a_x, a_v, a_f, a_g)):
+                block.append(value)
+        final_block = np.hstack([np.diag(values) for values in coefficient_blocks])
+        generator = np.zeros((12, 12))
+        generator[0:3, 3:6] = np.eye(3)
+        generator[3:6, 3:6] = -friction * np.eye(3)
+        generator[3:6, 6:9] = np.eye(3)
+        generator[6:9, 9:12] = np.eye(3)
+        generator[9:12] = final_block
+        frame_time = 0.02
+        transition = np.eye(12)
+        power = np.eye(12)
+        for order in range(1, 5):
+            power = power @ (frame_time * generator) / order
+            transition += power
+        states = np.empty((3, 160, 12))
+        states[:, 0] = np.random.default_rng(981).normal(size=(3, 12))
+        for frame in range(1, states.shape[1]):
+            states[:, frame] = np.einsum("ab,pb->pa", transition, states[:, frame - 1])
+        second = np.einsum("ab,ptb->pta", final_block, states)
+
+        result = fit_generator_constrained_response(
+            states,
+            second,
+            frame_time=frame_time,
+            friction=friction,
+            fit_frames=100,
+        )
+
+        np.testing.assert_allclose(result["fitted_second_generator_block"], final_block, rtol=1e-8, atol=1e-8)
+        np.testing.assert_allclose(result["predicted_state_response"], states, rtol=1e-8, atol=1e-8)
+        self.assertLess(float(result["spectral_radius"]), 1.0)
+        self.assertLess(float(result["heldout_position_relative_l2_error"]), 1e-8)
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_matched_generator_response_preserves_exact_state_order(self):
+        epsilon = 0.002
+        time = np.arange(4, dtype=float) * 0.005
+        baseline = np.arange(12, dtype=float).reshape(4, 3)
+        responses = {
+            "position": np.full((4, 3), 1.0),
+            "velocity": np.full((4, 3), 2.0),
+            "force": np.full((4, 3), 3.0),
+            "force_generator": np.full((4, 3), 4.0),
+            "second_force_generator": np.full((4, 3), 5.0),
+        }
+        positive = {"time": time, **{key: baseline + epsilon * value for key, value in responses.items()}}
+        negative = {"time": time, **{key: baseline - epsilon * value for key, value in responses.items()}}
+
+        result = matched_generator_response(positive, negative, epsilon=epsilon)
+
+        np.testing.assert_allclose(result["time"], time)
+        np.testing.assert_allclose(result["state_response"], np.tile([1.0] * 3 + [2.0] * 3 + [3.0] * 3 + [4.0] * 3, (4, 1)))
+        np.testing.assert_allclose(result["second_force_response"], 5.0)
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_generator_response_closure_cli_exposes_preregistered_gates(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_generator_response_closure.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--output-prefix", "--fit-times", "--horizons", "--linearity-tolerance"):
+            self.assertIn(option, completed.stdout)
+
     def test_residual_ar1_memory_diagnostic_recovers_white_innovation_limit(self):
         rng = np.random.default_rng(91)
         residual = np.zeros((4000, 2, 3))
@@ -3986,6 +4268,28 @@ ITEM: ATOMS id type x y z ix iy iz vx vy vz fx fy fz
 
         np.testing.assert_allclose(trajectory["velocities"][0, 0], [0.1, 0.2, 0.3])
         np.testing.assert_allclose(trajectory["forces"][0, 1], [-1.1, -1.2, -1.3])
+
+    def test_load_lammps_dump_reads_velocity_without_force_columns(self):
+        dump = """ITEM: TIMESTEP
+0
+ITEM: NUMBER OF ATOMS
+2
+ITEM: BOX BOUNDS pp pp pp
+-2 2
+-2 2
+-2 2
+ITEM: ATOMS id type x y z ix iy iz vx vy vz
+1 1 1.5 0 0 0 0 0 0.1 0.2 0.3
+2 2 -1.5 1 0 0 0 0 -0.1 -0.2 -0.3
+"""
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "trajectory.lammpstrj"
+            path.write_text(dump)
+
+            trajectory = load_lammps_custom_trajectory(path)
+
+        np.testing.assert_allclose(trajectory["velocities"][0, 0], [0.1, 0.2, 0.3])
+        self.assertNotIn("forces", trajectory)
 
     def test_initial_configuration_fs_uses_minimum_images_and_a_particles(self):
         box = np.array([10.0, 10.0, 10.0])

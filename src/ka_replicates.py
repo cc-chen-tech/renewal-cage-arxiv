@@ -3472,7 +3472,7 @@ def load_lammps_custom_trajectory(
     force_frames: list[np.ndarray] = []
     expected_types: np.ndarray | None = None
     expected_box: np.ndarray | None = None
-    extended_schema: bool | None = None
+    optional_schema: str | None = None
     with path.open() as handle:
         while True:
             if maximum_frame_count is not None and len(timesteps) >= maximum_frame_count:
@@ -3498,19 +3498,25 @@ def load_lammps_custom_trajectory(
                 raise ValueError("LAMMPS dump box lengths must be positive")
             atom_header = handle.readline().strip()
             base_header = "ITEM: ATOMS id type x y z ix iy iz"
+            velocity_header = base_header + " vx vy vz"
             extended_header = base_header + " vx vy vz fx fy fz"
-            if atom_header not in {base_header, extended_header}:
+            schema_by_header = {
+                base_header: "positions",
+                velocity_header: "velocity",
+                extended_header: "velocity_force",
+            }
+            schema = schema_by_header.get(atom_header)
+            if schema is None:
                 raise ValueError("unexpected LAMMPS dump atom schema")
-            has_velocity_force = atom_header == extended_header
-            if extended_schema is None:
-                extended_schema = has_velocity_force
-            elif has_velocity_force != extended_schema:
+            if optional_schema is None:
+                optional_schema = schema
+            elif schema != optional_schema:
                 raise ValueError("LAMMPS dump schema changed between frames")
             rows = [handle.readline() for _ in range(particle_count)]
             if any(row == "" for row in rows):
                 raise ValueError("truncated LAMMPS dump frame")
             values = np.fromstring("".join(rows), sep=" ")
-            column_count = 14 if has_velocity_force else 8
+            column_count = {"positions": 8, "velocity": 11, "velocity_force": 14}[schema]
             if values.size != particle_count * column_count:
                 raise ValueError("malformed LAMMPS dump atom row")
             values = values.reshape(particle_count, column_count)
@@ -3530,8 +3536,9 @@ def load_lammps_custom_trajectory(
                 raise ValueError("box lengths changed between dump frames")
             wrapped_frames.append(wrapped)
             unwrapped_frames.append(unwrapped)
-            if has_velocity_force:
+            if schema in {"velocity", "velocity_force"}:
                 velocity_frames.append(values[:, 8:11].astype(np.float32))
+            if schema == "velocity_force":
                 force_frames.append(values[:, 11:14].astype(np.float32))
 
     if not timesteps:
@@ -3546,8 +3553,9 @@ def load_lammps_custom_trajectory(
         "wrapped_positions": np.stack(wrapped_frames),
         "unwrapped_positions": np.stack(unwrapped_frames),
     }
-    if extended_schema:
+    if optional_schema in {"velocity", "velocity_force"}:
         result["velocities"] = np.stack(velocity_frames)
+    if optional_schema == "velocity_force":
         result["forces"] = np.stack(force_frames)
     return result
 

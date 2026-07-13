@@ -453,6 +453,122 @@ def ka_lj_force_generator_observables(
     }
 
 
+def ka_lj_second_force_generator(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    directional_step: float = 1e-5,
+) -> np.ndarray:
+    """Return the deterministic drift ``L^2 F`` for selected KA particles."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    target = np.asarray(target_indices, dtype=int)
+    if not math.isfinite(directional_step) or directional_step <= 0.0:
+        raise ValueError("directional_step must be finite and positive")
+    geometry = _ka_lj_target_pair_geometry(
+        positions,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_indices=target,
+    )
+    plus = ka_lj_force_generator_observables(
+        positions + directional_step * velocities,
+        velocities=velocities,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_indices=target,
+        friction=friction,
+        temperature=0.0,
+    )["force_generator"]
+    minus = ka_lj_force_generator_observables(
+        positions - directional_step * velocities,
+        velocities=velocities,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_indices=target,
+        friction=friction,
+        temperature=0.0,
+    )["force_generator"]
+    position_drift = (plus - minus) / (2.0 * directional_step)
+
+    velocity_drift = np.empty_like(position_drift)
+    pair_hessian = geometry["pair_hessian"]
+    for slot, particle in enumerate(target):
+        neighbors = np.flatnonzero(geometry["active"][slot])
+        selected = np.concatenate(([particle], neighbors))
+        selected_force = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=selected,
+        )[0]
+        acceleration = selected_force - friction * velocities[selected]
+        velocity_drift[slot] = -np.sum(
+            np.einsum("jab,jb->ja", pair_hessian[slot, neighbors], acceleration[0] - acceleration[1:]),
+            axis=0,
+        )
+    return position_drift + velocity_drift
+
+
+def force_generator_increment_diagnostic(
+    force: np.ndarray,
+    force_generator: np.ndarray,
+    second_force_generator: np.ndarray,
+    force_generator_noise_covariance_rate: np.ndarray,
+    *,
+    frame_time: float,
+) -> dict[str, float]:
+    """Compare finite force increments with exact KA generator predictions."""
+
+    force = np.asarray(force, dtype=float)
+    generator = np.asarray(force_generator, dtype=float)
+    second = np.asarray(second_force_generator, dtype=float)
+    covariance_rate = np.asarray(force_generator_noise_covariance_rate, dtype=float)
+    if force.ndim != 2 or force.shape[0] < 3 or force.shape[1] != 3:
+        raise ValueError("force must have shape (at least 3 frames, 3)")
+    if generator.shape != force.shape or second.shape != force.shape or np.any(~np.isfinite(force)):
+        raise ValueError("force and generator arrays must be finite and aligned")
+    if np.any(~np.isfinite(generator)) or np.any(~np.isfinite(second)):
+        raise ValueError("force and generator arrays must be finite and aligned")
+    if covariance_rate.shape != (len(force), 3, 3) or np.any(~np.isfinite(covariance_rate)):
+        raise ValueError("covariance rates must be finite and align with force frames")
+    if not math.isfinite(frame_time) or frame_time <= 0.0:
+        raise ValueError("frame_time must be finite and positive")
+
+    centered_force_derivative = (force[2:] - force[:-2]) / (2.0 * frame_time)
+    centered_generator = generator[1:-1]
+    derivative_difference = centered_force_derivative - centered_generator
+    derivative_norm = float(np.linalg.norm(centered_generator))
+    if derivative_norm == 0.0:
+        raise ValueError("force_generator must have nonzero centered norm")
+
+    innovation = generator[1:] - generator[:-1] - frame_time * second[:-1]
+    predicted_covariance = frame_time * covariance_rate[:-1]
+    squared_mahalanobis = np.asarray(
+        [value @ np.linalg.solve(covariance, value) for value, covariance in zip(innovation, predicted_covariance)]
+    )
+    innovation_rms = math.sqrt(float(np.mean(np.sum(innovation**2, axis=1))))
+    if innovation_rms == 0.0:
+        raise ValueError("generator increments must have nonzero innovation")
+    return {
+        "force_derivative_relative_l2": float(np.linalg.norm(derivative_difference) / derivative_norm),
+        "force_derivative_correlation": float(
+            np.corrcoef(centered_force_derivative.reshape(-1), centered_generator.reshape(-1))[0, 1]
+        ),
+        "innovation_trace_variance_ratio": float(
+            np.sum(innovation**2) / np.sum(np.trace(predicted_covariance, axis1=1, axis2=2))
+        ),
+        "innovation_mean_squared_mahalanobis": float(np.mean(squared_mahalanobis)),
+        "innovation_normalized_mean": float(np.linalg.norm(np.mean(innovation, axis=0)) / innovation_rms),
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def ka_lj_shell_forces(
     positions: np.ndarray,
     *,
