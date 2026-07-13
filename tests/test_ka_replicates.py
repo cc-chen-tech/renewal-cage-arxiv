@@ -4365,6 +4365,22 @@ class KAReplicatePreparationTests(unittest.TestCase):
         for option in ("--manifest", "--covariance", "--resolution", "--output", "--stride"):
             self.assertIn(option, completed.stdout)
 
+    def test_c3_physical_fidelity_cli_exposes_raw_trajectory_outputs(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "compare_ka_c3_physical_fidelity.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--hard-trajectory", "--c3-trajectory", "--summary-output", "--curve-output"):
+            self.assertIn(option, completed.stdout)
+
     def test_residual_ar1_memory_diagnostic_recovers_white_innovation_limit(self):
         rng = np.random.default_rng(91)
         residual = np.zeros((4000, 2, 3))
