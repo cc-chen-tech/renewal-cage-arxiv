@@ -252,6 +252,25 @@ class SmoothCageTests(unittest.TestCase):
         ):
             self.assertIn(required, source)
 
+    def test_smooth_event_clock_analysis_preregisters_claim_limited_gates(self):
+        source = (
+            ROOT / "scripts" / "analyze_ka_smooth_cage_event_clock.py"
+        ).read_text()
+
+        for required in (
+            "TARGET_SEED = 20260714",
+            "PHOP_THRESHOLD = 0.08",
+            "HALF_WINDOW = 8",
+            "TARGET_COUNT = 64",
+            "STRUCTURAL_BRIER_REFERENCE = 0.026964",
+            "microscopic_initial_escape_state_allowed",
+            "event_clock_claim_allowed",
+            "autonomous_single_particle_gle_claim_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertIn(required, source)
+
     def test_projected_drift_matches_phase_space_directional_derivative(self):
         from ka_local_cage import ka_lj_force_and_isotropic_curvature
         from ka_smooth_cage import (
