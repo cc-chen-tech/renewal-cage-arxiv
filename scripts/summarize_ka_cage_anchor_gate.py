@@ -495,7 +495,8 @@ def write_gate_svg(
         [
             f'<rect x="610" y="445" width="302" height="54" rx="4" fill="{result_color}"/>',
             f'<text x="761" y="478" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">{result}</text>',
-            '<text x="610" y="528" font-family="Arial, sans-serif" font-size="11" fill="#596268">Dynamical mechanism only; closure, facilitation, and thermodynamic claims remain 0.</text>',
+            '<text x="610" y="528" font-family="Arial, sans-serif" font-size="11" fill="#596268">Dynamical mechanism only; closure, facilitation,</text>',
+            '<text x="610" y="543" font-family="Arial, sans-serif" font-size="11" fill="#596268">and thermodynamic claims remain 0.</text>',
             '</svg>',
         ]
     )

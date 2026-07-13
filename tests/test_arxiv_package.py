@@ -407,6 +407,14 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("Cooling-induced cage-anchor memory gate", svg)
         self.assertIn("T=0.45", svg)
         self.assertIn("T=0.58", svg)
+        self.assertIn(
+            'y="528" font-family="Arial, sans-serif" font-size="11" fill="#596268">Dynamical mechanism only; closure, facilitation,</text>',
+            svg,
+        )
+        self.assertIn(
+            'y="543" font-family="Arial, sans-serif" font-size="11" fill="#596268">and thermodynamic claims remain 0.</text>',
+            svg,
+        )
         self.assertNotIn("nan", svg.lower())
         self.assertNotIn("inf", svg.lower())
 
