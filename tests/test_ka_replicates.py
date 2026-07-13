@@ -127,6 +127,10 @@ from ka_generator_response import (  # noqa: E402
     tangent_force_generator_noise_covariance_rate,
     tangent_noise_covariance_diagnostic,
 )
+from prepare_ka_c3_switched_parent import (  # noqa: E402
+    parse_thermodynamic_log,
+    switched_parent_lammps_input,
+)
 from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E402
 
 
@@ -1929,6 +1933,68 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         for option in ("--lammps-binary", "--output", "--absolute-tolerance", "--relative-tolerance"):
             self.assertIn(option, completed.stdout)
+
+    def test_ka_c3_parent_cli_exposes_reproducible_equilibration_controls(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "prepare_ka_c3_switched_parent.py"), "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in (
+            "--source-restart",
+            "--lammps-binary",
+            "--output-directory",
+            "--temperature",
+            "--friction",
+            "--seed",
+            "--timestep",
+            "--duration",
+        ):
+            self.assertIn(option, completed.stdout)
+
+    def test_ka_c3_parent_thermodynamic_log_parser_reads_run_zero_and_dynamic_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "log.lammps"
+            log_path.write_text(
+                "Step Time Temp PotEng KinEng TotEng Press\n"
+                "0 0 0.58 -7.1 0.87 -6.23 2.1\n"
+                "Loop time of 0 on 1 procs for 0 steps\n"
+                "Step Time Temp PotEng KinEng TotEng Press\n"
+                "0 0 0.58 -7.1 0.87 -6.23 2.1\n"
+                "100 0.1 0.57 -7.09 0.86 -6.23 2.0\n"
+                "Loop time of 1 on 1 procs for 100 steps\n"
+            )
+
+            rows = parse_thermodynamic_log(log_path)
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[-1]["step"], 100.0)
+        self.assertAlmostEqual(rows[-1]["total_energy"], -6.23)
+
+    def test_ka_c3_parent_input_switches_potential_before_run_zero_and_thermostatting(self):
+        text = switched_parent_lammps_input(
+            source_restart=Path("parent.restart"),
+            temperature=0.58,
+            friction=1.0,
+            seed=712451,
+            timestep=0.001,
+            run_steps=100,
+            thermo_interval=1,
+        )
+
+        read_index = text.index("read_restart")
+        switch_index = text.index("pair_style lepton 2.5")
+        run_zero_index = text.index("run 0")
+        fix_index = text.index("fix integrator all nve")
+        self.assertLess(read_index, switch_index)
+        self.assertLess(switch_index, run_zero_index)
+        self.assertLess(run_zero_index, fix_index)
+        self.assertIn("fix bath all langevin 0.58 0.58 1 712451", text)
+        self.assertIn("run 100", text)
+        self.assertIn("write_restart equilibrated_c3.restart", text)
 
     def test_ka_c3_switched_radial_derivatives_match_lj_and_vanish_through_third_order(self):
         epsilon = 1.0
