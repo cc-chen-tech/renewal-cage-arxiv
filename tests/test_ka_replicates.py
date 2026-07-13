@@ -1070,6 +1070,73 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(verdict["spatial_cooperation_test_required"], 1.0)
         self.assertEqual(verdict["spatial_cooperation_proven"], 0.0)
 
+    def test_waiting_threshold_audit_separates_dominant_and_secondary_mechanisms(self):
+        script_path = ROOT / "scripts" / "analyze_ka_waiting_threshold_sensitivity.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_waiting_threshold_sensitivity", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = []
+        for replicate in (1.0, 2.0, 3.0):
+            for threshold_scale in (0.9, 1.0, 1.1):
+                rows.append(
+                    {
+                        "replicate": replicate,
+                        "threshold_scale": threshold_scale,
+                        "median_empirical_iid_relative_error": 0.19,
+                        "median_gamma_iid_relative_error": 0.34,
+                        "median_sequence_shuffle_relative_error": 0.09,
+                        "maximum_sequence_shuffle_relative_error": (
+                            0.19 if threshold_scale == 0.9 else 0.14
+                        ),
+                        "long_window_sequence_shuffle_relative_error": (
+                            0.19 if threshold_scale == 0.9 else 0.14
+                        ),
+                        "median_temporal_ordering_contribution_fraction": 0.09,
+                        "median_particle_identity_contribution_fraction": 0.10,
+                        "median_waiting_correlation_z_vs_shuffle": 15.0,
+                        "persistent_environment_identifiable": 1.0,
+                        "collective_covariance_detected": 1.0,
+                    }
+                )
+
+        replicate_rows, verdict = module.classify_waiting_threshold_sensitivity(
+            rows, finite_exchange_supported=True
+        )
+
+        self.assertEqual(len(replicate_rows), 3)
+        self.assertTrue(
+            all(
+                row["dominant_mechanism"]
+                == "mixed_particle_environment_and_event_memory"
+                for row in replicate_rows
+            )
+        )
+        self.assertEqual(verdict["threshold_robust_dominant_mechanism"], 1.0)
+        self.assertEqual(
+            verdict["dominant_mechanism"],
+            "mixed_particle_environment_and_event_memory",
+        )
+        self.assertEqual(verdict["gamma_shape_misspecification_supported"], 1.0)
+        self.assertEqual(verdict["empirical_waiting_law_sufficient"], 0.0)
+        self.assertEqual(verdict["gamma_shape_misspecification_sufficient"], 0.0)
+        self.assertEqual(verdict["temporal_waiting_memory_supported"], 1.0)
+        self.assertEqual(verdict["temporal_waiting_memory_dominant"], 0.0)
+        self.assertEqual(verdict["temporal_waiting_memory_parameter_claim_allowed"], 0.0)
+        self.assertEqual(verdict["median_window_particle_conditioned_shuffle_sufficient"], 1.0)
+        self.assertEqual(verdict["all_window_particle_conditioned_shuffle_sufficient"], 0.0)
+        self.assertEqual(verdict["long_window_shuffle_failure_any_threshold"], 1.0)
+        self.assertEqual(verdict["long_window_shuffle_failure_all_thresholds"], 0.0)
+        self.assertEqual(verdict["persistent_particle_environment_supported"], 1.0)
+        self.assertEqual(verdict["spatial_cooperation_test_required"], 1.0)
+        self.assertEqual(verdict["spatial_cooperation_proven"], 0.0)
+        self.assertEqual(
+            verdict["minimal_model_implication"],
+            "finite_exchange_particle_conditioned_renewal",
+        )
+
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
         valid_rows = [
             {"wave_number": q, "s4": 10.0 / (1.0 + (2.0 * q) ** 2)}

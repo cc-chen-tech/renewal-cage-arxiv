@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="480" viewBox="0 0 860 480">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124}.grid{stroke:#DADCE0}</style>
+<text x="430" y="28" text-anchor="middle" font-size="18" font-weight="700">Low-temperature waiting diagnosis is threshold robust</text>
+<line class="grid" x1="80" y1="355.00" x2="760" y2="355.00"/>
+<text x="70" y="359.00" text-anchor="end" font-size="11">0.05</text>
+<line class="grid" x1="80" y1="315.75" x2="760" y2="315.75"/>
+<text x="70" y="319.75" text-anchor="end" font-size="11">0.1</text>
+<line class="grid" x1="80" y1="253.55" x2="760" y2="253.55"/>
+<text x="70" y="257.55" text-anchor="end" font-size="11">0.3</text>
+<line class="grid" x1="80" y1="185.38" x2="760" y2="185.38"/>
+<text x="70" y="189.38" text-anchor="end" font-size="11">1</text>
+<line class="grid" x1="80" y1="123.17" x2="760" y2="123.17"/>
+<text x="70" y="127.17" text-anchor="end" font-size="11">3</text>
+<line class="grid" x1="80" y1="55.00" x2="760" y2="55.00"/>
+<text x="70" y="59.00" text-anchor="end" font-size="11">10</text>
+<line class="axis" x1="80" y1="55" x2="80" y2="355"/>
+<line class="axis" x1="80" y1="355" x2="760" y2="355"/>
+<text x="430" y="395" text-anchor="middle" font-size="13">Debye-Waller threshold scale</text>
+<text x="20" y="205" text-anchor="middle" font-size="13" transform="rotate(-90 20 205)">relative Fano effect (log scale)</text>
+<circle cx="80.00" cy="237.98" r="4" fill="#D55E00"/>
+<circle cx="420.00" cy="246.86" r="4" fill="#D55E00"/>
+<circle cx="760.00" cy="260.50" r="4" fill="#D55E00"/>
+<polyline fill="none" stroke="#D55E00" stroke-width="2.5" points="80.00,237.98 420.00,246.86 760.00,260.50"/>
+<line x1="95" y1="425" x2="120" y2="425" stroke="#D55E00" stroke-width="3"/>
+<text x="127" y="430" font-size="11">Gamma-law error</text>
+<circle cx="80.00" cy="270.08" r="4" fill="#0072B2"/>
+<circle cx="420.00" cy="277.97" r="4" fill="#0072B2"/>
+<circle cx="760.00" cy="287.99" r="4" fill="#0072B2"/>
+<polyline fill="none" stroke="#0072B2" stroke-width="2.5" points="80.00,270.08 420.00,277.97 760.00,287.99"/>
+<line x1="485" y1="425" x2="510" y2="425" stroke="#0072B2" stroke-width="3"/>
+<text x="517" y="430" font-size="11">pooled empirical error</text>
+<circle cx="80.00" cy="310.98" r="4" fill="#CC79A7"/>
+<circle cx="420.00" cy="321.49" r="4" fill="#CC79A7"/>
+<circle cx="760.00" cy="333.01" r="4" fill="#CC79A7"/>
+<polyline fill="none" stroke="#CC79A7" stroke-width="2.5" points="80.00,310.98 420.00,321.49 760.00,333.01"/>
+<line x1="95" y1="453" x2="120" y2="453" stroke="#CC79A7" stroke-width="3"/>
+<text x="127" y="458" font-size="11">ordering contribution</text>
+<circle cx="80.00" cy="307.71" r="4" fill="#009E73"/>
+<circle cx="420.00" cy="313.24" r="4" fill="#009E73"/>
+<circle cx="760.00" cy="321.99" r="4" fill="#009E73"/>
+<polyline fill="none" stroke="#009E73" stroke-width="2.5" points="80.00,307.71 420.00,313.24 760.00,321.99"/>
+<line x1="485" y1="453" x2="510" y2="453" stroke="#009E73" stroke-width="3"/>
+<text x="517" y="458" font-size="11">particle-identity contribution</text>
+<text x="80.00" y="375" text-anchor="middle" font-size="11">0.9</text>
+<text x="420.00" y="375" text-anchor="middle" font-size="11">1.0</text>
+<text x="760.00" y="375" text-anchor="middle" font-size="11">1.1</text>
+</svg>

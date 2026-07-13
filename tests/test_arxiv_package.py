@@ -15,6 +15,72 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_waiting_failure_mechanism_is_threshold_robust_but_spatially_unresolved(self):
+        verdict_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_waiting_threshold_sensitivity_verdict.csv"
+        )
+        threshold_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_waiting_threshold_sensitivity_thresholds.csv"
+        )
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        with threshold_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+
+        self.assertEqual(len(rows), 9)
+        self.assertEqual(verdict["threshold_scales"], "0.9;1;1.1")
+        self.assertEqual(float(verdict["independent_replicate_count"]), 3.0)
+        self.assertEqual(float(verdict["threshold_robust_dominant_mechanism"]), 1.0)
+        self.assertEqual(
+            verdict["dominant_mechanism"],
+            "mixed_particle_environment_and_event_memory",
+        )
+        self.assertEqual(float(verdict["gamma_shape_misspecification_supported"]), 1.0)
+        self.assertEqual(float(verdict["empirical_waiting_law_sufficient"]), 0.0)
+        self.assertEqual(float(verdict["gamma_shape_misspecification_sufficient"]), 0.0)
+        self.assertEqual(float(verdict["temporal_waiting_memory_supported"]), 1.0)
+        self.assertEqual(float(verdict["temporal_waiting_memory_dominant"]), 0.0)
+        self.assertEqual(
+            float(verdict["temporal_waiting_memory_parameter_claim_allowed"]),
+            0.0,
+        )
+        self.assertEqual(
+            float(verdict["median_window_particle_conditioned_shuffle_sufficient"]),
+            1.0,
+        )
+        self.assertEqual(
+            float(verdict["all_window_particle_conditioned_shuffle_sufficient"]),
+            0.0,
+        )
+        self.assertEqual(float(verdict["long_window_shuffle_failure_any_threshold"]), 1.0)
+        self.assertEqual(float(verdict["long_window_shuffle_failure_all_thresholds"]), 0.0)
+        self.assertEqual(float(verdict["persistent_particle_environment_supported"]), 1.0)
+        self.assertLess(
+            float(verdict["maximum_median_sequence_shuffle_relative_error"]),
+            0.12,
+        )
+        self.assertGreater(float(verdict["maximum_sequence_shuffle_relative_error"]), 0.19)
+        self.assertGreater(float(verdict["minimum_temporal_ordering_contribution_fraction"]), 0.07)
+        self.assertGreater(float(verdict["minimum_particle_identity_contribution_fraction"]), 0.08)
+        self.assertEqual(float(verdict["spatial_cooperation_test_required"]), 1.0)
+        self.assertEqual(float(verdict["spatial_cooperation_proven"]), 0.0)
+        self.assertEqual(
+            verdict["minimal_model_implication"],
+            "finite_exchange_particle_conditioned_renewal",
+        )
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (
+                ROOT
+                / "figures"
+                / "renewal_cage_ka_replicates_T045_waiting_threshold_sensitivity.svg"
+            ).is_file()
+        )
+
     def test_rate_anomaly_is_threshold_robust_but_remains_single_replica_evidence(self):
         verdict_path = (
             ROOT / "data" / "renewal_cage_ka_rate_threshold_sensitivity_verdict.csv"
