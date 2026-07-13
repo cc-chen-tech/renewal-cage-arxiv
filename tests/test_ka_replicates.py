@@ -117,8 +117,12 @@ from ka_collective_memory import (  # noqa: E402
 from ka_generator_response import (  # noqa: E402
     extract_generator_response_path,
     fit_generator_constrained_response,
+    generator_response_tangent_diagnostic,
     generator_response_lammps_input,
     matched_generator_response,
+    right_censored_tangent_interval_mask,
+    tangent_force_generator_noise_covariance_rate,
+    tangent_noise_covariance_diagnostic,
 )
 from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E402
 
@@ -3489,6 +3493,13 @@ class KAReplicatePreparationTests(unittest.TestCase):
             rtol=1e-12,
             atol=1e-12,
         )
+        self.assertEqual(result["target_pair_active"].shape, (1, 2))
+        self.assertEqual(result["target_pair_hessian"].shape, (1, 2, 3, 3))
+        self.assertFalse(bool(result["target_pair_active"][0, 0]))
+        self.assertTrue(bool(result["target_pair_active"][0, 1]))
+        self.assertEqual(int(result["nearest_cutoff_particle_index"][0]), 1)
+        expected_gap = float(np.linalg.norm(positions[0] - positions[1]) - 2.5 * 0.8)
+        self.assertAlmostEqual(float(result["nearest_cutoff_signed_gap"][0]), expected_gap)
 
     def test_ka_second_force_generator_matches_first_generator_drift(self):
         positions = np.array([[0.0, 0.0, 0.0], [1.13, 0.17, -0.08]])
@@ -3612,7 +3623,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
             "dump trajectory all custom 5 trajectory.lammpstrj id type x y z ix iy iz vx vy vz",
             text,
         )
-        self.assertIn("dump_modify trajectory sort id", text)
+        self.assertIn("dump_modify trajectory sort id format float %.17g", text)
         self.assertIn("run 1000", text)
 
     def test_extract_generator_response_path_reads_full_microscopic_state(self):
@@ -3655,6 +3666,10 @@ class KAReplicatePreparationTests(unittest.TestCase):
             self.assertEqual(np.asarray(result[key]).shape, (5, 3))
             self.assertTrue(np.all(np.isfinite(result[key])))
         self.assertEqual(np.asarray(result["force_generator_noise_covariance_rate"]).shape, (5, 3, 3))
+        self.assertEqual(np.asarray(result["target_pair_active"]).shape, (5, 2))
+        self.assertEqual(np.asarray(result["target_pair_hessian"]).shape, (5, 2, 3, 3))
+        self.assertEqual(np.asarray(result["nearest_cutoff_signed_gap"]).shape, (5,))
+        self.assertEqual(np.asarray(result["nearest_cutoff_particle_index"]).shape, (5,))
         self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
 
     def test_generator_response_runner_exposes_low_disk_protocol_controls(self):
@@ -3748,6 +3763,149 @@ class KAReplicatePreparationTests(unittest.TestCase):
         np.testing.assert_allclose(result["second_force_response"], 5.0)
         self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_tangent_force_generator_noise_covariance_uses_pair_hessian_response(self):
+        epsilon = 0.002
+        delta_pair = np.zeros((2, 3, 3))
+        delta_pair[1] = np.diag([1.0, 2.0, 3.0])
+        positive = epsilon * delta_pair
+        negative = -epsilon * delta_pair
+
+        result = tangent_force_generator_noise_covariance_rate(
+            positive,
+            negative,
+            epsilon=epsilon,
+            friction=1.5,
+            temperature=0.4,
+        )
+
+        diagonal = np.sum(delta_pair, axis=0)
+        expected = 2.0 * 1.5 * 0.4 * (
+            diagonal @ diagonal.T + np.einsum("nab,ncb->ac", delta_pair, delta_pair)
+        )
+        np.testing.assert_allclose(result, expected, rtol=1e-12, atol=1e-12)
+
+    def test_right_censored_tangent_interval_mask_discards_all_intervals_after_first_cutoff_crossing(self):
+        mismatch = np.zeros(201, dtype=bool)
+        mismatch[7] = True
+
+        result = right_censored_tangent_interval_mask(
+            mismatch,
+            stride=5,
+            interval_count=40,
+        )
+
+        np.testing.assert_array_equal(result[:3], [True, False, False])
+        self.assertEqual(int(np.sum(result)), 1)
+        np.testing.assert_array_equal(
+            right_censored_tangent_interval_mask(
+                np.zeros(201, dtype=bool),
+                stride=5,
+                interval_count=40,
+            ),
+            np.ones(40, dtype=bool),
+        )
+
+    def test_tangent_noise_covariance_diagnostic_calibrates_heteroscedastic_gaussian_noise(self):
+        rng = np.random.default_rng(991)
+        member_count = 48
+        interval_count = 1200
+        phase = np.linspace(0.0, 8.0 * np.pi, interval_count, endpoint=False)
+        scale = np.exp(0.8 * np.sin(phase))[None, :, None]
+        diagonal = scale * np.array([0.7, 1.1, 1.6])[None, None, :]
+        covariance = np.zeros((member_count, interval_count, 3, 3))
+        covariance[..., 0, 0] = diagonal[..., 0]
+        covariance[..., 1, 1] = diagonal[..., 1]
+        covariance[..., 2, 2] = diagonal[..., 2]
+        normal = rng.normal(size=(member_count, interval_count, 3))
+        residual = normal * np.sqrt(diagonal)
+        valid = np.ones((member_count, interval_count), dtype=bool)
+        valid[:, ::113] = False
+
+        result = tangent_noise_covariance_diagnostic(residual, covariance, valid_mask=valid)
+
+        self.assertAlmostEqual(float(result["trace_variance_ratio"]), 1.0, delta=0.02)
+        self.assertAlmostEqual(float(result["mean_squared_mahalanobis"]), 3.0, delta=0.04)
+        self.assertLess(float(result["whitened_max_abs_component_excess_kurtosis"]), 0.08)
+        self.assertLess(abs(float(result["whitened_lag1_correlation"])), 0.02)
+        self.assertGreater(float(result["observed_predicted_energy_correlation"]), 0.25)
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
+        single = tangent_noise_covariance_diagnostic(
+            residual[0],
+            covariance[0],
+            valid_mask=valid[0],
+        )
+        self.assertEqual(float(single["valid_sample_count"]), float(np.sum(valid[0])))
+
+    def test_generator_response_tangent_diagnostic_recovers_exact_smooth_chain(self):
+        frame_time = 0.001
+        friction = 1.0
+        time = np.arange(1001, dtype=float) * frame_time
+        rates = -np.array(
+            [
+                [0.4, 0.7, 1.1],
+                [0.5, 0.9, 1.3],
+                [0.6, 1.0, 1.5],
+            ]
+        )
+        amplitude = np.array(
+            [
+                [1.0, 0.8, 1.2],
+                [0.7, 1.1, 0.9],
+                [1.3, 0.6, 1.0],
+            ]
+        )
+        position = amplitude[:, None, :] * np.exp(rates[:, None, :] * time[None, :, None])
+        velocity = rates[:, None, :] * position
+        force = (rates**2 + friction * rates)[:, None, :] * position
+        generator = rates[:, None, :] * force
+        second = rates[:, None, :] * generator
+        state = np.concatenate([position, velocity, force, generator], axis=2)
+
+        result = generator_response_tangent_diagnostic(
+            state,
+            second,
+            frame_time=frame_time,
+            friction=friction,
+        )
+
+        for identity in ("position_velocity", "velocity_force", "force_generator", "generator_second"):
+            self.assertLess(float(result[f"{identity}_relative_l2_error"]), 1e-6)
+            self.assertGreater(float(result[f"{identity}_correlation"]), 1.0 - 1e-10)
+        self.assertLess(float(result["tangent_innovation_rms"]), 1e-5)
+        self.assertLess(float(result["symmetric_tangent_residual_rms"]), 1e-9)
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_generator_response_tangent_diagnostic_detects_white_member_noise_suppression(self):
+        rng = np.random.default_rng(987)
+        member_count = 64
+        frame_count = 2001
+        frame_time = 0.005
+        relaxation_rate = -20.0
+        state = np.zeros((member_count, frame_count, 12))
+        increments = rng.normal(scale=0.08, size=(member_count, frame_count - 1, 3))
+        for frame in range(frame_count - 1):
+            state[:, frame + 1, 9:12] = (
+                state[:, frame, 9:12]
+                + frame_time * relaxation_rate * state[:, frame, 9:12]
+                + increments[:, frame]
+            )
+        second = relaxation_rate * state[:, :, 9:12]
+
+        result = generator_response_tangent_diagnostic(
+            state,
+            second,
+            frame_time=frame_time,
+            friction=1.0,
+        )
+
+        np.testing.assert_allclose(result["tangent_innovation"], increments, atol=1e-12)
+        self.assertLess(abs(float(result["tangent_innovation_lag1_correlation"])), 0.02)
+        self.assertLess(abs(float(result["tangent_innovation_squared_norm_lag1_correlation"])), 0.02)
+        self.assertLess(float(result["tangent_innovation_max_abs_component_excess_kurtosis"]), 0.08)
+        self.assertAlmostEqual(float(result["tangent_innovation_scaled_ensemble_suppression"]), 1.0, delta=0.08)
+        self.assertLess(float(result["tangent_innovation_normalized_mean"]), 3.0)
+
     def test_generator_response_closure_cli_exposes_preregistered_gates(self):
         completed = subprocess.run(
             [
@@ -3762,6 +3920,54 @@ class KAReplicatePreparationTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         for option in ("--output-prefix", "--fit-times", "--horizons", "--linearity-tolerance"):
+            self.assertIn(option, completed.stdout)
+
+    def test_generator_response_resolution_cli_exposes_stride_controls(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_generator_response_resolution.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--output", "--strides", "--maximum-time"):
+            self.assertIn(option, completed.stdout)
+
+    def test_generator_response_cutoff_cli_exposes_mechanism_filter(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_generator_response_cutoff.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--output", "--stride", "--maximum-time"):
+            self.assertIn(option, completed.stdout)
+
+    def test_tangent_noise_covariance_cli_exposes_microscopic_controls(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_tangent_noise_covariance.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--output", "--stride", "--maximum-time"):
             self.assertIn(option, completed.stdout)
 
     def test_residual_ar1_memory_diagnostic_recovers_white_innovation_limit(self):

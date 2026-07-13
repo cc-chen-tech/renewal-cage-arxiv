@@ -413,7 +413,13 @@ def _ka_lj_target_pair_geometry(
         * unit[:, :, None, :]
         + potential_prime_over_r[:, :, None, None] * np.eye(3)
     )
-    return {"pair_force": pair_force, "pair_hessian": pair_hessian, "active": active}
+    return {
+        "pair_force": pair_force,
+        "pair_hessian": pair_hessian,
+        "active": active,
+        "distance": distance,
+        "sigma": sigma,
+    }
 
 
 def ka_lj_force_generator_observables(
@@ -446,10 +452,17 @@ def ka_lj_force_generator_observables(
     diagonal_hessian = np.sum(pair_hessian, axis=1)
     covariance_geometry = np.einsum("pab,pcb->pac", diagonal_hessian, diagonal_hessian)
     covariance_geometry += np.einsum("pnab,pncb->pac", pair_hessian, pair_hessian)
+    cutoff_gap = geometry["distance"] - _CUTOFF_SCALE * geometry["sigma"]
+    valid_pair = geometry["distance"] > 1e-10
+    nearest_cutoff_particle = np.argmin(np.where(valid_pair, np.abs(cutoff_gap), np.inf), axis=1)
     return {
         "force": np.sum(geometry["pair_force"], axis=1),
         "force_generator": force_generator,
         "force_generator_noise_covariance_rate": 2.0 * friction * temperature * covariance_geometry,
+        "target_pair_active": geometry["active"],
+        "target_pair_hessian": pair_hessian,
+        "nearest_cutoff_particle_index": nearest_cutoff_particle,
+        "nearest_cutoff_signed_gap": cutoff_gap[np.arange(len(target)), nearest_cutoff_particle],
     }
 
 

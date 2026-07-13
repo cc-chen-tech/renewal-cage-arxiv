@@ -40,6 +40,8 @@ def verify_extraction(path: Path, *, expected_frames: int) -> None:
         "force_generator": (expected_frames, 3),
         "second_force_generator": (expected_frames, 3),
         "force_generator_noise_covariance_rate": (expected_frames, 3, 3),
+        "nearest_cutoff_signed_gap": (expected_frames,),
+        "nearest_cutoff_particle_index": (expected_frames,),
     }
     with np.load(path, allow_pickle=False) as payload:
         for key, shape in expected_shapes.items():
@@ -47,6 +49,20 @@ def verify_extraction(path: Path, *, expected_frames: int) -> None:
                 raise ValueError(f"{path}: invalid extracted array {key}")
         if float(payload["thermodynamic_claim_allowed"]) != 0.0:
             raise ValueError(f"{path}: thermodynamic claim boundary was not preserved")
+        if (
+            "target_pair_active" not in payload
+            or payload["target_pair_active"].ndim != 2
+            or payload["target_pair_active"].shape[0] != expected_frames
+            or payload["target_pair_active"].shape[1] < 2
+        ):
+            raise ValueError(f"{path}: invalid target pair active mask")
+        if (
+            "target_pair_hessian" not in payload
+            or payload["target_pair_hessian"].shape
+            != (expected_frames, payload["target_pair_active"].shape[1], 3, 3)
+            or np.any(~np.isfinite(payload["target_pair_hessian"]))
+        ):
+            raise ValueError(f"{path}: invalid target pair Hessian")
 
 
 def main() -> None:
@@ -204,6 +220,7 @@ def main() -> None:
         "integration_time_step_tau": args.integration_time_step,
         "duration_tau": args.duration,
         "saved_frame_interval_tau": args.dump_interval,
+        "dump_float_format": "%.17g",
         "directional_step": args.directional_step,
         "member_count": len(args.velocity_seeds),
         "epsilons": args.epsilons,

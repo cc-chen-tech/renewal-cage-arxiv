@@ -16,7 +16,11 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from ka_generator_response import fit_generator_constrained_response, matched_generator_response  # noqa: E402
+from ka_generator_response import (  # noqa: E402
+    fit_generator_constrained_response,
+    generator_response_tangent_diagnostic,
+    matched_generator_response,
+)
 
 
 def file_sha256(path: Path) -> str:
@@ -55,6 +59,16 @@ def propagate(transition: np.ndarray, initial_state: np.ndarray, frame_count: in
 def relative_l2(predicted: np.ndarray, observed: np.ndarray) -> float:
     norm = float(np.linalg.norm(observed))
     return float(np.linalg.norm(predicted - observed) / norm) if norm > 0.0 else float("nan")
+
+
+def flattened_correlation(left: np.ndarray, right: np.ndarray) -> float:
+    left_flat = np.asarray(left, dtype=float).reshape(-1)
+    right_flat = np.asarray(right, dtype=float).reshape(-1)
+    if left_flat.shape != right_flat.shape:
+        raise ValueError("correlation arrays must have the same shape")
+    if np.std(left_flat) == 0.0 or np.std(right_flat) == 0.0:
+        return float("nan")
+    return float(np.corrcoef(left_flat, right_flat)[0, 1])
 
 
 def free_transition_fit(states: np.ndarray, *, fit_frames: int) -> dict[str, np.ndarray | float]:
@@ -129,8 +143,214 @@ def main() -> None:
 
     summary_rows: list[dict[str, object]] = []
     curve_rows: list[dict[str, object]] = []
-    linearity: dict[tuple[int, float], bool] = {}
+    tangent_diagnostics: dict[tuple[int, float], dict[str, np.ndarray | float]] = {}
+    identity_names = ("position_velocity", "velocity_force", "force_generator", "generator_second")
+    for epsilon in epsilons:
+        epsilon_states = np.stack(
+            [np.asarray(responses[(member, epsilon)]["state_response"]) for member in members]
+        )
+        epsilon_second = np.stack(
+            [np.asarray(responses[(member, epsilon)]["second_force_response"]) for member in members]
+        )
+        pooled = generator_response_tangent_diagnostic(
+            epsilon_states,
+            epsilon_second,
+            frame_time=frame_time,
+            friction=friction,
+        )
+        for identity in identity_names:
+            summary_rows.append(
+                {
+                    "record": "tangent_identity_aggregate",
+                    "model": "exact_common_noise_tangent",
+                    "member_index": "",
+                    "evaluation_epsilon": epsilon,
+                    "identity": identity,
+                    "relative_l2_error": pooled[f"{identity}_relative_l2_error"],
+                    "correlation": pooled[f"{identity}_correlation"],
+                    "ensemble_mean_relative_l2_error": pooled[f"ensemble_mean_{identity}_relative_l2_error"],
+                    "ensemble_mean_correlation": pooled[f"ensemble_mean_{identity}_correlation"],
+                    "fit_parameters_from_macro_observables": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                }
+            )
+        summary_rows.append(
+            {
+                "record": "tangent_innovation_aggregate",
+                "model": "exact_common_noise_tangent",
+                "member_index": "",
+                "evaluation_epsilon": epsilon,
+                "tangent_innovation_rms": pooled["tangent_innovation_rms"],
+                "ensemble_mean_tangent_innovation_rms": pooled["ensemble_mean_tangent_innovation_rms"],
+                "tangent_innovation_ensemble_suppression": pooled[
+                    "tangent_innovation_ensemble_suppression"
+                ],
+                "tangent_innovation_scaled_ensemble_suppression": pooled[
+                    "tangent_innovation_scaled_ensemble_suppression"
+                ],
+                "tangent_innovation_lag1_correlation": pooled["tangent_innovation_lag1_correlation"],
+                "tangent_innovation_squared_norm_lag1_correlation": pooled[
+                    "tangent_innovation_squared_norm_lag1_correlation"
+                ],
+                "tangent_innovation_norm_median": pooled["tangent_innovation_norm_median"],
+                "tangent_innovation_norm_p95": pooled["tangent_innovation_norm_p95"],
+                "tangent_innovation_norm_p99": pooled["tangent_innovation_norm_p99"],
+                "tangent_innovation_norm_maximum": pooled["tangent_innovation_norm_maximum"],
+                "tangent_innovation_max_abs_component_excess_kurtosis": pooled[
+                    "tangent_innovation_max_abs_component_excess_kurtosis"
+                ],
+                "tangent_innovation_normalized_mean": pooled["tangent_innovation_normalized_mean"],
+                "fit_parameters_from_macro_observables": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+        for member_index, member in enumerate(members):
+            member_diagnostic = generator_response_tangent_diagnostic(
+                epsilon_states[member_index],
+                epsilon_second[member_index],
+                frame_time=frame_time,
+                friction=friction,
+            )
+            tangent_diagnostics[(member, epsilon)] = member_diagnostic
+            for identity in identity_names:
+                summary_rows.append(
+                    {
+                        "record": "tangent_identity_member",
+                        "model": "exact_common_noise_tangent",
+                        "member_index": member,
+                        "evaluation_epsilon": epsilon,
+                        "identity": identity,
+                        "relative_l2_error": member_diagnostic[f"{identity}_relative_l2_error"],
+                        "correlation": member_diagnostic[f"{identity}_correlation"],
+                        "fit_parameters_from_macro_observables": 0.0,
+                        "thermodynamic_claim_allowed": 0.0,
+                    }
+                )
+        for horizon in args.horizons:
+            stop = int(np.searchsorted(reference_time, horizon, side="right"))
+            if stop < 3 or stop > len(reference_time):
+                raise ValueError(f"tangent diagnostic horizon {horizon} is outside the response grid")
+            horizon_diagnostic = generator_response_tangent_diagnostic(
+                epsilon_states[:, :stop],
+                epsilon_second[:, :stop],
+                frame_time=frame_time,
+                friction=friction,
+            )
+            actual_horizon = float(reference_time[stop - 1])
+            for identity in identity_names:
+                summary_rows.append(
+                    {
+                        "record": "tangent_identity_horizon",
+                        "model": "exact_common_noise_tangent",
+                        "member_index": "",
+                        "evaluation_epsilon": epsilon,
+                        "horizon_time": actual_horizon,
+                        "identity": identity,
+                        "relative_l2_error": horizon_diagnostic[f"{identity}_relative_l2_error"],
+                        "correlation": horizon_diagnostic[f"{identity}_correlation"],
+                        "ensemble_mean_relative_l2_error": horizon_diagnostic[
+                            f"ensemble_mean_{identity}_relative_l2_error"
+                        ],
+                        "ensemble_mean_correlation": horizon_diagnostic[
+                            f"ensemble_mean_{identity}_correlation"
+                        ],
+                        "fit_parameters_from_macro_observables": 0.0,
+                        "thermodynamic_claim_allowed": 0.0,
+                    }
+                )
+            summary_rows.append(
+                {
+                    "record": "tangent_innovation_horizon",
+                    "model": "exact_common_noise_tangent",
+                    "member_index": "",
+                    "evaluation_epsilon": epsilon,
+                    "horizon_time": actual_horizon,
+                    **{
+                        key: horizon_diagnostic[key]
+                        for key in (
+                            "tangent_innovation_rms",
+                            "ensemble_mean_tangent_innovation_rms",
+                            "tangent_innovation_ensemble_suppression",
+                            "tangent_innovation_scaled_ensemble_suppression",
+                            "tangent_innovation_lag1_correlation",
+                            "tangent_innovation_squared_norm_lag1_correlation",
+                            "tangent_innovation_norm_median",
+                            "tangent_innovation_norm_p95",
+                            "tangent_innovation_norm_p99",
+                            "tangent_innovation_norm_maximum",
+                            "tangent_innovation_max_abs_component_excess_kurtosis",
+                            "tangent_innovation_normalized_mean",
+                        )
+                    },
+                    "fit_parameters_from_macro_observables": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                }
+            )
+            for member_index, member in enumerate(members):
+                member_horizon = generator_response_tangent_diagnostic(
+                    epsilon_states[member_index, :stop],
+                    epsilon_second[member_index, :stop],
+                    frame_time=frame_time,
+                    friction=friction,
+                )
+                summary_rows.append(
+                    {
+                        "record": "tangent_innovation_member_horizon",
+                        "model": "exact_common_noise_tangent",
+                        "member_index": member,
+                        "evaluation_epsilon": epsilon,
+                        "horizon_time": actual_horizon,
+                        **{
+                            key: member_horizon[key]
+                            for key in (
+                                "tangent_innovation_rms",
+                                "tangent_innovation_lag1_correlation",
+                                "tangent_innovation_squared_norm_lag1_correlation",
+                                "tangent_innovation_norm_median",
+                                "tangent_innovation_norm_p95",
+                                "tangent_innovation_norm_p99",
+                                "tangent_innovation_norm_maximum",
+                                "tangent_innovation_max_abs_component_excess_kurtosis",
+                                "tangent_innovation_normalized_mean",
+                            )
+                        },
+                        "fit_parameters_from_macro_observables": 0.0,
+                        "thermodynamic_claim_allowed": 0.0,
+                    }
+                )
+
+    reference_epsilon = epsilons[0]
     comparison_epsilon = epsilons[1]
+    for member in members:
+        reference_innovation = np.asarray(
+            tangent_diagnostics[(member, reference_epsilon)]["tangent_innovation"]
+        )[0]
+        comparison_innovation = np.asarray(
+            tangent_diagnostics[(member, comparison_epsilon)]["tangent_innovation"]
+        )[0]
+        for horizon in args.horizons:
+            stop = int(np.searchsorted(reference_time, horizon, side="right")) - 1
+            if stop < 1 or stop > len(reference_innovation):
+                raise ValueError(f"innovation horizon {horizon} is outside the response grid")
+            summary_rows.append(
+                {
+                    "record": "tangent_innovation_cross_epsilon",
+                    "model": "exact_common_noise_tangent",
+                    "member_index": member,
+                    "evaluation_epsilon": comparison_epsilon,
+                    "horizon_time": float(reference_time[stop]),
+                    "tangent_innovation_relative_l2_error": relative_l2(
+                        comparison_innovation[:stop], reference_innovation[:stop]
+                    ),
+                    "tangent_innovation_correlation": flattened_correlation(
+                        comparison_innovation[:stop], reference_innovation[:stop]
+                    ),
+                    "fit_parameters_from_macro_observables": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                }
+            )
+
+    linearity: dict[tuple[int, float], bool] = {}
     for member in members:
         reference_state = np.asarray(responses[(member, reference_epsilon)]["state_response"])
         comparison_state = np.asarray(responses[(member, comparison_epsilon)]["state_response"])
