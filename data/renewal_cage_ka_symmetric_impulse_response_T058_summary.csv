@@ -1,0 +1,4 @@
+epsilon,time_points,force_response_reference_relative_l2,position_response_reference_relative_l2,initial_force_response_x,final_force_response_norm,initial_position_response_x,initial_position_response_transverse_norm,response_scope,thermodynamic_claim_allowed
+0.001,201,0.0,0.0,-381.90200915567016,185.68487070325426,1.0000000000000009,0.0,full_KA_Langevin_matched_common_random_number_linear_response,0
+0.002,201,0.006931899865107883,0.001591345680911671,-381.91539590570255,185.57782900126466,1.0000000000000009,0.0,full_KA_Langevin_matched_common_random_number_linear_response,0
+0.004,201,0.009078315963713472,0.001391611246303362,-381.9689448009875,185.46628576427298,1.0000000000000009,0.0,full_KA_Langevin_matched_common_random_number_linear_response,0

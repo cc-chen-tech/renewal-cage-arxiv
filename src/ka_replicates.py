@@ -3468,8 +3468,11 @@ def load_lammps_custom_trajectory(
     timesteps: list[int] = []
     wrapped_frames: list[np.ndarray] = []
     unwrapped_frames: list[np.ndarray] = []
+    velocity_frames: list[np.ndarray] = []
+    force_frames: list[np.ndarray] = []
     expected_types: np.ndarray | None = None
     expected_box: np.ndarray | None = None
+    optional_schema: str | None = None
     with path.open() as handle:
         while True:
             if maximum_frame_count is not None and len(timesteps) >= maximum_frame_count:
@@ -3494,15 +3497,29 @@ def load_lammps_custom_trajectory(
             if np.any(box_lengths <= 0.0):
                 raise ValueError("LAMMPS dump box lengths must be positive")
             atom_header = handle.readline().strip()
-            if atom_header != "ITEM: ATOMS id type x y z ix iy iz":
+            base_header = "ITEM: ATOMS id type x y z ix iy iz"
+            velocity_header = base_header + " vx vy vz"
+            extended_header = base_header + " vx vy vz fx fy fz"
+            schema_by_header = {
+                base_header: "positions",
+                velocity_header: "velocity",
+                extended_header: "velocity_force",
+            }
+            schema = schema_by_header.get(atom_header)
+            if schema is None:
                 raise ValueError("unexpected LAMMPS dump atom schema")
+            if optional_schema is None:
+                optional_schema = schema
+            elif schema != optional_schema:
+                raise ValueError("LAMMPS dump schema changed between frames")
             rows = [handle.readline() for _ in range(particle_count)]
             if any(row == "" for row in rows):
                 raise ValueError("truncated LAMMPS dump frame")
             values = np.fromstring("".join(rows), sep=" ")
-            if values.size != particle_count * 8:
+            column_count = {"positions": 8, "velocity": 11, "velocity_force": 14}[schema]
+            if values.size != particle_count * column_count:
                 raise ValueError("malformed LAMMPS dump atom row")
-            values = values.reshape(particle_count, 8)
+            values = values.reshape(particle_count, column_count)
             atom_ids = values[:, 0].astype(int)
             if not np.array_equal(atom_ids, np.arange(1, particle_count + 1)):
                 raise ValueError("LAMMPS dump atoms must be sorted by id")
@@ -3519,19 +3536,28 @@ def load_lammps_custom_trajectory(
                 raise ValueError("box lengths changed between dump frames")
             wrapped_frames.append(wrapped)
             unwrapped_frames.append(unwrapped)
+            if schema in {"velocity", "velocity_force"}:
+                velocity_frames.append(values[:, 8:11].astype(np.float32))
+            if schema == "velocity_force":
+                force_frames.append(values[:, 11:14].astype(np.float32))
 
     if not timesteps:
         raise ValueError("LAMMPS dump contains no frames")
     timestep_array = np.asarray(timesteps, dtype=np.int64)
     if len(timestep_array) > 1 and np.any(np.diff(timestep_array) <= 0):
         raise ValueError("LAMMPS dump timesteps must increase strictly")
-    return {
+    result = {
         "timesteps": timestep_array,
         "particle_types": np.asarray(expected_types, dtype=int),
         "box_lengths": np.asarray(expected_box, dtype=float),
         "wrapped_positions": np.stack(wrapped_frames),
         "unwrapped_positions": np.stack(unwrapped_frames),
     }
+    if optional_schema in {"velocity", "velocity_force"}:
+        result["velocities"] = np.stack(velocity_frames)
+    if optional_schema == "velocity_force":
+        result["forces"] = np.stack(force_frames)
+    return result
 
 
 def initial_configuration_fs(
@@ -3637,7 +3663,35 @@ def _lammps_input(
     velocity_seed: int,
     equilibration_steps: int,
     production_steps: int,
+    dynamics: str,
+    langevin_damping: float | None,
+    langevin_seed: int | None,
+    dump_interval_steps: int,
+    high_resolution_steps: int,
+    high_resolution_dump_interval_steps: int | None,
 ) -> str:
+    if dynamics == "nvt":
+        dynamics_lines = f"fix thermostat all nvt temp {temperature:g} {temperature:g} 10"
+    elif dynamics == "langevin":
+        if langevin_damping is None or langevin_seed is None:
+            raise ValueError("langevin dynamics requires damping and a random seed")
+        dynamics_lines = (
+            "fix integrator all nve\n"
+            f"fix bath all langevin {temperature:g} {temperature:g} {langevin_damping:g} {langevin_seed}"
+        )
+    else:
+        raise ValueError("dynamics must be 'nvt' or 'langevin'")
+    high_resolution_commands = ""
+    if high_resolution_steps:
+        if high_resolution_dump_interval_steps is None:
+            raise ValueError("high-resolution dump interval is required when high-resolution steps are positive")
+        high_resolution_commands = f"""dump high_resolution all custom {high_resolution_dump_interval_steps} high_resolution.lammpstrj id type x y z ix iy iz
+dump_modify high_resolution sort id
+run {high_resolution_steps}
+undump high_resolution
+"""
+    remaining_steps = production_steps - high_resolution_steps
+    remaining_commands = f"run {remaining_steps}\n" if remaining_steps else ""
     return f"""units lj
 atom_style atomic
 boundary p p p
@@ -3652,7 +3706,7 @@ neighbor 0.3 bin
 neigh_modify delay 0 every 1 check yes
 
 velocity all create {temperature:g} {velocity_seed} mom yes rot no dist gaussian
-fix thermostat all nvt temp {temperature:g} {temperature:g} 10
+{dynamics_lines}
 timestep 0.001
 thermo 10000
 thermo_style custom step time temp pe ke etotal press
@@ -3661,12 +3715,133 @@ run {equilibration_steps}
 write_restart equilibrated.restart
 reset_timestep 0
 
-dump trajectory all custom 1000 trajectory.lammpstrj id type x y z ix iy iz
+dump trajectory all custom {dump_interval_steps} trajectory.lammpstrj id type x y z ix iy iz
 dump_modify trajectory sort id
 restart 100000 restart.*
-run {production_steps}
+{high_resolution_commands}{remaining_commands}write_restart final.restart
+"""
+
+
+def _isoconfigurational_lammps_input(
+    *,
+    parent_restart: Path,
+    temperature: float,
+    velocity_seed: int,
+    langevin_seed: int,
+    damping: float,
+    duration_steps: int,
+    dump_interval_steps: int,
+    dump_velocity_force: bool,
+) -> str:
+    """Build one NVE-plus-Langevin clone from an identical parent restart."""
+
+    dump_columns = "id type x y z ix iy iz vx vy vz fx fy fz" if dump_velocity_force else "id type x y z ix iy iz"
+    return f"""units lj
+atom_style atomic
+read_restart {parent_restart}
+
+reset_timestep 0
+velocity all create {temperature:g} {velocity_seed} mom yes rot no dist gaussian
+fix integrator all nve
+fix bath all langevin {temperature:g} {temperature:g} {damping:g} {langevin_seed}
+timestep 0.001
+thermo 10000
+thermo_style custom step time temp pe ke etotal press
+
+dump clone all custom {dump_interval_steps} trajectory.lammpstrj {dump_columns}
+dump_modify clone sort id
+run {duration_steps}
 write_restart final.restart
 """
+
+
+def prepare_isoconfigurational_langevin_clones(
+    parent_restart: Path,
+    output_directory: Path,
+    *,
+    temperature: float,
+    velocity_seeds: Sequence[int],
+    langevin_seeds: Sequence[int],
+    damping: float,
+    duration: float,
+    dump_interval: float,
+    dump_velocity_force: bool = False,
+) -> dict[str, object]:
+    """Prepare independent-noise Langevin clones from one many-particle state.
+
+    Each clone reads exactly the same restart coordinates, then independently
+    samples Maxwell velocities and Langevin noise.  This is an
+    isoconfigurational ensemble, not a continuation of a physical-time path.
+    """
+
+    parent_restart = Path(parent_restart).resolve()
+    output_directory = Path(output_directory).resolve()
+    if not parent_restart.is_file():
+        raise ValueError("parent_restart must be an existing LAMMPS restart")
+    if not math.isfinite(temperature) or temperature <= 0.0:
+        raise ValueError("temperature must be positive and finite")
+    if not math.isfinite(damping) or damping <= 0.0:
+        raise ValueError("damping must be positive and finite")
+    if not math.isfinite(duration) or duration <= 0.0 or not math.isfinite(dump_interval) or dump_interval <= 0.0:
+        raise ValueError("duration and dump_interval must be positive and finite")
+    velocity = [int(value) for value in velocity_seeds]
+    noise = [int(value) for value in langevin_seeds]
+    if len(velocity) < 2 or len(velocity) != len(noise):
+        raise ValueError("at least two aligned velocity and Langevin seeds are required")
+    if any(value <= 0 for value in velocity + noise) or len(set(velocity)) != len(velocity) or len(set(noise)) != len(noise):
+        raise ValueError("velocity and Langevin seeds must be positive and unique within each sequence")
+    timestep = 0.001
+    duration_steps = int(round(duration / timestep))
+    dump_interval_steps = int(round(dump_interval / timestep))
+    if not math.isclose(duration_steps * timestep, duration) or not math.isclose(dump_interval_steps * timestep, dump_interval):
+        raise ValueError("duration and dump_interval must be integer multiples of 0.001 tau")
+    if output_directory.exists():
+        raise ValueError("output_directory must not already exist")
+
+    output_directory.mkdir(parents=True)
+    clone_rows: list[dict[str, object]] = []
+    for clone_index, (velocity_seed, langevin_seed) in enumerate(zip(velocity, noise), start=1):
+        clone_directory = output_directory / f"clone_{clone_index:03d}"
+        clone_directory.mkdir()
+        (clone_directory / "in.clone").write_text(
+            _isoconfigurational_lammps_input(
+                parent_restart=parent_restart,
+                temperature=temperature,
+                velocity_seed=velocity_seed,
+                langevin_seed=langevin_seed,
+                damping=damping,
+                duration_steps=duration_steps,
+                dump_interval_steps=dump_interval_steps,
+                dump_velocity_force=dump_velocity_force,
+            )
+        )
+        row = {
+            "clone_index": clone_index,
+            "velocity_seed": velocity_seed,
+            "langevin_seed": langevin_seed,
+            "parent_restart_path": str(parent_restart),
+            "axis_semantics": "isoconfigurational_langevin_clones",
+        }
+        (clone_directory / "clone_manifest.json").write_text(json.dumps(row, indent=2, sort_keys=True) + "\n")
+        clone_rows.append(row)
+    manifest: dict[str, object] = {
+        "clone_count": len(clone_rows),
+        "parent_restart_path": str(parent_restart),
+        "parent_restart_sha256": _sha256(parent_restart),
+        "temperature": temperature,
+        "dynamics": "nve_plus_langevin",
+        "langevin_damping": damping,
+        "duration_tau": duration,
+        "saved_frame_interval_tau": dump_interval,
+        "dump_velocity_force": bool(dump_velocity_force),
+        "axis_semantics": "isoconfigurational_langevin_clones",
+        "randomized_maxwell_velocities": True,
+        "independent_bath_noise": True,
+        "thermodynamic_claim_allowed": False,
+        "clones": clone_rows,
+    }
+    (output_directory / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return manifest
 
 
 def prepare_replicate(
@@ -3678,6 +3853,12 @@ def prepare_replicate(
     velocity_seed: int,
     equilibration_time: float = 100.0,
     production_time: float = 5000.0,
+    dynamics: str = "nvt",
+    langevin_damping: float | None = None,
+    langevin_seed: int | None = None,
+    dump_interval_time: float = 1.0,
+    high_resolution_duration: float = 0.0,
+    high_resolution_dump_interval: float | None = None,
     _payload: dict[str, object] | None = None,
     _source_sha256: str | None = None,
 ) -> dict[str, object]:
@@ -3693,12 +3874,33 @@ def prepare_replicate(
         raise ValueError("frame_index must be a nonnegative integer")
     if isinstance(velocity_seed, bool) or not isinstance(velocity_seed, int) or velocity_seed <= 0:
         raise ValueError("velocity_seed must be a positive integer")
+    if dynamics not in {"nvt", "langevin"}:
+        raise ValueError("dynamics must be 'nvt' or 'langevin'")
+    if dynamics == "langevin":
+        if langevin_damping is None or not math.isfinite(langevin_damping) or langevin_damping <= 0.0:
+            raise ValueError("langevin_damping must be positive and finite for Langevin dynamics")
+        if isinstance(langevin_seed, bool) or not isinstance(langevin_seed, int) or langevin_seed <= 0:
+            raise ValueError("langevin_seed must be a positive integer for Langevin dynamics")
+    elif langevin_damping is not None or langevin_seed is not None:
+        raise ValueError("Langevin controls are only valid when dynamics='langevin'")
     for name, value in (
         ("equilibration_time", equilibration_time),
         ("production_time", production_time),
+        ("dump_interval_time", dump_interval_time),
     ):
         if not math.isfinite(value) or value <= 0.0:
             raise ValueError(f"{name} must be positive and finite")
+    if not math.isfinite(high_resolution_duration) or high_resolution_duration < 0.0:
+        raise ValueError("high_resolution_duration must be finite and nonnegative")
+    if high_resolution_duration > production_time:
+        raise ValueError("high_resolution_duration cannot exceed production_time")
+    if high_resolution_duration > 0.0:
+        if high_resolution_dump_interval is None or not math.isfinite(high_resolution_dump_interval):
+            raise ValueError("high_resolution_dump_interval is required for a positive high_resolution_duration")
+        if high_resolution_dump_interval <= 0.0:
+            raise ValueError("high_resolution_dump_interval must be positive")
+    elif high_resolution_dump_interval is not None:
+        raise ValueError("high_resolution_dump_interval requires a positive high_resolution_duration")
 
     if _payload is None:
         with source_path.open("rb") as handle:
@@ -3718,10 +3920,25 @@ def prepare_replicate(
     timestep = 0.001
     equilibration_steps = int(round(equilibration_time / timestep))
     production_steps = int(round(production_time / timestep))
+    dump_interval_steps = int(round(dump_interval_time / timestep))
+    high_resolution_steps = int(round(high_resolution_duration / timestep))
+    high_resolution_dump_interval_steps = (
+        int(round(high_resolution_dump_interval / timestep))
+        if high_resolution_dump_interval is not None
+        else None
+    )
     if not math.isclose(equilibration_steps * timestep, equilibration_time):
         raise ValueError("equilibration_time must be an integer multiple of 0.001 tau")
     if not math.isclose(production_steps * timestep, production_time):
         raise ValueError("production_time must be an integer multiple of 0.001 tau")
+    if not math.isclose(dump_interval_steps * timestep, dump_interval_time):
+        raise ValueError("dump_interval_time must be an integer multiple of 0.001 tau")
+    if not math.isclose(high_resolution_steps * timestep, high_resolution_duration):
+        raise ValueError("high_resolution_duration must be an integer multiple of 0.001 tau")
+    if high_resolution_dump_interval is not None and not math.isclose(
+        high_resolution_dump_interval_steps * timestep, high_resolution_dump_interval
+    ):
+        raise ValueError("high_resolution_dump_interval must be an integer multiple of 0.001 tau")
 
     output_directory.mkdir(parents=True, exist_ok=False)
     _write_lammps_data(output_directory / "initial.data", positions, particle_types, box_lengths)
@@ -3731,6 +3948,12 @@ def prepare_replicate(
             velocity_seed=velocity_seed,
             equilibration_steps=equilibration_steps,
             production_steps=production_steps,
+            dynamics=dynamics,
+            langevin_damping=langevin_damping,
+            langevin_seed=langevin_seed,
+            dump_interval_steps=dump_interval_steps,
+            high_resolution_steps=high_resolution_steps,
+            high_resolution_dump_interval_steps=high_resolution_dump_interval_steps,
         )
     )
 
@@ -3746,13 +3969,17 @@ def prepare_replicate(
         "particle_counts": {"A": a_count, "B": b_count, "total": a_count + b_count},
         "box_lengths": box_lengths.tolist(),
         "density": float(len(particle_types) / np.prod(box_lengths)),
-        "ensemble": "NVT",
-        "thermostat": "LAMMPS_fix_nvt_Nose_Hoover",
-        "thermostat_coupling_tau": 10.0,
+        "ensemble": "NVT" if dynamics == "nvt" else "NVE_plus_Langevin",
+        "dynamics": dynamics,
+        "thermostat": "LAMMPS_fix_nvt_Nose_Hoover" if dynamics == "nvt" else "LAMMPS_fix_langevin",
+        "thermostat_coupling_tau": 10.0 if dynamics == "nvt" else langevin_damping,
+        "langevin_seed": langevin_seed,
         "timestep_tau": timestep,
         "equilibration_time_tau": equilibration_time,
         "production_time_tau": production_time,
-        "saved_frame_interval_tau": 1.0,
+        "saved_frame_interval_tau": dump_interval_time,
+        "high_resolution_duration_tau": high_resolution_duration,
+        "high_resolution_saved_frame_interval_tau": high_resolution_dump_interval,
         "restart_interval_tau": 100.0,
         "potential": "standard_80_20_Kob_Andersen_LJ_shifted_at_2p5_sigma",
         "independence_class": "decorrelated_parent_frames_plus_velocity_seeds",
@@ -3776,6 +4003,12 @@ def prepare_replicate_ensemble(
     maximum_absolute_fs: float = 0.1,
     equilibration_time: float = 100.0,
     production_time: float = 5000.0,
+    dynamics: str = "nvt",
+    langevin_damping: float | None = None,
+    langevin_seeds: Sequence[int] | None = None,
+    dump_interval_time: float = 1.0,
+    high_resolution_duration: float = 0.0,
+    high_resolution_dump_interval: float | None = None,
 ) -> dict[str, object]:
     """Prepare a gated ensemble without repeatedly loading or hashing its parent."""
 
@@ -3787,6 +4020,18 @@ def prepare_replicate_ensemble(
         raise ValueError("frame_indices and velocity_seeds must have the same length of at least two")
     if len(set(seeds)) != len(seeds):
         raise ValueError("velocity_seeds must be unique")
+    if dynamics == "langevin":
+        if langevin_seeds is None:
+            raise ValueError("Langevin ensembles require one langevin seed per replicate")
+        bath_seeds = [int(value) for value in langevin_seeds]
+        if len(bath_seeds) != len(frames) or len(set(bath_seeds)) != len(bath_seeds):
+            raise ValueError("langevin_seeds must be unique and align with frame_indices")
+    elif dynamics == "nvt":
+        if langevin_seeds is not None:
+            raise ValueError("langevin_seeds are only valid when dynamics='langevin'")
+        bath_seeds = [None] * len(frames)
+    else:
+        raise ValueError("dynamics must be 'nvt' or 'langevin'")
     if not source_path.is_file():
         raise ValueError("source_path must be an existing pickle trajectory")
 
@@ -3806,7 +4051,9 @@ def prepare_replicate_ensemble(
     output_directory.mkdir(parents=True, exist_ok=False)
 
     replicate_manifests: list[dict[str, object]] = []
-    for replicate_index, (frame_index, velocity_seed) in enumerate(zip(frames, seeds), start=1):
+    for replicate_index, (frame_index, velocity_seed, langevin_seed) in enumerate(
+        zip(frames, seeds, bath_seeds), start=1
+    ):
         replicate_directory = output_directory / f"replicate_{replicate_index:02d}"
         replicate_manifest = prepare_replicate(
             source_path,
@@ -3816,6 +4063,12 @@ def prepare_replicate_ensemble(
             velocity_seed=velocity_seed,
             equilibration_time=equilibration_time,
             production_time=production_time,
+            dynamics=dynamics,
+            langevin_damping=langevin_damping,
+            langevin_seed=langevin_seed,
+            dump_interval_time=dump_interval_time,
+            high_resolution_duration=high_resolution_duration,
+            high_resolution_dump_interval=high_resolution_dump_interval,
             _payload=payload,
             _source_sha256=source_sha256,
         )
@@ -3825,6 +4078,7 @@ def prepare_replicate_ensemble(
                 "directory": replicate_directory.name,
                 "source_frame_index": frame_index,
                 "velocity_seed": velocity_seed,
+                "langevin_seed": langevin_seed,
             }
         )
 
@@ -3833,6 +4087,9 @@ def prepare_replicate_ensemble(
         "source_path": str(source_path),
         "source_sha256": source_sha256,
         "temperature": temperature,
+        "dynamics": dynamics,
+        "langevin_damping": langevin_damping,
+        "langevin_seeds": bath_seeds if dynamics == "langevin" else None,
         "replicate_count": len(frames),
         "independence_class": "decorrelated_parent_frames_plus_velocity_seeds",
         "independently_prepared_parent_samples": False,
@@ -3843,6 +4100,9 @@ def prepare_replicate_ensemble(
         "replicates": replicate_manifests,
         "equilibration_time_tau": equilibration_time,
         "production_time_tau": production_time,
+        "saved_frame_interval_tau": dump_interval_time,
+        "high_resolution_duration_tau": high_resolution_duration,
+        "high_resolution_saved_frame_interval_tau": high_resolution_dump_interval,
         "thermodynamic_claim_allowed": False,
     }
     temporary_manifest = output_directory / "ensemble_manifest.json.tmp"

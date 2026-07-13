@@ -815,6 +815,37 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(rows["diffusion"]["low_temperature_replicate_count"]), 3.0)
         self.assertTrue(all(row["thermodynamic_claim_allowed"] == "False" for row in rows.values()))
 
+    def test_c3_microscopic_tangent_control_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-c3-switched-tangent-control.md"
+        control_path = ROOT / "data" / "renewal_cage_ka_c3_tangent_control_T058_summary.csv"
+        fidelity_path = ROOT / "data" / "renewal_cage_ka_c3_physical_fidelity_T058_summary.csv"
+        self.assertTrue(document_path.is_file())
+        document = document_path.read_text()
+        for required in (
+            "ka_lj_c3_switch",
+            "5.914e-15",
+            "320/320",
+            "generator_second",
+            "renewal hazard",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with control_path.open() as handle:
+            control = next(csv.DictReader(handle))
+        self.assertEqual(control["potential_protocol"], "ka_lj_c3_switch")
+        self.assertEqual(int(control["minimum_valid_intervals_per_epsilon"]), 320)
+        self.assertEqual(int(control["maximum_right_censored_intervals_per_epsilon"]), 0)
+        self.assertEqual(control["microscopic_tangent_covariance_gate_pass"], "True")
+        self.assertEqual(control["all_original_design_gates_pass"], "False")
+        self.assertEqual(control["thermodynamic_claim_allowed"], "False")
+
+        with fidelity_path.open() as handle:
+            fidelity = next(csv.DictReader(handle))
+        self.assertLess(float(fidelity["scaled_pair_histogram_total_variation"]), 0.02)
+        self.assertLess(abs(float(fidelity["force_norm_mean_relative_difference"])), 0.02)
+        self.assertEqual(fidelity["thermodynamic_claim_allowed"], "False")
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
