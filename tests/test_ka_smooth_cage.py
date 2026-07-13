@@ -236,6 +236,22 @@ class SmoothCageTests(unittest.TestCase):
                 survival_times=np.array([1.0, 20.0]),
             )
 
+    def test_initial_state_reconstruction_uses_recorded_seeds_and_run_zero(self):
+        source = (
+            ROOT / "scripts" / "reconstruct_ka_clone_initial_state.py"
+        ).read_text()
+
+        for required in (
+            "velocity all create",
+            "run 0",
+            "vx vy vz fx fy fz",
+            "maximum_position_reconstruction_error",
+            "parent_restart_sha256",
+            "os.replace",
+            "unlink",
+        ):
+            self.assertIn(required, source)
+
     def test_projected_drift_matches_phase_space_directional_derivative(self):
         from ka_local_cage import ka_lj_force_and_isotropic_curvature
         from ka_smooth_cage import (
