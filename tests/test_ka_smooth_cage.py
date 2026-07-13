@@ -323,6 +323,25 @@ class SmoothCageTests(unittest.TestCase):
             source.index("temporary.replace(output_path)"),
         )
 
+    def test_smooth_cage_analysis_reports_preregistered_gates(self):
+        script = ROOT / "scripts" / "analyze_ka_smooth_cage_tangent.py"
+        source = script.read_text()
+
+        self.assertIn("tangent_noise_covariance_diagnostic", source)
+        self.assertIn("cross_epsilon_covariance_correlation", source)
+        for gate in (
+            "integrity_gate_pass",
+            "cross_epsilon_gate_pass",
+            "trace_variance_gate_pass",
+            "mahalanobis_gate_pass",
+            "whitened_lag1_gate_pass",
+            "microscopic_smooth_cage_tangent_gate_pass",
+            "without_delta_j_null_rejected",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertIn(gate, source)
+        self.assertIn("PRIMARY_STRIDE = 5", source)
+
 
 if __name__ == "__main__":
     unittest.main()
