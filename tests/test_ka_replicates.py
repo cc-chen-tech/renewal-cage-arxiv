@@ -120,6 +120,8 @@ from ka_generator_response import (  # noqa: E402
     fit_generator_constrained_response,
     generator_response_tangent_diagnostic,
     generator_response_lammps_input,
+    ka_c3_lepton_expression,
+    ka_c3_lepton_pair_commands,
     matched_generator_response,
     right_censored_tangent_interval_mask,
     tangent_force_generator_noise_covariance_rate,
@@ -1883,6 +1885,50 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
         self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
+    def test_ka_c3_lepton_commands_encode_all_pair_specific_switches_without_tables(self):
+        expression = ka_c3_lepton_expression(epsilon=1.5, sigma=0.8)
+        self.assertIn("step(r-ron)", expression)
+        self.assertIn("35*x^4-84*x^5+70*x^6-20*x^7", expression)
+        self.assertIn("eps=1.5", expression)
+        self.assertIn("sig=0.8", expression)
+        self.assertIn("ron=1.6", expression)
+        self.assertIn("rc=2", expression)
+        self.assertLess(expression.index("x=(r-ron)/(rc-ron)"), expression.index("ron=1.6"))
+
+        commands = ka_c3_lepton_pair_commands()
+        self.assertIn("pair_style lepton 2.5", commands)
+        self.assertIn('pair_coeff 1 1 "', commands)
+        self.assertIn('pair_coeff 1 2 "', commands)
+        self.assertIn('pair_coeff 2 2 "', commands)
+        self.assertIn('" 2.5', commands)
+        self.assertIn('" 2', commands)
+        self.assertIn('" 2.2', commands)
+        self.assertNotIn("table", commands)
+
+    def test_lammps_lepton_build_cli_exposes_reproducible_build_controls(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "build_lammps_lepton.py"), "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--source-directory", "--build-directory", "--jobs", "--manifest"):
+            self.assertIn(option, completed.stdout)
+
+    def test_ka_c3_lepton_parity_cli_exposes_binary_output_and_tolerance_controls(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "check_ka_c3_lepton_parity.py"), "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--lammps-binary", "--output", "--absolute-tolerance", "--relative-tolerance"):
+            self.assertIn(option, completed.stdout)
 
     def test_ka_c3_switched_radial_derivatives_match_lj_and_vanish_through_third_order(self):
         epsilon = 1.0

@@ -11,6 +11,37 @@ from ka_local_cage import ka_lj_force_generator_observables, ka_lj_second_force_
 from ka_replicates import load_lammps_custom_trajectory
 
 
+def ka_c3_lepton_expression(*, epsilon: float, sigma: float) -> str:
+    """Return the analytic Lepton energy for one C3-switched KA pair."""
+
+    if not math.isfinite(epsilon) or epsilon < 0.0:
+        raise ValueError("epsilon must be finite and nonnegative")
+    if not math.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("sigma must be finite and positive")
+    inner = 2.0 * sigma
+    cutoff = 2.5 * sigma
+    return (
+        "4*eps*((sig/r)^12-(sig/r)^6)"
+        "*(1-step(r-ron)*(35*x^4-84*x^5+70*x^6-20*x^7));"
+        f"eps={epsilon:g};sig={sigma:g};x=(r-ron)/(rc-ron);"
+        f"ron={inner:g};rc={cutoff:g}"
+    )
+
+
+def ka_c3_lepton_pair_commands() -> str:
+    """Return explicit Lepton commands for all three binary KA pair types."""
+
+    rows = ["pair_style lepton 2.5"]
+    for left, right, epsilon, sigma in (
+        (1, 1, 1.0, 1.0),
+        (1, 2, 1.5, 0.8),
+        (2, 2, 0.5, 0.88),
+    ):
+        expression = ka_c3_lepton_expression(epsilon=epsilon, sigma=sigma)
+        rows.append(f'pair_coeff {left} {right} "{expression}" {2.5 * sigma:g}')
+    return "\n".join(rows)
+
+
 def generator_response_lammps_input(
     *,
     parent_restart: Path,
