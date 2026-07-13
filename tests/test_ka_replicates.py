@@ -913,7 +913,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
 
         result = module.exact_rate_trend(np.array([1.0, 1.1, 1.2, 1.3, 1.4, 1.5]))
 
-        self.assertGreater(result["normalized_total_linear_change"], 0.4)
+        self.assertAlmostEqual(result["normalized_total_linear_change"], 0.4)
         self.assertLess(result["exact_two_sided_permutation_p_value"], 0.01)
         self.assertEqual(result["strict_trend_detected"], 1.0)
 

@@ -85,6 +85,48 @@ the force directional derivative and the Hessian-noise identity on an analytic
 pair configuration.  This gives a parameter-free entry point for the next
 Krylov/Mori-Zwanzig closure test.
 
+The second generator coordinate is also evaluated directly,
+
+```text
+L^2 F_i = -sum_(j,k) [(v_k . grad_k) H_ij] v_j
+          -sum_j H_ij (F_j - gamma v_j).
+```
+
+The third-derivative contraction is obtained by a converged centered
+directional derivative of the exact Hessian.  Across four full-state KA
+clones, the centered trajectory derivative agrees with `LF` with correlation
+`0.99905 +/- 0.00016` and relative L2 error `0.0442 +/- 0.0032`.  The finite-step
+`LF` innovation has FDT trace-variance ratio `0.906 +/- 0.021` and mean squared
+Mahalanobis norm `2.71 +/- 0.08`, compared with the three-dimensional
+infinitesimal value `3`.
+
+## Generator-response closure gate
+
+The low-disk matched-response protocol runs the full 4096-particle Langevin
+system with common noise, two perturbation amplitudes, both signs, and eight
+independent bath realizations.  It retains compressed microscopic
+`(x, v, F, LF, L2F)` paths and deletes validated raw dumps except for one audit
+trajectory.
+
+- scripts: `scripts/run_ka_generator_response.py` and
+  `scripts/analyze_ka_generator_response_closure.py`
+- outputs: `data/renewal_cage_ka_generator_response_closure_T058_summary.csv`
+  and `data/renewal_cage_ka_generator_response_closure_T058_curve.csv`
+- linearity: all eight members pass the `0.02` cross-amplitude position gate at
+  `0.2 tau`; seven of eight pass at `1 tau`, with the remaining error `0.02005`.
+- falsification: a deterministic 12-state model fixes the exact kinematic rows
+  `dx=v`, `dv=F-gamma v`, and `dF=LF`, fitting only the final `dLF=L2F` row.
+  Leave-one-clone-out position errors are `0.345` at `0.2 tau` and `1.93` at
+  `1 tau` for the longest `0.2 tau` fit window, so every preregistered closure
+  gate fails.  A free empirical transition also fails, with errors `0.319` and
+  `1.08`.
+
+This is a useful negative result: the exact instantaneous generator chain is
+not, by itself, a stable deterministic single-trajectory closure.  The next
+test must retain the tangent-noise term or judge the drift first on an
+ensemble-mean response.  The result does not falsify the microscopic Langevin
+starting point or establish a renewal clock.
+
 ## Current boundary
 
 The evidence supports this statement:
