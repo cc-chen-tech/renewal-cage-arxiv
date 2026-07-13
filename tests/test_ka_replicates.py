@@ -142,6 +142,111 @@ from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E4
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_radial_recoil_markov_is_deterministic_and_removes_triplet_order(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        path = np.array(
+            [
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                    [-0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-1.0, -math.sqrt(3.0), 0.0],
+                    [-1.0, 0.0, 0.0],
+                ]
+            ]
+        )
+
+        first = surrogate(path, np.random.default_rng(7), 2)
+        second = surrogate(path, np.random.default_rng(7), 2)
+
+        np.testing.assert_allclose(first, second)
+        self.assertFalse(np.array_equal(first, path))
+
+    def test_radial_recoil_markov_preserves_particle_conditioned_transitions(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        path = np.array(
+            [
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                    [-0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-1.0, -math.sqrt(3.0), 0.0],
+                    [-1.0, 0.0, 0.0],
+                ],
+                [
+                    [2.0, 0.0, 0.0],
+                    [-2.0, 2.0 * math.sqrt(3.0), 0.0],
+                    [1.0, math.sqrt(3.0), 0.0],
+                    [-4.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [-2.0, -2.0 * math.sqrt(3.0), 0.0],
+                    [-2.0, 0.0, 0.0],
+                ],
+            ]
+        )
+
+        generated = surrogate(path, np.random.default_rng(17), radial_bin_count=2)
+        radii = np.linalg.norm(generated, axis=2)
+        cosines = np.sum(generated[:, :-1] * generated[:, 1:], axis=2) / (
+            radii[:, :-1] * radii[:, 1:]
+        )
+
+        np.testing.assert_allclose(radii, np.linalg.norm(path, axis=2))
+        np.testing.assert_allclose(cosines[:, ::2], -0.5)
+        np.testing.assert_allclose(cosines[:, 1::2], 0.5)
+
+    def test_radial_recoil_markov_quality_reports_named_errors(self):
+        quality = getattr(ka_replicates, "radial_recoil_markov_quality", None)
+        self.assertIsNotNone(quality)
+        reference = np.array(
+            [
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                    [-0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-1.0, -math.sqrt(3.0), 0.0],
+                ]
+            ]
+        )
+
+        errors = quality(reference, 2.0 * reference)
+
+        self.assertAlmostEqual(errors["radial_mean_relative_error"], 1.0)
+        self.assertAlmostEqual(errors["radial_standard_deviation_relative_error"], 1.0)
+        self.assertAlmostEqual(errors["lag_one_cosine_mean_absolute_error"], 0.0)
+        self.assertAlmostEqual(
+            errors["lag_one_cosine_quantile_maximum_absolute_error"], 0.0
+        )
+        self.assertAlmostEqual(
+            errors["normalized_lag_one_dot_correlation_absolute_error"], 0.0
+        )
+
+    def test_radial_recoil_markov_rejects_invalid_paths_bins_and_rng(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        quality = getattr(ka_replicates, "radial_recoil_markov_quality", None)
+        self.assertIsNotNone(surrogate)
+        self.assertIsNotNone(quality)
+        valid = np.array([[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]])
+
+        with self.assertRaisesRegex(ValueError, "three-dimensional"):
+            surrogate(np.ones((1, 3, 2)), np.random.default_rng(3), radial_bin_count=1)
+        with self.assertRaisesRegex(ValueError, "nonzero"):
+            surrogate(np.zeros((1, 3, 3)), np.random.default_rng(3), radial_bin_count=1)
+        with self.assertRaisesRegex(ValueError, "radial_bin_count"):
+            surrogate(valid, np.random.default_rng(3), radial_bin_count=2)
+        with self.assertRaisesRegex(ValueError, "NumPy Generator"):
+            surrogate(valid, object(), radial_bin_count=1)
+        with self.assertRaisesRegex(ValueError, "equal shapes"):
+            quality(valid, np.ones((1, 3, 3)))
+
     def test_cage_anchor_returns_detect_exact_backtrack_and_analytic_null(self):
         measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
         self.assertIsNotNone(measure)

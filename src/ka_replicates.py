@@ -2624,6 +2624,189 @@ def consecutive_cage_anchor_returns(
     }
 
 
+def _validate_radial_recoil_block_path(
+    block_displacements: np.ndarray,
+    *,
+    name: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Validate a nondegenerate three-dimensional block path for the recoil null."""
+
+    try:
+        displacements = np.asarray(block_displacements, dtype=float)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} must be a finite three-dimensional block path") from error
+    if (
+        displacements.ndim != 3
+        or displacements.shape[0] < 1
+        or displacements.shape[1] < 2
+        or displacements.shape[2] != 3
+        or np.any(~np.isfinite(displacements))
+    ):
+        raise ValueError(
+            f"{name} must be a finite particle-block array of three-dimensional vectors"
+        )
+    radii = np.linalg.norm(displacements, axis=2)
+    if np.any(radii <= 0.0):
+        raise ValueError(f"{name} must contain only nonzero vectors")
+    return displacements, radii
+
+
+def _radial_recoil_source_bin(
+    source_radii: np.ndarray,
+    current_radius: float,
+    radial_bin_count: int,
+) -> int:
+    """Assign one generated source radius to the matching empirical equal-count bin."""
+
+    rank = int(np.searchsorted(source_radii, current_radius, side="left"))
+    return min(radial_bin_count - 1, rank * radial_bin_count // len(source_radii))
+
+
+def _isotropic_azimuth_direction(
+    source_vector: np.ndarray,
+    relative_cosine: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Draw a unit vector at a fixed polar cosine and uniform azimuth in 3D."""
+
+    source_radius = float(np.linalg.norm(source_vector))
+    source_direction = source_vector / source_radius
+    basis = np.zeros(3)
+    basis[int(np.argmin(np.abs(source_direction)))] = 1.0
+    first_perpendicular = np.cross(source_direction, basis)
+    first_perpendicular /= np.linalg.norm(first_perpendicular)
+    second_perpendicular = np.cross(source_direction, first_perpendicular)
+    azimuth = rng.uniform(0.0, 2.0 * math.pi)
+    transverse = math.sqrt(max(0.0, 1.0 - relative_cosine**2))
+    return (
+        relative_cosine * source_direction
+        + transverse
+        * (
+            math.cos(azimuth) * first_perpendicular
+            + math.sin(azimuth) * second_perpendicular
+        )
+    )
+
+
+def radial_recoil_markov_surrogate(
+    block_displacements: np.ndarray,
+    rng: np.random.Generator,
+    radial_bin_count: int,
+) -> np.ndarray:
+    """Sample a particle-local radial recoil Markov path with isotropic azimuths."""
+
+    displacements, radii = _validate_radial_recoil_block_path(
+        block_displacements,
+        name="block_displacements",
+    )
+    if not isinstance(rng, np.random.Generator):
+        raise ValueError("rng must be a NumPy Generator")
+    transition_count = displacements.shape[1] - 1
+    if (
+        isinstance(radial_bin_count, bool)
+        or not isinstance(radial_bin_count, int)
+        or not 1 <= radial_bin_count <= transition_count
+    ):
+        raise ValueError("radial_bin_count must be a positive integer no larger than transitions")
+
+    source_order = np.argsort(radii[:, :-1], axis=1)
+    source_groups = np.array_split(source_order, radial_bin_count, axis=1)
+    sorted_source_radii = np.take_along_axis(radii[:, :-1], source_order, axis=1)
+    surrogate = np.empty_like(displacements)
+    surrogate[:, 0] = displacements[:, 0]
+    for block_index in range(1, displacements.shape[1]):
+        for particle_index in range(displacements.shape[0]):
+            previous = surrogate[particle_index, block_index - 1]
+            bin_index = _radial_recoil_source_bin(
+                sorted_source_radii[particle_index],
+                float(np.linalg.norm(previous)),
+                radial_bin_count,
+            )
+            source_indices = source_groups[bin_index][particle_index]
+            sampled_source = int(source_indices[rng.integers(len(source_indices))])
+            target = displacements[particle_index, sampled_source + 1]
+            relative_cosine = float(
+                np.dot(displacements[particle_index, sampled_source], target)
+                / (radii[particle_index, sampled_source] * radii[particle_index, sampled_source + 1])
+            )
+            target_radius = radii[particle_index, sampled_source + 1]
+            surrogate[particle_index, block_index] = target_radius * _isotropic_azimuth_direction(
+                previous,
+                float(np.clip(relative_cosine, -1.0, 1.0)),
+                rng,
+            )
+    return surrogate
+
+
+def radial_recoil_markov_quality(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> dict[str, float]:
+    """Report the one-step radial and recoil-law errors used by the transfer gate."""
+
+    reference, reference_radii = _validate_radial_recoil_block_path(
+        reference,
+        name="reference",
+    )
+    candidate, candidate_radii = _validate_radial_recoil_block_path(
+        candidate,
+        name="candidate",
+    )
+    if reference.shape != candidate.shape:
+        raise ValueError("reference and candidate block paths must have equal shapes")
+
+    reference_radial_mean = float(np.mean(reference_radii))
+    reference_radial_standard_deviation = float(np.std(reference_radii))
+    if reference_radial_standard_deviation == 0.0:
+        raise ValueError("reference radial standard deviation must be positive")
+    candidate_radial_mean = float(np.mean(candidate_radii))
+    candidate_radial_standard_deviation = float(np.std(candidate_radii))
+
+    def lag_one_cosines(vectors: np.ndarray, radii: np.ndarray) -> np.ndarray:
+        return np.sum(vectors[:, :-1] * vectors[:, 1:], axis=2) / (
+            radii[:, :-1] * radii[:, 1:]
+        )
+
+    reference_cosines = lag_one_cosines(reference, reference_radii)
+    candidate_cosines = lag_one_cosines(candidate, candidate_radii)
+    quantile_errors = {
+        quantile: abs(
+            float(np.quantile(candidate_cosines, quantile))
+            - float(np.quantile(reference_cosines, quantile))
+        )
+        for quantile in (0.10, 0.25, 0.50, 0.75, 0.90)
+    }
+    reference_dot_correlation = float(
+        np.mean(np.sum(reference[:, :-1] * reference[:, 1:], axis=2))
+    )
+    candidate_dot_correlation = float(
+        np.mean(np.sum(candidate[:, :-1] * candidate[:, 1:], axis=2))
+    )
+    reference_msd = float(np.mean(reference_radii**2))
+    candidate_msd = float(np.mean(candidate_radii**2))
+    return {
+        "radial_mean_relative_error": abs(
+            candidate_radial_mean / reference_radial_mean - 1.0
+        ),
+        "radial_standard_deviation_relative_error": abs(
+            candidate_radial_standard_deviation / reference_radial_standard_deviation - 1.0
+        ),
+        "lag_one_cosine_mean_absolute_error": abs(
+            float(np.mean(candidate_cosines)) - float(np.mean(reference_cosines))
+        ),
+        "lag_one_cosine_quantile_0p10_absolute_error": quantile_errors[0.10],
+        "lag_one_cosine_quantile_0p25_absolute_error": quantile_errors[0.25],
+        "lag_one_cosine_quantile_0p50_absolute_error": quantile_errors[0.50],
+        "lag_one_cosine_quantile_0p75_absolute_error": quantile_errors[0.75],
+        "lag_one_cosine_quantile_0p90_absolute_error": quantile_errors[0.90],
+        "lag_one_cosine_quantile_maximum_absolute_error": max(quantile_errors.values()),
+        "normalized_lag_one_dot_correlation_absolute_error": abs(
+            candidate_dot_correlation / candidate_msd
+            - reference_dot_correlation / reference_msd
+        ),
+    }
+
+
 def summarize_replicate_binned_metric(
     rows: Sequence[dict[str, object]],
     *,
