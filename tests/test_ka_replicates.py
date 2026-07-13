@@ -1,5 +1,6 @@
 import json
 import importlib.util
+import math
 import pickle
 import csv
 import subprocess
@@ -717,6 +718,55 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertIsNotNone(finite)
         self.assertAlmostEqual(finite(rows, block_count=1), 1.0)
         self.assertAlmostEqual(finite(rows, block_count=2), 1.0 / 3.0)
+
+    def test_cumulative_block_observables_match_direct_windows(self):
+        observe = getattr(ka_replicates, "cumulative_block_observables", None)
+        self.assertIsNotNone(observe)
+        blocks = np.array([[[1.0, 0.0], [0.0, 2.0], [-1.0, 0.0]]])
+
+        result = observe(blocks, block_count=2, wave_numbers=np.array([1.0]))
+
+        self.assertEqual(result["particle_window_count"], 2.0)
+        self.assertAlmostEqual(result["msd"], 5.0)
+        self.assertAlmostEqual(result["fourth_moment"], 25.0)
+        self.assertAlmostEqual(result["ngp"], -0.5)
+        self.assertAlmostEqual(
+            result["characteristic_k1"],
+            0.5 * (math.cos(1.0) + math.cos(2.0)),
+        )
+
+    def test_within_particle_shuffle_preserves_particle_vector_multisets(self):
+        shuffle = getattr(ka_replicates, "within_particle_time_shuffle", None)
+        self.assertIsNotNone(shuffle)
+        blocks = np.arange(24, dtype=float).reshape(2, 4, 3)
+
+        shuffled = shuffle(blocks, np.random.default_rng(7))
+
+        for particle in range(blocks.shape[0]):
+            original = sorted(map(tuple, blocks[particle]))
+            randomized = sorted(map(tuple, shuffled[particle]))
+            self.assertEqual(randomized, original)
+        self.assertFalse(np.array_equal(shuffled, blocks))
+
+    def test_direction_randomized_path_preserves_lengths_not_recoil(self):
+        observe = getattr(
+            ka_replicates,
+            "direction_randomized_block_observables",
+            None,
+        )
+        self.assertIsNotNone(observe)
+        blocks = np.array([[[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]])
+
+        result = observe(blocks, block_count=2, wave_numbers=np.array([1.0]))
+
+        self.assertEqual(result["particle_window_count"], 1.0)
+        self.assertAlmostEqual(result["msd"], 2.0)
+        self.assertAlmostEqual(result["fourth_moment"], 16.0 / 3.0)
+        self.assertAlmostEqual(result["ngp"], -0.2)
+        self.assertAlmostEqual(
+            result["characteristic_k1"],
+            (math.sin(1.0) / 1.0) ** 2,
+        )
 
     def test_two_clock_hmm_hybrid_gate_separates_rate_drift_from_shape_closure(self):
         script_path = ROOT / "scripts" / "analyze_ka_two_clock_hmm_mixture.py"

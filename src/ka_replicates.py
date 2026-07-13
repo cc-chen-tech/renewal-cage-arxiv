@@ -305,6 +305,154 @@ def finite_window_green_kubo_factor(
     return 1.0 + 2.0 * correction / block_msd
 
 
+def _validate_block_path_inputs(
+    block_displacements: np.ndarray,
+    block_count: int,
+    wave_numbers: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    displacements = np.asarray(block_displacements, dtype=float)
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if (
+        displacements.ndim != 3
+        or min(displacements.shape) < 1
+        or np.any(~np.isfinite(displacements))
+    ):
+        raise ValueError("block displacements must be a finite particle-block-vector array")
+    if (
+        isinstance(block_count, bool)
+        or not isinstance(block_count, int)
+        or not 1 <= block_count <= displacements.shape[1]
+    ):
+        raise ValueError("block_count must fit inside the block axis")
+    if (
+        wave_numbers.ndim != 1
+        or len(wave_numbers) < 1
+        or np.any(~np.isfinite(wave_numbers))
+        or np.any(wave_numbers <= 0.0)
+    ):
+        raise ValueError("wave numbers must be a positive finite vector")
+    return displacements, wave_numbers
+
+
+def cumulative_block_observables(
+    block_displacements: np.ndarray,
+    *,
+    block_count: int,
+    wave_numbers: np.ndarray,
+) -> dict[str, float]:
+    """Measure cumulative observables over all contiguous particle-block windows."""
+
+    displacements, wave_numbers = _validate_block_path_inputs(
+        block_displacements,
+        block_count,
+        wave_numbers,
+    )
+    prefix = np.concatenate(
+        [
+            np.zeros((displacements.shape[0], 1, displacements.shape[2])),
+            np.cumsum(displacements, axis=1),
+        ],
+        axis=1,
+    )
+    cumulative = prefix[:, block_count:] - prefix[:, :-block_count]
+    vectors = cumulative.reshape(-1, displacements.shape[2])
+    squared = np.sum(vectors**2, axis=1)
+    msd = float(np.mean(squared))
+    fourth = float(np.mean(squared**2))
+    ngp = (
+        displacements.shape[2]
+        / (displacements.shape[2] + 2.0)
+        * fourth
+        / msd**2
+        - 1.0
+        if msd > 0.0
+        else math.nan
+    )
+    result = {
+        "block_count": float(block_count),
+        "particle_window_count": float(len(vectors)),
+        "msd": msd,
+        "fourth_moment": fourth,
+        "ngp": ngp,
+    }
+    for wave_number in wave_numbers:
+        key = f"characteristic_k{wave_number:g}".replace(".", "p")
+        result[key] = float(np.mean(np.cos(wave_number * vectors)))
+    return result
+
+
+def within_particle_time_shuffle(
+    block_displacements: np.ndarray,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Destroy block order while preserving each particle's vector multiset."""
+
+    displacements = np.asarray(block_displacements, dtype=float)
+    if (
+        displacements.ndim != 3
+        or min(displacements.shape) < 1
+        or np.any(~np.isfinite(displacements))
+        or not isinstance(rng, np.random.Generator)
+    ):
+        raise ValueError("a finite block array and NumPy generator are required")
+    order = np.argsort(rng.random(displacements.shape[:2]), axis=1)
+    return np.take_along_axis(displacements, order[:, :, np.newaxis], axis=1)
+
+
+def direction_randomized_block_observables(
+    block_displacements: np.ndarray,
+    *,
+    block_count: int,
+    wave_numbers: np.ndarray,
+) -> dict[str, float]:
+    """Average ordered block lengths over independent isotropic 3D directions."""
+
+    displacements, wave_numbers = _validate_block_path_inputs(
+        block_displacements,
+        block_count,
+        wave_numbers,
+    )
+    if displacements.shape[2] != 3:
+        raise ValueError("the analytic direction-randomized kernel requires 3D vectors")
+    squared_lengths = np.sum(displacements**2, axis=2)
+    fourth_lengths = squared_lengths**2
+
+    def window_sum(values: np.ndarray) -> np.ndarray:
+        prefix = np.concatenate(
+            [np.zeros((values.shape[0], 1)), np.cumsum(values, axis=1)],
+            axis=1,
+        )
+        return prefix[:, block_count:] - prefix[:, :-block_count]
+
+    sum_second = window_sum(squared_lengths)
+    sum_fourth = window_sum(fourth_lengths)
+    fourth_windows = sum_fourth + (5.0 / 3.0) * (
+        sum_second**2 - sum_fourth
+    )
+    msd = float(np.mean(sum_second))
+    fourth = float(np.mean(fourth_windows))
+    result = {
+        "block_count": float(block_count),
+        "particle_window_count": float(sum_second.size),
+        "msd": msd,
+        "fourth_moment": fourth,
+        "ngp": 3.0 / 5.0 * fourth / msd**2 - 1.0 if msd > 0.0 else math.nan,
+    }
+    lengths = np.sqrt(squared_lengths)
+    window_count = lengths.shape[1] - block_count + 1
+    for wave_number in wave_numbers:
+        characteristic = np.ones((lengths.shape[0], window_count))
+        for offset in range(block_count):
+            characteristic *= np.sinc(
+                wave_number
+                * lengths[:, offset : offset + window_count]
+                / math.pi
+            )
+        key = f"characteristic_k{wave_number:g}".replace(".", "p")
+        result[key] = float(np.mean(characteristic))
+    return result
+
+
 def particle_event_count_matrix(
     events: dict[str, np.ndarray],
     *,
