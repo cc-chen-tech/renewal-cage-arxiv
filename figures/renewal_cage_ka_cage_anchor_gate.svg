@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560">
+<rect width="960" height="560" fill="#f7f7f4"/>
+<text x="48" y="48" font-family="Arial, sans-serif" font-size="25" font-weight="700" fill="#172126">Cooling-induced cage-anchor memory gate</text>
+<text x="48" y="76" font-family="Arial, sans-serif" font-size="14" fill="#4d585d">Calibration returns and held-out one-step recoil transfer</text>
+<rect x="90" y="115" width="460" height="330" fill="#ffffff" stroke="#a9b0b3"/>
+<line x1="90" y1="445.00" x2="550" y2="445.00" stroke="#e2e5e5"/>
+<text x="78" y="450.00" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#596268">0</text>
+<line x1="90" y1="362.50" x2="550" y2="362.50" stroke="#e2e5e5"/>
+<text x="78" y="367.50" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#596268">0.25</text>
+<line x1="90" y1="280.00" x2="550" y2="280.00" stroke="#e2e5e5"/>
+<text x="78" y="285.00" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#596268">0.5</text>
+<line x1="90" y1="197.50" x2="550" y2="197.50" stroke="#e2e5e5"/>
+<text x="78" y="202.50" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#596268">0.75</text>
+<line x1="90" y1="115.00" x2="550" y2="115.00" stroke="#e2e5e5"/>
+<text x="78" y="120.00" text-anchor="end" font-family="Arial, sans-serif" font-size="12" fill="#596268">1</text>
+<text x="90.00" y="473" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#30383c">0.5</text>
+<text x="320.00" y="473" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#30383c">1</text>
+<text x="550.00" y="473" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#30383c">1.5</text>
+<circle cx="84.00" cy="392.60" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="314.00" cy="301.79" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="544.00" cy="233.44" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="84.00" cy="393.39" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="314.00" cy="303.41" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="544.00" cy="234.65" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="84.00" cy="391.41" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="314.00" cy="300.14" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="544.00" cy="231.90" r="4" fill="#b33a3a" fill-opacity="0.78"/>
+<circle cx="96.00" cy="441.96" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="326.00" cy="426.15" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="556.00" cy="396.71" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="96.00" cy="441.69" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="326.00" cy="425.39" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="556.00" cy="395.30" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="96.00" cy="442.45" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="326.00" cy="427.79" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="556.00" cy="397.00" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="96.00" cy="441.83" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="326.00" cy="425.94" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="556.00" cy="395.80" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="96.00" cy="441.94" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="326.00" cy="426.02" r="4" fill="#176b87" fill-opacity="0.78"/>
+<circle cx="556.00" cy="395.06" r="4" fill="#176b87" fill-opacity="0.78"/>
+<text x="320.0" y="500" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#30383c">Return radius / a_DW</text>
+<text x="25" y="280.0" transform="rotate(-90 25 280.0)" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#30383c">Return fraction</text>
+<circle cx="112" cy="510" r="5" fill="#b33a3a"/><text x="125" y="515" font-family="Arial, sans-serif" font-size="13" fill="#30383c">T=0.45</text>
+<circle cx="202" cy="510" r="5" fill="#176b87"/><text x="215" y="515" font-family="Arial, sans-serif" font-size="13" fill="#30383c">T=0.58</text>
+<text x="610" y="126" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#172126">Frozen decision conditions</text>
+<rect x="610" y="150" width="52" height="22" rx="3" fill="#2f7d4a"/>
+<text x="636" y="166" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff">PASS</text>
+<text x="676" y="166" font-family="Arial, sans-serif" font-size="13" fill="#30383c">All return radii separate</text>
+<rect x="610" y="188" width="52" height="22" rx="3" fill="#2f7d4a"/>
+<text x="636" y="204" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff">PASS</text>
+<text x="676" y="204" font-family="Arial, sans-serif" font-size="13" fill="#30383c">Primary return/null ratio >= 1.35</text>
+<rect x="610" y="226" width="52" height="22" rx="3" fill="#2f7d4a"/>
+<text x="636" y="242" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff">PASS</text>
+<text x="676" y="242" font-family="Arial, sans-serif" font-size="13" fill="#30383c">Recoil quality and precision: T=0.45</text>
+<rect x="610" y="264" width="52" height="22" rx="3" fill="#2f7d4a"/>
+<text x="636" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff">PASS</text>
+<text x="676" y="280" font-family="Arial, sans-serif" font-size="13" fill="#30383c">Recoil quality and precision: T=0.58</text>
+<rect x="610" y="302" width="52" height="22" rx="3" fill="#2f7d4a"/>
+<text x="636" y="318" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff">PASS</text>
+<text x="676" y="318" font-family="Arial, sans-serif" font-size="13" fill="#30383c">T=0.58 closes MSD, NGP, and Fs</text>
+<rect x="610" y="340" width="52" height="22" rx="3" fill="#2f7d4a"/>
+<text x="636" y="356" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff">PASS</text>
+<text x="676" y="356" font-family="Arial, sans-serif" font-size="13" fill="#30383c">T=0.45 fails NGP and multi-k Fs</text>
+<rect x="610" y="378" width="52" height="22" rx="3" fill="#2f7d4a"/>
+<text x="636" y="394" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff">PASS</text>
+<text x="676" y="394" font-family="Arial, sans-serif" font-size="13" fill="#30383c">Ordered path remains upper bound</text>
+<rect x="610" y="445" width="302" height="54" rx="4" fill="#2f7d4a"/>
+<text x="761" y="478" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">CAGE-ANCHOR MEMORY REQUIRED</text>
+<text x="610" y="528" font-family="Arial, sans-serif" font-size="11" fill="#596268">Dynamical mechanism only; closure, facilitation, and thermodynamic claims remain 0.</text>
+</svg>

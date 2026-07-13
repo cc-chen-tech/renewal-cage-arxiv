@@ -284,6 +284,107 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(
             float(summary["minimum_cross_epsilon_covariance_correlation"]), 0.9999
         )
+    def test_cage_anchor_gate_artifacts_enforce_frozen_crossover(self):
+        data = ROOT / "data"
+        figure = ROOT / "figures" / "renewal_cage_ka_cage_anchor_gate.svg"
+        return_rows_path = data / "renewal_cage_ka_cage_anchor_returns_rows.csv"
+        return_verdict_path = data / "renewal_cage_ka_cage_anchor_returns_verdict.csv"
+        recoil_prefixes = {
+            "low": data / "renewal_cage_ka_replicates_T045_recoil_markov",
+            "high": data / "renewal_cage_ka_replicates_T058_recoil_markov",
+        }
+        gate_path = data / "renewal_cage_ka_cage_anchor_gate.csv"
+
+        with return_rows_path.open() as handle:
+            return_rows = list(csv.DictReader(handle))
+        with return_verdict_path.open() as handle:
+            return_verdict = next(csv.DictReader(handle))
+        recoil = {}
+        for temperature, prefix in recoil_prefixes.items():
+            tables = {}
+            for suffix in ("rows", "quality", "summary", "verdict"):
+                with prefix.with_name(f"{prefix.name}_{suffix}.csv").open() as handle:
+                    tables[suffix] = list(csv.DictReader(handle))
+            recoil[temperature] = tables
+        with gate_path.open() as handle:
+            gate = next(csv.DictReader(handle))
+
+        self.assertEqual(len(return_rows), 24)
+        self.assertEqual(len(recoil["low"]["quality"]), 48)
+        self.assertEqual(len(recoil["high"]["quality"]), 80)
+        self.assertEqual(float(return_verdict["low_temperature_replicate_count"]), 3.0)
+        self.assertEqual(float(return_verdict["high_temperature_replicate_count"]), 5.0)
+        self.assertEqual(float(return_verdict["all_radius_scales_separated"]), 1.0)
+        self.assertEqual(float(return_verdict["primary_radius_null_excess_pass"]), 1.0)
+        self.assertGreaterEqual(
+            float(return_verdict["minimum_primary_low_return_excess_ratio"]),
+            1.35,
+        )
+        self.assertEqual({float(row["radius_scale"]) for row in return_rows}, {0.5, 1.0, 1.5})
+
+        for temperature, expected_count, calibration_time in (
+            ("low", 3.0, 5000.0),
+            ("high", 5.0, 750.0),
+        ):
+            verdict = recoil[temperature]["verdict"][0]
+            quality = recoil[temperature]["quality"]
+            self.assertEqual(float(verdict["independent_replicate_count"]), expected_count)
+            self.assertEqual(float(verdict["calibration_time"]), calibration_time)
+            self.assertEqual(float(verdict["block_size"]), 20.0)
+            self.assertEqual(float(verdict["required_realizations_per_replicate"]), 16.0)
+            self.assertEqual(float(verdict["quality_realization_completeness_pass"]), 1.0)
+            self.assertEqual(float(verdict["quality_pass"]), 1.0)
+            self.assertEqual(float(verdict["precision_pass"]), 1.0)
+            self.assertLessEqual(float(verdict["maximum_ensemble_msd_mc_relative_se"]), 0.01)
+            self.assertLessEqual(float(verdict["maximum_ensemble_ngp_mc_se"]), 0.03)
+            self.assertLessEqual(float(verdict["maximum_ensemble_fs_mc_se"]), 0.003)
+            self.assertLessEqual(max(float(row["radial_mean_relative_error"]) for row in quality), 0.02)
+            self.assertLessEqual(max(float(row["radial_standard_deviation_relative_error"]) for row in quality), 0.02)
+            self.assertLessEqual(max(float(row["lag_one_cosine_mean_absolute_error"]) for row in quality), 0.02)
+            self.assertLessEqual(max(float(row["lag_one_cosine_quantile_maximum_absolute_error"]) for row in quality), 0.03)
+            self.assertLessEqual(max(float(row["normalized_lag_one_dot_correlation_absolute_error"]) for row in quality), 0.02)
+            self.assertTrue(all(float(row["replicate_first_aggregation"]) == 1.0 for row in recoil[temperature]["summary"]))
+
+        low = recoil["low"]["verdict"][0]
+        high = recoil["high"]["verdict"][0]
+        self.assertGreater(float(low["maximum_ensemble_ngp_absolute_error"]), 0.30)
+        self.assertGreater(float(low["maximum_ensemble_fs_absolute_error"]), 0.03)
+        self.assertEqual(float(high["curve_transfer_pass"]), 1.0)
+        self.assertLessEqual(float(high["maximum_ensemble_msd_relative_error"]), 0.10)
+        self.assertLessEqual(float(high["maximum_ensemble_ngp_absolute_error"]), 0.30)
+        self.assertLessEqual(float(high["maximum_ensemble_fs_absolute_error"]), 0.03)
+
+        for key, expected in (
+            ("block_size", 20.0),
+            ("radial_bin_count", 8.0),
+            ("recoil_realizations_per_replicate", 16.0),
+            ("primary_radius_scale", 1.0),
+            ("msd_relative_error_tolerance", 0.10),
+            ("ngp_absolute_error_tolerance", 0.30),
+            ("fs_absolute_error_tolerance", 0.03),
+        ):
+            self.assertEqual(float(gate[key]), expected)
+        self.assertEqual(float(gate["ordered_calibration_path_upper_bound_pass"]), 1.0)
+        self.assertEqual(float(gate["cage_anchor_memory_required"]), 1.0)
+        self.assertEqual(gate["mechanism_state"], "cage_anchor_memory_required")
+        for key in (
+            "microdynamic_closure_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(gate[key]), 0.0)
+            self.assertTrue(all(float(row[key]) == 0.0 for row in return_rows))
+            for tables in recoil.values():
+                for table in tables.values():
+                    self.assertTrue(all(float(row[key]) == 0.0 for row in table))
+
+        svg = figure.read_text()
+        self.assertIn("Cooling-induced cage-anchor memory gate", svg)
+        self.assertIn("T=0.45", svg)
+        self.assertIn("T=0.58", svg)
+        self.assertNotIn("nan", svg.lower())
+        self.assertNotIn("inf", svg.lower())
+
     def test_nonlinear_path_gate_artifacts_preserve_claim_boundaries(self):
         gate_path = ROOT / "data" / "renewal_cage_ka_nonlinear_path_gate.csv"
         quality_path = (
