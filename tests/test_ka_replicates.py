@@ -6251,5 +6251,209 @@ ITEM: ATOMS id type x y z ix iy iz vx vy vz
             self.assertIn("fix bath all langevin 0.58 0.58 1 99173", input_text)
 
 
+class KACageAnchorGateTests(unittest.TestCase):
+    def _module(self, filename: str, module_name: str):
+        script_path = ROOT / "scripts" / filename
+        spec = importlib.util.spec_from_file_location(module_name, script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    def test_cage_anchor_return_classifier_requires_all_scales_and_primary_null(self):
+        module = self._module(
+            "analyze_ka_cage_anchor_returns.py",
+            "analyze_ka_cage_anchor_returns_classifier",
+        )
+        low_rows = [
+            {
+                "replicate": float(replicate),
+                "radius_scale": scale,
+                "return_fraction": 0.70 + 0.01 * replicate,
+                "isotropic_null_fraction": 0.50,
+            }
+            for replicate in (1, 2, 3)
+            for scale in (0.5, 1.0, 1.5)
+        ]
+        high_rows = [
+            {
+                "replicate": float(replicate),
+                "radius_scale": scale,
+                "return_fraction": 0.40 + 0.01 * replicate,
+                "isotropic_null_fraction": 0.40,
+            }
+            for replicate in (1, 2, 3, 4, 5)
+            for scale in (0.5, 1.0, 1.5)
+        ]
+
+        verdict = module.classify_cage_anchor_returns(low_rows, high_rows)
+
+        self.assertEqual(verdict["all_radius_scales_separated"], 1.0)
+        self.assertEqual(verdict["primary_radius_null_excess_pass"], 1.0)
+        self.assertEqual(verdict["cage_anchor_return_signal_ready"], 1.0)
+        self.assertEqual(verdict["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(verdict["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(verdict["thermodynamic_claim_allowed"], 0.0)
+
+        low_rows[0]["return_fraction"] = 0.40
+        rejected = module.classify_cage_anchor_returns(low_rows, high_rows)
+        self.assertEqual(rejected["all_radius_scales_separated"], 0.0)
+        self.assertEqual(rejected["cage_anchor_return_signal_ready"], 0.0)
+
+    def test_recoil_seed_and_replicate_summary_are_deterministic_and_replicate_first(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_aggregation",
+        )
+        first = module.recoil_seed(781031, replicate=2, realization=3)
+        self.assertEqual(first, module.recoil_seed(781031, replicate=2, realization=3))
+        self.assertNotEqual(first, module.recoil_seed(781031, replicate=3, realization=3))
+        self.assertNotEqual(first, module.recoil_seed(781031, replicate=2, realization=4))
+
+        rows = [
+            {
+                "replicate": float(replicate),
+                "realization": float(realization),
+                "lag": 20.0,
+                "predicted_msd": msd,
+                "observed_msd": observed_msd,
+                "predicted_ngp": ngp,
+                "observed_ngp": 0.25,
+                "predicted_fs_k2": fs,
+                "observed_fs_k2": 0.65,
+            }
+            for replicate, observed_msd, values in (
+                (1, 2.0, ((1.0, 0.10, 0.80), (3.0, 0.30, 0.60))),
+                (2, 4.0, ((3.0, 0.20, 0.70), (5.0, 0.40, 0.50))),
+            )
+            for realization, (msd, ngp, fs) in enumerate(values)
+        ]
+
+        replicate_rows, summary_rows = module.summarize_recoil_realizations(
+            rows,
+            fs_keys=["observed_fs_k2"],
+        )
+
+        self.assertEqual(len(replicate_rows), 2)
+        self.assertEqual(len(summary_rows), 1)
+        self.assertAlmostEqual(replicate_rows[0]["predicted_msd"], 2.0)
+        self.assertAlmostEqual(replicate_rows[0]["predicted_msd_mc_se"], 1.0)
+        self.assertEqual(summary_rows[0]["independent_replicate_count"], 2.0)
+        self.assertAlmostEqual(summary_rows[0]["predicted_msd"], 3.0)
+        self.assertAlmostEqual(summary_rows[0]["observed_msd"], 3.0)
+        self.assertAlmostEqual(summary_rows[0]["ensemble_msd_relative_error"], 0.0)
+
+    def test_recoil_analysis_uses_only_calibration_paths_for_surrogate_kernels(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_provenance",
+        )
+        blocks = np.random.default_rng(721).normal(size=(4, 10, 3))
+        heldout = {}
+        for block_count in (1, 2):
+            observed = ka_replicates.cumulative_block_observables(
+                blocks,
+                block_count=block_count,
+                wave_numbers=np.array([2.0]),
+            )
+            heldout[20 * block_count] = {
+                "observed_msd": observed["msd"],
+                "observed_ngp": observed["ngp"],
+                "observed_fs_k2": observed["characteristic_k2"],
+            }
+
+        result = module.analyze_replicate_recoil_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=np.array([2.0]),
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=2,
+            base_seed=781031,
+        )
+
+        self.assertEqual(result, module.analyze_replicate_recoil_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=np.array([2.0]),
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=2,
+            base_seed=781031,
+        ))
+        self.assertEqual(len(result["rows"]), 4)
+        self.assertEqual(len(result["quality_rows"]), 2)
+        self.assertTrue(
+            all(row["heldout_path_used_in_prediction"] == 0.0 for row in result["rows"])
+        )
+        self.assertTrue(
+            all(row["calibration_path_used_in_kernel"] == 1.0 for row in result["rows"])
+        )
+        self.assertTrue(
+            all(row["heldout_events_used_in_calibration"] == 0.0 for row in result["quality_rows"])
+        )
+
+    def test_recoil_transfer_requires_quality_before_curve_decision(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_classifier",
+        )
+        quality_rows = [
+            {
+                "replicate": float(replicate),
+                "realization": float(realization),
+                "radial_mean_relative_error": 0.01,
+                "radial_standard_deviation_relative_error": 0.01,
+                "lag_one_cosine_mean_absolute_error": 0.01,
+                "lag_one_cosine_quantile_maximum_absolute_error": 0.01,
+                "normalized_lag_one_dot_correlation_absolute_error": 0.01,
+            }
+            for replicate in (1, 2, 3)
+            for realization in range(16)
+        ]
+        summary_rows = [
+            {
+                "lag": 20.0,
+                "ensemble_msd_relative_error": 0.05,
+                "ensemble_ngp_absolute_error": 0.10,
+                "ensemble_absolute_error_fs_k2": 0.02,
+                "ensemble_msd_mc_relative_se": 0.005,
+                "ensemble_ngp_mc_se": 0.02,
+                "ensemble_fs_k2_mc_se": 0.002,
+            }
+        ]
+
+        quality_rows[0]["radial_mean_relative_error"] = 0.03
+        verdict = module.classify_recoil_transfer(
+            quality_rows,
+            summary_rows,
+            required_replicate_count=3,
+            required_realization_count=16,
+        )
+
+        self.assertEqual(verdict["quality_pass"], 0.0)
+        self.assertEqual(verdict["curve_transfer_pass"], 0.0)
+        self.assertEqual(verdict["mechanism_state"], "unresolved_quality")
+        self.assertEqual(verdict["cage_anchor_memory_required"], 0.0)
+
+        quality_rows[0]["radial_mean_relative_error"] = 0.01
+        accepted = module.classify_recoil_transfer(
+            quality_rows,
+            summary_rows,
+            required_replicate_count=3,
+            required_realization_count=16,
+        )
+        self.assertEqual(accepted["quality_pass"], 1.0)
+        self.assertEqual(accepted["curve_transfer_pass"], 1.0)
+        self.assertEqual(accepted["mechanism_state"], "curve_closed")
+        self.assertEqual(accepted["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(accepted["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(accepted["thermodynamic_claim_allowed"], 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()
