@@ -15,6 +15,68 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_ordered_empirical_paths_close_heldout_curves_but_nulls_fail(self):
+        low_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_empirical_path_verdict.csv"
+        )
+        high_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T058_empirical_path_verdict.csv"
+        )
+        crossover_path = ROOT / "data" / "renewal_cage_ka_empirical_path_crossover.csv"
+        with low_path.open() as handle:
+            low = {row["model"]: row for row in csv.DictReader(handle)}
+        with high_path.open() as handle:
+            high = {row["model"]: row for row in csv.DictReader(handle)}
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+
+        low_contiguous = low["contiguous_empirical_path"]
+        self.assertLess(float(low_contiguous["maximum_ensemble_msd_relative_error"]), 0.056)
+        self.assertLess(float(low_contiguous["maximum_ensemble_ngp_absolute_error"]), 0.030)
+        self.assertLess(float(low_contiguous["maximum_ensemble_fs_absolute_error"]), 0.022)
+        self.assertEqual(float(low_contiguous["curve_transfer_pass"]), 1.0)
+        self.assertEqual(
+            float(low_contiguous["paired_contiguous_better_replicate_count"]),
+            3.0,
+        )
+        low_shuffle = low["within_particle_time_shuffle"]
+        self.assertGreater(float(low_shuffle["maximum_ensemble_msd_relative_error"]), 6.6)
+        self.assertGreater(float(low_shuffle["maximum_ensemble_ngp_absolute_error"]), 2.0)
+        self.assertGreater(float(low_shuffle["maximum_ensemble_fs_absolute_error"]), 0.65)
+        self.assertEqual(float(low_shuffle["shuffle_precision_pass"]), 1.0)
+        self.assertEqual(float(low_shuffle["curve_transfer_pass"]), 0.0)
+        self.assertEqual(float(low["direction_randomized_path"]["curve_transfer_pass"]), 0.0)
+
+        high_contiguous = high["contiguous_empirical_path"]
+        self.assertLess(float(high_contiguous["maximum_ensemble_msd_relative_error"]), 0.088)
+        self.assertLess(float(high_contiguous["maximum_ensemble_ngp_absolute_error"]), 0.026)
+        self.assertLess(float(high_contiguous["maximum_ensemble_fs_absolute_error"]), 0.030)
+        self.assertEqual(float(high_contiguous["curve_transfer_pass"]), 1.0)
+        self.assertEqual(
+            float(crossover["single_particle_multiblock_path_memory_required"]),
+            1.0,
+        )
+        self.assertEqual(float(crossover["amplitude_persistence_alone_sufficient"]), 0.0)
+        self.assertEqual(float(crossover["ordered_recoil_path_required"]), 1.0)
+        self.assertEqual(
+            crossover["next_minimal_extension"],
+            "conditional_reversible_cage_path_kernel",
+        )
+        for key in (
+            "microdynamic_closure_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(crossover[key]), 0.0)
+            self.assertEqual(float(low_contiguous[key]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_empirical_path_crossover.svg").is_file()
+        )
+
     def test_state_joint_kernel_closes_high_temperature_curves_but_breaks_on_cooling(self):
         low_path = (
             ROOT

@@ -1716,6 +1716,77 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=3, realization=3))
         self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=2, realization=4))
 
+    def test_empirical_path_crossover_requires_shared_higher_order_failure(self):
+        script_path = ROOT / "scripts" / "summarize_ka_empirical_path_transfer.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_empirical_path_transfer",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        low = [
+            {
+                "model": "contiguous_empirical_path",
+                "curve_transfer_pass": "1",
+                "maximum_ensemble_ngp_absolute_error": "0.04",
+                "maximum_ensemble_fs_absolute_error": "0.02",
+                "paired_contiguous_better_replicate_count": "2",
+                "paired_replicate_count": "3",
+                "shuffle_precision_pass": "1",
+            },
+            {
+                "model": "within_particle_time_shuffle",
+                "curve_transfer_pass": "0",
+                "maximum_ensemble_ngp_absolute_error": "1.2",
+                "maximum_ensemble_fs_absolute_error": "0.18",
+                "paired_contiguous_better_replicate_count": "2",
+                "paired_replicate_count": "3",
+                "shuffle_precision_pass": "1",
+            },
+            {
+                "model": "direction_randomized_path",
+                "curve_transfer_pass": "0",
+                "maximum_ensemble_ngp_absolute_error": "1.0",
+                "maximum_ensemble_fs_absolute_error": "0.15",
+                "paired_contiguous_better_replicate_count": "2",
+                "paired_replicate_count": "3",
+                "shuffle_precision_pass": "1",
+            },
+        ]
+        high = [
+            {
+                "model": "contiguous_empirical_path",
+                "curve_transfer_pass": "1",
+                "maximum_ensemble_ngp_absolute_error": "0.03",
+                "maximum_ensemble_fs_absolute_error": "0.02",
+            }
+        ]
+        markov_low = {
+            "curve_transfer_pass": "0",
+            "maximum_ensemble_ngp_absolute_error": "2.1",
+            "maximum_ensemble_fs_absolute_error": "0.27",
+        }
+
+        result = module.classify_empirical_path_crossover(
+            low,
+            high,
+            markov_low,
+        )
+
+        self.assertEqual(result["shared_low_temperature_higher_order_failure"], 1.0)
+        self.assertEqual(result["replicate_consensus_pass"], 1.0)
+        self.assertEqual(result["single_particle_multiblock_path_memory_required"], 1.0)
+        self.assertEqual(result["amplitude_persistence_alone_sufficient"], 0.0)
+        self.assertEqual(result["ordered_recoil_path_required"], 1.0)
+        self.assertEqual(
+            result["next_minimal_extension"],
+            "conditional_reversible_cage_path_kernel",
+        )
+        self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
         valid_rows = [
             {"wave_number": q, "s4": 10.0 / (1.0 + (2.0 * q) ** 2)}
@@ -2174,6 +2245,7 @@ ITEM: ATOMS id type x y z ix iy iz
             path.write_text(dump)
 
             trajectory = load_lammps_custom_trajectory(path)
+            limited = load_lammps_custom_trajectory(path, maximum_frame_count=1)
 
         np.testing.assert_array_equal(trajectory["timesteps"], [0, 1000])
         np.testing.assert_array_equal(trajectory["particle_types"], [0, 1])
@@ -2181,6 +2253,8 @@ ITEM: ATOMS id type x y z ix iy iz
         np.testing.assert_allclose(trajectory["wrapped_positions"][1, 0], [-1.5, 0.0, 0.0])
         np.testing.assert_allclose(trajectory["unwrapped_positions"][1, 0], [2.5, 0.0, 0.0])
         np.testing.assert_allclose(trajectory["unwrapped_positions"][1, 1], [-2.5, 1.0, 0.0])
+        np.testing.assert_array_equal(limited["timesteps"], [0])
+        self.assertEqual(limited["unwrapped_positions"].shape, (1, 2, 3))
 
     def test_initial_configuration_fs_uses_minimum_images_and_a_particles(self):
         box = np.array([10.0, 10.0, 10.0])

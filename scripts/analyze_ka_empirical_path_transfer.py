@@ -326,9 +326,12 @@ def main() -> None:
         if not local_lags:
             raise ValueError(f"replicate {replicate} has no held-out block-compatible lag")
         directory = args.ensemble_directory / str(replicate_spec["directory"])
-        trajectory = load_lammps_custom_trajectory(directory / "trajectory.lammpstrj")
+        trajectory = load_lammps_custom_trajectory(
+            directory / "trajectory.lammpstrj",
+            maximum_frame_count=args.calibration_time + 1,
+        )
         positions = trajectory["unwrapped_positions"][
-            : args.calibration_time + 1,
+            :,
             trajectory["particle_types"] == 0,
         ]
         block_total = args.calibration_time // args.block_size

@@ -3451,10 +3451,20 @@ def temperature_scan_verdict(
     return rows
 
 
-def load_lammps_custom_trajectory(path: Path) -> dict[str, np.ndarray]:
+def load_lammps_custom_trajectory(
+    path: Path,
+    *,
+    maximum_frame_count: int | None = None,
+) -> dict[str, np.ndarray]:
     """Load the fixed custom-dump schema emitted by the replicate protocol."""
 
     path = Path(path)
+    if maximum_frame_count is not None and (
+        isinstance(maximum_frame_count, bool)
+        or not isinstance(maximum_frame_count, int)
+        or maximum_frame_count < 1
+    ):
+        raise ValueError("maximum_frame_count must be a positive integer")
     timesteps: list[int] = []
     wrapped_frames: list[np.ndarray] = []
     unwrapped_frames: list[np.ndarray] = []
@@ -3462,6 +3472,8 @@ def load_lammps_custom_trajectory(path: Path) -> dict[str, np.ndarray]:
     expected_box: np.ndarray | None = None
     with path.open() as handle:
         while True:
+            if maximum_frame_count is not None and len(timesteps) >= maximum_frame_count:
+                break
             marker = handle.readline()
             if marker == "":
                 break

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124}.grid{stroke:#DADCE0}</style>
+<text x="450" y="29" text-anchor="middle" font-size="18" font-weight="700">Ordered cage paths close held-out dynamics</text>
+<line class="grid" x1="85" y1="362.00" x2="825" y2="362.00"/>
+<text x="75" y="366.00" text-anchor="end" font-size="10">0.05</text>
+<line class="grid" x1="85" y1="334.64" x2="825" y2="334.64"/>
+<text x="75" y="338.64" text-anchor="end" font-size="10">0.1</text>
+<line class="grid" x1="85" y1="291.28" x2="825" y2="291.28"/>
+<text x="75" y="295.28" text-anchor="end" font-size="10">0.3</text>
+<line class="grid" x1="85" y1="243.76" x2="825" y2="243.76"/>
+<text x="75" y="247.76" text-anchor="end" font-size="10">1</text>
+<line class="grid" x1="85" y1="200.40" x2="825" y2="200.40"/>
+<text x="75" y="204.40" text-anchor="end" font-size="10">3</text>
+<line class="grid" x1="85" y1="152.88" x2="825" y2="152.88"/>
+<text x="75" y="156.88" text-anchor="end" font-size="10">10</text>
+<line class="grid" x1="85" y1="62.00" x2="825" y2="62.00"/>
+<text x="75" y="66.00" text-anchor="end" font-size="10">100</text>
+<line class="axis" x1="85" y1="62" x2="85" y2="362"/>
+<line class="axis" x1="85" y1="362" x2="825" y2="362"/>
+<text x="20" y="215" text-anchor="middle" font-size="12" transform="rotate(-90 20 215)">maximum error / tolerance</text>
+<line x1="85" y1="243.76" x2="825" y2="243.76" stroke="#202124" stroke-width="1.5"/>
+<circle cx="165.33" cy="249.18" r="4.5" fill="#0072B2"/>
+<circle cx="175.33" cy="266.79" r="4.5" fill="#D55E00"/>
+<text x="170.33" y="380" text-anchor="middle" font-size="9">MSD</text>
+<circle cx="203.33" cy="340.89" r="4.5" fill="#0072B2"/>
+<circle cx="213.33" cy="335.11" r="4.5" fill="#D55E00"/>
+<text x="208.33" y="380" text-anchor="middle" font-size="9">NGP</text>
+<circle cx="241.33" cy="244.63" r="4.5" fill="#0072B2"/>
+<circle cx="251.33" cy="257.32" r="4.5" fill="#D55E00"/>
+<text x="246.33" y="380" text-anchor="middle" font-size="9">multi-k F_s</text>
+<text x="208.33" y="401" text-anchor="middle" font-size="11" font-weight="700">Contiguous</text>
+<circle cx="412.00" cy="210.95" r="4.5" fill="#0072B2"/>
+<circle cx="422.00" cy="78.01" r="4.5" fill="#D55E00"/>
+<text x="417.00" y="380" text-anchor="middle" font-size="9">MSD</text>
+<circle cx="450.00" cy="272.31" r="4.5" fill="#0072B2"/>
+<circle cx="460.00" cy="167.44" r="4.5" fill="#D55E00"/>
+<text x="455.00" y="380" text-anchor="middle" font-size="9">NGP</text>
+<circle cx="488.00" cy="198.46" r="4.5" fill="#0072B2"/>
+<circle cx="498.00" cy="121.76" r="4.5" fill="#D55E00"/>
+<text x="493.00" y="380" text-anchor="middle" font-size="9">multi-k F_s</text>
+<text x="455.00" y="401" text-anchor="middle" font-size="11" font-weight="700">Time shuffle</text>
+<circle cx="658.67" cy="194.71" r="4.5" fill="#0072B2"/>
+<circle cx="668.67" cy="62.69" r="4.5" fill="#D55E00"/>
+<text x="663.67" y="380" text-anchor="middle" font-size="9">MSD</text>
+<circle cx="696.67" cy="285.24" r="4.5" fill="#0072B2"/>
+<circle cx="706.67" cy="168.80" r="4.5" fill="#D55E00"/>
+<text x="701.67" y="380" text-anchor="middle" font-size="9">NGP</text>
+<circle cx="734.67" cy="194.27" r="4.5" fill="#0072B2"/>
+<circle cx="744.67" cy="118.65" r="4.5" fill="#D55E00"/>
+<text x="739.67" y="380" text-anchor="middle" font-size="9">multi-k F_s</text>
+<text x="701.67" y="401" text-anchor="middle" font-size="11" font-weight="700">Direction null</text>
+<circle cx="340" cy="438" r="5" fill="#0072B2"/>
+<text x="352" y="442" font-size="11">T=0.58</text>
+<circle cx="465" cy="438" r="5" fill="#D55E00"/>
+<text x="477" y="442" font-size="11">T=0.45</text>
+<text x="650" y="74" font-size="10">pass below 1</text>
+</svg>
