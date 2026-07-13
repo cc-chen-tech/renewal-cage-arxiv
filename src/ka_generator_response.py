@@ -54,6 +54,7 @@ def generator_response_lammps_input(
     run_steps: int,
     dump_interval_steps: int,
     trajectory_name: str,
+    potential_protocol: str = "ka_lj_cut",
 ) -> str:
     """Build one serial full-state matched-response KA Langevin input."""
 
@@ -76,12 +77,15 @@ def generator_response_lammps_input(
         raise ValueError("run_steps must be divisible by dump_interval_steps")
     if not trajectory_name or any(character.isspace() for character in trajectory_name):
         raise ValueError("trajectory_name must be nonempty and contain no whitespace")
+    if potential_protocol not in {"ka_lj_cut", "ka_lj_c3_switch"}:
+        raise ValueError("unsupported KA pair-potential protocol")
+    pair_commands = "" if potential_protocol == "ka_lj_cut" else ka_c3_lepton_pair_commands() + "\n"
 
     return f"""units lj
 atom_style atomic
 processors 1 1 1
 read_restart {Path(parent_restart).resolve()}
-
+{pair_commands}
 reset_timestep 0
 group tagged id {target_id}
 displace_atoms tagged move {displacement:g} 0 0 units box
@@ -188,6 +192,9 @@ def extract_generator_response_path(
         "nearest_cutoff_signed_gap": nearest_cutoff_signed_gap,
         "nearest_cutoff_particle_index": nearest_cutoff_particle_index,
         "potential_protocol": np.asarray(potential_protocol),
+        "switch_on_sigma": 2.0 if potential_protocol == "ka_lj_c3_switch" else np.nan,
+        "cutoff_sigma": 2.5,
+        "continuous_radial_derivative_order": 3.0 if potential_protocol == "ka_lj_c3_switch" else -1.0,
         "frame_time": frame_time,
         "target_id": float(target_id),
         "temperature": float(temperature),

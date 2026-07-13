@@ -31,7 +31,7 @@ def encode_epsilon(value: float) -> str:
     return f"{value:.6f}".rstrip("0").rstrip(".").replace(".", "p")
 
 
-def verify_extraction(path: Path, *, expected_frames: int) -> None:
+def verify_extraction(path: Path, *, expected_frames: int, expected_protocol: str) -> None:
     expected_shapes = {
         "time": (expected_frames,),
         "position": (expected_frames, 3),
@@ -49,6 +49,8 @@ def verify_extraction(path: Path, *, expected_frames: int) -> None:
                 raise ValueError(f"{path}: invalid extracted array {key}")
         if float(payload["thermodynamic_claim_allowed"]) != 0.0:
             raise ValueError(f"{path}: thermodynamic claim boundary was not preserved")
+        if "potential_protocol" not in payload or str(payload["potential_protocol"]) != expected_protocol:
+            raise ValueError(f"{path}: potential protocol metadata mismatch")
         if (
             "target_pair_active" not in payload
             or payload["target_pair_active"].ndim != 2
@@ -65,6 +67,26 @@ def verify_extraction(path: Path, *, expected_frames: int) -> None:
             raise ValueError(f"{path}: invalid target pair Hessian")
 
 
+def validate_parent_protocol(parent_restart: Path, potential_protocol: str) -> tuple[Path | None, str | None]:
+    """Require a matching hashed preparation manifest for switched parents."""
+
+    manifest_path = parent_restart.parent / "manifest.json"
+    if not manifest_path.is_file():
+        if potential_protocol == "ka_lj_c3_switch":
+            raise ValueError("C3-switched parent requires a sibling preparation manifest")
+        return None, None
+    manifest = json.loads(manifest_path.read_text())
+    declared = manifest.get("potential_protocol")
+    if declared is not None and declared != potential_protocol:
+        raise ValueError("parent manifest potential protocol does not match requested protocol")
+    expected_hash = manifest.get("output_restart_sha256")
+    if expected_hash is not None and expected_hash != file_sha256(parent_restart):
+        raise ValueError("parent restart does not match its preparation manifest")
+    if potential_protocol == "ka_lj_c3_switch" and expected_hash is None:
+        raise ValueError("C3-switched parent manifest must hash the output restart")
+    return manifest_path, file_sha256(manifest_path)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--lammps-binary", type=Path, required=True)
@@ -73,6 +95,11 @@ def main() -> None:
     parser.add_argument("--velocity-seeds", type=int, nargs="+", required=True)
     parser.add_argument("--langevin-seeds", type=int, nargs="+", required=True)
     parser.add_argument("--epsilons", type=float, nargs="+", default=[0.001, 0.002])
+    parser.add_argument(
+        "--potential-protocol",
+        choices=("ka_lj_cut", "ka_lj_c3_switch"),
+        default="ka_lj_cut",
+    )
     parser.add_argument("--target-id", type=int, default=821)
     parser.add_argument("--temperature", type=float, default=0.58)
     parser.add_argument("--friction", type=float, default=1.0)
@@ -118,9 +145,14 @@ def main() -> None:
         raise ValueError("duration must contain an integer number of dump intervals")
     if output_directory.exists():
         raise ValueError("output directory must not already exist")
-    output_directory.mkdir(parents=True)
 
     parent_hash = file_sha256(parent_restart)
+    binary_hash = file_sha256(lammps_binary)
+    parent_manifest_path, parent_manifest_hash = validate_parent_protocol(
+        parent_restart,
+        args.potential_protocol,
+    )
+    output_directory.mkdir(parents=True)
     expected_frames = run_steps // dump_interval_steps + 1
     records: list[dict[str, object]] = []
     audit_selected = False
@@ -150,6 +182,7 @@ def main() -> None:
                         run_steps=run_steps,
                         dump_interval_steps=dump_interval_steps,
                         trajectory_name=trajectory_path.name,
+                        potential_protocol=args.potential_protocol,
                     )
                 )
                 subprocess.run(
@@ -172,6 +205,7 @@ def main() -> None:
                     friction=args.friction,
                     integration_time_step=args.integration_time_step,
                     directional_step=args.directional_step,
+                    potential_protocol=args.potential_protocol,
                 )
                 extraction_path = run_directory / "generator_path.npz"
                 np.savez_compressed(
@@ -183,9 +217,14 @@ def main() -> None:
                     velocity_seed=velocity_seed,
                     langevin_seed=langevin_seed,
                     parent_restart_sha256=parent_hash,
+                    lammps_binary_sha256=binary_hash,
                     fit_parameters_from_macro_observables=False,
                 )
-                verify_extraction(extraction_path, expected_frames=expected_frames)
+                verify_extraction(
+                    extraction_path,
+                    expected_frames=expected_frames,
+                    expected_protocol=args.potential_protocol,
+                )
                 retain_raw = bool(args.retain_audit_raw and not audit_selected)
                 if retain_raw:
                     audit_selected = True
@@ -204,6 +243,9 @@ def main() -> None:
                         "raw_retained": retain_raw,
                         "frame_count": expected_frames,
                         "frame_time_tau": args.dump_interval,
+                        "potential_protocol": args.potential_protocol,
+                        "parent_restart_sha256": parent_hash,
+                        "lammps_binary_sha256": binary_hash,
                         "fit_parameters_from_macro_observables": False,
                         "thermodynamic_claim_allowed": False,
                     }
@@ -213,7 +255,14 @@ def main() -> None:
         "protocol": "full_KA_common_noise_generator_response",
         "parent_restart_path": str(parent_restart),
         "parent_restart_sha256": parent_hash,
+        "parent_manifest_path": str(parent_manifest_path) if parent_manifest_path is not None else None,
+        "parent_manifest_sha256": parent_manifest_hash,
         "lammps_binary": str(lammps_binary),
+        "lammps_binary_sha256": binary_hash,
+        "potential_protocol": args.potential_protocol,
+        "switch_on_sigma": 2.0 if args.potential_protocol == "ka_lj_c3_switch" else None,
+        "cutoff_sigma": 2.5,
+        "continuous_radial_derivative_order": 3 if args.potential_protocol == "ka_lj_c3_switch" else None,
         "target_id": args.target_id,
         "temperature": args.temperature,
         "friction": args.friction,

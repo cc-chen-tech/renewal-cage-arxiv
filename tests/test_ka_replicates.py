@@ -131,6 +131,10 @@ from prepare_ka_c3_switched_parent import (  # noqa: E402
     parse_thermodynamic_log,
     switched_parent_lammps_input,
 )
+from run_ka_generator_response import (  # noqa: E402
+    file_sha256 as generator_response_file_sha256,
+    validate_parent_protocol,
+)
 from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E402
 
 
@@ -3936,6 +3940,26 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertIn("dump_modify trajectory sort id format float %.17g", text)
         self.assertIn("run 1000", text)
 
+    def test_generator_response_lammps_input_reasserts_c3_pair_commands_after_restart(self):
+        text = generator_response_lammps_input(
+            parent_restart=Path("/tmp/c3_parent.restart"),
+            target_id=821,
+            displacement=0.001,
+            temperature=0.58,
+            friction=1.0,
+            velocity_seed=82101,
+            langevin_seed=83101,
+            run_steps=100,
+            dump_interval_steps=1,
+            trajectory_name="trajectory.lammpstrj",
+            potential_protocol="ka_lj_c3_switch",
+        )
+
+        self.assertLess(text.index("read_restart"), text.index("pair_style lepton 2.5"))
+        self.assertIn('pair_coeff 1 1 "', text)
+        self.assertIn('pair_coeff 1 2 "', text)
+        self.assertIn('pair_coeff 2 2 "', text)
+
     def test_extract_generator_response_path_reads_full_microscopic_state(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "trajectory.lammpstrj"
@@ -4000,11 +4024,30 @@ class KAReplicatePreparationTests(unittest.TestCase):
             "--velocity-seeds",
             "--langevin-seeds",
             "--epsilons",
+            "--potential-protocol",
             "--duration",
             "--dump-interval",
             "--retain-audit-raw",
         ):
             self.assertIn(option, completed.stdout)
+
+    def test_generator_response_runner_requires_hashed_matching_c3_parent_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            restart = root / "equilibrated_c3.restart"
+            restart.write_bytes(b"c3 restart fixture")
+            with self.assertRaisesRegex(ValueError, "sibling preparation manifest"):
+                validate_parent_protocol(restart, "ka_lj_c3_switch")
+
+            manifest = {
+                "potential_protocol": "ka_lj_c3_switch",
+                "output_restart_sha256": generator_response_file_sha256(restart),
+            }
+            (root / "manifest.json").write_text(json.dumps(manifest))
+            manifest_path, manifest_hash = validate_parent_protocol(restart, "ka_lj_c3_switch")
+
+        self.assertEqual(manifest_path, root / "manifest.json")
+        self.assertIsNotNone(manifest_hash)
 
     def test_generator_constrained_response_recovers_exact_stable_krylov_system(self):
         friction = 1.0
