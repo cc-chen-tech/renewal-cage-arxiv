@@ -87,6 +87,102 @@ class SmoothCageTests(unittest.TestCase):
         )
         self.assertLess(relative_l2, 1e-6)
 
+    def test_projected_observables_obey_kinematics_and_fdt(self):
+        from ka_smooth_cage import smooth_cage_projected_observables
+
+        inputs = self.microscopic_configuration()
+        velocities = np.array(
+            [
+                [0.20, -0.10, 0.30],
+                [-0.15, 0.25, -0.05],
+                [0.10, 0.05, -0.20],
+                [-0.05, -0.30, 0.15],
+            ]
+        )
+        friction = 0.7
+        temperature = 0.58
+        result = smooth_cage_projected_observables(
+            **inputs,
+            velocities=velocities,
+            friction=friction,
+            temperature=temperature,
+            directional_step=1e-5,
+            potential_protocol="ka_lj_c3_switch",
+        )
+
+        expected_velocity = np.einsum("nab,nb->a", result["jacobian"], velocities)
+        np.testing.assert_allclose(result["relative_velocity"], expected_velocity, atol=1e-12)
+        np.testing.assert_allclose(
+            result["noise_covariance_rate"],
+            2.0 * friction * temperature * result["jacobian_gram"],
+            rtol=1e-12,
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            result["effective_mass"] @ result["jacobian_gram"],
+            np.eye(3),
+            rtol=1e-10,
+            atol=1e-10,
+        )
+        self.assertGreater(result["jacobian_gram_minimum_eigenvalue"], 0.0)
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
+    def test_projected_drift_matches_phase_space_directional_derivative(self):
+        from ka_local_cage import ka_lj_force_and_isotropic_curvature
+        from ka_smooth_cage import (
+            smooth_cage_projected_observables,
+            smooth_force_support_cage,
+        )
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        velocities = np.array(
+            [
+                [0.20, -0.10, 0.30],
+                [-0.15, 0.25, -0.05],
+                [0.10, 0.05, -0.20],
+                [-0.05, -0.30, 0.15],
+            ]
+        )
+        force, _ = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            potential_protocol="ka_lj_c3_switch",
+        )
+        result = smooth_cage_projected_observables(
+            **inputs,
+            velocities=velocities,
+            friction=0.0,
+            temperature=0.0,
+            directional_step=1e-5,
+            potential_protocol="ka_lj_c3_switch",
+        )
+
+        errors = []
+        for step in (8e-4, 4e-4, 2e-4):
+            plus = smooth_force_support_cage(
+                **{**inputs, "positions": positions + step * velocities}
+            )
+            minus = smooth_force_support_cage(
+                **{**inputs, "positions": positions - step * velocities}
+            )
+            plus_velocity = np.einsum(
+                "nab,nb->a", plus["jacobian"], velocities + step * force
+            )
+            minus_velocity = np.einsum(
+                "nab,nb->a", minus["jacobian"], velocities - step * force
+            )
+            numerical = (plus_velocity - minus_velocity) / (2.0 * step)
+            errors.append(np.linalg.norm(numerical - result["projected_drift"]))
+
+        self.assertLess(errors[1], 0.35 * errors[0])
+        self.assertLess(errors[2], 0.35 * errors[1])
+        self.assertLess(
+            errors[-1] / np.linalg.norm(result["projected_drift"]),
+            2e-4,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

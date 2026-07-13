@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
+
+from ka_local_cage import ka_lj_force_and_isotropic_curvature
 
 
 _SIGMA = np.array([[1.0, 0.8], [0.8, 0.88]], dtype=float)
@@ -96,5 +100,91 @@ def smooth_force_support_cage(
         "support": weight > 0.0,
         "support_radius": support_radius,
         "total_weight": total_weight,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def smooth_cage_projected_observables(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_index: int,
+    friction: float,
+    temperature: float,
+    directional_step: float,
+    potential_protocol: str = "ka_lj_c3_switch",
+) -> dict[str, np.ndarray | float]:
+    """Return the exact instantaneous SDE coefficients of the cage coordinate."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    if velocities.shape != positions.shape or np.any(~np.isfinite(velocities)):
+        raise ValueError("velocities must be finite and align with positions")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    if not math.isfinite(directional_step) or directional_step <= 0.0:
+        raise ValueError("directional_step must be finite and positive")
+    if potential_protocol not in {"ka_lj_cut", "ka_lj_c3_switch"}:
+        raise ValueError("unsupported KA pair-potential protocol")
+
+    coordinate = smooth_force_support_cage(
+        positions,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_index=target_index,
+    )
+    jacobian = np.asarray(coordinate["jacobian"], dtype=float)
+    relative_velocity = np.einsum("nab,nb->a", jacobian, velocities)
+    active = np.flatnonzero(np.any(np.abs(jacobian) > 0.0, axis=(1, 2)))
+    active_force, _ = ka_lj_force_and_isotropic_curvature(
+        positions,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_indices=active,
+        potential_protocol=potential_protocol,
+    )
+    force_drift = np.einsum("nab,nb->a", jacobian[active], active_force)
+
+    plus = smooth_force_support_cage(
+        positions + directional_step * velocities,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_index=target_index,
+    )
+    minus = smooth_force_support_cage(
+        positions - directional_step * velocities,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_index=target_index,
+    )
+    plus_velocity = np.einsum("nab,nb->a", plus["jacobian"], velocities)
+    minus_velocity = np.einsum("nab,nb->a", minus["jacobian"], velocities)
+    geometric_drift = (plus_velocity - minus_velocity) / (2.0 * directional_step)
+    projected_drift = force_drift + geometric_drift - friction * relative_velocity
+
+    gram = np.einsum("nab,ncb->ac", jacobian, jacobian)
+    eigenvalues = np.linalg.eigvalsh(gram)
+    if np.min(eigenvalues) <= 0.0:
+        raise ValueError("smooth cage Jacobian Gram matrix must be positive definite")
+    effective_mass = np.linalg.inv(gram)
+    return {
+        **coordinate,
+        "relative_velocity": relative_velocity,
+        "force_drift": force_drift,
+        "geometric_drift": geometric_drift,
+        "projected_drift": projected_drift,
+        "jacobian_gram": gram,
+        "effective_mass": effective_mass,
+        "noise_covariance_rate": 2.0 * friction * temperature * gram,
+        "jacobian_gram_minimum_eigenvalue": float(np.min(eigenvalues)),
+        "jacobian_gram_condition_number": float(np.max(eigenvalues) / np.min(eigenvalues)),
+        "friction": float(friction),
+        "temperature": float(temperature),
+        "directional_step": float(directional_step),
+        "potential_protocol": np.asarray(potential_protocol),
         "thermodynamic_claim_allowed": 0.0,
     }
