@@ -284,7 +284,66 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(
             float(summary["minimum_cross_epsilon_covariance_correlation"]), 0.9999
         )
+    def test_nonlinear_path_gate_artifacts_preserve_claim_boundaries(self):
+        gate_path = ROOT / "data" / "renewal_cage_ka_nonlinear_path_gate.csv"
+        quality_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_nonlinear_path_quality.csv"
+        )
+        svg_path = ROOT / "figures" / "renewal_cage_ka_nonlinear_path_gate.svg"
+        with gate_path.open() as handle:
+            gate = next(csv.DictReader(handle))
+        with quality_path.open() as handle:
+            quality = list(csv.DictReader(handle))
 
+        self.assertEqual(float(gate["low_temperature_gate_ready"]), 1.0)
+        self.assertEqual(
+            float(gate["low_temperature_nonlinear_path_memory_required"]),
+            1.0,
+        )
+        self.assertEqual(
+            float(gate["low_temperature_surrogate_failure_replicate_count"]),
+            3.0,
+        )
+        self.assertEqual(
+            float(gate["low_temperature_paired_contiguous_better_replicate_count"]),
+            3.0,
+        )
+        self.assertEqual(float(gate["high_temperature_resolution_sensitivity"]), 1.0)
+        self.assertEqual(float(gate["high_temperature_mechanism_resolved"]), 0.0)
+        self.assertEqual(
+            float(gate["binary_temperature_crossover_claim_allowed"]),
+            0.0,
+        )
+        self.assertEqual(float(gate["unique_microscopic_model_selected"]), 0.0)
+        self.assertEqual(float(gate["low_cumulant_horizon_k2"]), 4096.0)
+        self.assertEqual(float(gate["low_cumulant_horizon_k4"]), 200.0)
+        self.assertEqual(float(gate["low_cumulant_horizon_k7p25"]), 20.0)
+        self.assertEqual(len(quality), 24)
+        self.assertLess(
+            max(float(row["cross_spectral_matrix_nrmse"]) for row in quality),
+            0.012,
+        )
+        for key in (
+            "microdynamic_closure_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(gate[key]), 0.0)
+        for key, value in gate.items():
+            if key in (
+                "high_block20_state",
+                "high_block10_state",
+                "next_minimal_model_candidate",
+            ):
+                continue
+            self.assertTrue(math.isfinite(float(value)), key)
+        svg = svg_path.read_text()
+        self.assertIn("Nonlinear cage-path cumulant gate", svg)
+        self.assertIn("B  Observed-cumulant Fs error", svg)
+        self.assertNotIn("nan", svg.lower())
+        self.assertNotIn("inf", svg.lower())
     def test_ordered_empirical_paths_close_heldout_curves_but_nulls_fail(self):
         low_path = (
             ROOT

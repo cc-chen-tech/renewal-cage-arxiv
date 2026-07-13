@@ -2340,6 +2340,85 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertGreater(by_k[7.25]["unit_interval_failure_count"], 0.0)
         self.assertEqual(by_k[7.25]["heldout_prediction_claim_allowed"], 0.0)
 
+    def test_nonlinear_path_gate_blocks_unresolved_temperature_crossover(self):
+        script_path = ROOT / "scripts" / "summarize_ka_nonlinear_path_gate.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_nonlinear_path_gate",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        low = {
+            "temperature": 0.45,
+            "surrogate_quality_pass": 1.0,
+            "surrogate_precision_pass": 1.0,
+            "stationarity_control_pass": 1.0,
+            "contiguous_ensemble_curve_pass": 1.0,
+            "radial_surrogate_msd_pass": 1.0,
+            "radial_surrogate_higher_order_failure": 1.0,
+            "surrogate_failure_replicate_count": 3.0,
+            "paired_contiguous_better_replicate_count": 3.0,
+            "required_replicate_count": 3.0,
+            "replicate_consensus_pass": 1.0,
+            "nonlinear_single_particle_path_memory_required": 1.0,
+            "linear_spectrum_null_rejected": 1.0,
+        }
+        high_block20 = {
+            **low,
+            "temperature": 0.58,
+            "surrogate_quality_pass": 0.0,
+            "stationarity_control_pass": 0.0,
+            "radial_surrogate_higher_order_failure": 0.0,
+            "replicate_consensus_pass": 0.0,
+            "nonlinear_single_particle_path_memory_required": 0.0,
+            "linear_spectrum_null_rejected": 0.0,
+            "required_replicate_count": 5.0,
+        }
+        high_block10 = {
+            **high_block20,
+            "radial_surrogate_higher_order_failure": 1.0,
+        }
+        low_cumulant = [
+            {"wave_number": 2.0, "longest_contiguous_valid_lag": 4096.0},
+            {"wave_number": 4.0, "longest_contiguous_valid_lag": 200.0},
+            {"wave_number": 7.25, "longest_contiguous_valid_lag": 20.0},
+        ]
+        high_cumulant = [
+            {"wave_number": 2.0, "longest_contiguous_valid_lag": 600.0},
+            {"wave_number": 4.0, "longest_contiguous_valid_lag": 600.0},
+            {"wave_number": 7.25, "longest_contiguous_valid_lag": 0.0},
+        ]
+        empirical = {
+            "single_particle_multiblock_path_memory_required": 1.0,
+            "ordered_recoil_path_required": 1.0,
+        }
+
+        result = module.classify_nonlinear_path_gate(
+            low,
+            high_block20,
+            high_block10,
+            low_cumulant,
+            high_cumulant,
+            empirical,
+        )
+
+        self.assertEqual(result["low_temperature_nonlinear_path_memory_required"], 1.0)
+        self.assertEqual(result["low_temperature_gate_ready"], 1.0)
+        self.assertEqual(result["high_temperature_resolution_sensitivity"], 1.0)
+        self.assertEqual(result["high_temperature_mechanism_resolved"], 0.0)
+        self.assertEqual(result["binary_temperature_crossover_claim_allowed"], 0.0)
+        self.assertEqual(result["low_k_cumulant_horizon_order_pass"], 1.0)
+        self.assertEqual(result["observed_cumulant_diagnostic_only"], 1.0)
+        self.assertEqual(result["unique_microscopic_model_selected"], 0.0)
+        self.assertEqual(
+            result["next_minimal_model_candidate"],
+            "finite_lifetime_reversible_cage_state",
+        )
+        self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
     def test_empirical_path_crossover_requires_shared_higher_order_failure(self):
         script_path = ROOT / "scripts" / "summarize_ka_empirical_path_transfer.py"
         spec = importlib.util.spec_from_file_location(
