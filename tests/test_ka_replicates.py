@@ -1137,6 +1137,91 @@ class KAReplicatePreparationTests(unittest.TestCase):
             "finite_exchange_particle_conditioned_renewal",
         )
 
+    def test_three_temperature_uncertainty_certificate_keeps_parent_scope_boundary(self):
+        script_path = ROOT / "scripts" / "audit_ka_three_temperature_uncertainty.py"
+        spec = importlib.util.spec_from_file_location(
+            "audit_ka_three_temperature_uncertainty", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        coverage = []
+        for temperature, count in ((0.70, 5.0), (0.58, 5.0), (0.45, 3.0)):
+            for metric in (
+                "diffusion",
+                "alpha_relaxation_time",
+                "diffusion_alpha_product",
+                "ngp_peak",
+                "persistence_exchange_ratio",
+            ):
+                coverage.append(
+                    {
+                        "temperature": temperature,
+                        "metric": metric,
+                        "observable_class": "scalar",
+                        "independent_replicate_count": count,
+                        "uncertainty_ready": 1.0,
+                        "precision_ready": 1.0,
+                    }
+                )
+            for metric in ("msd", "ngp_3d", "fs_k5", "fs_k7p25", "fs_k9"):
+                coverage.append(
+                    {
+                        "temperature": temperature,
+                        "metric": metric,
+                        "observable_class": "curve",
+                        "independent_replicate_count": count,
+                        "uncertainty_ready": 1.0,
+                        "precision_ready": 1.0,
+                    }
+                )
+        trends = [
+            {"metric": metric, "trend_pass": 1.0}
+            for metric in (
+                "diffusion",
+                "alpha_relaxation_time",
+                "diffusion_alpha_product",
+                "ngp_peak",
+                "persistence_exchange_ratio",
+            )
+            for _ in range(2)
+        ]
+        manifests = [
+            {
+                "temperature": temperature,
+                "replicate_count": count,
+                "independently_prepared_parent_samples": False,
+                "maximum_absolute_fs_observed": 0.03,
+                "maximum_absolute_fs_allowed": 0.1,
+                "independence_class": "decorrelated_parent_frames_plus_velocity_seeds",
+            }
+            for temperature, count in ((0.70, 5), (0.58, 5), (0.45, 3))
+        ]
+
+        verdict = module.build_uncertainty_verdict(
+            manifests,
+            coverage,
+            trends,
+            physical_time_gate_pass=True,
+        )
+
+        self.assertEqual(verdict["temperature_count"], 3.0)
+        self.assertEqual(verdict["minimum_restart_replicate_count"], 3.0)
+        self.assertEqual(
+            verdict["restart_replicate_counts_by_temperature"],
+            "0.45:3;0.58:5;0.7:5",
+        )
+        self.assertEqual(verdict["restart_ensemble_uncertainty_ready"], 1.0)
+        self.assertEqual(verdict["physical_time_definition_consistent"], 1.0)
+        self.assertEqual(verdict["saved_frame_interval_tau"], 1.0)
+        self.assertEqual(verdict["core_scalar_uncertainty_ready"], 1.0)
+        self.assertEqual(verdict["curve_uncertainty_ready"], 1.0)
+        self.assertEqual(verdict["core_scalar_precision_ready"], 1.0)
+        self.assertEqual(verdict["curve_precision_ready"], 1.0)
+        self.assertEqual(verdict["three_temperature_trend_chain_pass"], 1.0)
+        self.assertEqual(verdict["independently_prepared_parent_ensemble_ready"], 0.0)
+        self.assertEqual(verdict["thermodynamic_claim_allowed"], 0.0)
+
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
         valid_rows = [
             {"wave_number": q, "s4": 10.0 / (1.0 + (2.0 * q) ** 2)}

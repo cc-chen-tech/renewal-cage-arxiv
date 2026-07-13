@@ -15,6 +15,47 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_three_temperature_restart_uncertainty_supports_scalar_trends_not_parent_scope(self):
+        verdict_path = ROOT / "data" / "renewal_cage_ka_three_temperature_uncertainty_verdict.csv"
+        trends_path = ROOT / "data" / "renewal_cage_ka_three_temperature_uncertainty_trends.csv"
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        with trends_path.open() as handle:
+            trends = list(csv.DictReader(handle))
+        by_transition_metric = {
+            (
+                float(row["high_temperature"]),
+                float(row["low_temperature"]),
+                row["metric"],
+            ): row
+            for row in trends
+        }
+
+        self.assertEqual(verdict["restart_replicate_counts_by_temperature"], "0.45:3;0.58:5;0.7:5")
+        self.assertEqual(float(verdict["physical_time_definition_consistent"]), 1.0)
+        self.assertEqual(float(verdict["saved_frame_interval_tau"]), 1.0)
+        self.assertEqual(float(verdict["restart_ensemble_uncertainty_ready"]), 1.0)
+        self.assertEqual(float(verdict["core_scalar_uncertainty_ready"]), 1.0)
+        self.assertEqual(float(verdict["core_scalar_precision_ready"]), 1.0)
+        self.assertEqual(float(verdict["curve_uncertainty_ready"]), 1.0)
+        self.assertEqual(float(verdict["curve_precision_ready"]), 0.0)
+        self.assertEqual(
+            verdict["precision_blockers"],
+            "T0.45:fs_k5;T0.45:fs_k7p25;T0.45:fs_k9;T0.45:ngp_3d",
+        )
+        self.assertEqual(float(verdict["cooling_trend_pass_count"]), 10.0)
+        self.assertEqual(float(verdict["cooling_trend_test_count"]), 10.0)
+        self.assertEqual(float(verdict["three_temperature_trend_chain_pass"]), 1.0)
+        self.assertEqual(float(verdict["independently_prepared_parent_ensemble_ready"]), 0.0)
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+        first_se = by_transition_metric[(0.7, 0.58, "diffusion_alpha_product")]
+        second_se = by_transition_metric[(0.58, 0.45, "diffusion_alpha_product")]
+        self.assertGreater(float(first_se["ci95_low_ratio"]), 1.14)
+        self.assertGreater(float(second_se["ci95_low_ratio"]), 1.94)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_three_temperature_uncertainty.svg").is_file()
+        )
+
     def test_waiting_failure_mechanism_is_threshold_robust_but_spatially_unresolved(self):
         verdict_path = (
             ROOT

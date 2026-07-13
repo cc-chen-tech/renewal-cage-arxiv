@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124}.grid{stroke:#DADCE0}</style>
+<text x="450" y="28" text-anchor="middle" font-size="18" font-weight="700">Independent-restart cooling trends with 95% intervals</text>
+<line class="grid" x1="85" y1="351.92" x2="825" y2="351.92"/>
+<text x="75" y="355.92" text-anchor="end" font-size="11">1</text>
+<line class="grid" x1="85" y1="287.51" x2="825" y2="287.51"/>
+<text x="75" y="291.51" text-anchor="end" font-size="11">3</text>
+<line class="grid" x1="85" y1="216.93" x2="825" y2="216.93"/>
+<text x="75" y="220.93" text-anchor="end" font-size="11">10</text>
+<line class="grid" x1="85" y1="152.53" x2="825" y2="152.53"/>
+<text x="75" y="156.53" text-anchor="end" font-size="11">30</text>
+<line class="grid" x1="85" y1="81.94" x2="825" y2="81.94"/>
+<text x="75" y="85.94" text-anchor="end" font-size="11">100</text>
+<line class="axis" x1="85" y1="55" x2="85" y2="365"/>
+<line class="axis" x1="85" y1="365" x2="825" y2="365"/>
+<text x="22" y="210" text-anchor="middle" font-size="13" transform="rotate(-90 22 210)">cooling effect factor (log scale)</text>
+<line x1="186.00" y1="285.50" x2="186.00" y2="281.45" stroke="#0072B2" stroke-width="2"/>
+<circle cx="186.00" cy="283.47" r="4" fill="#0072B2"/>
+<line x1="228.00" y1="275.24" x2="228.00" y2="271.25" stroke="#D55E00" stroke-width="2"/>
+<circle cx="228.00" cy="273.24" r="4" fill="#D55E00"/>
+<line x1="270.00" y1="343.78" x2="270.00" y2="339.63" stroke="#009E73" stroke-width="2"/>
+<circle cx="270.00" cy="341.70" r="4" fill="#009E73"/>
+<line x1="312.00" y1="321.92" x2="312.00" y2="317.73" stroke="#CC79A7" stroke-width="2"/>
+<circle cx="312.00" cy="319.83" r="4" fill="#CC79A7"/>
+<line x1="354.00" y1="349.03" x2="354.00" y2="347.65" stroke="#6B7280" stroke-width="2"/>
+<circle cx="354.00" cy="348.34" r="4" fill="#6B7280"/>
+<text x="270.00" y="387" text-anchor="middle" font-size="12">T=0.7 to 0.58</text>
+<line x1="556.00" y1="159.80" x2="556.00" y2="127.70" stroke="#0072B2" stroke-width="2"/>
+<circle cx="556.00" cy="143.75" r="4" fill="#0072B2"/>
+<line x1="598.00" y1="118.80" x2="598.00" y2="68.08" stroke="#D55E00" stroke-width="2"/>
+<circle cx="598.00" cy="93.44" r="4" fill="#D55E00"/>
+<line x1="640.00" y1="312.80" x2="640.00" y2="291.84" stroke="#009E73" stroke-width="2"/>
+<circle cx="640.00" cy="302.32" r="4" fill="#009E73"/>
+<line x1="682.00" y1="280.44" x2="682.00" y2="262.69" stroke="#CC79A7" stroke-width="2"/>
+<circle cx="682.00" cy="271.57" r="4" fill="#CC79A7"/>
+<line x1="724.00" y1="347.68" x2="724.00" y2="343.12" stroke="#6B7280" stroke-width="2"/>
+<circle cx="724.00" cy="345.40" r="4" fill="#6B7280"/>
+<text x="640.00" y="387" text-anchor="middle" font-size="12">T=0.58 to 0.45</text>
+<circle cx="100" cy="425" r="4" fill="#0072B2"/>
+<text x="112" y="430" font-size="11">D slowdown</text>
+<circle cx="375" cy="425" r="4" fill="#D55E00"/>
+<text x="387" y="430" font-size="11">tau_alpha</text>
+<circle cx="650" cy="425" r="4" fill="#009E73"/>
+<text x="662" y="430" font-size="11">D tau_alpha</text>
+<circle cx="100" cy="453" r="4" fill="#CC79A7"/>
+<text x="112" y="458" font-size="11">NGP peak</text>
+<circle cx="375" cy="453" r="4" fill="#6B7280"/>
+<text x="387" y="458" font-size="11">tau_p/tau_x</text>
+</svg>

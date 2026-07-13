@@ -1,0 +1,11 @@
+high_temperature,low_temperature,metric,cooling_direction,cooling_effect_ratio,ci95_low_ratio,ci95_high_ratio,ci95_method,high_temperature_replicate_count,low_temperature_replicate_count,trend_pass,thermodynamic_claim_allowed
+0.7,0.58,diffusion,decrease,3.214139938813908,3.1049976951382137,3.327118587706011,conservative_student_t_delta_log_ratio,5.0,5.0,1.0,0.0
+0.7,0.58,alpha_relaxation_time,increase,3.8267125914577584,3.6988962560409564,3.9589456540462677,conservative_student_t_delta_log_ratio,5.0,5.0,1.0,0.0
+0.7,0.58,diffusion_alpha_product,increase,1.1903725941009735,1.1489506364950504,1.233287895735271,conservative_student_t_delta_log_ratio,5.0,5.0,1.0,0.0
+0.7,0.58,ngp_peak,increase,1.7287792088874698,1.6681728790889265,1.7915874251077943,conservative_student_t_delta_log_ratio,5.0,5.0,1.0,0.0
+0.7,0.58,persistence_exchange_ratio,increase,1.0629026671643214,1.0504254729554354,1.075528068342035,conservative_student_t_delta_log_ratio,5.0,5.0,1.0,0.0
+0.58,0.45,diffusion,decrease,34.844269751582615,26.497310766604336,45.820617239816855,conservative_student_t_delta_log_ratio,5.0,3.0,1.0,0.0
+0.58,0.45,alpha_relaxation_time,increase,82.19225032300618,53.330445675365745,126.67372131638155,conservative_student_t_delta_log_ratio,5.0,3.0,1.0,0.0
+0.58,0.45,diffusion_alpha_product,increase,2.3303714791795476,1.9489369049234129,2.7864582056271745,conservative_student_t_delta_log_ratio,5.0,3.0,1.0,0.0
+0.58,0.45,ngp_peak,increase,3.937677406458323,3.384558690328664,4.5811890931714565,conservative_student_t_delta_log_ratio,5.0,3.0,1.0,0.0
+0.58,0.45,persistence_exchange_ratio,increase,1.1175815040174422,1.0748935504323518,1.1619647523417649,conservative_student_t_delta_log_ratio,5.0,3.0,1.0,0.0
