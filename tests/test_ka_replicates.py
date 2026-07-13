@@ -2278,6 +2278,68 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertAlmostEqual(result[1]["radial_higher_order_score"], 3.0)
         self.assertEqual(result[0]["paired_contiguous_better"], 1.0)
 
+    def test_path_cumulant_scattering_reports_contiguous_validity_horizon(self):
+        script_path = ROOT / "scripts" / "analyze_ka_path_cumulant_scattering.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_path_cumulant_scattering",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = []
+        for replicate in (1, 2):
+            for lag, msd, ngp in (
+                (1, 0.1, 0.1),
+                (2, 0.6, 1.0),
+                (3, 0.8, 0.5),
+            ):
+                predicted_k2 = float(
+                    ka_replicates.fourth_cumulant_scattering(
+                        np.array([msd]),
+                        np.array([ngp]),
+                        2.0,
+                    )[0]
+                )
+                predicted_k7p25 = float(
+                    ka_replicates.fourth_cumulant_scattering(
+                        np.array([msd]),
+                        np.array([ngp]),
+                        7.25,
+                    )[0]
+                )
+                rows.append(
+                    {
+                        "replicate": float(replicate),
+                        "temperature": 0.45,
+                        "lag": float(lag),
+                        "observed_msd": msd,
+                        "observed_ngp": ngp,
+                        "observed_fs_k2": predicted_k2 - (0.05 if lag == 3 else 0.0),
+                        "observed_fs_k7p25": min(predicted_k7p25, 0.95),
+                    }
+                )
+
+        diagnostic_rows = module.cumulant_scattering_rows(rows)
+        validity = module.cumulant_scattering_validity(rows)
+
+        self.assertEqual(len(diagnostic_rows), 6)
+        self.assertTrue(
+            all(row["independent_replicate_count"] == 2.0 for row in diagnostic_rows)
+        )
+        self.assertTrue(all(row["observed_msd_used"] == 1.0 for row in diagnostic_rows))
+        self.assertTrue(all(row["observed_ngp_used"] == 1.0 for row in diagnostic_rows))
+        self.assertTrue(
+            all(row["heldout_prediction_claim_allowed"] == 0.0 for row in diagnostic_rows)
+        )
+        by_k = {row["wave_number"]: row for row in validity}
+        self.assertEqual(by_k[2.0]["longest_contiguous_valid_lag"], 2.0)
+        self.assertEqual(by_k[2.0]["first_invalid_lag"], 3.0)
+        self.assertEqual(by_k[7.25]["longest_contiguous_valid_lag"], 1.0)
+        self.assertEqual(by_k[7.25]["first_invalid_lag"], 2.0)
+        self.assertGreater(by_k[7.25]["unit_interval_failure_count"], 0.0)
+        self.assertEqual(by_k[7.25]["heldout_prediction_claim_allowed"], 0.0)
+
     def test_empirical_path_crossover_requires_shared_higher_order_failure(self):
         script_path = ROOT / "scripts" / "summarize_ka_empirical_path_transfer.py"
         spec = importlib.util.spec_from_file_location(
