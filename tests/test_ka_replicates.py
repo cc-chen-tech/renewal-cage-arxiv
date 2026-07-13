@@ -6343,6 +6343,113 @@ class KACageAnchorGateTests(unittest.TestCase):
         self.assertAlmostEqual(summary_rows[0]["observed_msd"], 3.0)
         self.assertAlmostEqual(summary_rows[0]["ensemble_msd_relative_error"], 0.0)
 
+    def test_recoil_analysis_requires_frozen_block_size(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_function_block_size",
+        )
+        blocks = np.random.default_rng(701).normal(size=(2, 9, 3))
+        heldout = {
+            20: {
+                "observed_msd": 1.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            }
+        }
+
+        with self.assertRaisesRegex(ValueError, "exactly 20"):
+            module.analyze_replicate_recoil_paths(
+                blocks,
+                heldout,
+                replicate=1,
+                temperature=0.45,
+                block_size=10,
+                wave_numbers=np.array([2.0]),
+                fs_keys=["observed_fs_k2"],
+                surrogate_realizations=16,
+                base_seed=781031,
+            )
+
+    def test_recoil_analysis_requires_frozen_realization_count(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_function_realizations",
+        )
+        blocks = np.random.default_rng(703).normal(size=(2, 9, 3))
+        heldout = {
+            20: {
+                "observed_msd": 1.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            }
+        }
+
+        with self.assertRaisesRegex(ValueError, "exactly 16"):
+            module.analyze_replicate_recoil_paths(
+                blocks,
+                heldout,
+                replicate=1,
+                temperature=0.45,
+                block_size=20,
+                wave_numbers=np.array([2.0]),
+                fs_keys=["observed_fs_k2"],
+                surrogate_realizations=15,
+                base_seed=781031,
+            )
+
+    def test_recoil_cli_requires_frozen_block_size(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_cli_block_size",
+        )
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            (root / "ensemble_manifest.json").write_text(
+                json.dumps({"temperature": 0.45, "replicates": []})
+            )
+
+            with self.assertRaisesRegex(ValueError, "exactly 20"):
+                module.main(
+                    [
+                        str(root),
+                        "--calibration-time",
+                        "160",
+                        "--heldout-factorization",
+                        str(root / "missing.csv"),
+                        "--block-size",
+                        "10",
+                        "--surrogate-realizations",
+                        "16",
+                        "--output-prefix",
+                        str(root / "output"),
+                    ]
+                )
+
+    def test_recoil_cli_requires_frozen_realization_count(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_cli_realizations",
+        )
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+
+            with self.assertRaisesRegex(ValueError, "exactly 16"):
+                module.main(
+                    [
+                        str(root),
+                        "--calibration-time",
+                        "160",
+                        "--heldout-factorization",
+                        str(root / "missing.csv"),
+                        "--block-size",
+                        "20",
+                        "--surrogate-realizations",
+                        "15",
+                        "--output-prefix",
+                        str(root / "output"),
+                    ]
+                )
+
     def test_recoil_analysis_uses_only_calibration_paths_for_surrogate_kernels(self):
         module = self._module(
             "analyze_ka_recoil_markov_transfer.py",
@@ -6370,7 +6477,7 @@ class KACageAnchorGateTests(unittest.TestCase):
             block_size=20,
             wave_numbers=np.array([2.0]),
             fs_keys=["observed_fs_k2"],
-            surrogate_realizations=2,
+            surrogate_realizations=16,
             base_seed=781031,
         )
 
@@ -6382,11 +6489,11 @@ class KACageAnchorGateTests(unittest.TestCase):
             block_size=20,
             wave_numbers=np.array([2.0]),
             fs_keys=["observed_fs_k2"],
-            surrogate_realizations=2,
+            surrogate_realizations=16,
             base_seed=781031,
         ))
-        self.assertEqual(len(result["rows"]), 4)
-        self.assertEqual(len(result["quality_rows"]), 2)
+        self.assertEqual(len(result["rows"]), 32)
+        self.assertEqual(len(result["quality_rows"]), 16)
         self.assertTrue(
             all(row["heldout_path_used_in_prediction"] == 0.0 for row in result["rows"])
         )

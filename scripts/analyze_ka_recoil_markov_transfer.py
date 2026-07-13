@@ -53,6 +53,21 @@ def _wave_number_from_observed_key(key: str) -> float:
     return float(key.removeprefix("observed_fs_k").replace("p", "."))
 
 
+def _validate_frozen_recoil_protocol(
+    *,
+    block_size: int,
+    surrogate_realizations: int,
+) -> None:
+    if isinstance(block_size, bool) or not isinstance(block_size, int) or block_size != 20:
+        raise ValueError("the frozen recoil gate requires block_size exactly 20")
+    if (
+        isinstance(surrogate_realizations, bool)
+        or not isinstance(surrogate_realizations, int)
+        or surrogate_realizations != 16
+    ):
+        raise ValueError("the frozen recoil gate requires exactly 16 surrogate realizations")
+
+
 def _prediction_row(
     *,
     replicate: int,
@@ -115,6 +130,10 @@ def analyze_replicate_recoil_paths(
     surrogate_realizations: int,
     base_seed: int,
 ) -> dict[str, list[dict[str, object]]]:
+    _validate_frozen_recoil_protocol(
+        block_size=block_size,
+        surrogate_realizations=surrogate_realizations,
+    )
     blocks = np.asarray(block_displacements, dtype=float)
     if (
         blocks.ndim != 3
@@ -373,10 +392,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--seed", type=int, default=781031)
     parser.add_argument("--output-prefix", type=Path, required=True)
     args = parser.parse_args(argv)
+    _validate_frozen_recoil_protocol(
+        block_size=args.block_size,
+        surrogate_realizations=args.surrogate_realizations,
+    )
     if min(args.calibration_time, args.block_size, args.surrogate_realizations) < 1 or args.seed < 0:
         raise ValueError("calibration, block, realization, and seed controls are invalid")
-    if args.surrogate_realizations != 16:
-        raise ValueError("the frozen recoil gate requires exactly 16 surrogate realizations")
     if args.calibration_time // args.block_size < 8:
         raise ValueError("calibration window must contain at least eight complete blocks")
     manifest = json.loads((args.ensemble_directory / "ensemble_manifest.json").read_text())
