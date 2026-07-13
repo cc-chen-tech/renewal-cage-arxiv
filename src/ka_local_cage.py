@@ -380,6 +380,7 @@ def ka_lj_force_and_isotropic_curvature(
     particle_types: np.ndarray,
     box_lengths: np.ndarray,
     target_indices: np.ndarray | None = None,
+    potential_protocol: str = "ka_lj_cut",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return KA forces and ``tr(H_ii)/3`` for selected particles.
 
@@ -412,16 +413,15 @@ def ka_lj_force_and_isotropic_curvature(
     distance = np.sqrt(np.maximum(squared_distance, 1e-24))
     epsilon = _EPSILON[particle_types[target, None], particle_types[None, :]]
     sigma = _SIGMA[particle_types[target, None], particle_types[None, :]]
-    active = (distance > 1e-10) & (distance < _CUTOFF_SCALE * sigma)
-    sigma_over_r2 = (sigma / np.maximum(distance, 1e-12)) ** 2
-    sigma_over_r6 = sigma_over_r2**3
-    sigma_over_r12 = sigma_over_r6**2
-    force_coefficient = (
-        24.0 * epsilon * (2.0 * sigma_over_r12 - sigma_over_r6) / np.maximum(squared_distance, 1e-24)
+    _, potential_first, potential_second, _ = ka_lj_radial_derivatives(
+        distance,
+        epsilon=epsilon,
+        sigma=sigma,
+        protocol=potential_protocol,
     )
-    force = np.sum((force_coefficient * active)[:, :, None] * displacement, axis=1)
-    trace = 24.0 * epsilon * (22.0 * sigma_over_r12 - 5.0 * sigma_over_r6) / np.maximum(squared_distance, 1e-24)
-    curvature = np.sum(trace * active, axis=1) / 3.0
+    potential_first_over_r = potential_first / np.maximum(distance, 1e-12)
+    force = np.sum((-potential_first_over_r)[:, :, None] * displacement, axis=1)
+    curvature = np.sum(potential_second + 2.0 * potential_first_over_r, axis=1) / 3.0
     return force, curvature
 
 
@@ -431,6 +431,7 @@ def _ka_lj_target_pair_geometry(
     particle_types: np.ndarray,
     box_lengths: np.ndarray,
     target_indices: np.ndarray,
+    potential_protocol: str = "ka_lj_cut",
 ) -> dict[str, np.ndarray]:
     """Return exact KA pair forces and Hessian blocks for selected targets."""
 
@@ -454,20 +455,15 @@ def _ka_lj_target_pair_geometry(
     distance = np.sqrt(np.maximum(squared_distance, 1e-24))
     epsilon = _EPSILON[particle_types[target, None], particle_types[None, :]]
     sigma = _SIGMA[particle_types[target, None], particle_types[None, :]]
-    active = (distance > 1e-10) & (distance < _CUTOFF_SCALE * sigma)
-    sigma_over_r2 = (sigma / np.maximum(distance, 1e-12)) ** 2
-    sigma_over_r6 = sigma_over_r2**3
-    sigma_over_r12 = sigma_over_r6**2
-    force_coefficient = (
-        24.0 * epsilon * (2.0 * sigma_over_r12 - sigma_over_r6) / np.maximum(squared_distance, 1e-24)
+    _, potential_first, potential_second, _ = ka_lj_radial_derivatives(
+        distance,
+        epsilon=epsilon,
+        sigma=sigma,
+        protocol=potential_protocol,
     )
-    pair_force = (force_coefficient * active)[:, :, None] * displacement
-    potential_prime_over_r = (
-        24.0 * epsilon * (-2.0 * sigma_over_r12 + sigma_over_r6) / np.maximum(squared_distance, 1e-24)
-    ) * active
-    potential_second = (
-        24.0 * epsilon * (26.0 * sigma_over_r12 - 7.0 * sigma_over_r6) / np.maximum(squared_distance, 1e-24)
-    ) * active
+    active = (distance > 1e-10) & (distance < _CUTOFF_SCALE * sigma)
+    potential_prime_over_r = potential_first / np.maximum(distance, 1e-12)
+    pair_force = (-potential_prime_over_r)[:, :, None] * displacement
     unit = displacement / np.maximum(distance[:, :, None], 1e-12)
     pair_hessian = (
         (potential_second - potential_prime_over_r)[:, :, None, None]
@@ -493,6 +489,7 @@ def ka_lj_force_generator_observables(
     target_indices: np.ndarray,
     friction: float,
     temperature: float,
+    potential_protocol: str = "ka_lj_cut",
 ) -> dict[str, np.ndarray]:
     """Return ``F``, ``L F``, and the conditional noise covariance rate."""
 
@@ -507,6 +504,7 @@ def ka_lj_force_generator_observables(
         particle_types=particle_types,
         box_lengths=box_lengths,
         target_indices=target,
+        potential_protocol=potential_protocol,
     )
     pair_hessian = geometry["pair_hessian"]
     relative_velocity = velocities[target, None, :] - velocities[None, :, :]
@@ -537,6 +535,7 @@ def ka_lj_second_force_generator(
     target_indices: np.ndarray,
     friction: float,
     directional_step: float = 1e-5,
+    potential_protocol: str = "ka_lj_cut",
 ) -> np.ndarray:
     """Return the deterministic drift ``L^2 F`` for selected KA particles."""
 
@@ -550,6 +549,7 @@ def ka_lj_second_force_generator(
         particle_types=particle_types,
         box_lengths=box_lengths,
         target_indices=target,
+        potential_protocol=potential_protocol,
     )
     plus = ka_lj_force_generator_observables(
         positions + directional_step * velocities,
@@ -559,6 +559,7 @@ def ka_lj_second_force_generator(
         target_indices=target,
         friction=friction,
         temperature=0.0,
+        potential_protocol=potential_protocol,
     )["force_generator"]
     minus = ka_lj_force_generator_observables(
         positions - directional_step * velocities,
@@ -568,6 +569,7 @@ def ka_lj_second_force_generator(
         target_indices=target,
         friction=friction,
         temperature=0.0,
+        potential_protocol=potential_protocol,
     )["force_generator"]
     position_drift = (plus - minus) / (2.0 * directional_step)
 
@@ -581,6 +583,7 @@ def ka_lj_second_force_generator(
             particle_types=particle_types,
             box_lengths=box_lengths,
             target_indices=selected,
+            potential_protocol=potential_protocol,
         )[0]
         acceleration = selected_force - friction * velocities[selected]
         velocity_drift[slot] = -np.sum(

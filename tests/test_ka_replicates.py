@@ -3526,6 +3526,122 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertAlmostEqual(curvature[0], expected_curvature)
         self.assertAlmostEqual(curvature[1], expected_curvature)
 
+    def test_ka_c3_switched_pair_force_and_hessian_match_radial_derivatives(self):
+        box_lengths = np.array([20.0, 20.0, 20.0])
+        cases = (
+            (np.array([0, 0]), 1.0, 1.0),
+            (np.array([0, 1]), 1.5, 0.8),
+            (np.array([1, 1]), 0.5, 0.88),
+        )
+        for particle_types, epsilon, sigma in cases:
+            for scaled_radius in (1.2, 2.25, 2.499):
+                radius = scaled_radius * sigma
+                positions = np.array([[radius, 0.0, 0.0], [0.0, 0.0, 0.0]])
+                result = ka_lj_force_generator_observables(
+                    positions,
+                    velocities=np.zeros_like(positions),
+                    particle_types=particle_types,
+                    box_lengths=box_lengths,
+                    target_indices=np.array([0]),
+                    friction=1.0,
+                    temperature=0.58,
+                    potential_protocol="ka_lj_c3_switch",
+                )
+                _, first, second, _ = ka_lj_radial_derivatives(
+                    np.array([radius]),
+                    epsilon=epsilon,
+                    sigma=sigma,
+                    protocol="ka_lj_c3_switch",
+                )
+                expected_force = np.array([-first[0], 0.0, 0.0])
+                expected_hessian = np.diag([second[0], first[0] / radius, first[0] / radius])
+                np.testing.assert_allclose(result["force"][0], expected_force, rtol=2e-12, atol=2e-12)
+                np.testing.assert_allclose(
+                    result["target_pair_hessian"][0, 1],
+                    expected_hessian,
+                    rtol=2e-12,
+                    atol=2e-12,
+                )
+
+    def test_ka_c3_switched_force_generators_match_full_phase_space_drift(self):
+        positions = np.array([[0.0, 0.0, 0.0], [1.77, 0.17, -0.08]])
+        velocities = np.array([[0.4, -0.2, 0.1], [-0.3, 0.5, -0.4]])
+        particle_types = np.array([0, 1])
+        box_lengths = np.array([20.0, 20.0, 20.0])
+        target = np.array([0])
+        protocol = "ka_lj_c3_switch"
+        result = ka_lj_force_generator_observables(
+            positions,
+            velocities=velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            temperature=0.58,
+            potential_protocol=protocol,
+        )
+        step = 1e-6
+        force_plus = ka_lj_force_and_isotropic_curvature(
+            positions + step * velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            potential_protocol=protocol,
+        )[0]
+        force_minus = ka_lj_force_and_isotropic_curvature(
+            positions - step * velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            potential_protocol=protocol,
+        )[0]
+        np.testing.assert_allclose(
+            result["force_generator"],
+            (force_plus - force_minus) / (2.0 * step),
+            rtol=3e-8,
+            atol=3e-8,
+        )
+
+        second = ka_lj_second_force_generator(
+            positions,
+            velocities=velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            directional_step=1e-5,
+            potential_protocol=protocol,
+        )
+        force = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            potential_protocol=protocol,
+        )[0]
+        acceleration = force - velocities
+        drift_step = 2e-6
+        plus = ka_lj_force_generator_observables(
+            positions + drift_step * velocities,
+            velocities=velocities + drift_step * acceleration,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            temperature=0.0,
+            potential_protocol=protocol,
+        )["force_generator"]
+        minus = ka_lj_force_generator_observables(
+            positions - drift_step * velocities,
+            velocities=velocities - drift_step * acceleration,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=target,
+            friction=1.0,
+            temperature=0.0,
+            potential_protocol=protocol,
+        )["force_generator"]
+        np.testing.assert_allclose(second, (plus - minus) / (2.0 * drift_step), rtol=3e-5, atol=3e-5)
+
     def test_ka_force_generator_matches_directional_force_derivative_and_hessian_noise(self):
         positions = np.array([[0.0, 0.0, 0.0], [1.13, 0.17, -0.08]])
         velocities = np.array([[0.4, -0.2, 0.1], [-0.3, 0.5, -0.4]])
@@ -3741,6 +3857,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
                 friction=1.0,
                 integration_time_step=0.001,
                 directional_step=1e-5,
+                potential_protocol="ka_lj_c3_switch",
             )
 
         np.testing.assert_allclose(result["time"], np.arange(5) * 0.005)
@@ -3752,6 +3869,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(np.asarray(result["target_pair_hessian"]).shape, (5, 2, 3, 3))
         self.assertEqual(np.asarray(result["nearest_cutoff_signed_gap"]).shape, (5,))
         self.assertEqual(np.asarray(result["nearest_cutoff_particle_index"]).shape, (5,))
+        self.assertEqual(str(result["potential_protocol"]), "ka_lj_c3_switch")
         self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
 
     def test_generator_response_runner_exposes_low_disk_protocol_controls(self):

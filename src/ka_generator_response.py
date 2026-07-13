@@ -75,6 +75,7 @@ def extract_generator_response_path(
     friction: float,
     integration_time_step: float,
     directional_step: float,
+    potential_protocol: str = "ka_lj_cut",
 ) -> dict[str, np.ndarray | float]:
     """Extract exact tagged `F`, `LF`, and `L2F` from one full-state path."""
 
@@ -122,6 +123,7 @@ def extract_generator_response_path(
             target_indices=target,
             friction=friction,
             temperature=temperature,
+            potential_protocol=potential_protocol,
         )
         force[frame] = observable["force"][0]
         generator[frame] = observable["force_generator"][0]
@@ -138,6 +140,7 @@ def extract_generator_response_path(
             target_indices=target,
             friction=friction,
             directional_step=directional_step,
+            potential_protocol=potential_protocol,
         )[0]
 
     frame_time = float(intervals[0]) * integration_time_step
@@ -153,6 +156,7 @@ def extract_generator_response_path(
         "target_pair_hessian": target_pair_hessian,
         "nearest_cutoff_signed_gap": nearest_cutoff_signed_gap,
         "nearest_cutoff_particle_index": nearest_cutoff_particle_index,
+        "potential_protocol": np.asarray(potential_protocol),
         "frame_time": frame_time,
         "target_id": float(target_id),
         "temperature": float(temperature),
