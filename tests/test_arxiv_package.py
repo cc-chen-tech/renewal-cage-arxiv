@@ -15,6 +15,41 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_rate_anomaly_is_threshold_robust_but_remains_single_replica_evidence(self):
+        verdict_path = (
+            ROOT / "data" / "renewal_cage_ka_rate_threshold_sensitivity_verdict.csv"
+        )
+        stability_path = (
+            ROOT / "data" / "renewal_cage_ka_rate_threshold_sensitivity_stability.csv"
+        )
+        with verdict_path.open() as handle:
+            verdict = next(csv.DictReader(handle))
+        with stability_path.open() as handle:
+            stability = {
+                int(float(row["replicate"])): row for row in csv.DictReader(handle)
+            }
+
+        self.assertEqual(verdict["threshold_scales"], "0.9;1;1.1")
+        self.assertEqual(float(verdict["failed_rate_replicate"]), 3.0)
+        self.assertEqual(float(verdict["failed_replicate_threshold_robust_trend"]), 1.0)
+        self.assertEqual(float(verdict["jump_threshold_artifact_supported"]), 0.0)
+        self.assertEqual(float(verdict["threshold_robust_rate_anomaly_detected"]), 1.0)
+        self.assertLess(
+            float(stability[3]["trend_amplitude_span_across_thresholds"]),
+            0.03,
+        )
+        self.assertGreater(
+            float(stability[3]["minimum_absolute_total_linear_change"]),
+            0.20,
+        )
+        self.assertEqual(float(verdict["systematic_rate_nonstationarity_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["new_rate_state_parameter_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["macro_observable_prediction_claim_allowed"]), 0.0)
+        self.assertEqual(float(verdict["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_rate_threshold_sensitivity.svg").is_file()
+        )
+
     def test_six_window_rate_audit_blocks_new_rate_state_and_macro_claims(self):
         verdict_path = ROOT / "data" / "renewal_cage_ka_rate_stability_verdict.csv"
         rows_path = ROOT / "data" / "renewal_cage_ka_rate_stability_rows.csv"

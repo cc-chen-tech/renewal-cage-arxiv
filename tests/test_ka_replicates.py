@@ -538,6 +538,26 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertLess(result["exact_two_sided_permutation_p_value"], 0.01)
         self.assertEqual(result["strict_trend_detected"], 1.0)
 
+    def test_rate_threshold_stability_requires_same_sign_and_bounded_change(self):
+        script_path = ROOT / "scripts" / "analyze_ka_rate_threshold_sensitivity.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_rate_threshold_sensitivity", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = [
+            {"threshold_scale": 0.9, "normalized_total_linear_change": 0.19},
+            {"threshold_scale": 1.0, "normalized_total_linear_change": 0.23},
+            {"threshold_scale": 1.1, "normalized_total_linear_change": 0.25},
+        ]
+
+        result = module.classify_threshold_stability(rows)
+
+        self.assertEqual(result["trend_sign_stable_across_thresholds"], 1.0)
+        self.assertEqual(result["trend_amplitude_stable_across_thresholds"], 1.0)
+        self.assertEqual(result["threshold_robust_trend"], 1.0)
+
     def test_exchange_spectrum_rejects_nonincreasing_times(self):
         fit = getattr(ka_replicates, "fit_exponential_correlation_spectrum", None)
         self.assertIsNotNone(fit)

@@ -1,0 +1,4 @@
+trend_sign_stable_across_thresholds,trend_amplitude_span_across_thresholds,maximum_allowed_trend_amplitude_span,trend_amplitude_stable_across_thresholds,threshold_robust_trend,minimum_absolute_total_linear_change,maximum_absolute_total_linear_change,replicate,minimum_exact_permutation_p_value,strict_trend_at_any_threshold,borderline_trend_at_all_thresholds
+1.0,0.023823357234592432,0.1,1.0,1.0,0.011135612430997954,0.03495896966559039,1.0,0.6546463245492372,0.0,0.0
+1.0,0.028601551969212394,0.1,1.0,1.0,0.08780926536150335,0.11641081733071575,2.0,0.24826629680998613,0.0,0.0
+1.0,0.02738566015343266,0.1,1.0,1.0,0.20091214721764214,0.2282978073710748,3.0,0.049930651872399444,1.0,1.0

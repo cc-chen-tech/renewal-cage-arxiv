@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="430" viewBox="0 0 800 430">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124;stroke-width:1}.grid{stroke:#DADCE0;stroke-width:1}</style>
+<text x="400" y="27" text-anchor="middle" font-size="18" font-weight="700">Low-temperature rate trend is threshold robust</text>
+<line class="grid" x1="75" y1="340.00" x2="735" y2="340.00"/>
+<text x="65" y="344.00" text-anchor="end" font-size="11">-0.18</text>
+<line class="grid" x1="75" y1="268.75" x2="735" y2="268.75"/>
+<text x="65" y="272.75" text-anchor="end" font-size="11">-0.06</text>
+<line class="grid" x1="75" y1="197.50" x2="735" y2="197.50"/>
+<text x="65" y="201.50" text-anchor="end" font-size="11">0.06</text>
+<line class="grid" x1="75" y1="126.25" x2="735" y2="126.25"/>
+<text x="65" y="130.25" text-anchor="end" font-size="11">0.18</text>
+<line class="grid" x1="75" y1="55.00" x2="735" y2="55.00"/>
+<text x="65" y="59.00" text-anchor="end" font-size="11">0.30</text>
+<line class="axis" x1="75" y1="55" x2="75" y2="340"/>
+<line class="axis" x1="75" y1="340" x2="735" y2="340"/>
+<text x="405.00" y="375" text-anchor="middle" font-size="13">Debye-Waller threshold scale</text>
+<text x="18" y="200" text-anchor="middle" font-size="13" transform="rotate(-90 18 200)">normalized six-window linear change</text>
+<polyline fill="none" stroke="#0072B2" stroke-width="2.5" points="75.00,226.51 405.00,216.35 735.00,212.37"/>
+<circle cx="75.00" cy="226.51" r="4" fill="#0072B2"/>
+<circle cx="405.00" cy="216.35" r="4" fill="#0072B2"/>
+<circle cx="735.00" cy="212.37" r="4" fill="#0072B2"/>
+<polyline fill="none" stroke="#D55E00" stroke-width="2.5" points="75.00,285.26 405.00,295.04 735.00,302.24"/>
+<circle cx="75.00" cy="285.26" r="4" fill="#D55E00"/>
+<circle cx="405.00" cy="295.04" r="4" fill="#D55E00"/>
+<circle cx="735.00" cy="302.24" r="4" fill="#D55E00"/>
+<polyline fill="none" stroke="#009E73" stroke-width="2.5" points="75.00,113.83 405.00,98.92 735.00,97.57"/>
+<circle cx="75.00" cy="113.83" r="4" fill="#009E73"/>
+<circle cx="405.00" cy="98.92" r="4" fill="#009E73"/>
+<circle cx="735.00" cy="97.57" r="4" fill="#009E73"/>
+<text x="75.00" y="360" text-anchor="middle" font-size="11">0.9</text>
+<text x="405.00" y="360" text-anchor="middle" font-size="11">1.0</text>
+<text x="735.00" y="360" text-anchor="middle" font-size="11">1.1</text>
+<line x1="220" y1="405" x2="248" y2="405" stroke="#0072B2" stroke-width="3"/>
+<text x="256" y="410" font-size="11">replicate 1</text>
+<line x1="375" y1="405" x2="403" y2="405" stroke="#D55E00" stroke-width="3"/>
+<text x="411" y="410" font-size="11">replicate 2</text>
+<line x1="530" y1="405" x2="558" y2="405" stroke="#009E73" stroke-width="3"/>
+<text x="566" y="410" font-size="11">replicate 3</text>
+</svg>
