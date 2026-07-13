@@ -135,6 +135,7 @@ from run_ka_generator_response import (  # noqa: E402
     file_sha256 as generator_response_file_sha256,
     validate_parent_protocol,
 )
+from analyze_ka_tangent_noise_covariance import protocol_tangent_interval_mask  # noqa: E402
 from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E402
 
 
@@ -4160,6 +4161,29 @@ class KAReplicatePreparationTests(unittest.TestCase):
             np.ones(40, dtype=bool),
         )
 
+    def test_c3_protocol_retains_support_crossings_while_strict_hard_cutoff_rejects_censoring(self):
+        mismatch = np.zeros(201, dtype=bool)
+        mismatch[7] = True
+
+        c3_valid, support_crossing = protocol_tangent_interval_mask(
+            mismatch,
+            potential_protocol="ka_lj_c3_switch",
+            stride=5,
+            interval_count=40,
+            require_full_horizon=True,
+        )
+
+        np.testing.assert_array_equal(c3_valid, np.ones(40, dtype=bool))
+        self.assertGreater(int(np.sum(support_crossing)), 0)
+        with self.assertRaisesRegex(ValueError, "right-censored"):
+            protocol_tangent_interval_mask(
+                mismatch,
+                potential_protocol="ka_lj_cut",
+                stride=5,
+                interval_count=40,
+                require_full_horizon=True,
+            )
+
     def test_tangent_noise_covariance_diagnostic_calibrates_heteroscedastic_gaussian_noise(self):
         rng = np.random.default_rng(991)
         member_count = 48
@@ -4322,7 +4346,23 @@ class KAReplicatePreparationTests(unittest.TestCase):
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        for option in ("--output", "--stride", "--maximum-time"):
+        for option in ("--output", "--stride", "--maximum-time", "--require-full-horizon"):
+            self.assertIn(option, completed.stdout)
+
+    def test_c3_tangent_control_cli_exposes_preregistered_gate_inputs(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_c3_tangent_control.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for option in ("--manifest", "--covariance", "--resolution", "--output", "--stride"):
             self.assertIn(option, completed.stdout)
 
     def test_residual_ar1_memory_diagnostic_recovers_white_innovation_limit(self):

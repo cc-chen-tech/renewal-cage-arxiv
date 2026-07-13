@@ -141,12 +141,45 @@ def unavailable_diagnostic(valid_sample_count: int) -> dict[str, float]:
     }
 
 
+def protocol_tangent_interval_mask(
+    mismatch: np.ndarray,
+    *,
+    potential_protocol: str,
+    stride: int,
+    interval_count: int,
+    require_full_horizon: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Separate pair-support crossings from true hard-cutoff censoring."""
+
+    mismatch = np.asarray(mismatch, dtype=bool)
+    if mismatch.shape != (interval_count * stride + 1,):
+        raise ValueError("pair-support mismatch must align with strided intervals")
+    support_crossing = np.asarray(
+        [np.any(mismatch[start : start + stride + 1]) for start in range(0, interval_count * stride, stride)],
+        dtype=bool,
+    )
+    if potential_protocol == "ka_lj_c3_switch":
+        valid = np.ones(interval_count, dtype=bool)
+    elif potential_protocol == "ka_lj_cut":
+        valid = right_censored_tangent_interval_mask(
+            mismatch,
+            stride=stride,
+            interval_count=interval_count,
+        )
+    else:
+        raise ValueError("unsupported KA pair-potential protocol")
+    if require_full_horizon and np.any(~valid):
+        raise ValueError("full-horizon analysis rejects right-censored tangent intervals")
+    return valid, support_crossing
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--stride", type=int, default=5)
     parser.add_argument("--maximum-time", type=float)
+    parser.add_argument("--require-full-horizon", action="store_true")
     args = parser.parse_args()
     if not args.manifest.is_file():
         raise ValueError("manifest must exist")
@@ -160,6 +193,10 @@ def main() -> None:
     manifest = json.loads(manifest_path.read_text())
     if manifest.get("thermodynamic_claim_allowed") is not False:
         raise ValueError("manifest must preserve the thermodynamic claim boundary")
+    potential_protocol = str(manifest.get("potential_protocol", "ka_lj_cut"))
+    if potential_protocol not in {"ka_lj_cut", "ka_lj_c3_switch"}:
+        raise ValueError("manifest has an unsupported potential protocol")
+    require_full_horizon = bool(args.require_full_horizon or potential_protocol == "ka_lj_c3_switch")
     base_frame_time = float(manifest["saved_frame_interval_tau"])
     friction = float(manifest["friction"])
     temperature = float(manifest["temperature"])
@@ -177,6 +214,7 @@ def main() -> None:
     residuals: dict[tuple[int, float], np.ndarray] = {}
     covariance: dict[tuple[int, float], np.ndarray] = {}
     valid_masks: dict[tuple[int, float], np.ndarray] = {}
+    support_crossings: dict[tuple[int, float], np.ndarray] = {}
     maximum_time: float | None = None
     rows: list[dict[str, object]] = []
     for member in members:
@@ -208,10 +246,12 @@ def main() -> None:
                 np.logical_xor(plus["target_pair_active"][:stop], minus["target_pair_active"][:stop]),
                 axis=1,
             )
-            valid = right_censored_tangent_interval_mask(
+            valid, support_crossing = protocol_tangent_interval_mask(
                 mismatch,
+                potential_protocol=potential_protocol,
                 stride=args.stride,
                 interval_count=len(residual),
+                require_full_horizon=require_full_horizon,
             )
             valid_count = int(np.sum(valid))
             result = (
@@ -222,8 +262,8 @@ def main() -> None:
             residuals[(member, epsilon)] = residual
             covariance[(member, epsilon)] = integrated
             valid_masks[(member, epsilon)] = valid
-            rows.append(
-                diagnostic_row(
+            support_crossings[(member, epsilon)] = support_crossing
+            row = diagnostic_row(
                     record="covariance_member",
                     member_index=member,
                     epsilon=epsilon,
@@ -234,20 +274,23 @@ def main() -> None:
                     contaminated_interval_count=int(np.sum(~valid)),
                     result=result,
                 )
-            )
+            row["pair_support_crossing_interval_count"] = int(np.sum(support_crossing))
+            row["potential_protocol"] = potential_protocol
+            row["full_horizon_required"] = require_full_horizon
+            rows.append(row)
 
     assert maximum_time is not None
     for epsilon in epsilons:
         stacked_residual = np.stack([residuals[(member, epsilon)] for member in members])
         stacked_covariance = np.stack([covariance[(member, epsilon)] for member in members])
         stacked_valid = np.stack([valid_masks[(member, epsilon)] for member in members])
+        stacked_crossing = np.stack([support_crossings[(member, epsilon)] for member in members])
         result = tangent_noise_covariance_diagnostic(
             stacked_residual,
             stacked_covariance,
             valid_mask=stacked_valid,
         )
-        rows.append(
-            diagnostic_row(
+        row = diagnostic_row(
                 record="covariance_aggregate",
                 member_index="",
                 epsilon=epsilon,
@@ -258,7 +301,10 @@ def main() -> None:
                 contaminated_interval_count=int(np.sum(~stacked_valid)),
                 result=result,
             )
-        )
+        row["pair_support_crossing_interval_count"] = int(np.sum(stacked_crossing))
+        row["potential_protocol"] = potential_protocol
+        row["full_horizon_required"] = require_full_horizon
+        rows.append(row)
 
     reference_epsilon, comparison_epsilon = epsilons[:2]
     for member in members:
@@ -277,6 +323,8 @@ def main() -> None:
                 "valid_interval_count": int(np.sum(valid)),
                 "covariance_cross_epsilon_relative_l2_error": relative_l2(comparison, reference),
                 "covariance_cross_epsilon_correlation": correlation(comparison, reference),
+                "potential_protocol": potential_protocol,
+                "full_horizon_required": require_full_horizon,
                 "fit_parameters_from_macro_observables": 0.0,
                 "thermodynamic_claim_allowed": 0.0,
             }
