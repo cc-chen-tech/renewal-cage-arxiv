@@ -15,6 +15,39 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_correlated_jump_kernel_closes_low_diffusion_but_rejects_macro_independence(self):
+        low_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_hybrid_macro_verdict.csv"
+        high_path = ROOT / "data" / "renewal_cage_ka_replicates_T058_hybrid_macro_verdict.csv"
+        crossover_path = ROOT / "data" / "renewal_cage_ka_hybrid_macro_crossover.csv"
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+
+        self.assertLess(float(low["diffusion_relative_error"]), 0.075)
+        self.assertLess(float(low["maximum_count_tail_probability"]), 0.0081)
+        self.assertGreater(float(low["alpha_relaxation_relative_error"]), 0.33)
+        self.assertGreater(float(low["maximum_ensemble_ngp_absolute_error"]), 0.52)
+        self.assertGreater(float(low["maximum_ensemble_fs_absolute_error"]), 0.075)
+        self.assertEqual(float(low["calibration_correlated_jump_kernel"]), 1.0)
+        self.assertEqual(float(low["jump_direction_correlation_included"]), 1.0)
+        self.assertEqual(float(low["joint_macro_transfer_pass"]), 0.0)
+        self.assertEqual(float(low["preregistered_heldout_prediction_claim_allowed"]), 0.0)
+        self.assertGreater(float(high["diffusion_relative_error"]), 0.22)
+        self.assertEqual(float(crossover["independent_count_jump_kernel_rejected"]), 1.0)
+        self.assertEqual(float(crossover["additional_exchange_clock_supported"]), 0.0)
+        self.assertEqual(
+            crossover["next_minimal_extension"],
+            "mobility_state_conditioned_jump_cage_kernel",
+        )
+        self.assertEqual(float(crossover["heldout_macro_closure_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_hybrid_macro_crossover.svg").is_file()
+        )
+
     def test_three_temperature_restart_uncertainty_supports_scalar_trends_not_parent_scope(self):
         verdict_path = ROOT / "data" / "renewal_cage_ka_three_temperature_uncertainty_verdict.csv"
         trends_path = ROOT / "data" / "renewal_cage_ka_three_temperature_uncertainty_trends.csv"

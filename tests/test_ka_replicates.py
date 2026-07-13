@@ -481,6 +481,142 @@ class KAReplicatePreparationTests(unittest.TestCase):
         )
         self.assertLess(float(np.sum(np.abs(empirical_pair - predicted_pair))), 0.04)
 
+    def test_two_clock_hmm_total_count_pgf_matches_cumulative_monte_carlo(self):
+        predict = getattr(
+            ka_replicates,
+            "two_clock_hmm_mixture_total_count_statistics",
+            None,
+        )
+        simulate = getattr(ka_replicates, "simulate_two_clock_hmm_mixture_counts", None)
+        self.assertIsNotNone(predict)
+        self.assertIsNotNone(simulate)
+        parameters = {
+            "slow_mean_count": 0.08,
+            "fast_mean_count": 0.42,
+            "stationary_slow_probability": 0.7,
+            "stationary_fast_probability": 0.3,
+            "fast_clock_weight": 0.6,
+            "slow_clock_weight": 0.4,
+            "fast_clock_retention": 0.35,
+            "slow_clock_retention": 0.92,
+            "block_size": 20.0,
+        }
+        block_count = 8
+        argument = 0.73
+
+        predicted = predict(
+            parameters,
+            block_count=block_count,
+            pgf_argument=argument,
+        )
+        simulated = simulate(
+            parameters,
+            sequence_count=180000,
+            block_count=block_count,
+            random_seed=7319,
+        ).sum(axis=1)
+
+        self.assertAlmostEqual(predicted["mean_count"], float(np.mean(simulated)), delta=0.01)
+        self.assertAlmostEqual(predicted["count_variance"], float(np.var(simulated)), delta=0.02)
+        self.assertAlmostEqual(
+            predicted["count_pgf"],
+            float(np.mean(argument**simulated)),
+            delta=0.002,
+        )
+
+    def test_two_clock_hmm_total_count_pmf_matches_cumulative_monte_carlo(self):
+        predict = getattr(ka_replicates, "two_clock_hmm_mixture_total_count_pmf", None)
+        simulate = getattr(ka_replicates, "simulate_two_clock_hmm_mixture_counts", None)
+        self.assertIsNotNone(predict)
+        self.assertIsNotNone(simulate)
+        parameters = {
+            "slow_mean_count": 0.08,
+            "fast_mean_count": 0.42,
+            "stationary_slow_probability": 0.7,
+            "stationary_fast_probability": 0.3,
+            "fast_clock_weight": 0.6,
+            "slow_clock_weight": 0.4,
+            "fast_clock_retention": 0.35,
+            "slow_clock_retention": 0.92,
+            "block_size": 20.0,
+        }
+        block_count = 8
+        predicted = predict(parameters, block_count=block_count, maximum_count=15)
+        simulated = simulate(
+            parameters,
+            sequence_count=180000,
+            block_count=block_count,
+            random_seed=8127,
+        ).sum(axis=1)
+        observed = np.bincount(np.minimum(simulated, 16), minlength=17) / len(simulated)
+        expected = np.concatenate([predicted["count_pmf"], [predicted["tail_probability"]]])
+
+        self.assertLess(0.5 * float(np.sum(np.abs(observed - expected))), 0.006)
+
+    def test_compound_jump_cage_observables_use_factorial_count_fluctuations(self):
+        propagate = getattr(ka_replicates, "compound_jump_cage_observables", None)
+        self.assertIsNotNone(propagate)
+        result = propagate(
+            mean_count=3.0,
+            factorial_second_count=12.0,
+            jump_msd=0.4,
+            jump_fourth_moment=0.32,
+            count_pgf=0.55,
+            cage_msd=0.2,
+            cage_ngp=0.1,
+            cage_fs=0.8,
+            dimension=3,
+        )
+
+        self.assertAlmostEqual(result["jump_channel_msd"], 1.2)
+        expected_jump_fourth = 3.0 * 0.32 + (5.0 / 3.0) * 12.0 * 0.4**2
+        self.assertAlmostEqual(result["jump_channel_fourth_moment"], expected_jump_fourth)
+        self.assertAlmostEqual(result["factorized_msd"], 1.4)
+        self.assertAlmostEqual(result["factorized_fs"], 0.44)
+
+    def test_green_kubo_jump_renormalization_scales_all_single_jump_inputs(self):
+        renormalize = getattr(ka_replicates, "green_kubo_renormalized_jump_statistics", None)
+        self.assertIsNotNone(renormalize)
+        jumps = np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]])
+
+        result = renormalize(jumps, green_kubo_factor=0.25, wave_numbers=np.array([2.0]))
+
+        self.assertAlmostEqual(result["raw_jump_msd"], 1.0)
+        self.assertAlmostEqual(result["effective_jump_msd"], 0.25)
+        self.assertAlmostEqual(result["effective_jump_fourth_moment"], 0.0625)
+        self.assertAlmostEqual(result["jump_characteristic_k2"], np.mean(np.cos(jumps)))
+
+    def test_correlated_jump_propagator_preserves_consecutive_direction_memory(self):
+        propagate = getattr(ka_replicates, "correlated_jump_propagator", None)
+        self.assertIsNotNone(propagate)
+        events = {
+            "particle": np.array([0, 0, 0, 1, 1, 1]),
+            "time": np.array([1.0, 2.0, 3.0, 1.0, 2.0, 3.0]),
+            "jump_vector": np.array(
+                [
+                    [1.0, 0.0],
+                    [-1.0, 0.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0],
+                    [0.0, -1.0],
+                    [0.0, 1.0],
+                ]
+            ),
+        }
+
+        rows = propagate(
+            events,
+            maximum_count=3,
+            wave_numbers=np.array([1.0]),
+            minimum_sample_count=2,
+        )
+
+        self.assertEqual([row["jump_count"] for row in rows], [0.0, 1.0, 2.0, 3.0])
+        self.assertAlmostEqual(rows[1]["conditional_msd"], 1.0)
+        self.assertAlmostEqual(rows[2]["conditional_msd"], 0.0)
+        self.assertAlmostEqual(rows[3]["conditional_msd"], 1.0)
+        self.assertAlmostEqual(rows[2]["conditional_characteristic_k1"], 1.0)
+
     def test_two_clock_hmm_hybrid_gate_separates_rate_drift_from_shape_closure(self):
         script_path = ROOT / "scripts" / "analyze_ka_two_clock_hmm_mixture.py"
         spec = importlib.util.spec_from_file_location(
@@ -1221,6 +1357,76 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(verdict["three_temperature_trend_chain_pass"], 1.0)
         self.assertEqual(verdict["independently_prepared_parent_ensemble_ready"], 0.0)
         self.assertEqual(verdict["thermodynamic_claim_allowed"], 0.0)
+
+    def test_hybrid_macro_transfer_requires_curves_and_derived_scalars(self):
+        script_path = ROOT / "scripts" / "predict_ka_hybrid_macro_observables.py"
+        spec = importlib.util.spec_from_file_location(
+            "predict_ka_hybrid_macro_observables", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        curve_errors = {
+            "maximum_ensemble_msd_relative_error": 0.08,
+            "maximum_ensemble_ngp_absolute_error": 0.20,
+            "maximum_ensemble_fs_absolute_error": 0.02,
+        }
+        scalar_errors = {
+            "diffusion_relative_error": 0.07,
+            "alpha_relaxation_relative_error": 0.12,
+            "diffusion_alpha_product_relative_error": 0.15,
+        }
+
+        verdict = module.classify_macro_transfer(
+            curve_errors,
+            scalar_errors,
+            alpha_crossing_ready=True,
+        )
+
+        self.assertEqual(verdict["curve_transfer_pass"], 1.0)
+        self.assertEqual(verdict["derived_scalar_transfer_pass"], 1.0)
+        self.assertEqual(verdict["joint_macro_transfer_pass"], 1.0)
+        self.assertEqual(verdict["heldout_events_used_in_prediction"], 0.0)
+        self.assertEqual(verdict["macro_fit_parameter_count"], 0.0)
+        self.assertEqual(verdict["thermodynamic_claim_allowed"], 0.0)
+
+    def test_hybrid_macro_crossover_selects_state_conditioned_kernel_not_new_clock(self):
+        script_path = ROOT / "scripts" / "summarize_ka_hybrid_macro_transfer.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_hybrid_macro_transfer", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        result = module.classify_crossover(
+            low={
+                "diffusion_relative_error": "0.074",
+                "alpha_relaxation_relative_error": "0.337",
+                "maximum_ensemble_ngp_absolute_error": "0.528",
+                "maximum_ensemble_fs_absolute_error": "0.0755",
+                "maximum_count_tail_probability": "0.008",
+                "jump_direction_correlation_included": "1",
+                "joint_macro_transfer_pass": "0",
+            },
+            high={
+                "diffusion_relative_error": "0.226",
+                "maximum_ensemble_ngp_absolute_error": "0.527",
+                "maximum_ensemble_fs_absolute_error": "0.087",
+                "maximum_count_tail_probability": "0.015",
+                "joint_macro_transfer_pass": "0",
+            },
+        )
+
+        self.assertEqual(result["low_temperature_diffusion_transfer_pass"], 1.0)
+        self.assertEqual(result["low_temperature_alpha_transfer_pass"], 0.0)
+        self.assertEqual(result["low_temperature_count_kernel_identifiable"], 1.0)
+        self.assertEqual(result["independent_count_jump_kernel_rejected"], 1.0)
+        self.assertEqual(result["additional_exchange_clock_supported"], 0.0)
+        self.assertEqual(
+            result["next_minimal_extension"],
+            "mobility_state_conditioned_jump_cage_kernel",
+        )
 
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
         valid_rows = [

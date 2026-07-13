@@ -1,0 +1,2 @@
+temperature,diffusion_lag,predicted_diffusion,observed_diffusion,diffusion_relative_error,predicted_alpha_relaxation_time,observed_alpha_relaxation_time,alpha_relaxation_relative_error,predicted_diffusion_alpha_product,observed_diffusion_alpha_product,diffusion_alpha_product_relative_error
+0.58,600.0,0.0007626234678163076,0.0009857521392586273,0.22635372783480046,nan,nan,nan,nan,nan,nan

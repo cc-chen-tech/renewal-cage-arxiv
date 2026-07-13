@@ -1204,6 +1204,182 @@ def two_clock_hmm_mixture_count_predictions(
     ]
 
 
+def two_clock_hmm_mixture_total_count_statistics(
+    parameters: dict[str, object],
+    *,
+    block_count: int,
+    pgf_argument: float,
+) -> dict[str, float]:
+    """Propagate the two-clock HMM through a finite cumulative count window."""
+
+    if isinstance(block_count, bool) or not isinstance(block_count, int) or block_count < 1:
+        raise ValueError("block_count must be a positive integer")
+    if not math.isfinite(pgf_argument):
+        raise ValueError("pgf_argument must be finite")
+    stationary = np.array(
+        [
+            float(parameters["stationary_slow_probability"]),
+            float(parameters["stationary_fast_probability"]),
+        ],
+        dtype=float,
+    )
+    means = np.array(
+        [
+            float(parameters["slow_mean_count"]),
+            float(parameters["fast_mean_count"]),
+        ],
+        dtype=float,
+    )
+    clock_weights = np.array(
+        [
+            float(parameters["fast_clock_weight"]),
+            float(parameters["slow_clock_weight"]),
+        ],
+        dtype=float,
+    )
+    retentions = np.array(
+        [
+            float(parameters["fast_clock_retention"]),
+            float(parameters["slow_clock_retention"]),
+        ],
+        dtype=float,
+    )
+    if (
+        np.any(~np.isfinite(stationary))
+        or np.any(~np.isfinite(means))
+        or np.any(~np.isfinite(clock_weights))
+        or np.any(~np.isfinite(retentions))
+        or np.any(stationary <= 0.0)
+        or not math.isclose(float(np.sum(stationary)), 1.0, abs_tol=1e-8)
+        or np.any(means < 0.0)
+        or np.any(clock_weights < 0.0)
+        or not math.isclose(float(np.sum(clock_weights)), 1.0, abs_tol=1e-8)
+        or np.any(retentions < 0.0)
+        or np.any(retentions > 1.0)
+    ):
+        raise ValueError("parameters must define stationary positive two-clock emissions")
+
+    def propagate(retention: float) -> tuple[float, float, float]:
+        transition = np.array(
+            [
+                [
+                    1.0 - stationary[1] * (1.0 - retention),
+                    stationary[1] * (1.0 - retention),
+                ],
+                [
+                    stationary[0] * (1.0 - retention),
+                    1.0 - stationary[0] * (1.0 - retention),
+                ],
+            ]
+        )
+        probability = stationary.copy()
+        first = np.zeros(2, dtype=float)
+        second = np.zeros(2, dtype=float)
+        pgf = stationary.copy()
+        emission_pgf = np.exp(means * (pgf_argument - 1.0))
+        for _ in range(block_count):
+            second = (second + 2.0 * first * means + probability * means**2) @ transition
+            first = (first + probability * means) @ transition
+            probability = probability @ transition
+            pgf = (pgf * emission_pgf) @ transition
+        return float(np.sum(first)), float(np.sum(second)), float(np.sum(pgf))
+
+    values = [propagate(float(retention)) for retention in retentions]
+    mean_count = float(sum(weight * value[0] for weight, value in zip(clock_weights, values)))
+    factorial_second = float(
+        sum(weight * value[1] for weight, value in zip(clock_weights, values))
+    )
+    count_pgf = float(sum(weight * value[2] for weight, value in zip(clock_weights, values)))
+    return {
+        "block_count": float(block_count),
+        "lag_time": block_count * float(parameters["block_size"]),
+        "mean_count": mean_count,
+        "factorial_second_count": factorial_second,
+        "count_variance": factorial_second + mean_count - mean_count**2,
+        "pgf_argument": float(pgf_argument),
+        "count_pgf": count_pgf,
+    }
+
+
+def two_clock_hmm_mixture_total_count_pmf(
+    parameters: dict[str, object],
+    *,
+    block_count: int,
+    maximum_count: int,
+) -> dict[str, object]:
+    """Return the exact truncated cumulative-count PMF of the two-clock HMM."""
+
+    if isinstance(maximum_count, bool) or not isinstance(maximum_count, int) or maximum_count < 0:
+        raise ValueError("maximum_count must be a nonnegative integer")
+    two_clock_hmm_mixture_total_count_statistics(
+        parameters,
+        block_count=block_count,
+        pgf_argument=1.0,
+    )
+    stationary = np.array(
+        [
+            float(parameters["stationary_slow_probability"]),
+            float(parameters["stationary_fast_probability"]),
+        ]
+    )
+    means = np.array(
+        [
+            float(parameters["slow_mean_count"]),
+            float(parameters["fast_mean_count"]),
+        ]
+    )
+
+    def poisson(mean: float) -> np.ndarray:
+        values = np.zeros(maximum_count + 1, dtype=float)
+        values[0] = math.exp(-mean)
+        for count in range(1, maximum_count + 1):
+            values[count] = values[count - 1] * mean / count
+        return values
+
+    emissions = [poisson(float(mean)) for mean in means]
+
+    def propagate(retention: float) -> np.ndarray:
+        transition = np.array(
+            [
+                [
+                    1.0 - stationary[1] * (1.0 - retention),
+                    stationary[1] * (1.0 - retention),
+                ],
+                [
+                    stationary[0] * (1.0 - retention),
+                    1.0 - stationary[0] * (1.0 - retention),
+                ],
+            ]
+        )
+        state_count = np.zeros((maximum_count + 1, 2), dtype=float)
+        state_count[0] = stationary
+        for _ in range(block_count):
+            emitted = np.column_stack(
+                [
+                    np.convolve(state_count[:, state], emissions[state])[
+                        : maximum_count + 1
+                    ]
+                    for state in range(2)
+                ]
+            )
+            state_count = emitted @ transition
+        return np.sum(state_count, axis=1)
+
+    pmf = (
+        float(parameters["fast_clock_weight"])
+        * propagate(float(parameters["fast_clock_retention"]))
+        + float(parameters["slow_clock_weight"])
+        * propagate(float(parameters["slow_clock_retention"]))
+    )
+    return {
+        "block_count": float(block_count),
+        "lag_time": block_count * float(parameters["block_size"]),
+        "maximum_count": float(maximum_count),
+        "count_pmf": pmf,
+        "tail_probability": max(0.0, 1.0 - float(np.sum(pmf))),
+    }
+
+
 def two_clock_hmm_mixture_pair_pmf(
     parameters: dict[str, object],
     *,
@@ -1377,6 +1553,197 @@ def independent_isotropic_channel_moments(
         "combined_fourth_moment": combined_fourth,
         "combined_ngp": combined_ngp,
     }
+
+
+def compound_jump_cage_observables(
+    *,
+    mean_count: float,
+    factorial_second_count: float,
+    jump_msd: float,
+    jump_fourth_moment: float,
+    count_pgf: float,
+    cage_msd: float,
+    cage_ngp: float,
+    cage_fs: float,
+    dimension: int,
+) -> dict[str, float]:
+    """Map a count law and iid isotropic jumps to cage-convolved observables."""
+
+    values = (
+        mean_count,
+        factorial_second_count,
+        jump_msd,
+        jump_fourth_moment,
+        count_pgf,
+        cage_msd,
+        cage_ngp,
+        cage_fs,
+    )
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("count, jump, and cage inputs must be finite")
+    if (
+        min(mean_count, factorial_second_count, jump_msd, jump_fourth_moment, cage_msd) < 0.0
+        or cage_ngp < -1.0
+        or not -1.0 <= count_pgf <= 1.0
+        or not -1.0 <= cage_fs <= 1.0
+        or isinstance(dimension, bool)
+        or not isinstance(dimension, int)
+        or dimension < 1
+    ):
+        raise ValueError("count, jump, cage, and dimension inputs are outside their domains")
+    jump_channel_msd = mean_count * jump_msd
+    jump_channel_fourth = (
+        mean_count * jump_fourth_moment
+        + (1.0 + 2.0 / dimension)
+        * factorial_second_count
+        * jump_msd**2
+    )
+    jump_channel_ngp = (
+        dimension
+        * jump_channel_fourth
+        / ((dimension + 2.0) * jump_channel_msd**2)
+        - 1.0
+        if jump_channel_msd > 0.0
+        else 0.0
+    )
+    combined = independent_isotropic_channel_moments(
+        first_msd=jump_channel_msd,
+        first_ngp=jump_channel_ngp,
+        second_msd=cage_msd,
+        second_ngp=cage_ngp,
+        dimension=dimension,
+    )
+    return {
+        "jump_channel_msd": jump_channel_msd,
+        "jump_channel_fourth_moment": jump_channel_fourth,
+        "jump_channel_ngp": jump_channel_ngp,
+        "factorized_msd": combined["combined_msd"],
+        "factorized_fourth_moment": combined["combined_fourth_moment"],
+        "factorized_ngp": combined["combined_ngp"],
+        "factorized_fs": count_pgf * cage_fs,
+    }
+
+
+def green_kubo_renormalized_jump_statistics(
+    jump_vectors: np.ndarray,
+    *,
+    green_kubo_factor: float,
+    wave_numbers: np.ndarray,
+) -> dict[str, float]:
+    """Coarse-grain directional jump memory into calibration-measured moments."""
+
+    jumps = np.asarray(jump_vectors, dtype=float)
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if (
+        jumps.ndim != 2
+        or len(jumps) == 0
+        or jumps.shape[1] < 1
+        or np.any(~np.isfinite(jumps))
+    ):
+        raise ValueError("jump_vectors must be a nonempty finite matrix")
+    if (
+        not math.isfinite(green_kubo_factor)
+        or green_kubo_factor <= 0.0
+        or wave_numbers.ndim != 1
+        or len(wave_numbers) == 0
+        or np.any(~np.isfinite(wave_numbers))
+        or np.any(wave_numbers <= 0.0)
+    ):
+        raise ValueError("green_kubo_factor and wave_numbers must be positive and finite")
+    raw_squared = np.sum(jumps**2, axis=1)
+    effective = math.sqrt(green_kubo_factor) * jumps
+    effective_squared = np.sum(effective**2, axis=1)
+    result = {
+        "green_kubo_factor": float(green_kubo_factor),
+        "raw_jump_msd": float(np.mean(raw_squared)),
+        "raw_jump_fourth_moment": float(np.mean(raw_squared**2)),
+        "effective_jump_msd": float(np.mean(effective_squared)),
+        "effective_jump_fourth_moment": float(np.mean(effective_squared**2)),
+    }
+    for wave_number in wave_numbers:
+        key = f"jump_characteristic_k{wave_number:g}".replace(".", "p")
+        result[key] = float(np.mean(np.cos(wave_number * effective)))
+    return result
+
+
+def correlated_jump_propagator(
+    events: dict[str, np.ndarray],
+    *,
+    maximum_count: int,
+    wave_numbers: np.ndarray,
+    minimum_sample_count: int,
+) -> list[dict[str, float]]:
+    """Estimate conditional net-displacement kernels for consecutive jumps."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    times = np.asarray(events["time"], dtype=float)
+    jumps = np.asarray(events["jump_vector"], dtype=float)
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if (
+        particles.ndim != 1
+        or times.shape != particles.shape
+        or jumps.ndim != 2
+        or jumps.shape[0] != len(particles)
+        or jumps.shape[1] < 1
+        or len(particles) == 0
+        or np.any(~np.isfinite(times))
+        or np.any(~np.isfinite(jumps))
+    ):
+        raise ValueError("event particles, times, and jump vectors must be aligned and finite")
+    if (
+        isinstance(maximum_count, bool)
+        or not isinstance(maximum_count, int)
+        or maximum_count < 1
+        or isinstance(minimum_sample_count, bool)
+        or not isinstance(minimum_sample_count, int)
+        or minimum_sample_count < 1
+        or wave_numbers.ndim != 1
+        or len(wave_numbers) == 0
+        or np.any(~np.isfinite(wave_numbers))
+        or np.any(wave_numbers <= 0.0)
+    ):
+        raise ValueError("count limits and wave numbers must be positive")
+    order = np.lexsort((times, particles))
+    particles = particles[order]
+    jumps = jumps[order]
+    particle_jumps = [jumps[particles == particle] for particle in np.unique(particles)]
+    rows: list[dict[str, float]] = [
+        {
+            "jump_count": 0.0,
+            "sample_count": float(len(particle_jumps)),
+            "conditional_msd": 0.0,
+            "conditional_fourth_moment": 0.0,
+            **{
+                f"conditional_characteristic_k{wave_number:g}".replace(".", "p"): 1.0
+                for wave_number in wave_numbers
+            },
+        }
+    ]
+    for count in range(1, maximum_count + 1):
+        displacements: list[np.ndarray] = []
+        for values in particle_jumps:
+            if len(values) < count:
+                continue
+            cumulative = np.vstack(
+                [np.zeros((1, values.shape[1])), np.cumsum(values, axis=0)]
+            )
+            displacements.append(cumulative[count:] - cumulative[:-count])
+        sample_count = sum(len(values) for values in displacements)
+        if sample_count < minimum_sample_count:
+            break
+        displacement = np.vstack(displacements)
+        squared = np.sum(displacement**2, axis=1)
+        row = {
+            "jump_count": float(count),
+            "sample_count": float(sample_count),
+            "conditional_msd": float(np.mean(squared)),
+            "conditional_fourth_moment": float(np.mean(squared**2)),
+        }
+        for wave_number in wave_numbers:
+            key = f"conditional_characteristic_k{wave_number:g}".replace(".", "p")
+            row[key] = float(np.mean(np.cos(wave_number * displacement)))
+        rows.append(row)
+    return rows
 
 
 def debye_waller_factor_from_msd(

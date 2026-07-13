@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="390" viewBox="0 0 900 390">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124}.grid{stroke:#DADCE0}</style>
+<text x="450" y="27" text-anchor="middle" font-size="18" font-weight="700">Two-clock count law needs a state-conditioned displacement kernel</text>
+<text x="167.50" y="45" text-anchor="middle" font-size="13" font-weight="700">MSD</text>
+<line class="grid" x1="60" y1="300.00" x2="275" y2="300.00"/>
+<text x="53" y="304.00" text-anchor="end" font-size="9">0</text>
+<line class="grid" x1="60" y1="218.33" x2="275" y2="218.33"/>
+<text x="53" y="222.33" text-anchor="end" font-size="9">0.2</text>
+<line class="grid" x1="60" y1="136.67" x2="275" y2="136.67"/>
+<text x="53" y="140.67" text-anchor="end" font-size="9">0.39</text>
+<line class="grid" x1="60" y1="55.00" x2="275" y2="55.00"/>
+<text x="53" y="59.00" text-anchor="end" font-size="9">0.59</text>
+<line class="axis" x1="60" y1="55" x2="60" y2="300"/>
+<line class="axis" x1="60" y1="300" x2="275" y2="300"/>
+<polyline fill="none" stroke="#202124" stroke-width="2.5" points="60.00,283.50 129.06,276.14 158.80,268.58 198.12,247.22 227.86,212.38 257.60,141.00 275.00,73.15"/>
+<polyline fill="none" stroke="#D55E00" stroke-width="2.5" points="60.00,282.14 129.06,272.02 158.80,262.40 198.12,238.38 227.86,203.88 257.60,142.78 275.00,89.93"/>
+<text x="167.50" y="325" text-anchor="middle" font-size="11">lag time (log scale)</text>
+<text x="417.50" y="45" text-anchor="middle" font-size="13" font-weight="700">NGP</text>
+<line class="grid" x1="310" y1="300.00" x2="525" y2="300.00"/>
+<text x="303" y="304.00" text-anchor="end" font-size="9">0</text>
+<line class="grid" x1="310" y1="218.33" x2="525" y2="218.33"/>
+<text x="303" y="222.33" text-anchor="end" font-size="9">0.78</text>
+<line class="grid" x1="310" y1="136.67" x2="525" y2="136.67"/>
+<text x="303" y="140.67" text-anchor="end" font-size="9">1.6</text>
+<line class="grid" x1="310" y1="55.00" x2="525" y2="55.00"/>
+<text x="303" y="59.00" text-anchor="end" font-size="9">2.3</text>
+<line class="axis" x1="310" y1="55" x2="310" y2="300"/>
+<line class="axis" x1="310" y1="300" x2="525" y2="300"/>
+<polyline fill="none" stroke="#202124" stroke-width="2.5" points="310.00,229.24 379.06,133.17 408.80,89.69 448.12,73.15 477.86,98.32 507.60,148.60 525.00,175.41"/>
+<polyline fill="none" stroke="#D55E00" stroke-width="2.5" points="310.00,212.99 379.06,150.88 408.80,131.12 448.12,128.53 477.86,146.77 507.60,176.87 525.00,198.90"/>
+<text x="417.50" y="325" text-anchor="middle" font-size="11">lag time (log scale)</text>
+<text x="667.50" y="45" text-anchor="middle" font-size="13" font-weight="700">F_s(k=7.25)</text>
+<line class="grid" x1="560" y1="300.00" x2="775" y2="300.00"/>
+<text x="553" y="304.00" text-anchor="end" font-size="9">0</text>
+<line class="grid" x1="560" y1="218.33" x2="775" y2="218.33"/>
+<text x="553" y="222.33" text-anchor="end" font-size="9">0.26</text>
+<line class="grid" x1="560" y1="136.67" x2="775" y2="136.67"/>
+<text x="553" y="140.67" text-anchor="end" font-size="9">0.52</text>
+<line class="grid" x1="560" y1="55.00" x2="775" y2="55.00"/>
+<text x="553" y="59.00" text-anchor="end" font-size="9">0.79</text>
+<line class="axis" x1="560" y1="55" x2="560" y2="300"/>
+<line class="axis" x1="560" y1="300" x2="775" y2="300"/>
+<polyline fill="none" stroke="#202124" stroke-width="2.5" points="560.00,73.15 629.06,91.33 658.80,105.35 698.12,134.84 727.86,167.29 757.60,209.65 775.00,233.53"/>
+<polyline fill="none" stroke="#D55E00" stroke-width="2.5" points="560.00,77.50 629.06,103.88 658.80,122.88 698.12,157.60 727.86,190.86 757.60,226.08 775.00,246.03"/>
+<text x="667.50" y="325" text-anchor="middle" font-size="11">lag time (log scale)</text>
+<line x1="320" y1="365" x2="350" y2="365" stroke="#202124" stroke-width="3"/>
+<text x="360" y="370" font-size="11">held-out observation</text>
+<line x1="515" y1="365" x2="545" y2="365" stroke="#D55E00" stroke-width="3"/>
+<text x="555" y="370" font-size="11">calibration-only prediction</text>
+</svg>
