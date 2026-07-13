@@ -265,6 +265,240 @@ def smooth_cage_invariant_features(
     return {"geometry": geometry, "kinematic": kinematic, "full": full}
 
 
+def grouped_exponential_escape_diagnostic(
+    features: np.ndarray,
+    first_passage: np.ndarray,
+    escaped: np.ndarray,
+    groups: np.ndarray,
+    *,
+    horizon: float,
+    survival_times: np.ndarray,
+    l2_regularization: float = 1.0,
+    maximum_iterations: int = 100,
+) -> dict[str, np.ndarray | float]:
+    """Fit a censored exponential reaction coordinate across held-out parents."""
+
+    features = np.asarray(features, dtype=float)
+    first_passage = np.asarray(first_passage, dtype=float)
+    escaped_raw = np.asarray(escaped)
+    groups = np.asarray(groups)
+    survival_times = np.asarray(survival_times, dtype=float)
+    if features.ndim != 2 or features.shape[0] < 2 or features.shape[1] < 1 or np.any(
+        ~np.isfinite(features)
+    ):
+        raise ValueError("features must be a finite nonempty two-dimensional array")
+    sample_count = len(features)
+    if first_passage.shape != (sample_count,) or np.any(~np.isfinite(first_passage)):
+        raise ValueError("first_passage must be finite and align with features")
+    if escaped_raw.shape != (sample_count,) or not np.all(
+        np.isin(escaped_raw, (False, True, 0, 1))
+    ):
+        raise ValueError("escaped must be an aligned Boolean array")
+    escaped = escaped_raw.astype(bool)
+    if groups.shape != (sample_count,):
+        raise ValueError("groups must align with feature rows")
+    if not math.isfinite(horizon) or horizon <= 0.0:
+        raise ValueError("horizon must be positive and finite")
+    if np.any(first_passage <= 0.0) or np.any(first_passage > horizon) or np.any(
+        (~escaped) & ~np.isclose(first_passage, horizon, rtol=0.0, atol=1e-12)
+    ):
+        raise ValueError(
+            "first_passage must contain positive observed times or horizon censoring"
+        )
+    if (
+        survival_times.ndim != 1
+        or len(survival_times) < 1
+        or np.any(~np.isfinite(survival_times))
+        or np.any(survival_times <= 0.0)
+        or np.any(survival_times > horizon)
+        or np.any(np.diff(survival_times) <= 0.0)
+    ):
+        raise ValueError("survival_times must increase inside the common horizon")
+    if (
+        not math.isfinite(l2_regularization)
+        or l2_regularization < 0.0
+        or isinstance(maximum_iterations, bool)
+        or not isinstance(maximum_iterations, (int, np.integer))
+        or maximum_iterations < 1
+    ):
+        raise ValueError("regularization and iteration controls must be valid")
+    unique_groups = np.unique(groups)
+    if len(unique_groups) < 2:
+        raise ValueError("at least two parent groups are required")
+
+    out_rate = np.full(sample_count, np.nan, dtype=float)
+    out_probability = np.full(sample_count, np.nan, dtype=float)
+    out_baseline_rate = np.full(sample_count, np.nan, dtype=float)
+    out_baseline_probability = np.full(sample_count, np.nan, dtype=float)
+    group_brier_skill: list[float] = []
+    group_log_likelihood_gain: list[float] = []
+    group_log_likelihood_gain_per_observation: list[float] = []
+    group_survival_error: list[float] = []
+    group_baseline_survival_error: list[float] = []
+    group_iteration_count: list[float] = []
+
+    for held_group in unique_groups:
+        held = groups == held_group
+        train = ~held
+        train_event = escaped[train].astype(float)
+        held_event = escaped[held].astype(float)
+        training_event_count = float(np.sum(train_event))
+        training_exposure = float(np.sum(first_passage[train]))
+        if training_event_count <= 0.0 or training_exposure <= 0.0:
+            raise ValueError("every training fold must contain event exposure")
+        if not np.any(held_event) or np.all(held_event):
+            raise ValueError("every held parent must contain escaped and censored rows")
+
+        mean = np.mean(features[train], axis=0)
+        scale = np.std(features[train], axis=0)
+        scale[scale < 1e-12] = 1.0
+        train_x = np.column_stack(
+            [np.ones(np.sum(train)), (features[train] - mean) / scale]
+        )
+        held_x = np.column_stack(
+            [np.ones(np.sum(held)), (features[held] - mean) / scale]
+        )
+        baseline_rate = training_event_count / training_exposure
+        coefficient = np.zeros(train_x.shape[1], dtype=float)
+        coefficient[0] = math.log(baseline_rate)
+        penalty = np.diag(
+            np.concatenate(
+                [[0.0], np.full(train_x.shape[1] - 1, l2_regularization)]
+            )
+        )
+        penalty_diagonal = np.diag(penalty)
+
+        def objective(value: np.ndarray) -> float:
+            eta = np.clip(np.einsum("ij,j->i", train_x, value), -30.0, 30.0)
+            rate = np.exp(eta)
+            return float(
+                np.sum(rate * first_passage[train] - train_event * eta)
+                + 0.5 * np.sum(penalty_diagonal * value**2)
+            )
+
+        iteration_count = maximum_iterations
+        for iteration in range(maximum_iterations):
+            eta = np.clip(
+                np.einsum("ij,j->i", train_x, coefficient), -30.0, 30.0
+            )
+            rate = np.exp(eta)
+            weighted_exposure = rate * first_passage[train]
+            gradient = np.einsum(
+                "ij,i->j", train_x, weighted_exposure - train_event
+            ) + penalty_diagonal * coefficient
+            hessian = np.einsum(
+                "ia,i,ib->ab", train_x, weighted_exposure, train_x
+            ) + penalty
+            step = np.linalg.solve(hessian, gradient)
+            if float(np.max(np.abs(step))) < 1e-9:
+                iteration_count = iteration + 1
+                break
+            current_objective = objective(coefficient)
+            step_scale = 1.0
+            while step_scale >= 2.0**-20:
+                candidate = coefficient - step_scale * step
+                if objective(candidate) <= current_objective:
+                    coefficient = candidate
+                    break
+                step_scale *= 0.5
+            else:
+                raise ValueError("censored exponential Newton step failed to decrease")
+
+        held_rate = np.exp(
+            np.clip(np.einsum("ij,j->i", held_x, coefficient), -30.0, 30.0)
+        )
+        held_probability = -np.expm1(-held_rate * horizon)
+        baseline_probability = -math.expm1(-baseline_rate * horizon)
+        out_rate[held] = held_rate
+        out_probability[held] = held_probability
+        out_baseline_rate[held] = baseline_rate
+        out_baseline_probability[held] = baseline_probability
+
+        model_brier = float(np.mean((held_probability - held_event) ** 2))
+        baseline_brier = float(np.mean((baseline_probability - held_event) ** 2))
+        model_log_likelihood = float(
+            np.sum(held_event * np.log(held_rate) - held_rate * first_passage[held])
+        )
+        baseline_log_likelihood = float(
+            np.sum(
+                held_event * math.log(baseline_rate)
+                - baseline_rate * first_passage[held]
+            )
+        )
+        likelihood_gain = model_log_likelihood - baseline_log_likelihood
+        held_first_passage = first_passage[held]
+        held_escaped = escaped[held]
+        observed_survival = np.array(
+            [
+                np.mean(
+                    (held_escaped & (held_first_passage > time))
+                    | (~held_escaped & (held_first_passage >= time))
+                )
+                for time in survival_times
+            ],
+            dtype=float,
+        )
+        predicted_survival = np.array(
+            [np.mean(np.exp(-held_rate * time)) for time in survival_times],
+            dtype=float,
+        )
+        baseline_survival = np.exp(-baseline_rate * survival_times)
+        group_brier_skill.append(
+            1.0 - model_brier / baseline_brier if baseline_brier > 0.0 else math.nan
+        )
+        group_log_likelihood_gain.append(likelihood_gain)
+        group_log_likelihood_gain_per_observation.append(
+            likelihood_gain / float(np.sum(held))
+        )
+        group_survival_error.append(
+            float(np.max(np.abs(predicted_survival - observed_survival)))
+        )
+        group_baseline_survival_error.append(
+            float(np.max(np.abs(baseline_survival - observed_survival)))
+        )
+        group_iteration_count.append(float(iteration_count))
+
+    if np.any(~np.isfinite(out_rate)) or np.any(~np.isfinite(out_probability)):
+        raise ValueError("every observation must receive an out-of-group prediction")
+    return {
+        "parent_groups": unique_groups,
+        "out_of_group_rate": out_rate,
+        "out_of_group_event_probability": out_probability,
+        "out_of_group_baseline_rate": out_baseline_rate,
+        "out_of_group_baseline_event_probability": out_baseline_probability,
+        "group_brier_skill": np.asarray(group_brier_skill),
+        "group_log_likelihood_gain": np.asarray(group_log_likelihood_gain),
+        "group_log_likelihood_gain_per_observation": np.asarray(
+            group_log_likelihood_gain_per_observation
+        ),
+        "group_survival_calibration_error": np.asarray(group_survival_error),
+        "group_baseline_survival_calibration_error": np.asarray(
+            group_baseline_survival_error
+        ),
+        "group_iteration_count": np.asarray(group_iteration_count),
+        "mean_heldout_brier_skill": float(np.mean(group_brier_skill)),
+        "mean_heldout_log_likelihood_gain_per_observation": float(
+            np.mean(group_log_likelihood_gain_per_observation)
+        ),
+        "minimum_group_log_likelihood_gain": float(
+            np.min(group_log_likelihood_gain)
+        ),
+        "maximum_heldout_survival_calibration_error": float(
+            np.max(group_survival_error)
+        ),
+        "maximum_baseline_survival_calibration_error": float(
+            np.max(group_baseline_survival_error)
+        ),
+        "parent_group_count": float(len(unique_groups)),
+        "observation_count": float(sample_count),
+        "event_count": float(np.sum(escaped)),
+        "horizon": float(horizon),
+        "l2_regularization": float(l2_regularization),
+        "fit_parameters_from_macro_observables": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def extract_smooth_cage_path(
     path: Path,
     *,

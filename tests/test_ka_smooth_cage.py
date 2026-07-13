@@ -184,6 +184,58 @@ class SmoothCageTests(unittest.TestCase):
         for key in ("geometry", "kinematic", "full"):
             np.testing.assert_allclose(feature[key], rotated_feature[key], atol=1e-12)
 
+    def test_grouped_exponential_escape_recovers_transferable_microscopic_rate(self):
+        from ka_smooth_cage import grouped_exponential_escape_diagnostic
+
+        rng = np.random.default_rng(20260714)
+        groups = np.repeat(np.arange(5), 800)
+        feature = rng.normal(size=(len(groups), 2))
+        rate = np.exp(-3.0 + 0.8 * feature[:, 0] - 0.5 * feature[:, 1])
+        raw_first_passage = rng.exponential(1.0 / rate)
+        horizon = 20.0
+        escaped = raw_first_passage <= horizon
+        first_passage = np.minimum(raw_first_passage, horizon)
+        result = grouped_exponential_escape_diagnostic(
+            feature,
+            first_passage,
+            escaped,
+            groups,
+            horizon=horizon,
+            survival_times=np.array([1, 2, 4, 8, 12, 16, 20], dtype=float),
+            l2_regularization=1.0,
+        )
+
+        self.assertGreater(result["mean_heldout_brier_skill"], 0.05)
+        self.assertGreater(
+            result["mean_heldout_log_likelihood_gain_per_observation"], 0.01
+        )
+        self.assertLess(result["maximum_heldout_survival_calibration_error"], 0.05)
+        self.assertGreater(np.corrcoef(result["out_of_group_rate"], rate)[0, 1], 0.95)
+
+    def test_grouped_exponential_escape_rejects_invalid_censoring_and_groups(self):
+        from ka_smooth_cage import grouped_exponential_escape_diagnostic
+
+        feature = np.ones((4, 1))
+        escaped = np.ones(4, dtype=bool)
+        with self.assertRaisesRegex(ValueError, "at least two parent groups"):
+            grouped_exponential_escape_diagnostic(
+                feature,
+                np.ones(4),
+                escaped,
+                np.zeros(4),
+                horizon=2.0,
+                survival_times=np.array([1.0, 2.0]),
+            )
+        with self.assertRaisesRegex(ValueError, "first_passage"):
+            grouped_exponential_escape_diagnostic(
+                feature,
+                np.full(4, 21.0),
+                escaped,
+                np.arange(4) % 2,
+                horizon=20.0,
+                survival_times=np.array([1.0, 20.0]),
+            )
+
     def test_projected_drift_matches_phase_space_directional_derivative(self):
         from ka_local_cage import ka_lj_force_and_isotropic_curvature
         from ka_smooth_cage import (
