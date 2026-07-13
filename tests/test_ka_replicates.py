@@ -877,6 +877,103 @@ class KAReplicatePreparationTests(unittest.TestCase):
             (math.sin(1.0) / 1.0) ** 2,
         )
 
+    def test_shared_phase_projection_preserves_cross_spectral_matrix(self):
+        project = getattr(ka_replicates, "shared_phase_spectral_projection", None)
+        spectral_error = getattr(
+            ka_replicates,
+            "cross_spectral_matrix_nrmse",
+            None,
+        )
+        self.assertIsNotNone(project)
+        self.assertIsNotNone(spectral_error)
+        reference = np.random.default_rng(3).normal(size=(2, 8, 3))
+        candidate = np.random.default_rng(5).normal(size=(2, 8, 3))
+
+        projected = project(reference, candidate)
+
+        self.assertLess(spectral_error(reference, projected), 1e-12)
+
+    def test_phase_randomization_preserves_spectrum_and_mean_not_path(self):
+        randomize = getattr(ka_replicates, "phase_randomized_cross_spectrum", None)
+        spectral_error = getattr(
+            ka_replicates,
+            "cross_spectral_matrix_nrmse",
+            None,
+        )
+        self.assertIsNotNone(randomize)
+        self.assertIsNotNone(spectral_error)
+        reference = np.random.default_rng(7).normal(size=(2, 9, 3))
+
+        first = randomize(reference, np.random.default_rng(11))
+        second = randomize(reference, np.random.default_rng(13))
+
+        self.assertLess(spectral_error(reference, first), 1e-12)
+        np.testing.assert_allclose(np.mean(first, axis=1), np.mean(reference, axis=1))
+        self.assertFalse(np.allclose(first, second))
+
+    def test_radial_projection_preserves_particle_radius_multisets(self):
+        project = getattr(ka_replicates, "radial_rank_projection", None)
+        self.assertIsNotNone(project)
+        reference = np.random.default_rng(17).normal(size=(2, 8, 3))
+        candidate = np.random.default_rng(19).normal(size=(2, 8, 3))
+
+        projected = project(reference, candidate)
+
+        np.testing.assert_allclose(
+            np.sort(np.linalg.norm(projected, axis=2), axis=1),
+            np.sort(np.linalg.norm(reference, axis=2), axis=1),
+        )
+
+    def test_radial_multivariate_surrogate_is_deterministic_and_improves_spectrum(self):
+        surrogate = getattr(ka_replicates, "radial_multivariate_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        reference = np.random.default_rng(23).normal(size=(2, 12, 3))
+
+        first = surrogate(reference, np.random.default_rng(29), iteration_count=20)
+        repeated = surrogate(reference, np.random.default_rng(29), iteration_count=20)
+        different = surrogate(reference, np.random.default_rng(31), iteration_count=20)
+
+        np.testing.assert_allclose(first["displacements"], repeated["displacements"])
+        self.assertFalse(np.allclose(first["displacements"], different["displacements"]))
+        self.assertLess(first["radial_distribution_maximum_absolute_error"], 1e-12)
+        self.assertLess(
+            first["cross_spectral_matrix_nrmse"],
+            first["initial_cross_spectral_matrix_nrmse"],
+        )
+        self.assertEqual(first["iteration_count"], 20.0)
+
+    def test_radial_multivariate_surrogate_rejects_invalid_controls(self):
+        surrogate = getattr(ka_replicates, "radial_multivariate_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        reference = np.ones((1, 4, 3))
+
+        with self.assertRaises(ValueError):
+            surrogate(reference, np.random.default_rng(37), iteration_count=0)
+        with self.assertRaises(ValueError):
+            surrogate(reference, object(), iteration_count=2)
+
+    def test_fourth_cumulant_scattering_matches_isotropic_expansion(self):
+        scattering = getattr(ka_replicates, "fourth_cumulant_scattering", None)
+        self.assertIsNotNone(scattering)
+        msd = np.array([0.3, 0.6])
+        ngp = np.array([0.2, 0.4])
+        expected = np.exp(-4.0 * msd / 6.0 + 16.0 * ngp * msd**2 / 72.0)
+
+        result = scattering(msd, ngp, 2.0)
+
+        np.testing.assert_allclose(result, expected)
+
+    def test_fourth_cumulant_scattering_rejects_unphysical_inputs(self):
+        scattering = getattr(ka_replicates, "fourth_cumulant_scattering", None)
+        self.assertIsNotNone(scattering)
+
+        with self.assertRaises(ValueError):
+            scattering(np.array([0.2]), np.array([-1.1]), 2.0)
+        with self.assertRaises(ValueError):
+            scattering(np.array([0.2]), np.array([0.1, 0.2]), 2.0)
+        with self.assertRaises(ValueError):
+            scattering(np.array([0.2]), np.array([0.1]), 0.0)
+
     def test_two_clock_hmm_hybrid_gate_separates_rate_drift_from_shape_closure(self):
         script_path = ROOT / "scripts" / "analyze_ka_two_clock_hmm_mixture.py"
         spec = importlib.util.spec_from_file_location(

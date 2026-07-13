@@ -453,6 +453,208 @@ def direction_randomized_block_observables(
     return result
 
 
+def _validate_spectral_block_path(
+    block_displacements: np.ndarray,
+    *,
+    name: str,
+) -> np.ndarray:
+    displacements = np.asarray(block_displacements, dtype=float)
+    if (
+        displacements.ndim != 3
+        or displacements.shape[0] < 1
+        or displacements.shape[1] < 2
+        or displacements.shape[2] < 1
+        or np.any(~np.isfinite(displacements))
+    ):
+        raise ValueError(
+            f"{name} must be a finite particle-block-vector array with at least two blocks"
+        )
+    return displacements
+
+
+def _validate_spectral_block_path_pair(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    reference = _validate_spectral_block_path(reference, name="reference")
+    candidate = _validate_spectral_block_path(candidate, name="candidate")
+    if candidate.shape != reference.shape:
+        raise ValueError("reference and candidate block paths must have equal shapes")
+    return reference, candidate
+
+
+def cross_spectral_matrix_nrmse(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> float:
+    """Return normalized error between particle-resolved spectral matrices."""
+
+    reference, candidate = _validate_spectral_block_path_pair(reference, candidate)
+    reference_fft = np.fft.rfft(reference, axis=1)
+    candidate_fft = np.fft.rfft(candidate, axis=1)
+    reference_matrix = reference_fft[:, :, :, np.newaxis] * np.conjugate(
+        reference_fft[:, :, np.newaxis, :]
+    )
+    candidate_matrix = candidate_fft[:, :, :, np.newaxis] * np.conjugate(
+        candidate_fft[:, :, np.newaxis, :]
+    )
+    scale = float(np.sqrt(np.mean(np.abs(reference_matrix) ** 2)))
+    if scale == 0.0:
+        raise ValueError("reference block path must have nonzero spectral energy")
+    return float(np.sqrt(np.mean(np.abs(candidate_matrix - reference_matrix) ** 2)) / scale)
+
+
+def shared_phase_spectral_projection(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> np.ndarray:
+    """Project a path onto the reference amplitudes and relative channel phases."""
+
+    reference, candidate = _validate_spectral_block_path_pair(reference, candidate)
+    reference_fft = np.fft.rfft(reference, axis=1)
+    candidate_fft = np.fft.rfft(candidate, axis=1)
+    reference_amplitude = np.abs(reference_fft)
+    candidate_amplitude = np.abs(candidate_fft)
+    epsilon = np.finfo(float).eps
+    reference_unit = np.divide(
+        reference_fft,
+        reference_amplitude,
+        out=np.ones_like(reference_fft),
+        where=reference_amplitude > epsilon,
+    )
+    candidate_unit = np.divide(
+        candidate_fft,
+        candidate_amplitude,
+        out=np.ones_like(candidate_fft),
+        where=candidate_amplitude > epsilon,
+    )
+    common_phase = np.sum(
+        reference_amplitude**2 * candidate_unit * np.conjugate(reference_unit),
+        axis=2,
+    )
+    common_phase = np.divide(
+        common_phase,
+        np.abs(common_phase),
+        out=np.ones_like(common_phase),
+        where=np.abs(common_phase) > epsilon,
+    )
+    projected_fft = reference_amplitude * reference_unit * common_phase[:, :, np.newaxis]
+    return np.fft.irfft(projected_fft, n=reference.shape[1], axis=1)
+
+
+def phase_randomized_cross_spectrum(
+    reference: np.ndarray,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Randomize common Fourier phases while preserving every spectral matrix."""
+
+    reference = _validate_spectral_block_path(reference, name="reference")
+    if not isinstance(rng, np.random.Generator):
+        raise ValueError("rng must be a NumPy Generator")
+    reference_fft = np.fft.rfft(reference, axis=1)
+    angles = rng.uniform(0.0, 2.0 * math.pi, size=reference_fft.shape[:2])
+    phase = np.exp(1j * angles)
+    phase[:, 0] = 1.0
+    if reference.shape[1] % 2 == 0:
+        phase[:, -1] = rng.choice(np.array([-1.0, 1.0]), size=reference.shape[0])
+    return np.fft.irfft(
+        reference_fft * phase[:, :, np.newaxis],
+        n=reference.shape[1],
+        axis=1,
+    )
+
+
+def radial_rank_projection(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> np.ndarray:
+    """Restore each particle's radius multiset while retaining candidate directions."""
+
+    reference, candidate = _validate_spectral_block_path_pair(reference, candidate)
+    reference_radii = np.sort(np.linalg.norm(reference, axis=2), axis=1)
+    candidate_radii = np.linalg.norm(candidate, axis=2)
+    candidate_order = np.argsort(candidate_radii, axis=1)
+    assigned_radii = np.empty_like(candidate_radii)
+    np.put_along_axis(assigned_radii, candidate_order, reference_radii, axis=1)
+    zero_direction = candidate_radii == 0.0
+    if np.any(zero_direction & (assigned_radii > 0.0)):
+        raise ValueError("candidate contains a zero direction for a positive assigned radius")
+    directions = np.divide(
+        candidate,
+        candidate_radii[:, :, np.newaxis],
+        out=np.zeros_like(candidate),
+        where=candidate_radii[:, :, np.newaxis] > 0.0,
+    )
+    return directions * assigned_radii[:, :, np.newaxis]
+
+
+def radial_multivariate_surrogate(
+    reference: np.ndarray,
+    rng: np.random.Generator,
+    *,
+    iteration_count: int,
+) -> dict[str, object]:
+    """Iteratively preserve radial disorder and the multichannel path spectrum."""
+
+    reference = _validate_spectral_block_path(reference, name="reference")
+    if not isinstance(rng, np.random.Generator):
+        raise ValueError("rng must be a NumPy Generator")
+    if (
+        isinstance(iteration_count, bool)
+        or not isinstance(iteration_count, int)
+        or iteration_count < 1
+    ):
+        raise ValueError("iteration_count must be a positive integer")
+    surrogate = within_particle_time_shuffle(reference, rng)
+    initial_error = cross_spectral_matrix_nrmse(reference, surrogate)
+    for _ in range(iteration_count):
+        surrogate = radial_rank_projection(
+            reference,
+            shared_phase_spectral_projection(reference, surrogate),
+        )
+    final_error = cross_spectral_matrix_nrmse(reference, surrogate)
+    radial_error = float(
+        np.max(
+            np.abs(
+                np.sort(np.linalg.norm(surrogate, axis=2), axis=1)
+                - np.sort(np.linalg.norm(reference, axis=2), axis=1)
+            )
+        )
+    )
+    return {
+        "displacements": surrogate,
+        "iteration_count": float(iteration_count),
+        "initial_cross_spectral_matrix_nrmse": initial_error,
+        "cross_spectral_matrix_nrmse": final_error,
+        "radial_distribution_maximum_absolute_error": radial_error,
+    }
+
+
+def fourth_cumulant_scattering(
+    msd: np.ndarray,
+    ngp: np.ndarray,
+    wave_number: float,
+) -> np.ndarray:
+    """Fourth-order isotropic cumulant expansion of one-component scattering."""
+
+    msd = np.asarray(msd, dtype=float)
+    ngp = np.asarray(ngp, dtype=float)
+    if msd.shape != ngp.shape or msd.size < 1:
+        raise ValueError("msd and ngp must be nonempty aligned arrays")
+    if np.any(~np.isfinite(msd)) or np.any(msd < 0.0):
+        raise ValueError("msd must be finite and nonnegative")
+    if np.any(~np.isfinite(ngp)) or np.any(ngp <= -1.0):
+        raise ValueError("ngp must be finite and greater than -1")
+    if not math.isfinite(wave_number) or wave_number <= 0.0:
+        raise ValueError("wave_number must be positive and finite")
+    exponent = (
+        -(wave_number**2) * msd / 6.0
+        + wave_number**4 * ngp * msd**2 / 72.0
+    )
+    with np.errstate(over="ignore"):
+        return np.exp(exponent)
+
+
 def particle_event_count_matrix(
     events: dict[str, np.ndarray],
     *,
