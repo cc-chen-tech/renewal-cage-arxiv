@@ -617,6 +617,107 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertAlmostEqual(rows[3]["conditional_msd"], 1.0)
         self.assertAlmostEqual(rows[2]["conditional_characteristic_k1"], 1.0)
 
+    def test_posterior_weighted_displacement_kernel_links_fast_counts_to_large_motion(self):
+        estimate = getattr(
+            ka_replicates,
+            "posterior_weighted_state_displacement_kernels",
+            None,
+        )
+        self.assertIsNotNone(estimate)
+        counts = np.array([0, 0, 1, 3, 4, 5])
+        displacements = np.array(
+            [
+                [0.1, 0.0],
+                [0.0, 0.1],
+                [0.2, 0.0],
+                [1.0, 0.0],
+                [0.0, 1.2],
+                [1.4, 0.0],
+            ]
+        )
+
+        result = estimate(
+            counts,
+            displacements,
+            slow_mean_count=0.2,
+            fast_mean_count=3.5,
+            stationary_slow_probability=0.6,
+            stationary_fast_probability=0.4,
+            wave_numbers=np.array([1.0]),
+        )
+
+        self.assertGreater(result["fast_effective_sample_size"], 2.0)
+        self.assertGreater(result["slow_effective_sample_size"], 2.0)
+        self.assertGreater(result["fast_msd"], 5.0 * result["slow_msd"])
+        self.assertLess(result["fast_characteristic_k1"], result["slow_characteristic_k1"])
+
+    def test_two_clock_state_displacement_propagates_markov_fourth_moment(self):
+        propagate = getattr(
+            ka_replicates,
+            "two_clock_state_displacement_statistics",
+            None,
+        )
+        self.assertIsNotNone(propagate)
+        parameters = {
+            "stationary_slow_probability": 0.7,
+            "stationary_fast_probability": 0.3,
+            "fast_clock_weight": 0.6,
+            "slow_clock_weight": 0.4,
+            "fast_clock_retention": 0.3,
+            "slow_clock_retention": 0.9,
+            "block_size": 20.0,
+        }
+        kernels = {
+            "slow_msd": 0.2,
+            "fast_msd": 1.0,
+            "slow_fourth_moment": 0.08,
+            "fast_fourth_moment": 2.0,
+            "slow_characteristic_k1": 0.95,
+            "fast_characteristic_k1": 0.65,
+        }
+
+        one = propagate(
+            parameters,
+            kernels,
+            block_count=1,
+            wave_number_key="k1",
+            dimension=2,
+        )
+        two = propagate(
+            parameters,
+            kernels,
+            block_count=2,
+            wave_number_key="k1",
+            dimension=2,
+        )
+
+        self.assertAlmostEqual(one["event_msd"], 0.7 * 0.2 + 0.3 * 1.0)
+        self.assertAlmostEqual(one["event_fourth_moment"], 0.7 * 0.08 + 0.3 * 2.0)
+        self.assertAlmostEqual(two["event_msd"], 2.0 * one["event_msd"])
+        self.assertGreater(two["event_fourth_moment"], 2.0 * one["event_fourth_moment"])
+        self.assertLess(two["event_characteristic"], one["event_characteristic"])
+
+    def test_block_vector_correlation_curve_measures_cross_block_memory(self):
+        correlate = getattr(ka_replicates, "block_vector_correlation_curve", None)
+        self.assertIsNotNone(correlate)
+        displacements = np.array(
+            [
+                [[1.0, 0.0], [-0.5, 0.0], [1.0, 0.0]],
+                [[0.0, 1.0], [0.0, -0.5], [0.0, 1.0]],
+            ]
+        )
+
+        rows = correlate(displacements, maximum_lag=1)
+
+        self.assertAlmostEqual(rows[0]["block_vector_msd"], 0.75)
+        self.assertAlmostEqual(rows[0]["block_dot_correlation"], -0.5)
+        self.assertAlmostEqual(rows[0]["cumulative_green_kubo_factor"], -1.0 / 3.0)
+
+        finite = getattr(ka_replicates, "finite_window_green_kubo_factor", None)
+        self.assertIsNotNone(finite)
+        self.assertAlmostEqual(finite(rows, block_count=1), 1.0)
+        self.assertAlmostEqual(finite(rows, block_count=2), 1.0 / 3.0)
+
     def test_two_clock_hmm_hybrid_gate_separates_rate_drift_from_shape_closure(self):
         script_path = ROOT / "scripts" / "analyze_ka_two_clock_hmm_mixture.py"
         spec = importlib.util.spec_from_file_location(
@@ -1390,6 +1491,20 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(verdict["macro_fit_parameter_count"], 0.0)
         self.assertEqual(verdict["thermodynamic_claim_allowed"], 0.0)
 
+    def test_joint_state_kernel_does_not_double_count_external_cage_channel(self):
+        script_path = ROOT / "scripts" / "predict_ka_hybrid_macro_observables.py"
+        spec = importlib.util.spec_from_file_location(
+            "predict_ka_hybrid_macro_observables_joint", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        self.assertTrue(module.kernel_uses_external_cage("correlated-global"))
+        self.assertTrue(module.kernel_uses_external_cage("state-conditioned-finite-gk"))
+        self.assertFalse(module.kernel_uses_external_cage("state-conditioned-joint"))
+        self.assertFalse(module.kernel_uses_external_cage("state-conditioned-joint-finite-gk"))
+
     def test_hybrid_macro_crossover_selects_state_conditioned_kernel_not_new_clock(self):
         script_path = ROOT / "scripts" / "summarize_ka_hybrid_macro_transfer.py"
         spec = importlib.util.spec_from_file_location(
@@ -1426,6 +1541,41 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(
             result["next_minimal_extension"],
             "mobility_state_conditioned_jump_cage_kernel",
+        )
+
+    def test_state_kernel_crossover_selects_cooling_induced_multiblock_memory(self):
+        script_path = ROOT / "scripts" / "summarize_ka_state_kernel_crossover.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_state_kernel_crossover", script_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        result = module.classify_state_kernel_crossover(
+            low={
+                "curve_transfer_pass": "0",
+                "diffusion_relative_error": "0.059",
+                "maximum_ensemble_ngp_absolute_error": "2.11",
+                "maximum_ensemble_fs_absolute_error": "0.269",
+            },
+            high={
+                "curve_transfer_pass": "1",
+                "diffusion_relative_error": "0.08",
+                "alpha_crossing_ready": "0",
+                "maximum_ensemble_ngp_absolute_error": "0.15",
+                "maximum_ensemble_fs_absolute_error": "0.021",
+            },
+        )
+
+        self.assertEqual(result["high_temperature_curve_closure"], 1.0)
+        self.assertEqual(result["low_temperature_curve_closure"], 0.0)
+        self.assertEqual(result["diffusion_transfer_pass_both_temperatures"], 1.0)
+        self.assertEqual(result["cooling_induced_higher_order_memory_required"], 1.0)
+        self.assertEqual(result["additional_mobility_clock_supported"], 0.0)
+        self.assertEqual(
+            result["next_minimal_extension"],
+            "non_markov_multiblock_orientation_cage_persistence_kernel",
         )
 
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):

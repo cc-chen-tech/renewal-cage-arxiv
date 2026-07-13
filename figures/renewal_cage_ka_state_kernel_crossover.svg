@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="430" viewBox="0 0 820 430">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}.axis{stroke:#202124}.grid{stroke:#DADCE0}</style>
+<text x="410" y="27" text-anchor="middle" font-size="18" font-weight="700">Cooling breaks the two-state Markov displacement kernel</text>
+<line class="grid" x1="80" y1="325.00" x2="740" y2="325.00"/>
+<text x="70" y="329.00" text-anchor="end" font-size="11">0.1</text>
+<line class="grid" x1="80" y1="260.59" x2="740" y2="260.59"/>
+<text x="70" y="264.59" text-anchor="end" font-size="11">0.3</text>
+<line class="grid" x1="80" y1="190.00" x2="740" y2="190.00"/>
+<text x="70" y="194.00" text-anchor="end" font-size="11">1</text>
+<line class="grid" x1="80" y1="125.59" x2="740" y2="125.59"/>
+<text x="70" y="129.59" text-anchor="end" font-size="11">3</text>
+<line class="grid" x1="80" y1="55.00" x2="740" y2="55.00"/>
+<text x="70" y="59.00" text-anchor="end" font-size="11">10</text>
+<line class="axis" x1="80" y1="55" x2="80" y2="325"/>
+<line class="axis" x1="80" y1="325" x2="740" y2="325"/>
+<text x="20" y="190" text-anchor="middle" font-size="13" transform="rotate(-90 20 190)">error / tolerance (log scale)</text>
+<circle cx="150.50" cy="203.08" r="5" fill="#0072B2"/>
+<circle cx="174.50" cy="221.37" r="5" fill="#D55E00"/>
+<text x="162.50" y="347" text-anchor="middle" font-size="11">MSD curve</text>
+<circle cx="315.50" cy="230.55" r="5" fill="#0072B2"/>
+<circle cx="339.50" cy="75.52" r="5" fill="#D55E00"/>
+<text x="327.50" y="347" text-anchor="middle" font-size="11">NGP curve</text>
+<circle cx="480.50" cy="210.15" r="5" fill="#0072B2"/>
+<circle cx="504.50" cy="61.42" r="5" fill="#D55E00"/>
+<text x="492.50" y="347" text-anchor="middle" font-size="11">multi-k F_s</text>
+<circle cx="645.50" cy="226.85" r="5" fill="#0072B2"/>
+<circle cx="669.50" cy="245.14" r="5" fill="#D55E00"/>
+<text x="657.50" y="347" text-anchor="middle" font-size="11">diffusion</text>
+<circle cx="285" cy="390" r="5" fill="#0072B2"/>
+<text x="298" y="395" font-size="11">T=0.58</text>
+<circle cx="430" cy="390" r="5" fill="#D55E00"/>
+<text x="443" y="395" font-size="11">T=0.45</text>
+<text x="690" y="65" text-anchor="end" font-size="10">pass below 1</text>
+</svg>

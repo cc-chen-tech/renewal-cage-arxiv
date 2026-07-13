@@ -15,6 +15,55 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_state_joint_kernel_closes_high_temperature_curves_but_breaks_on_cooling(self):
+        low_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_state_joint_finite_gk_macro_verdict.csv"
+        )
+        high_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T058_state_joint_finite_gk_macro_verdict.csv"
+        )
+        crossover_path = ROOT / "data" / "renewal_cage_ka_state_kernel_crossover.csv"
+        with low_path.open() as handle:
+            low = next(csv.DictReader(handle))
+        with high_path.open() as handle:
+            high = next(csv.DictReader(handle))
+        with crossover_path.open() as handle:
+            crossover = next(csv.DictReader(handle))
+
+        self.assertLess(float(low["maximum_ensemble_msd_relative_error"]), 0.059)
+        self.assertLess(float(low["diffusion_relative_error"]), 0.059)
+        self.assertGreater(float(low["maximum_ensemble_ngp_absolute_error"]), 2.11)
+        self.assertGreater(float(low["maximum_ensemble_fs_absolute_error"]), 0.268)
+        self.assertEqual(float(low["curve_transfer_pass"]), 0.0)
+        self.assertEqual(float(low["calibration_only_joint_displacement_distribution"]), 1.0)
+        self.assertEqual(float(low["calibration_cage_residual_transfer"]), 0.0)
+        self.assertEqual(float(low["block_direction_correlation_lag_count"]), 8.0)
+        self.assertEqual(float(low["unmeasured_block_correlation_assumed_zero"]), 1.0)
+        self.assertLess(float(high["maximum_ensemble_msd_relative_error"]), 0.081)
+        self.assertLess(float(high["diffusion_relative_error"]), 0.081)
+        self.assertLess(float(high["maximum_ensemble_ngp_absolute_error"]), 0.151)
+        self.assertLess(float(high["maximum_ensemble_fs_absolute_error"]), 0.022)
+        self.assertEqual(float(high["curve_transfer_pass"]), 1.0)
+        self.assertEqual(float(high["alpha_crossing_ready"]), 0.0)
+        self.assertEqual(
+            float(crossover["cooling_induced_higher_order_memory_required"]),
+            1.0,
+        )
+        self.assertEqual(float(crossover["additional_mobility_clock_supported"]), 0.0)
+        self.assertEqual(
+            crossover["next_minimal_extension"],
+            "non_markov_multiblock_orientation_cage_persistence_kernel",
+        )
+        self.assertEqual(float(crossover["heldout_macro_closure_claim_allowed"]), 0.0)
+        self.assertEqual(float(crossover["thermodynamic_claim_allowed"]), 0.0)
+        self.assertTrue(
+            (ROOT / "figures" / "renewal_cage_ka_state_kernel_crossover.svg").is_file()
+        )
+
     def test_correlated_jump_kernel_closes_low_diffusion_but_rejects_macro_independence(self):
         low_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_hybrid_macro_verdict.csv"
         high_path = ROOT / "data" / "renewal_cage_ka_replicates_T058_hybrid_macro_verdict.csv"

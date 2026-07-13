@@ -224,6 +224,87 @@ def jump_vector_correlation_curve(
     return rows
 
 
+def block_vector_correlation_curve(
+    block_displacements: np.ndarray,
+    *,
+    maximum_lag: int,
+) -> list[dict[str, float]]:
+    """Measure vector memory between consecutive fixed-time displacement blocks."""
+
+    displacements = np.asarray(block_displacements, dtype=float)
+    if (
+        displacements.ndim != 3
+        or min(displacements.shape) < 1
+        or np.any(~np.isfinite(displacements))
+    ):
+        raise ValueError("block_displacements must be a finite particle-block-vector array")
+    if (
+        isinstance(maximum_lag, bool)
+        or not isinstance(maximum_lag, int)
+        or maximum_lag < 1
+        or maximum_lag >= displacements.shape[1]
+    ):
+        raise ValueError("maximum_lag must fit inside the block axis")
+    block_msd = float(np.mean(np.sum(displacements**2, axis=2)))
+    if block_msd <= 0.0:
+        raise ValueError("block displacement variance must be positive")
+    cumulative = 0.0
+    rows: list[dict[str, float]] = []
+    for lag in range(1, maximum_lag + 1):
+        correlation = float(
+            np.mean(
+                np.sum(
+                    displacements[:, :-lag] * displacements[:, lag:], axis=2
+                )
+            )
+        )
+        cumulative += correlation
+        rows.append(
+            {
+                "block_lag": float(lag),
+                "pair_count": float(
+                    displacements.shape[0] * (displacements.shape[1] - lag)
+                ),
+                "block_vector_msd": block_msd,
+                "block_dot_correlation": correlation,
+                "correlation_over_block_msd": correlation / block_msd,
+                "cumulative_green_kubo_factor": 1.0
+                + 2.0 * cumulative / block_msd,
+            }
+        )
+    return rows
+
+
+def finite_window_green_kubo_factor(
+    correlation_rows: Sequence[dict[str, object]],
+    *,
+    block_count: int,
+) -> float:
+    """Convert block-vector correlations to the exact finite-window MSD factor."""
+
+    if isinstance(block_count, bool) or not isinstance(block_count, int) or block_count < 1:
+        raise ValueError("block_count must be a positive integer")
+    if block_count == 1:
+        return 1.0
+    selected = [
+        row
+        for row in correlation_rows
+        if 1 <= int(float(row["block_lag"])) < block_count
+    ]
+    if not selected:
+        return 1.0
+    block_msd_values = {float(row["block_vector_msd"]) for row in selected}
+    if len(block_msd_values) != 1 or min(block_msd_values) <= 0.0:
+        raise ValueError("correlation rows must share one positive block MSD")
+    block_msd = block_msd_values.pop()
+    correction = sum(
+        (1.0 - float(row["block_lag"]) / block_count)
+        * float(row["block_dot_correlation"])
+        for row in selected
+    )
+    return 1.0 + 2.0 * correction / block_msd
+
+
 def particle_event_count_matrix(
     events: dict[str, np.ndarray],
     *,
@@ -1744,6 +1825,199 @@ def correlated_jump_propagator(
             row[key] = float(np.mean(np.cos(wave_number * displacement)))
         rows.append(row)
     return rows
+
+
+def posterior_weighted_state_displacement_kernels(
+    counts: np.ndarray,
+    displacements: np.ndarray,
+    *,
+    slow_mean_count: float,
+    fast_mean_count: float,
+    stationary_slow_probability: float,
+    stationary_fast_probability: float,
+    wave_numbers: np.ndarray,
+) -> dict[str, float]:
+    """Estimate slow/fast displacement kernels from count-emission posteriors."""
+
+    counts = np.asarray(counts)
+    displacements = np.asarray(displacements, dtype=float)
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if (
+        counts.ndim != 1
+        or displacements.ndim != 2
+        or len(counts) != len(displacements)
+        or len(counts) < 2
+        or np.any(counts < 0)
+        or np.any(counts != np.floor(counts))
+        or np.any(~np.isfinite(displacements))
+    ):
+        raise ValueError("counts and displacements must be aligned finite block samples")
+    probabilities = np.array(
+        [stationary_slow_probability, stationary_fast_probability], dtype=float
+    )
+    means = np.array([slow_mean_count, fast_mean_count], dtype=float)
+    if (
+        np.any(~np.isfinite(probabilities))
+        or np.any(probabilities <= 0.0)
+        or not math.isclose(float(np.sum(probabilities)), 1.0, abs_tol=1e-8)
+        or np.any(~np.isfinite(means))
+        or np.any(means <= 0.0)
+        or means[0] > means[1]
+        or wave_numbers.ndim != 1
+        or len(wave_numbers) == 0
+        or np.any(~np.isfinite(wave_numbers))
+        or np.any(wave_numbers <= 0.0)
+    ):
+        raise ValueError("state probabilities, count means, and wave numbers are invalid")
+    log_factorial = np.array([math.lgamma(float(value) + 1.0) for value in counts])
+    log_weights = np.column_stack(
+        [
+            math.log(probabilities[state])
+            + counts * math.log(means[state])
+            - means[state]
+            - log_factorial
+            for state in range(2)
+        ]
+    )
+    row_max = np.max(log_weights, axis=1, keepdims=True)
+    weights = np.exp(log_weights - row_max)
+    weights /= np.sum(weights, axis=1, keepdims=True)
+    squared = np.sum(displacements**2, axis=1)
+    result: dict[str, float] = {}
+    for state, prefix in enumerate(("slow", "fast")):
+        state_weights = weights[:, state]
+        weight_sum = float(np.sum(state_weights))
+        result[f"{prefix}_posterior_weight_sum"] = weight_sum
+        result[f"{prefix}_effective_sample_size"] = float(
+            weight_sum**2 / np.sum(state_weights**2)
+        )
+        result[f"{prefix}_mean_count"] = float(
+            np.sum(state_weights * counts) / weight_sum
+        )
+        result[f"{prefix}_msd"] = float(
+            np.sum(state_weights * squared) / weight_sum
+        )
+        result[f"{prefix}_fourth_moment"] = float(
+            np.sum(state_weights * squared**2) / weight_sum
+        )
+        for wave_number in wave_numbers:
+            characteristic = np.mean(
+                np.cos(wave_number * displacements), axis=1
+            )
+            key = f"{prefix}_characteristic_k{wave_number:g}".replace(".", "p")
+            result[key] = float(
+                np.sum(state_weights * characteristic) / weight_sum
+            )
+    return result
+
+
+def two_clock_state_displacement_statistics(
+    parameters: dict[str, object],
+    kernels: dict[str, object],
+    *,
+    block_count: int,
+    wave_number_key: str,
+    dimension: int,
+) -> dict[str, float]:
+    """Propagate state-conditioned isotropic block displacements through two clocks."""
+
+    if isinstance(block_count, bool) or not isinstance(block_count, int) or block_count < 1:
+        raise ValueError("block_count must be a positive integer")
+    if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 1:
+        raise ValueError("dimension must be a positive integer")
+    stationary = np.array(
+        [
+            float(parameters["stationary_slow_probability"]),
+            float(parameters["stationary_fast_probability"]),
+        ]
+    )
+    clock_weights = np.array(
+        [
+            float(parameters["fast_clock_weight"]),
+            float(parameters["slow_clock_weight"]),
+        ]
+    )
+    retentions = np.array(
+        [
+            float(parameters["fast_clock_retention"]),
+            float(parameters["slow_clock_retention"]),
+        ]
+    )
+    state_msd = np.array(
+        [float(kernels["slow_msd"]), float(kernels["fast_msd"])]
+    )
+    state_fourth = np.array(
+        [
+            float(kernels["slow_fourth_moment"]),
+            float(kernels["fast_fourth_moment"]),
+        ]
+    )
+    state_characteristic = np.array(
+        [
+            float(kernels[f"slow_characteristic_{wave_number_key}"]),
+            float(kernels[f"fast_characteristic_{wave_number_key}"]),
+        ]
+    )
+    values = np.concatenate(
+        [
+            stationary,
+            clock_weights,
+            retentions,
+            state_msd,
+            state_fourth,
+            state_characteristic,
+        ]
+    )
+    if (
+        np.any(~np.isfinite(values))
+        or np.any(state_msd < 0.0)
+        or np.any(state_fourth < 0.0)
+        or np.any(np.abs(state_characteristic) > 1.0)
+        or np.any(retentions < 0.0)
+        or np.any(retentions > 1.0)
+    ):
+        raise ValueError("state displacement kernels and clocks are invalid")
+    event_msd = block_count * float(stationary @ state_msd)
+    single_fourth = block_count * float(stationary @ state_fourth)
+
+    def propagate(retention: float) -> tuple[float, float]:
+        transition = np.array(
+            [
+                [
+                    1.0 - stationary[1] * (1.0 - retention),
+                    stationary[1] * (1.0 - retention),
+                ],
+                [
+                    stationary[0] * (1.0 - retention),
+                    1.0 - stationary[0] * (1.0 - retention),
+                ],
+            ]
+        )
+        pair_sum = 0.0
+        transition_power = transition.copy()
+        for lag in range(1, block_count):
+            pair_sum += (block_count - lag) * float(
+                (stationary * state_msd) @ transition_power @ state_msd
+            )
+            transition_power = transition_power @ transition
+        fourth = single_fourth + 2.0 * (1.0 + 2.0 / dimension) * pair_sum
+        characteristic = stationary * state_characteristic
+        for _ in range(1, block_count):
+            characteristic = (characteristic @ transition) * state_characteristic
+        return fourth, float(np.sum(characteristic))
+
+    propagated = [propagate(float(retention)) for retention in retentions]
+    return {
+        "block_count": float(block_count),
+        "lag_time": block_count * float(parameters["block_size"]),
+        "event_msd": event_msd,
+        "event_fourth_moment": float(
+            sum(weight * value[0] for weight, value in zip(clock_weights, propagated))
+        ),
+        "event_characteristic": float(
+            sum(weight * value[1] for weight, value in zip(clock_weights, propagated))
+        ),
+    }
 
 
 def debye_waller_factor_from_msd(

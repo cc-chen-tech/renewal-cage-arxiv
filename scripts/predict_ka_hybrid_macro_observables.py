@@ -16,15 +16,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from ka_replicates import (  # noqa: E402
+    block_vector_correlation_curve,
     compound_jump_cage_observables,
     correlated_jump_propagator,
     extract_debye_waller_cage_jumps,
+    finite_window_green_kubo_factor,
     jump_vector_correlation_curve,
     load_lammps_custom_trajectory,
+    particle_event_count_matrix,
+    posterior_weighted_state_displacement_kernels,
     position_fluctuation_values,
     two_clock_hmm_mixture_parameters,
     two_clock_hmm_mixture_total_count_pmf,
     two_clock_hmm_mixture_total_count_statistics,
+    two_clock_state_displacement_statistics,
 )
 
 
@@ -110,6 +115,13 @@ def wave_number_from_key(key: str) -> float:
     return float(key.removeprefix("residual_fs_k").replace("p", "."))
 
 
+def kernel_uses_external_cage(kernel_mode: str) -> bool:
+    return kernel_mode not in {
+        "state-conditioned-joint",
+        "state-conditioned-joint-finite-gk",
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("ensemble_directory", type=Path)
@@ -124,6 +136,17 @@ def main() -> None:
     parser.add_argument("--maximum-event-correlation-lag", type=int, default=8)
     parser.add_argument("--maximum-propagator-count", type=int, default=60)
     parser.add_argument("--minimum-propagator-samples", type=int, default=500)
+    parser.add_argument(
+        "--kernel-mode",
+        choices=(
+            "correlated-global",
+            "state-conditioned",
+            "state-conditioned-finite-gk",
+            "state-conditioned-joint",
+            "state-conditioned-joint-finite-gk",
+        ),
+        default="correlated-global",
+    )
     parser.add_argument("--output-prefix", type=Path, required=True)
     args = parser.parse_args()
 
@@ -197,21 +220,122 @@ def main() -> None:
         )
         green_kubo_factor = float(correlation[-1]["cumulative_green_kubo_factor"])
         wave_numbers = np.array([wave_number_from_key(key) for key in fs_keys])
-        propagator = correlated_jump_propagator(
-            events,
-            maximum_count=args.maximum_propagator_count,
-            wave_numbers=wave_numbers,
-            minimum_sample_count=args.minimum_propagator_samples,
-        )
-        maximum_kernel_count = int(propagator[-1]["jump_count"])
-        for propagator_row in propagator:
-            propagator_rows.append(
-                {
-                    "replicate": float(replicate),
-                    "temperature": float(manifest["temperature"]),
-                    **propagator_row,
-                }
+        if args.kernel_mode == "correlated-global":
+            propagator = correlated_jump_propagator(
+                events,
+                maximum_count=args.maximum_propagator_count,
+                wave_numbers=wave_numbers,
+                minimum_sample_count=args.minimum_propagator_samples,
             )
+            maximum_kernel_count = int(propagator[-1]["jump_count"])
+            state_kernels = None
+            block_green_kubo_factor = math.nan
+            for propagator_row in propagator:
+                propagator_rows.append(
+                    {
+                        "replicate": float(replicate),
+                        "temperature": float(manifest["temperature"]),
+                        "kernel_mode": args.kernel_mode,
+                        **propagator_row,
+                    }
+                )
+        else:
+            count_matrix = particle_event_count_matrix(
+                events,
+                duration=float(args.calibration_time),
+                particle_count=calibration_positions.shape[1],
+                block_size=args.block_size,
+            )
+            block_count_calibration = count_matrix.shape[1]
+            block_displacements = np.zeros(
+                (
+                    calibration_positions.shape[1],
+                    block_count_calibration,
+                    calibration_positions.shape[2],
+                ),
+                dtype=float,
+            )
+            event_blocks = np.asarray(events["time"], dtype=int) // int(args.block_size)
+            retained = event_blocks < block_count_calibration
+            np.add.at(
+                block_displacements,
+                (
+                    np.asarray(events["particle"], dtype=int)[retained],
+                    event_blocks[retained],
+                ),
+                jumps[retained],
+            )
+            if args.kernel_mode in {
+                "state-conditioned-joint",
+                "state-conditioned-joint-finite-gk",
+            }:
+                starts = np.arange(block_count_calibration) * int(args.block_size)
+                ends = starts + int(args.block_size)
+                selected_displacements = np.transpose(
+                    calibration_positions[ends] - calibration_positions[starts],
+                    (1, 0, 2),
+                )
+            else:
+                selected_displacements = block_displacements
+            block_correlation = block_vector_correlation_curve(
+                selected_displacements,
+                maximum_lag=min(
+                    args.maximum_event_correlation_lag,
+                    block_count_calibration - 1,
+                ),
+            )
+            block_green_kubo_factor = float(
+                block_correlation[-1]["cumulative_green_kubo_factor"]
+            )
+            kernel_displacements = selected_displacements
+            state_kernels = posterior_weighted_state_displacement_kernels(
+                count_matrix.reshape(-1),
+                kernel_displacements.reshape(-1, block_displacements.shape[2]),
+                slow_mean_count=float(parameters["slow_mean_count"]),
+                fast_mean_count=float(parameters["fast_mean_count"]),
+                stationary_slow_probability=float(
+                    parameters["stationary_slow_probability"]
+                ),
+                stationary_fast_probability=float(
+                    parameters["stationary_fast_probability"]
+                ),
+                wave_numbers=wave_numbers,
+            )
+            maximum_kernel_count = 0
+            propagator = []
+            for state in ("slow", "fast"):
+                propagator_rows.append(
+                    {
+                        "replicate": float(replicate),
+                        "temperature": float(manifest["temperature"]),
+                        "kernel_mode": args.kernel_mode,
+                        "kernel_state": state,
+                        "block_green_kubo_factor": block_green_kubo_factor,
+                        "posterior_weight_sum": state_kernels[
+                            f"{state}_posterior_weight_sum"
+                        ],
+                        "effective_sample_size": state_kernels[
+                            f"{state}_effective_sample_size"
+                        ],
+                        "posterior_mean_count": state_kernels[
+                            f"{state}_mean_count"
+                        ],
+                        "conditional_msd": state_kernels[f"{state}_msd"],
+                        "conditional_fourth_moment": state_kernels[
+                            f"{state}_fourth_moment"
+                        ],
+                        **{
+                            f"conditional_characteristic_k{wave_number:g}".replace(
+                                ".", "p"
+                            ): state_kernels[
+                                f"{state}_characteristic_k{wave_number:g}".replace(
+                                    ".", "p"
+                                )
+                            ]
+                            for wave_number in wave_numbers
+                        },
+                    }
+                )
         raw_squared = np.sum(jumps**2, axis=1)
         for key in local_keys:
             lag = key[1]
@@ -223,20 +347,71 @@ def main() -> None:
                 block_count=block_count,
                 pgf_argument=1.0,
             )
-            count_distribution = two_clock_hmm_mixture_total_count_pmf(
-                parameters,
-                block_count=block_count,
-                maximum_count=maximum_kernel_count,
-            )
-            count_pmf = np.asarray(count_distribution["count_pmf"], dtype=float)
-            conditional_msd = np.array(
-                [float(value["conditional_msd"]) for value in propagator]
-            )
-            conditional_fourth = np.array(
-                [float(value["conditional_fourth_moment"]) for value in propagator]
-            )
-            event_msd = float(np.sum(count_pmf * conditional_msd))
-            event_fourth = float(np.sum(count_pmf * conditional_fourth))
+            if args.kernel_mode == "correlated-global":
+                count_distribution = two_clock_hmm_mixture_total_count_pmf(
+                    parameters,
+                    block_count=block_count,
+                    maximum_count=maximum_kernel_count,
+                )
+                count_pmf = np.asarray(count_distribution["count_pmf"], dtype=float)
+                conditional_msd = np.array(
+                    [float(value["conditional_msd"]) for value in propagator]
+                )
+                conditional_fourth = np.array(
+                    [float(value["conditional_fourth_moment"]) for value in propagator]
+                )
+                event_msd = float(np.sum(count_pmf * conditional_msd))
+                event_fourth = float(np.sum(count_pmf * conditional_fourth))
+                count_tail_probability = float(
+                    count_distribution["tail_probability"]
+                )
+                finite_green_kubo_factor = math.nan
+                lag_state_kernels = None
+            else:
+                if args.kernel_mode in {
+                    "state-conditioned-finite-gk",
+                    "state-conditioned-joint-finite-gk",
+                }:
+                    finite_green_kubo_factor = finite_window_green_kubo_factor(
+                        block_correlation,
+                        block_count=block_count,
+                    )
+                    if finite_green_kubo_factor <= 0.0:
+                        raise ValueError(
+                            "finite-window Green-Kubo factor must be positive"
+                        )
+                    lag_state_kernels = posterior_weighted_state_displacement_kernels(
+                        count_matrix.reshape(-1),
+                        (
+                            math.sqrt(finite_green_kubo_factor)
+                            * selected_displacements
+                        ).reshape(-1, selected_displacements.shape[2]),
+                        slow_mean_count=float(parameters["slow_mean_count"]),
+                        fast_mean_count=float(parameters["fast_mean_count"]),
+                        stationary_slow_probability=float(
+                            parameters["stationary_slow_probability"]
+                        ),
+                        stationary_fast_probability=float(
+                            parameters["stationary_fast_probability"]
+                        ),
+                        wave_numbers=wave_numbers,
+                    )
+                else:
+                    finite_green_kubo_factor = 1.0
+                    lag_state_kernels = state_kernels
+                reference_key = (
+                    f"k{wave_number_from_key(fs_keys[0]):g}".replace(".", "p")
+                )
+                reference_state = two_clock_state_displacement_statistics(
+                    parameters,
+                    lag_state_kernels,
+                    block_count=block_count,
+                    wave_number_key=reference_key,
+                    dimension=jumps.shape[1],
+                )
+                event_msd = float(reference_state["event_msd"])
+                event_fourth = float(reference_state["event_fourth_moment"])
+                count_tail_probability = 0.0
             row: dict[str, object] = {
                 "replicate": float(replicate),
                 "temperature": float(manifest["temperature"]),
@@ -249,6 +424,8 @@ def main() -> None:
                     np.mean(raw_squared**2)
                 ),
                 "calibration_green_kubo_factor": green_kubo_factor,
+                "calibration_block_asymptotic_green_kubo_factor": block_green_kubo_factor,
+                "calibration_block_finite_green_kubo_factor": finite_green_kubo_factor,
                 "event_correlation_lag_count": float(
                     args.maximum_event_correlation_lag
                 ),
@@ -258,9 +435,8 @@ def main() -> None:
                 "correlated_jump_kernel_minimum_samples": float(
                     args.minimum_propagator_samples
                 ),
-                "count_tail_probability": count_distribution[
-                    "tail_probability"
-                ],
+                "kernel_mode": args.kernel_mode,
+                "count_tail_probability": count_tail_probability,
                 "predicted_event_msd": event_msd,
                 "predicted_event_fourth_moment": event_fourth,
                 "predicted_mean_count": count_moments["mean_count"],
@@ -272,28 +448,52 @@ def main() -> None:
             }
             predicted_channels: dict[str, dict[str, float]] = {}
             for fs_key in fs_keys:
-                characteristic_key = (
-                    f"conditional_characteristic_k{wave_number_from_key(fs_key):g}".replace(
-                        ".", "p"
-                    )
+                wave_number_key = (
+                    f"k{wave_number_from_key(fs_key):g}".replace(".", "p")
                 )
-                event_fs = float(
-                    np.sum(
-                        count_pmf
-                        * np.array(
-                            [float(value[characteristic_key]) for value in propagator]
+                if args.kernel_mode == "correlated-global":
+                    characteristic_key = f"conditional_characteristic_{wave_number_key}"
+                    event_fs = float(
+                        np.sum(
+                            count_pmf
+                            * np.array(
+                                [
+                                    float(value[characteristic_key])
+                                    for value in propagator
+                                ]
+                            )
                         )
                     )
-                )
+                else:
+                    state_prediction = two_clock_state_displacement_statistics(
+                        parameters,
+                        lag_state_kernels,
+                        block_count=block_count,
+                        wave_number_key=wave_number_key,
+                        dimension=jumps.shape[1],
+                    )
+                    event_fs = float(state_prediction["event_characteristic"])
                 predicted_channels[fs_key] = compound_jump_cage_observables(
                     mean_count=1.0,
                     factorial_second_count=0.0,
                     jump_msd=event_msd,
                     jump_fourth_moment=event_fourth,
                     count_pgf=event_fs,
-                    cage_msd=float(calibration_row["residual_msd"]),
-                    cage_ngp=float(calibration_row["residual_ngp"]),
-                    cage_fs=float(calibration_row[fs_key]),
+                    cage_msd=(
+                        float(calibration_row["residual_msd"])
+                        if kernel_uses_external_cage(args.kernel_mode)
+                        else 0.0
+                    ),
+                    cage_ngp=(
+                        float(calibration_row["residual_ngp"])
+                        if kernel_uses_external_cage(args.kernel_mode)
+                        else 0.0
+                    ),
+                    cage_fs=(
+                        float(calibration_row[fs_key])
+                        if kernel_uses_external_cage(args.kernel_mode)
+                        else 1.0
+                    ),
                     dimension=jumps.shape[1],
                 )
                 observable_key = fs_key.removeprefix("residual_")
@@ -408,6 +608,11 @@ def main() -> None:
         "maximum_ensemble_fs_absolute_error": maximum_fs,
         "maximum_count_tail_probability": maximum_tail,
     }
+    joint_mode = not kernel_uses_external_cage(args.kernel_mode)
+    finite_block_gk_mode = args.kernel_mode in {
+        "state-conditioned-finite-gk",
+        "state-conditioned-joint-finite-gk",
+    }
     verdict: dict[str, object] = {
         "temperature": float(manifest["temperature"]),
         "independent_replicate_count": float(len(manifest["replicates"])),
@@ -416,9 +621,41 @@ def main() -> None:
         **curve_errors,
         **scalar_row,
         "calibration_only_two_clock_count_law": 1.0,
-        "calibration_only_jump_distribution": 1.0,
-        "calibration_correlated_jump_kernel": 1.0,
-        "calibration_cage_residual_transfer": 1.0,
+        "calibration_only_jump_distribution": float(not joint_mode),
+        "calibration_only_joint_displacement_distribution": float(joint_mode),
+        "kernel_mode": args.kernel_mode,
+        "calibration_correlated_jump_kernel": float(
+            args.kernel_mode == "correlated-global"
+        ),
+        "calibration_state_conditioned_block_kernel": float(
+            args.kernel_mode
+            in {
+                "state-conditioned",
+                "state-conditioned-finite-gk",
+                "state-conditioned-joint",
+                "state-conditioned-joint-finite-gk",
+            }
+        ),
+        "calibration_block_green_kubo_renormalization": float(
+            args.kernel_mode
+            in {
+                "state-conditioned-finite-gk",
+                "state-conditioned-joint-finite-gk",
+            }
+        ),
+        "calibration_state_conditioned_joint_displacement_kernel": float(
+            args.kernel_mode
+            in {
+                "state-conditioned-joint",
+                "state-conditioned-joint-finite-gk",
+            }
+        ),
+        "external_cage_channel_used": float(not joint_mode),
+        "calibration_cage_residual_transfer": float(not joint_mode),
+        "block_direction_correlation_lag_count": float(
+            args.maximum_event_correlation_lag
+        ),
+        "unmeasured_block_correlation_assumed_zero": float(finite_block_gk_mode),
         "jump_direction_correlation_included": 1.0,
         "preregistered_heldout_prediction_claim_allowed": 0.0,
     }
