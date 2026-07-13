@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="520" viewBox="0 0 1080 520">
+<rect width="1080" height="520" fill="#ffffff"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#20242a;letter-spacing:0}.title{font-size:20px;font-weight:700}.panel{font-size:15px;font-weight:700}.axis{font-size:12px}.legend{font-size:12px}</style>
+<text x="40" y="32" class="title">Nonlinear cage-path cumulant gate</text>
+<text x="70" y="62" class="panel">A  Held-out errors / frozen tolerance</text>
+<text x="600" y="62" class="panel">B  Observed-cumulant Fs error</text>
+<line x1="70.0" y1="432.0" x2="500.0" y2="432.0" stroke="#343a40"/>
+<line x1="70.0" y1="82.0" x2="70.0" y2="432.0" stroke="#343a40"/>
+<line x1="70.0" y1="432.00" x2="500.0" y2="432.00" stroke="#e3e6e8"/>
+<text x="60.0" y="436.00" text-anchor="end" class="axis">0</text>
+<line x1="70.0" y1="373.67" x2="500.0" y2="373.67" stroke="#e3e6e8"/>
+<text x="60.0" y="377.67" text-anchor="end" class="axis">1</text>
+<line x1="70.0" y1="315.33" x2="500.0" y2="315.33" stroke="#e3e6e8"/>
+<text x="60.0" y="319.33" text-anchor="end" class="axis">2</text>
+<line x1="70.0" y1="198.67" x2="500.0" y2="198.67" stroke="#e3e6e8"/>
+<text x="60.0" y="202.67" text-anchor="end" class="axis">4</text>
+<line x1="70.0" y1="82.00" x2="500.0" y2="82.00" stroke="#e3e6e8"/>
+<text x="60.0" y="86.00" text-anchor="end" class="axis">6</text>
+<line x1="70.0" y1="373.67" x2="500.0" y2="373.67" stroke="#9b2c2c" stroke-width="1.5" stroke-dasharray="6 5"/>
+<line x1="600.0" y1="432.0" x2="1030.0" y2="432.0" stroke="#343a40"/>
+<line x1="600.0" y1="82.0" x2="600.0" y2="432.0" stroke="#343a40"/>
+<line x1="600.0" y1="432.00" x2="1030.0" y2="432.00" stroke="#e3e6e8"/>
+<text x="590.0" y="436.00" text-anchor="end" class="axis">0</text>
+<line x1="600.0" y1="373.67" x2="1030.0" y2="373.67" stroke="#e3e6e8"/>
+<text x="590.0" y="377.67" text-anchor="end" class="axis">1</text>
+<line x1="600.0" y1="315.33" x2="1030.0" y2="315.33" stroke="#e3e6e8"/>
+<text x="590.0" y="319.33" text-anchor="end" class="axis">2</text>
+<line x1="600.0" y1="198.67" x2="1030.0" y2="198.67" stroke="#e3e6e8"/>
+<text x="590.0" y="202.67" text-anchor="end" class="axis">4</text>
+<line x1="600.0" y1="82.00" x2="1030.0" y2="82.00" stroke="#e3e6e8"/>
+<text x="590.0" y="86.00" text-anchor="end" class="axis">6</text>
+<line x1="600.0" y1="373.67" x2="1030.0" y2="373.67" stroke="#9b2c2c" stroke-width="1.5" stroke-dasharray="6 5"/>
+<circle cx="129.00" cy="399.45" r="5" fill="#167a72"/>
+<circle cx="269.00" cy="426.24" r="5" fill="#167a72"/>
+<circle cx="409.00" cy="390.63" r="5" fill="#167a72"/>
+<polyline points="129.00,399.45 269.00,426.24 409.00,390.63" fill="none" stroke="#167a72" stroke-width="2.5"/>
+<circle cx="161.00" cy="417.89" r="5" fill="#d65a31"/>
+<circle cx="301.00" cy="160.60" r="5" fill="#d65a31"/>
+<circle cx="441.00" cy="238.34" r="5" fill="#d65a31"/>
+<polyline points="161.00,417.89 301.00,160.60 441.00,238.34" fill="none" stroke="#d65a31" stroke-width="2.5"/>
+<text x="145.0" y="452" text-anchor="middle" class="axis">MSD</text>
+<text x="285.0" y="452" text-anchor="middle" class="axis">NGP</text>
+<text x="425.0" y="452" text-anchor="middle" class="axis">Fs</text>
+<text x="48" y="250" transform="rotate(-90 48 250)" text-anchor="middle" class="axis">normalized error</text>
+<polyline points="600.00,431.98 674.03,431.94 730.04,431.85 786.04,431.61 860.07,430.47 916.08,427.47 972.08,418.99 1004.84,409.17 1030.00,399.94" fill="none" stroke="#167a72" stroke-width="2.5"/>
+<polyline points="600.00,431.10 674.03,429.01 730.04,424.58 786.04,413.40 860.07,366.72 916.08,260.12 972.08,82.00 1004.84,82.00 1030.00,82.00" fill="none" stroke="#d65a31" stroke-width="2.5"/>
+<polyline points="600.00,412.84 674.03,373.34 730.04,293.12 786.04,89.50 860.07,82.00 916.08,82.00 972.08,82.00 1004.84,82.00 1030.00,82.00" fill="none" stroke="#4b5563" stroke-width="2.5"/>
+<text x="600.00" y="452" text-anchor="middle" class="axis">20</text>
+<text x="1030.00" y="452" text-anchor="middle" class="axis">4096</text>
+<text x="815" y="480" text-anchor="middle" class="axis">lag (log scale)</text>
+<text x="578" y="250" transform="rotate(-90 578 250)" text-anchor="middle" class="axis">|Fs(4)-Fs| / 0.03</text>
+<line x1="90" y1="503" x2="112" y2="503" stroke="#167a72" stroke-width="3"/>
+<text x="118" y="507" class="legend">contiguous path</text>
+<line x1="285" y1="503" x2="307" y2="503" stroke="#d65a31" stroke-width="3"/>
+<text x="313" y="507" class="legend">radial + spectrum null</text>
+<line x1="675" y1="503" x2="697" y2="503" stroke="#167a72" stroke-width="3"/>
+<text x="703" y="507" class="legend">k=2</text>
+<line x1="775" y1="503" x2="797" y2="503" stroke="#d65a31" stroke-width="3"/>
+<text x="803" y="507" class="legend">k=4</text>
+<line x1="875" y1="503" x2="897" y2="503" stroke="#4b5563" stroke-width="3"/>
+<text x="903" y="507" class="legend">k=7.25</text>
+</svg>

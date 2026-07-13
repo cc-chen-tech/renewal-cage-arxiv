@@ -1,0 +1,4 @@
+comparison,lag_count,maximum_msd_relative_error,maximum_ngp_absolute_error,maximum_fs_absolute_error,msd_relative_error_tolerance,ngp_absolute_error_tolerance,fs_absolute_error_tolerance,curve_transfer_pass,temperature,calibration_time,block_size,independent_replicate_count,surrogate_realizations_per_replicate,surrogate_iteration_count,surrogate_base_seed,microdynamic_closure_claim_allowed,spatial_facilitation_claim_allowed,thermodynamic_claim_allowed
+early_late,3.0,0.10235441306120463,0.06282531369733213,0.043860351584805835,0.1,0.3,0.03,0.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0,0.0,0.0,0.0
+early_heldout,3.0,0.11763027801245096,0.05293922731992673,0.04788301387130317,0.1,0.3,0.03,0.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0,0.0,0.0,0.0
+late_heldout,3.0,0.019129978125042246,0.015207655761947825,0.005857750846262277,0.1,0.3,0.03,1.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0,0.0,0.0,0.0
