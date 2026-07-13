@@ -301,6 +301,28 @@ class SmoothCageTests(unittest.TestCase):
             np.broadcast_to(0.2 * rate[0], (2, 3, 3)),
         )
 
+    def test_smooth_cage_runner_has_c3_low_disk_contract(self):
+        script = ROOT / "scripts" / "run_ka_smooth_cage_response.py"
+        source = script.read_text()
+
+        for option in (
+            "--parent-restart",
+            "--lammps",
+            "--output-directory",
+            "--members",
+            "--epsilons",
+            "--run-steps",
+            "--dump-interval",
+            "--directional-step",
+        ):
+            self.assertIn(option, source)
+        self.assertIn('potential_protocol="ka_lj_c3_switch"', source)
+        self.assertIn("temporary.replace(output_path)", source)
+        self.assertGreater(
+            source.index("trajectory_path.unlink()"),
+            source.index("temporary.replace(output_path)"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
