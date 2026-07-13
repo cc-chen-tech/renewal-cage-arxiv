@@ -3,6 +3,7 @@ import importlib.util
 import math
 import pickle
 import csv
+import copy
 import subprocess
 import sys
 import tempfile
@@ -1921,6 +1922,361 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(first, module.path_shuffle_seed(45101, replicate=2, realization=3))
         self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=3, realization=3))
         self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=2, realization=4))
+
+    def test_nonlinear_path_surrogate_seed_is_deterministic(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_seed",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        first = module.surrogate_seed(211003, replicate=2, realization=3)
+
+        self.assertEqual(
+            first,
+            module.surrogate_seed(211003, replicate=2, realization=3),
+        )
+        self.assertNotEqual(
+            first,
+            module.surrogate_seed(211003, replicate=3, realization=3),
+        )
+        self.assertNotEqual(
+            first,
+            module.surrogate_seed(211003, replicate=2, realization=4),
+        )
+
+    def test_nonlinear_path_surrogate_requires_quality_stationarity_and_paired_consensus(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_classifier",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        summary_rows = [
+            {
+                "model": "contiguous_empirical_path",
+                "ensemble_msd_relative_error": 0.05,
+                "ensemble_ngp_absolute_error": 0.10,
+                "ensemble_absolute_error_fs_k2": 0.01,
+                "ensemble_absolute_error_fs_k7p25": 0.02,
+                "ensemble_msd_mc_relative_se": 0.0,
+                "ensemble_ngp_mc_se": 0.0,
+                "ensemble_fs_k2_mc_se": 0.0,
+                "ensemble_fs_k7p25_mc_se": 0.0,
+            },
+            {
+                "model": "radial_multivariate_surrogate",
+                "ensemble_msd_relative_error": 0.03,
+                "ensemble_ngp_absolute_error": 1.20,
+                "ensemble_absolute_error_fs_k2": 0.02,
+                "ensemble_absolute_error_fs_k7p25": 0.09,
+                "ensemble_msd_mc_relative_se": 0.002,
+                "ensemble_ngp_mc_se": 0.01,
+                "ensemble_fs_k2_mc_se": 0.001,
+                "ensemble_fs_k7p25_mc_se": 0.002,
+            },
+        ]
+        quality_rows = [
+            {
+                "radial_distribution_maximum_absolute_error": 1e-14,
+                "cross_spectral_matrix_nrmse": 0.011,
+                "one_block_msd_relative_error": 1e-12,
+                "one_block_ngp_absolute_error": 1e-12,
+                "one_block_fs_maximum_absolute_error": 0.001,
+            }
+            for _ in range(3)
+        ]
+        replicate_scores = [
+            {
+                "replicate": float(replicate),
+                "radial_higher_order_score": radial,
+                "contiguous_higher_order_score": contiguous,
+            }
+            for replicate, radial, contiguous in (
+                (1, 4.2, 0.9),
+                (2, 5.1, 2.1),
+                (3, 4.0, 3.3),
+            )
+        ]
+        stationarity_rows = [
+            {"comparison": comparison, "curve_transfer_pass": 1.0}
+            for comparison in ("early_late", "early_heldout", "late_heldout")
+        ]
+
+        result = module.classify_nonlinear_path_surrogate(
+            summary_rows,
+            quality_rows=quality_rows,
+            replicate_scores=replicate_scores,
+            stationarity_rows=stationarity_rows,
+            required_replicate_count=3,
+        )
+
+        self.assertEqual(result["surrogate_quality_pass"], 1.0)
+        self.assertEqual(result["surrogate_precision_pass"], 1.0)
+        self.assertEqual(result["stationarity_control_pass"], 1.0)
+        self.assertEqual(result["nonlinear_single_particle_path_memory_required"], 1.0)
+        self.assertEqual(result["paired_contiguous_better_replicate_count"], 3.0)
+        self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
+        failures = []
+        changed = copy.deepcopy(quality_rows)
+        changed[0]["cross_spectral_matrix_nrmse"] = 0.02
+        failures.append((summary_rows, changed, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(summary_rows)
+        changed[1]["ensemble_fs_k7p25_mc_se"] = 0.004
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(stationarity_rows)
+        changed[0]["curve_transfer_pass"] = 0.0
+        failures.append((summary_rows, quality_rows, replicate_scores, changed))
+        changed = copy.deepcopy(summary_rows)
+        changed[0]["ensemble_msd_relative_error"] = 0.11
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(summary_rows)
+        changed[1]["ensemble_msd_relative_error"] = 0.11
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(summary_rows)
+        changed[1]["ensemble_ngp_absolute_error"] = 0.20
+        changed[1]["ensemble_absolute_error_fs_k7p25"] = 0.02
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(replicate_scores)
+        changed[0]["radial_higher_order_score"] = 0.9
+        failures.append((summary_rows, quality_rows, changed, stationarity_rows))
+        changed = copy.deepcopy(replicate_scores)
+        changed[0]["contiguous_higher_order_score"] = 4.3
+        failures.append((summary_rows, quality_rows, changed, stationarity_rows))
+
+        for summaries, quality, paired, stationarity in failures:
+            rejected = module.classify_nonlinear_path_surrogate(
+                summaries,
+                quality_rows=quality,
+                replicate_scores=paired,
+                stationarity_rows=stationarity,
+                required_replicate_count=3,
+            )
+            self.assertEqual(
+                rejected["nonlinear_single_particle_path_memory_required"],
+                0.0,
+            )
+
+    def test_nonlinear_path_surrogate_aggregates_realizations_before_replicates(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_aggregation",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = []
+        for replicate, predictions, observed_msd in (
+            (1, ((1.0, 0.1, 0.8), (3.0, 0.3, 0.6)), 2.0),
+            (2, ((3.0, 0.2, 0.7), (5.0, 0.4, 0.5)), 4.0),
+        ):
+            for realization, (msd, ngp, fs) in enumerate(predictions):
+                rows.append(
+                    {
+                        "model": "radial_multivariate_surrogate",
+                        "replicate": float(replicate),
+                        "realization": float(realization),
+                        "lag": 20.0,
+                        "predicted_msd": msd,
+                        "observed_msd": observed_msd,
+                        "predicted_ngp": ngp,
+                        "observed_ngp": 0.25,
+                        "predicted_fs_k2": fs,
+                        "observed_fs_k2": 0.65,
+                    }
+                )
+
+        replicate_rows, summary_rows = module.summarize_surrogate_realizations(
+            rows,
+            fs_keys=["observed_fs_k2"],
+        )
+
+        self.assertEqual(len(replicate_rows), 2)
+        self.assertEqual(len(summary_rows), 1)
+        first = replicate_rows[0]
+        self.assertAlmostEqual(first["predicted_msd"], 2.0)
+        self.assertAlmostEqual(first["predicted_msd_mc_se"], 1.0)
+        self.assertAlmostEqual(first["predicted_ngp"], 0.2)
+        summary = summary_rows[0]
+        self.assertEqual(summary["independent_replicate_count"], 2.0)
+        self.assertAlmostEqual(summary["predicted_msd"], 3.0)
+        self.assertAlmostEqual(summary["observed_msd"], 3.0)
+        self.assertAlmostEqual(summary["ensemble_msd_relative_error"], 0.0)
+        self.assertAlmostEqual(
+            summary["ensemble_msd_mc_relative_se"],
+            math.sqrt(2.0) / 2.0 / 3.0,
+        )
+
+    def test_nonlinear_path_stationarity_scores_three_frozen_comparisons(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_stationarity",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = [
+            {
+                "replicate": float(replicate),
+                "lag": 20.0,
+                "early_msd": early_msd,
+                "late_msd": late_msd,
+                "observed_msd": observed_msd,
+                "early_ngp": 0.20,
+                "late_ngp": 0.24,
+                "observed_ngp": 0.22,
+                "early_fs_k2": 0.80,
+                "late_fs_k2": 0.79,
+                "observed_fs_k2": 0.795,
+            }
+            for replicate, early_msd, late_msd, observed_msd in (
+                (1, 1.0, 1.05, 1.02),
+                (2, 3.0, 3.10, 3.05),
+            )
+        ]
+
+        result = module.stationarity_comparisons(
+            rows,
+            fs_keys=["observed_fs_k2"],
+        )
+
+        self.assertEqual(
+            {row["comparison"] for row in result},
+            {"early_late", "early_heldout", "late_heldout"},
+        )
+        self.assertTrue(all(row["curve_transfer_pass"] == 1.0 for row in result))
+        changed = copy.deepcopy(rows)
+        changed[0]["late_ngp"] = 1.2
+        rejected = module.stationarity_comparisons(
+            changed,
+            fs_keys=["observed_fs_k2"],
+        )
+        self.assertEqual(
+            next(row for row in rejected if row["comparison"] == "early_late")[
+                "curve_transfer_pass"
+            ],
+            0.0,
+        )
+
+    def test_nonlinear_path_replicate_analysis_keeps_surrogates_calibration_only(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_replicate",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        blocks = np.random.default_rng(101).normal(size=(3, 12, 3))
+        wave_numbers = np.array([2.0])
+        heldout = {}
+        for block_count in (1, 2, 4):
+            observed = ka_replicates.cumulative_block_observables(
+                blocks,
+                block_count=block_count,
+                wave_numbers=wave_numbers,
+            )
+            lag = 20 * block_count
+            heldout[lag] = {
+                "observed_msd": observed["msd"],
+                "observed_ngp": observed["ngp"],
+                "observed_fs_k2": observed["characteristic_k2"],
+            }
+
+        result = module.analyze_replicate_block_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=wave_numbers,
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=2,
+            iteration_count=3,
+            base_seed=211003,
+        )
+        repeated = module.analyze_replicate_block_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=wave_numbers,
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=2,
+            iteration_count=3,
+            base_seed=211003,
+        )
+
+        self.assertEqual(result, repeated)
+        self.assertEqual(
+            {row["model"] for row in result["rows"]},
+            {
+                "contiguous_empirical_path",
+                "phase_randomized_cross_spectrum",
+                "radial_multivariate_surrogate",
+            },
+        )
+        self.assertEqual(len(result["rows"]), 15)
+        self.assertEqual(len(result["quality_rows"]), 2)
+        self.assertEqual(len(result["stationarity_detail_rows"]), 3)
+        self.assertTrue(
+            all(row["heldout_path_used_in_prediction"] == 0.0 for row in result["rows"])
+        )
+        self.assertTrue(
+            all(
+                row["radial_distribution_maximum_absolute_error"] < 1e-12
+                for row in result["quality_rows"]
+            )
+        )
+
+    def test_nonlinear_path_replicate_scores_use_each_paths_worst_lag(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_scores",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = []
+        for model, ngp_errors, fs_errors in (
+            ("contiguous_empirical_path", (0.15, 0.03), (0.012, 0.006)),
+            ("radial_multivariate_surrogate", (0.60, 0.90), (0.06, 0.03)),
+        ):
+            for replicate, (ngp_error, fs_error) in enumerate(
+                zip(ngp_errors, fs_errors),
+                start=1,
+            ):
+                for lag_scale in (0.5, 1.0):
+                    rows.append(
+                        {
+                            "model": model,
+                            "replicate": float(replicate),
+                            "lag": 20.0 * lag_scale,
+                            "ngp_absolute_error": ngp_error * lag_scale,
+                            "absolute_error_fs_k2": fs_error * lag_scale,
+                        }
+                    )
+
+        result = module.replicate_higher_order_scores(rows)
+
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result[0]["contiguous_higher_order_score"], 0.5)
+        self.assertAlmostEqual(result[0]["radial_higher_order_score"], 2.0)
+        self.assertAlmostEqual(result[1]["contiguous_higher_order_score"], 0.2)
+        self.assertAlmostEqual(result[1]["radial_higher_order_score"], 3.0)
+        self.assertEqual(result[0]["paired_contiguous_better"], 1.0)
 
     def test_empirical_path_crossover_requires_shared_higher_order_failure(self):
         script_path = ROOT / "scripts" / "summarize_ka_empirical_path_transfer.py"
