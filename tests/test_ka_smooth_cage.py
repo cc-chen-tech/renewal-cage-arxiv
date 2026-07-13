@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -181,6 +182,123 @@ class SmoothCageTests(unittest.TestCase):
         self.assertLess(
             errors[-1] / np.linalg.norm(result["projected_drift"]),
             2e-4,
+        )
+
+    def test_extract_smooth_cage_path_reads_full_lammps_state(self):
+        from ka_smooth_cage import extract_smooth_cage_path
+
+        inputs = self.microscopic_configuration()
+        velocities = np.array(
+            [
+                [0.20, -0.10, 0.30],
+                [-0.15, 0.25, -0.05],
+                [0.10, 0.05, -0.20],
+                [-0.05, -0.30, 0.15],
+            ]
+        )
+        rows = []
+        for timestep, shift in ((0, 0.0), (5, 0.001)):
+            rows.extend(
+                [
+                    "ITEM: TIMESTEP",
+                    str(timestep),
+                    "ITEM: NUMBER OF ATOMS",
+                    "4",
+                    "ITEM: BOX BOUNDS pp pp pp",
+                    "-10 10",
+                    "-10 10",
+                    "-10 10",
+                    "ITEM: ATOMS id type x y z ix iy iz vx vy vz",
+                ]
+            )
+            for index, (position, velocity) in enumerate(
+                zip(inputs["positions"] + shift * velocities, velocities), start=1
+            ):
+                particle_type = inputs["particle_types"][index - 1] + 1
+                rows.append(
+                    f"{index} {particle_type} {position[0]} {position[1]} {position[2]} "
+                    f"0 0 0 {velocity[0]} {velocity[1]} {velocity[2]}"
+                )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trajectory.lammpstrj"
+            path.write_text("\n".join(rows) + "\n")
+            result = extract_smooth_cage_path(
+                path,
+                target_id=1,
+                friction=1.0,
+                temperature=0.58,
+                integration_time_step=0.001,
+                directional_step=1e-5,
+                potential_protocol="ka_lj_c3_switch",
+            )
+
+        self.assertEqual(result["relative_position"].shape, (2, 3))
+        self.assertEqual(result["relative_velocity"].shape, (2, 3))
+        self.assertEqual(result["projected_drift"].shape, (2, 3))
+        self.assertEqual(result["jacobian"].shape, (2, 4, 3, 3))
+        self.assertEqual(result["noise_covariance_rate"].shape, (2, 3, 3))
+        np.testing.assert_allclose(result["time"], np.array([0.0, 0.005]))
+
+    def test_matched_smooth_cage_tangent_has_exact_delta_j_covariance(self):
+        from ka_smooth_cage import matched_smooth_cage_tangent
+
+        epsilon = 0.01
+        friction = 0.8
+        temperature = 0.58
+        time = np.arange(6, dtype=float) * 0.1
+        delta_velocity = time[:, None] * np.array([[1.0, -0.5, 0.25]])
+        delta_drift = np.broadcast_to(np.array([1.0, -0.5, 0.25]), (6, 3))
+        base_jacobian = np.zeros((6, 4, 3, 3))
+        base_jacobian[:, 0] = np.eye(3)
+        delta_jacobian = np.zeros_like(base_jacobian)
+        delta_jacobian[:, 0] = np.diag([0.2, 0.3, 0.4])
+        delta_jacobian[:, 1] = -delta_jacobian[:, 0]
+        base_position = np.zeros((6, 3))
+        base_velocity = np.zeros((6, 3))
+        base_drift = np.zeros((6, 3))
+
+        def path(sign):
+            return {
+                "time": time,
+                "relative_position": base_position,
+                "relative_velocity": base_velocity + sign * epsilon * delta_velocity,
+                "projected_drift": base_drift + sign * epsilon * delta_drift,
+                "jacobian": base_jacobian + sign * epsilon * delta_jacobian,
+                "frame_time": 0.1,
+                "friction": friction,
+                "temperature": temperature,
+            }
+
+        result = matched_smooth_cage_tangent(path(1.0), path(-1.0), epsilon=epsilon)
+        expected_rate = 2.0 * friction * temperature * np.einsum(
+            "tnab,tncb->tac", delta_jacobian, delta_jacobian
+        )
+        np.testing.assert_allclose(result["relative_velocity_response"], delta_velocity)
+        np.testing.assert_allclose(result["projected_drift_response"], delta_drift)
+        np.testing.assert_allclose(result["tangent_noise_covariance_rate"], expected_rate)
+
+    def test_integrated_tangent_covariance_uses_nonoverlapping_trapezoids(self):
+        from ka_smooth_cage import integrated_smooth_cage_tangent_covariance
+
+        time = np.arange(5, dtype=float) * 0.1
+        drift = np.broadcast_to(np.array([1.0, -0.5, 0.25]), (5, 3))
+        velocity = time[:, None] * drift[0]
+        rate = np.broadcast_to(np.diag([2.0, 3.0, 4.0]), (5, 3, 3))
+        result = integrated_smooth_cage_tangent_covariance(
+            {
+                "time": time,
+                "relative_velocity_response": velocity,
+                "projected_drift_response": drift,
+                "tangent_noise_covariance_rate": rate,
+                "frame_time": 0.1,
+            },
+            stride=2,
+        )
+
+        np.testing.assert_allclose(result["residual"], np.zeros((2, 3)), atol=1e-14)
+        np.testing.assert_allclose(
+            result["integrated_covariance"],
+            np.broadcast_to(0.2 * rate[0], (2, 3, 3)),
         )
 
 
