@@ -24,6 +24,8 @@ from ka_replicates import (  # noqa: E402
     radial_recoil_markov_surrogate,
 )
 
+RADIAL_BIN_COUNT = 8
+
 
 def recoil_seed(base_seed: int, *, replicate: int, realization: int) -> int:
     if any(
@@ -159,7 +161,7 @@ def analyze_replicate_recoil_paths(
         surrogate = radial_recoil_markov_surrogate(
             blocks,
             np.random.default_rng(seed),
-            radial_bin_count=8,
+            radial_bin_count=RADIAL_BIN_COUNT,
         )
         quality_rows.append(
             {
@@ -168,6 +170,7 @@ def analyze_replicate_recoil_paths(
                 "realization": float(realization),
                 "temperature": float(temperature),
                 "block_size": float(block_size),
+                "radial_bin_count": float(RADIAL_BIN_COUNT),
                 "surrogate_seed": float(seed),
                 **radial_recoil_markov_quality(blocks, surrogate),
                 "calibration_path_used_in_kernel": 1.0,
@@ -343,6 +346,7 @@ def classify_recoil_transfer(
         "independent_replicate_count": float(len(replicate_ids)),
         "required_replicate_count": float(required_replicate_count),
         "required_realizations_per_replicate": float(required_realization_count),
+        "radial_bin_count": float(RADIAL_BIN_COUNT),
         "quality_realization_completeness_pass": float(complete),
         "quality_pass": float(quality_pass),
         "precision_pass": float(precision_pass),

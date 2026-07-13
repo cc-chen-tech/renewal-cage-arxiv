@@ -16,23 +16,30 @@ CLAIM_KEYS = (
     "spatial_facilitation_claim_allowed",
     "thermodynamic_claim_allowed",
 )
-RECOIL_KEYS = (
+RECOIL_VERDICT_KEYS = (
     "temperature",
     "calibration_time",
     "block_size",
+    "radial_bin_count",
     "independent_replicate_count",
     "required_replicate_count",
     "required_realizations_per_replicate",
-    "quality_realization_completeness_pass",
-    "quality_pass",
-    "precision_pass",
-    "curve_transfer_pass",
+    "surrogate_realizations_per_replicate",
+    "surrogate_base_seed",
     "maximum_ensemble_msd_relative_error",
     "maximum_ensemble_ngp_absolute_error",
     "maximum_ensemble_fs_absolute_error",
     "maximum_ensemble_msd_mc_relative_se",
     "maximum_ensemble_ngp_mc_se",
     "maximum_ensemble_fs_mc_se",
+    "heldout_events_used_in_calibration",
+)
+QUALITY_LIMITS = (
+    ("radial_mean_relative_error", 0.02),
+    ("radial_standard_deviation_relative_error", 0.02),
+    ("lag_one_cosine_mean_absolute_error", 0.02),
+    ("lag_one_cosine_quantile_maximum_absolute_error", 0.03),
+    ("normalized_lag_one_dot_correlation_absolute_error", 0.02),
 )
 
 
@@ -52,10 +59,29 @@ def _finite(row: dict[str, object], key: str) -> float:
     return value
 
 
+def _integer(row: dict[str, object], key: str) -> int:
+    value = _finite(row, key)
+    if value != int(value):
+        raise ValueError(f"field {key} must be an integer")
+    return int(value)
+
+
+def _nonnegative(row: dict[str, object], key: str) -> float:
+    value = _finite(row, key)
+    if value < 0.0:
+        raise ValueError(f"field {key} must be nonnegative")
+    return value
+
+
+def _recoil_seed(base_seed: int, *, replicate: int, realization: int) -> int:
+    return int((base_seed + 1_000_003 * replicate + 97_409 * realization) % (2**63 - 1))
+
+
 def _validate_return_rows(
     rows: Sequence[dict[str, object]],
     *,
     temperature: float,
+    calibration_time: int,
     replicate_count: int,
 ) -> None:
     if not rows:
@@ -63,10 +89,18 @@ def _validate_return_rows(
     keys = set()
     replicates = set()
     for row in rows:
-        replicate = int(_finite(row, "replicate"))
+        replicate = _integer(row, "replicate")
         scale = _finite(row, "radius_scale")
         if _finite(row, "temperature") != temperature:
             raise ValueError("return rows have the wrong temperature")
+        if _finite(row, "calibration_time") != float(calibration_time):
+            raise ValueError("return rows have the wrong calibration time")
+        if _finite(row, "fluctuation_half_window") != 5.0:
+            raise ValueError("return rows must use fluctuation half-window 5")
+        if _finite(row, "calibration_events_only") != 1.0:
+            raise ValueError("return rows must contain calibration events only")
+        if _finite(row, "heldout_events_used_in_calibration") != 0.0:
+            raise ValueError("return rows must not use held-out events in calibration")
         if scale not in RADIUS_SCALES:
             raise ValueError("return rows must use exactly the frozen radius scales")
         return_fraction = _finite(row, "return_fraction")
@@ -88,59 +122,151 @@ def _validate_return_rows(
         raise ValueError("return table must contain one row per replicate and radius scale")
 
 
-def _validate_recoil(
-    row: dict[str, object],
+def _validate_recoil_evidence(
+    quality_rows: Sequence[dict[str, object]],
+    verdict: dict[str, object],
     *,
     temperature: float,
     calibration_time: int,
     replicate_count: int,
-) -> None:
-    for key in RECOIL_KEYS:
-        _finite(row, key)
-    if _finite(row, "temperature") != temperature:
+) -> dict[str, float]:
+    if not quality_rows:
+        raise ValueError("recoil quality rows must not be empty")
+    for key in RECOIL_VERDICT_KEYS:
+        _finite(verdict, key)
+    if _finite(verdict, "temperature") != temperature:
         raise ValueError("recoil verdict has the wrong temperature")
-    if _finite(row, "calibration_time") != float(calibration_time):
+    if _finite(verdict, "calibration_time") != float(calibration_time):
         raise ValueError("recoil verdict has the wrong calibration time")
-    if _finite(row, "block_size") != 20.0:
+    if _finite(verdict, "block_size") != 20.0:
         raise ValueError("the frozen recoil gate requires block size 20")
-    if _finite(row, "required_realizations_per_replicate") != 16.0:
+    if _finite(verdict, "radial_bin_count") != 8.0:
+        raise ValueError("the frozen recoil gate requires 8 radial bins")
+    if (
+        _finite(verdict, "required_realizations_per_replicate") != 16.0
+        or _finite(verdict, "surrogate_realizations_per_replicate") != 16.0
+    ):
         raise ValueError("the frozen recoil gate requires 16 realizations")
     if (
-        _finite(row, "independent_replicate_count") != float(replicate_count)
-        or _finite(row, "required_replicate_count") != float(replicate_count)
+        _finite(verdict, "independent_replicate_count") != float(replicate_count)
+        or _finite(verdict, "required_replicate_count") != float(replicate_count)
     ):
         raise ValueError("recoil verdict has the wrong replicate count")
+    if _finite(verdict, "heldout_events_used_in_calibration") != 0.0:
+        raise ValueError("recoil verdict must not use held-out events in calibration")
+    for key in CLAIM_KEYS:
+        if _finite(verdict, key) != 0.0:
+            raise ValueError(f"claim boundary must remain zero: {key}")
+
+    base_seed = _integer(verdict, "surrogate_base_seed")
+    if base_seed < 0:
+        raise ValueError("surrogate base seed must be nonnegative")
+    pairs = set()
+    maxima = {key: 0.0 for key, _ in QUALITY_LIMITS}
+    for row in quality_rows:
+        replicate = _integer(row, "replicate")
+        realization = _integer(row, "realization")
+        pair = (replicate, realization)
+        pairs.add(pair)
+        if _finite(row, "temperature") != temperature:
+            raise ValueError("quality rows have the wrong temperature")
+        if _finite(row, "calibration_time") != float(calibration_time):
+            raise ValueError("quality rows have the wrong calibration time")
+        if _finite(row, "block_size") != 20.0:
+            raise ValueError("quality rows must use block size 20")
+        if _finite(row, "radial_bin_count") != 8.0:
+            raise ValueError("quality rows must use 8 radial bins")
+        if _finite(row, "surrogate_realizations_per_replicate") != 16.0:
+            raise ValueError("quality rows must declare 16 realizations")
+        if _integer(row, "surrogate_base_seed") != base_seed:
+            raise ValueError("quality and verdict base seeds must agree")
+        expected_seed = _recoil_seed(
+            base_seed,
+            replicate=replicate,
+            realization=realization,
+        )
+        if _integer(row, "surrogate_seed") != expected_seed:
+            raise ValueError("quality row surrogate seed is inconsistent")
+        if _finite(row, "calibration_path_used_in_kernel") != 1.0:
+            raise ValueError("quality rows must use the calibration path in the kernel")
+        if _finite(row, "heldout_events_used_in_calibration") != 0.0:
+            raise ValueError("quality rows must not use held-out events in calibration")
+        for key in CLAIM_KEYS:
+            if _finite(row, key) != 0.0:
+                raise ValueError(f"claim boundary must remain zero: {key}")
+        for key, _ in QUALITY_LIMITS:
+            maxima[key] = max(maxima[key], _nonnegative(row, key))
+    expected_pairs = {
+        (replicate, realization)
+        for replicate in range(1, replicate_count + 1)
+        for realization in range(16)
+    }
+    if pairs != expected_pairs or len(quality_rows) != len(expected_pairs):
+        raise ValueError("quality rows must form a complete replicate-realization grid")
+    return maxima
+
+
+def _ordered_path_upper_bound(row: dict[str, object]) -> bool:
+    if row.get("model") != "contiguous_empirical_path":
+        raise ValueError("ordered-path row must be the contiguous empirical path")
+    required = {
+        "temperature": 0.45,
+        "independent_replicate_count": 3.0,
+        "heldout_path_used_in_prediction": 0.0,
+        "macro_fit_parameter_count": 0.0,
+        "calibration_path_distribution_used": 1.0,
+    }
+    for key, expected in required.items():
+        if _finite(row, key) != expected:
+            raise ValueError(f"ordered-path provenance mismatch: {key}")
     for key in CLAIM_KEYS:
         if _finite(row, key) != 0.0:
             raise ValueError(f"claim boundary must remain zero: {key}")
+    return (
+        _nonnegative(row, "maximum_ensemble_msd_relative_error") <= 0.10
+        and _nonnegative(row, "maximum_ensemble_ngp_absolute_error") <= 0.30
+        and _nonnegative(row, "maximum_ensemble_fs_absolute_error") <= 0.03
+    )
 
 
 def classify_cage_anchor_gate(
     low_returns: Sequence[dict[str, object]],
     high_returns: Sequence[dict[str, object]],
+    low_quality: Sequence[dict[str, object]],
+    high_quality: Sequence[dict[str, object]],
     low_recoil: dict[str, object],
     high_recoil: dict[str, object],
+    ordered_path: dict[str, object],
 ) -> dict[str, object]:
     """Select cage-anchor memory only when every frozen condition passes."""
 
-    _validate_return_rows(low_returns, temperature=0.45, replicate_count=3)
-    _validate_return_rows(high_returns, temperature=0.58, replicate_count=5)
-    _validate_recoil(
+    _validate_return_rows(
+        low_returns,
+        temperature=0.45,
+        calibration_time=5000,
+        replicate_count=3,
+    )
+    _validate_return_rows(
+        high_returns,
+        temperature=0.58,
+        calibration_time=750,
+        replicate_count=5,
+    )
+    low_quality_maxima = _validate_recoil_evidence(
+        low_quality,
         low_recoil,
         temperature=0.45,
         calibration_time=5000,
         replicate_count=3,
     )
-    _validate_recoil(
+    high_quality_maxima = _validate_recoil_evidence(
+        high_quality,
         high_recoil,
         temperature=0.58,
         calibration_time=750,
         replicate_count=5,
     )
-    ordered_path_pass = _finite(
-        low_recoil,
-        "ordered_calibration_path_upper_bound_pass",
-    ) == 1.0
+    ordered_path_pass = _ordered_path_upper_bound(ordered_path)
 
     return_values: dict[str, float] = {}
     separated = True
@@ -171,47 +297,42 @@ def classify_cage_anchor_gate(
     primary_pass = primary_excess >= 1.35
     return_signal = separated and primary_pass
 
-    low_quality = all(
-        _finite(low_recoil, key) == 1.0
-        for key in (
-            "quality_realization_completeness_pass",
-            "quality_pass",
-            "precision_pass",
-        )
+    low_quality_pass = all(
+        low_quality_maxima[key] <= limit for key, limit in QUALITY_LIMITS
     )
-    high_quality = all(
-        _finite(high_recoil, key) == 1.0
-        for key in (
-            "quality_realization_completeness_pass",
-            "quality_pass",
-            "precision_pass",
-        )
+    high_quality_pass = all(
+        high_quality_maxima[key] <= limit for key, limit in QUALITY_LIMITS
     )
     low_precision = (
-        _finite(low_recoil, "maximum_ensemble_msd_mc_relative_se") <= 0.01
-        and _finite(low_recoil, "maximum_ensemble_ngp_mc_se") <= 0.03
-        and _finite(low_recoil, "maximum_ensemble_fs_mc_se") <= 0.003
+        _nonnegative(low_recoil, "maximum_ensemble_msd_mc_relative_se") <= 0.01
+        and _nonnegative(low_recoil, "maximum_ensemble_ngp_mc_se") <= 0.03
+        and _nonnegative(low_recoil, "maximum_ensemble_fs_mc_se") <= 0.003
     )
     high_precision = (
-        _finite(high_recoil, "maximum_ensemble_msd_mc_relative_se") <= 0.01
-        and _finite(high_recoil, "maximum_ensemble_ngp_mc_se") <= 0.03
-        and _finite(high_recoil, "maximum_ensemble_fs_mc_se") <= 0.003
+        _nonnegative(high_recoil, "maximum_ensemble_msd_mc_relative_se") <= 0.01
+        and _nonnegative(high_recoil, "maximum_ensemble_ngp_mc_se") <= 0.03
+        and _nonnegative(high_recoil, "maximum_ensemble_fs_mc_se") <= 0.003
     )
-    both_recoil_valid = low_quality and high_quality and low_precision and high_precision
+    both_recoil_valid = (
+        low_quality_pass and high_quality_pass and low_precision and high_precision
+    )
     high_curve_closed = (
-        _finite(high_recoil, "curve_transfer_pass") == 1.0
-        and _finite(high_recoil, "maximum_ensemble_msd_relative_error") <= 0.10
-        and _finite(high_recoil, "maximum_ensemble_ngp_absolute_error") <= 0.30
-        and _finite(high_recoil, "maximum_ensemble_fs_absolute_error") <= 0.03
+        _nonnegative(high_recoil, "maximum_ensemble_msd_relative_error") <= 0.10
+        and _nonnegative(high_recoil, "maximum_ensemble_ngp_absolute_error") <= 0.30
+        and _nonnegative(high_recoil, "maximum_ensemble_fs_absolute_error") <= 0.03
     )
-    low_ngp_failure = _finite(low_recoil, "maximum_ensemble_ngp_absolute_error") > 0.30
-    low_fs_failure = _finite(low_recoil, "maximum_ensemble_fs_absolute_error") > 0.03
-    low_curve_open = _finite(low_recoil, "curve_transfer_pass") == 0.0
+    low_curve_closed = (
+        _nonnegative(low_recoil, "maximum_ensemble_msd_relative_error") <= 0.10
+        and _nonnegative(low_recoil, "maximum_ensemble_ngp_absolute_error") <= 0.30
+        and _nonnegative(low_recoil, "maximum_ensemble_fs_absolute_error") <= 0.03
+    )
+    low_ngp_failure = _nonnegative(low_recoil, "maximum_ensemble_ngp_absolute_error") > 0.30
+    low_fs_failure = _nonnegative(low_recoil, "maximum_ensemble_fs_absolute_error") > 0.03
     selected = (
         return_signal
         and both_recoil_valid
         and high_curve_closed
-        and low_curve_open
+        and not low_curve_closed
         and low_ngp_failure
         and low_fs_failure
         and ordered_path_pass
@@ -225,7 +346,7 @@ def classify_cage_anchor_gate(
         mechanism_state = "unresolved_recoil_quality_or_precision"
     elif not high_curve_closed:
         mechanism_state = "high_temperature_curve_open"
-    elif not low_curve_open:
+    elif low_curve_closed:
         mechanism_state = "low_temperature_curve_closed"
     elif not (low_ngp_failure and low_fs_failure):
         mechanism_state = "low_temperature_dual_failure_absent"
@@ -253,10 +374,10 @@ def classify_cage_anchor_gate(
         "minimum_primary_low_return_excess_ratio": primary_excess,
         "primary_radius_null_excess_pass": float(primary_pass),
         "cage_anchor_return_signal_ready": float(return_signal),
-        "low_temperature_recoil_quality_precision_pass": float(low_quality and low_precision),
-        "high_temperature_recoil_quality_precision_pass": float(high_quality and high_precision),
+        "low_temperature_recoil_quality_precision_pass": float(low_quality_pass and low_precision),
+        "high_temperature_recoil_quality_precision_pass": float(high_quality_pass and high_precision),
         "high_temperature_curve_transfer_pass": float(high_curve_closed),
-        "low_temperature_curve_transfer_pass": float(not low_curve_open),
+        "low_temperature_curve_transfer_pass": float(low_curve_closed),
         "low_temperature_ngp_failure": float(low_ngp_failure),
         "low_temperature_fs_failure": float(low_fs_failure),
         "ordered_calibration_path_upper_bound_pass": float(ordered_path_pass),
@@ -266,6 +387,14 @@ def classify_cage_anchor_gate(
         "high_maximum_ensemble_msd_relative_error": _finite(high_recoil, "maximum_ensemble_msd_relative_error"),
         "high_maximum_ensemble_ngp_absolute_error": _finite(high_recoil, "maximum_ensemble_ngp_absolute_error"),
         "high_maximum_ensemble_fs_absolute_error": _finite(high_recoil, "maximum_ensemble_fs_absolute_error"),
+        **{
+            f"low_maximum_{key}": value
+            for key, value in low_quality_maxima.items()
+        },
+        **{
+            f"high_maximum_{key}": value
+            for key, value in high_quality_maxima.items()
+        },
         "cage_anchor_memory_required": float(selected),
         "mechanism_state": mechanism_state,
         "next_minimal_model_candidate": "anchor_aware_reversible_cage_semi_markov" if selected else "none_selected",
@@ -288,24 +417,12 @@ def _read_one(path: Path) -> dict[str, str]:
     return rows[0]
 
 
-def _ordered_path_upper_bound(path: Path) -> float:
+def _read_ordered_path(path: Path) -> dict[str, str]:
     rows = _read_rows(path)
     selected = [row for row in rows if row.get("model") == "contiguous_empirical_path"]
     if len(selected) != 1:
         raise ValueError("ordered-path verdict must contain one contiguous empirical path row")
-    row = selected[0]
-    required = {
-        "temperature": 0.45,
-        "independent_replicate_count": 3.0,
-        "raw_curve_tolerance_pass": 1.0,
-        "curve_transfer_pass": 1.0,
-        "calibration_path_distribution_used": 1.0,
-        "heldout_path_used_in_prediction": 0.0,
-    }
-    passed = all(_finite(row, key) == value for key, value in required.items())
-    for key in CLAIM_KEYS:
-        passed = passed and _finite(row, key) == 0.0
-    return float(passed)
+    return selected[0]
 
 
 def write_gate_csv(path: Path, row: dict[str, object]) -> None:
@@ -389,6 +506,8 @@ def write_gate_svg(
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("return_rows", type=Path)
+    parser.add_argument("low_recoil_quality", type=Path)
+    parser.add_argument("high_recoil_quality", type=Path)
     parser.add_argument("low_recoil_verdict", type=Path)
     parser.add_argument("high_recoil_verdict", type=Path)
     parser.add_argument("low_ordered_path_verdict", type=Path)
@@ -401,12 +520,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     high_returns = [row for row in rows if _finite(row, "temperature") == 0.58]
     if len(low_returns) + len(high_returns) != len(rows):
         raise ValueError("return table contains an unsupported temperature")
+    low_quality = _read_rows(args.low_recoil_quality)
+    high_quality = _read_rows(args.high_recoil_quality)
     low_recoil = _read_one(args.low_recoil_verdict)
     high_recoil = _read_one(args.high_recoil_verdict)
-    low_recoil["ordered_calibration_path_upper_bound_pass"] = _ordered_path_upper_bound(
-        args.low_ordered_path_verdict
+    ordered_path = _read_ordered_path(args.low_ordered_path_verdict)
+    gate = classify_cage_anchor_gate(
+        low_returns,
+        high_returns,
+        low_quality,
+        high_quality,
+        low_recoil,
+        high_recoil,
+        ordered_path,
     )
-    gate = classify_cage_anchor_gate(low_returns, high_returns, low_recoil, high_recoil)
     write_gate_csv(args.output_csv, gate)
     write_gate_svg(args.output_svg, low_returns, high_returns, gate)
 

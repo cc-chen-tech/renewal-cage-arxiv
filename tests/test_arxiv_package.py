@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from build_arxiv_package import build_arxiv_package  # noqa: E402
+from summarize_ka_cage_anchor_gate import classify_cage_anchor_gate  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
@@ -294,6 +295,7 @@ class ArxivPackageTests(unittest.TestCase):
             "high": data / "renewal_cage_ka_replicates_T058_recoil_markov",
         }
         gate_path = data / "renewal_cage_ka_cage_anchor_gate.csv"
+        ordered_path = data / "renewal_cage_ka_replicates_T045_empirical_path_verdict.csv"
 
         with return_rows_path.open() as handle:
             return_rows = list(csv.DictReader(handle))
@@ -308,6 +310,12 @@ class ArxivPackageTests(unittest.TestCase):
             recoil[temperature] = tables
         with gate_path.open() as handle:
             gate = next(csv.DictReader(handle))
+        with ordered_path.open() as handle:
+            ordered = next(
+                row
+                for row in csv.DictReader(handle)
+                if row["model"] == "contiguous_empirical_path"
+            )
 
         self.assertEqual(len(return_rows), 24)
         self.assertEqual(len(recoil["low"]["quality"]), 48)
@@ -331,6 +339,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(verdict["independent_replicate_count"]), expected_count)
             self.assertEqual(float(verdict["calibration_time"]), calibration_time)
             self.assertEqual(float(verdict["block_size"]), 20.0)
+            self.assertEqual(float(verdict["radial_bin_count"]), 8.0)
             self.assertEqual(float(verdict["required_realizations_per_replicate"]), 16.0)
             self.assertEqual(float(verdict["quality_realization_completeness_pass"]), 1.0)
             self.assertEqual(float(verdict["quality_pass"]), 1.0)
@@ -343,6 +352,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertLessEqual(max(float(row["lag_one_cosine_mean_absolute_error"]) for row in quality), 0.02)
             self.assertLessEqual(max(float(row["lag_one_cosine_quantile_maximum_absolute_error"]) for row in quality), 0.03)
             self.assertLessEqual(max(float(row["normalized_lag_one_dot_correlation_absolute_error"]) for row in quality), 0.02)
+            self.assertTrue(all(float(row["radial_bin_count"]) == 8.0 for row in quality))
             self.assertTrue(all(float(row["replicate_first_aggregation"]) == 1.0 for row in recoil[temperature]["summary"]))
 
         low = recoil["low"]["verdict"][0]
@@ -367,6 +377,21 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(gate["ordered_calibration_path_upper_bound_pass"]), 1.0)
         self.assertEqual(float(gate["cage_anchor_memory_required"]), 1.0)
         self.assertEqual(gate["mechanism_state"], "cage_anchor_memory_required")
+        recomputed = classify_cage_anchor_gate(
+            [row for row in return_rows if float(row["temperature"]) == 0.45],
+            [row for row in return_rows if float(row["temperature"]) == 0.58],
+            recoil["low"]["quality"],
+            recoil["high"]["quality"],
+            recoil["low"]["verdict"][0],
+            recoil["high"]["verdict"][0],
+            ordered,
+        )
+        self.assertEqual(set(recomputed), set(gate))
+        for key, value in recomputed.items():
+            if isinstance(value, str):
+                self.assertEqual(gate[key], value)
+            else:
+                self.assertEqual(float(gate[key]), value)
         for key in (
             "microdynamic_closure_claim_allowed",
             "spatial_facilitation_claim_allowed",

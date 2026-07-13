@@ -6261,16 +6261,23 @@ class KACageAnchorGateTests(unittest.TestCase):
         return module
 
     def _combined_gate_inputs(self):
+        claims = {
+            "microdynamic_closure_claim_allowed": 0.0,
+            "spatial_facilitation_claim_allowed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+        }
         low_returns = [
             {
                 "replicate": float(replicate),
                 "temperature": 0.45,
+                "calibration_time": 5000.0,
                 "radius_scale": scale,
                 "return_fraction": 0.70 + 0.01 * replicate,
                 "isotropic_null_fraction": 0.50,
-                "microdynamic_closure_claim_allowed": 0.0,
-                "spatial_facilitation_claim_allowed": 0.0,
-                "thermodynamic_claim_allowed": 0.0,
+                "fluctuation_half_window": 5.0,
+                "calibration_events_only": 1.0,
+                "heldout_events_used_in_calibration": 0.0,
+                **claims,
             }
             for replicate in (1, 2, 3)
             for scale in (0.5, 1.0, 1.5)
@@ -6279,60 +6286,117 @@ class KACageAnchorGateTests(unittest.TestCase):
             {
                 "replicate": float(replicate),
                 "temperature": 0.58,
+                "calibration_time": 750.0,
                 "radius_scale": scale,
                 "return_fraction": 0.40 + 0.01 * replicate,
                 "isotropic_null_fraction": 0.40,
-                "microdynamic_closure_claim_allowed": 0.0,
-                "spatial_facilitation_claim_allowed": 0.0,
-                "thermodynamic_claim_allowed": 0.0,
+                "fluctuation_half_window": 5.0,
+                "calibration_events_only": 1.0,
+                "heldout_events_used_in_calibration": 0.0,
+                **claims,
             }
             for replicate in (1, 2, 3, 4, 5)
             for scale in (0.5, 1.0, 1.5)
         ]
+        def quality_rows(temperature, calibration_time, replicate_count):
+            return [
+                {
+                    "replicate": float(replicate),
+                    "realization": float(realization),
+                    "temperature": temperature,
+                    "calibration_time": float(calibration_time),
+                    "block_size": 20.0,
+                    "radial_bin_count": 8.0,
+                    "surrogate_seed": float(
+                        (781031 + 1_000_003 * replicate + 97_409 * realization)
+                        % (2**63 - 1)
+                    ),
+                    "radial_mean_relative_error": 0.01,
+                    "radial_standard_deviation_relative_error": 0.01,
+                    "lag_one_cosine_mean_absolute_error": 0.01,
+                    "lag_one_cosine_quantile_maximum_absolute_error": 0.02,
+                    "normalized_lag_one_dot_correlation_absolute_error": 0.01,
+                    "calibration_path_used_in_kernel": 1.0,
+                    "heldout_events_used_in_calibration": 0.0,
+                    "surrogate_realizations_per_replicate": 16.0,
+                    "surrogate_base_seed": 781031.0,
+                    **claims,
+                }
+                for replicate in range(1, replicate_count + 1)
+                for realization in range(16)
+            ]
+
+        low_quality = quality_rows(0.45, 5000, 3)
+        high_quality = quality_rows(0.58, 750, 5)
         low_recoil = {
             "temperature": 0.45,
             "calibration_time": 5000.0,
             "block_size": 20.0,
+            "radial_bin_count": 8.0,
             "independent_replicate_count": 3.0,
             "required_replicate_count": 3.0,
             "required_realizations_per_replicate": 16.0,
-            "quality_realization_completeness_pass": 1.0,
-            "quality_pass": 1.0,
-            "precision_pass": 1.0,
-            "curve_transfer_pass": 0.0,
+            "surrogate_realizations_per_replicate": 16.0,
+            "surrogate_base_seed": 781031.0,
+            "quality_realization_completeness_pass": 0.0,
+            "quality_pass": 0.0,
+            "precision_pass": 0.0,
+            "curve_transfer_pass": 1.0,
             "maximum_ensemble_msd_relative_error": 0.08,
             "maximum_ensemble_ngp_absolute_error": 0.31,
             "maximum_ensemble_fs_absolute_error": 0.031,
             "maximum_ensemble_msd_mc_relative_se": 0.009,
             "maximum_ensemble_ngp_mc_se": 0.029,
             "maximum_ensemble_fs_mc_se": 0.0029,
-            "ordered_calibration_path_upper_bound_pass": 1.0,
-            "microdynamic_closure_claim_allowed": 0.0,
-            "spatial_facilitation_claim_allowed": 0.0,
-            "thermodynamic_claim_allowed": 0.0,
+            "heldout_events_used_in_calibration": 0.0,
+            **claims,
         }
         high_recoil = {
             "temperature": 0.58,
             "calibration_time": 750.0,
             "block_size": 20.0,
+            "radial_bin_count": 8.0,
             "independent_replicate_count": 5.0,
             "required_replicate_count": 5.0,
             "required_realizations_per_replicate": 16.0,
-            "quality_realization_completeness_pass": 1.0,
-            "quality_pass": 1.0,
-            "precision_pass": 1.0,
-            "curve_transfer_pass": 1.0,
+            "surrogate_realizations_per_replicate": 16.0,
+            "surrogate_base_seed": 781031.0,
+            "quality_realization_completeness_pass": 0.0,
+            "quality_pass": 0.0,
+            "precision_pass": 0.0,
+            "curve_transfer_pass": 0.0,
             "maximum_ensemble_msd_relative_error": 0.10,
             "maximum_ensemble_ngp_absolute_error": 0.30,
             "maximum_ensemble_fs_absolute_error": 0.03,
             "maximum_ensemble_msd_mc_relative_se": 0.01,
             "maximum_ensemble_ngp_mc_se": 0.03,
             "maximum_ensemble_fs_mc_se": 0.003,
-            "microdynamic_closure_claim_allowed": 0.0,
-            "spatial_facilitation_claim_allowed": 0.0,
-            "thermodynamic_claim_allowed": 0.0,
+            "heldout_events_used_in_calibration": 0.0,
+            **claims,
         }
-        return low_returns, high_returns, low_recoil, high_recoil
+        ordered_path = {
+            "model": "contiguous_empirical_path",
+            "temperature": 0.45,
+            "independent_replicate_count": 3.0,
+            "maximum_ensemble_msd_relative_error": 0.10,
+            "maximum_ensemble_ngp_absolute_error": 0.30,
+            "maximum_ensemble_fs_absolute_error": 0.03,
+            "raw_curve_tolerance_pass": 0.0,
+            "curve_transfer_pass": 0.0,
+            "heldout_path_used_in_prediction": 0.0,
+            "macro_fit_parameter_count": 0.0,
+            "calibration_path_distribution_used": 1.0,
+            **claims,
+        }
+        return (
+            low_returns,
+            high_returns,
+            low_quality,
+            high_quality,
+            low_recoil,
+            high_recoil,
+            ordered_path,
+        )
 
     def test_combined_gate_selects_anchor_only_for_every_frozen_condition(self):
         module = self._module(
@@ -6350,64 +6414,160 @@ class KACageAnchorGateTests(unittest.TestCase):
         self.assertEqual(accepted["thermodynamic_claim_allowed"], 0.0)
 
         cases = (
-            ("return separation", "low_returns", 0, "return_fraction", 0.40),
-            ("primary null excess", "low_returns", 1, "isotropic_null_fraction", 0.60),
-            ("low quality", "low_recoil", None, "quality_pass", 0.0),
-            ("high precision", "high_recoil", None, "precision_pass", 0.0),
-            ("high closure", "high_recoil", None, "curve_transfer_pass", 0.0),
-            ("low NGP failure", "low_recoil", None, "maximum_ensemble_ngp_absolute_error", 0.30),
-            ("low Fs failure", "low_recoil", None, "maximum_ensemble_fs_absolute_error", 0.03),
-            ("ordered path bound", "low_recoil", None, "ordered_calibration_path_upper_bound_pass", 0.0),
+            ("return separation", 0, 0, "return_fraction", 0.40),
+            ("primary null excess", 0, 1, "isotropic_null_fraction", 0.60),
+            ("low quality", 2, 0, "radial_mean_relative_error", 0.021),
+            ("high precision", 5, None, "maximum_ensemble_fs_mc_se", 0.0031),
+            ("high closure", 5, None, "maximum_ensemble_fs_absolute_error", 0.031),
+            ("low NGP failure", 4, None, "maximum_ensemble_ngp_absolute_error", 0.30),
+            ("low Fs failure", 4, None, "maximum_ensemble_fs_absolute_error", 0.03),
+            ("ordered path bound", 6, None, "maximum_ensemble_msd_relative_error", 0.101),
         )
         for name, target, index, key, value in cases:
-            low_returns = [dict(row) for row in inputs[0]]
-            high_returns = [dict(row) for row in inputs[1]]
-            low_recoil = dict(inputs[2])
-            high_recoil = dict(inputs[3])
-            selected = {
-                "low_returns": low_returns,
-                "high_returns": high_returns,
-                "low_recoil": low_recoil,
-                "high_recoil": high_recoil,
-            }[target]
+            changed = copy.deepcopy(inputs)
+            selected = changed[target]
             if index is None:
                 selected[key] = value
             else:
                 selected[index][key] = value
             with self.subTest(condition=name):
-                rejected = module.classify_cage_anchor_gate(
-                    low_returns,
-                    high_returns,
-                    low_recoil,
-                    high_recoil,
-                )
+                rejected = module.classify_cage_anchor_gate(*changed)
                 self.assertEqual(rejected["cage_anchor_memory_required"], 0.0)
 
-    def test_combined_gate_rejects_schema_and_frozen_protocol_mismatches(self):
+    def test_combined_gate_rejects_return_provenance_mismatches(self):
         module = self._module(
             "summarize_ka_cage_anchor_gate.py",
-            "summarize_ka_cage_anchor_gate_schema",
+            "summarize_ka_cage_anchor_gate_return_provenance",
         )
-        low_returns, high_returns, low_recoil, high_recoil = self._combined_gate_inputs()
+        inputs = self._combined_gate_inputs()
+        cases = (
+            ("temperature", "temperature", 0.46),
+            ("calibration time", "calibration_time", 4999.0),
+            ("half-window", "fluctuation_half_window", 4.0),
+            ("calibration-only provenance", "calibration_events_only", 0.0),
+            ("held-out contamination", "heldout_events_used_in_calibration", 1.0),
+            ("claim boundary", "thermodynamic_claim_allowed", 1.0),
+        )
+        for name, key, value in cases:
+            changed = copy.deepcopy(inputs)
+            changed[0][0][key] = value
+            with self.subTest(condition=name), self.assertRaises(ValueError):
+                module.classify_cage_anchor_gate(*changed)
 
-        missing = dict(low_recoil)
-        del missing["quality_pass"]
-        with self.assertRaisesRegex(ValueError, "quality_pass"):
-            module.classify_cage_anchor_gate(low_returns, high_returns, missing, high_recoil)
-
-        wrong_block = dict(high_recoil, block_size=10.0)
-        with self.assertRaisesRegex(ValueError, "block size"):
-            module.classify_cage_anchor_gate(low_returns, high_returns, low_recoil, wrong_block)
-
-        duplicate = [dict(row) for row in low_returns]
-        duplicate.append(dict(duplicate[0]))
+        duplicate = copy.deepcopy(inputs)
+        duplicate[0].append(dict(duplicate[0][0]))
         with self.assertRaisesRegex(ValueError, "one row per replicate and radius scale"):
-            module.classify_cage_anchor_gate(duplicate, high_returns, low_recoil, high_recoil)
+            module.classify_cage_anchor_gate(*duplicate)
 
-        bad_claim = [dict(row) for row in low_returns]
-        bad_claim[0]["thermodynamic_claim_allowed"] = 1.0
-        with self.assertRaisesRegex(ValueError, "thermodynamic_claim_allowed"):
-            module.classify_cage_anchor_gate(bad_claim, high_returns, low_recoil, high_recoil)
+    def test_combined_gate_rejects_recoil_provenance_and_completeness_mismatches(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_recoil_provenance",
+        )
+        inputs = self._combined_gate_inputs()
+        cases = (
+            ("calibration time", 2, 0, "calibration_time", 4999.0),
+            ("radial bins", 2, 0, "radial_bin_count", 7.0),
+            ("verdict temperature", 5, None, "temperature", 0.57),
+            ("verdict calibration time", 4, None, "calibration_time", 4999.0),
+            ("verdict block size", 5, None, "block_size", 10.0),
+            ("verdict radial bins", 4, None, "radial_bin_count", 7.0),
+            ("realization metadata", 4, None, "surrogate_realizations_per_replicate", 15.0),
+            ("calibration kernel", 2, 0, "calibration_path_used_in_kernel", 0.0),
+            ("held-out contamination", 2, 0, "heldout_events_used_in_calibration", 1.0),
+            ("verdict held-out contamination", 5, None, "heldout_events_used_in_calibration", 1.0),
+            ("seed metadata", 2, 0, "surrogate_base_seed", 781032.0),
+            ("claim boundary", 3, 0, "spatial_facilitation_claim_allowed", 1.0),
+            ("verdict claim boundary", 4, None, "thermodynamic_claim_allowed", 1.0),
+        )
+        for name, target, index, key, value in cases:
+            changed = copy.deepcopy(inputs)
+            selected = changed[target]
+            if index is None:
+                selected[key] = value
+            else:
+                selected[index][key] = value
+            with self.subTest(condition=name), self.assertRaises(ValueError):
+                module.classify_cage_anchor_gate(*changed)
+
+        missing = copy.deepcopy(inputs)
+        missing[2].pop()
+        with self.assertRaisesRegex(ValueError, "complete replicate-realization grid"):
+            module.classify_cage_anchor_gate(*missing)
+        duplicate = copy.deepcopy(inputs)
+        duplicate[3].append(dict(duplicate[3][0]))
+        with self.assertRaisesRegex(ValueError, "complete replicate-realization grid"):
+            module.classify_cage_anchor_gate(*duplicate)
+
+    def test_combined_gate_recomputes_all_quality_precision_and_curve_limits(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_numeric_limits",
+        )
+        inputs = self._combined_gate_inputs()
+        cases = (
+            (2, 0, "radial_mean_relative_error", 0.0201),
+            (2, 0, "radial_standard_deviation_relative_error", 0.0201),
+            (2, 0, "lag_one_cosine_mean_absolute_error", 0.0201),
+            (2, 0, "lag_one_cosine_quantile_maximum_absolute_error", 0.0301),
+            (2, 0, "normalized_lag_one_dot_correlation_absolute_error", 0.0201),
+            (4, None, "maximum_ensemble_msd_mc_relative_se", 0.0101),
+            (5, None, "maximum_ensemble_ngp_mc_se", 0.0301),
+            (5, None, "maximum_ensemble_fs_mc_se", 0.0031),
+            (5, None, "maximum_ensemble_msd_relative_error", 0.1001),
+            (5, None, "maximum_ensemble_ngp_absolute_error", 0.3001),
+            (5, None, "maximum_ensemble_fs_absolute_error", 0.0301),
+            (4, None, "maximum_ensemble_ngp_absolute_error", 0.30),
+            (4, None, "maximum_ensemble_fs_absolute_error", 0.03),
+        )
+        for target, index, key, value in cases:
+            changed = copy.deepcopy(inputs)
+            selected = changed[target]
+            if index is None:
+                selected[key] = value
+            else:
+                selected[index][key] = value
+            with self.subTest(field=key, value=value):
+                result = module.classify_cage_anchor_gate(*changed)
+                self.assertEqual(result["cage_anchor_memory_required"], 0.0)
+
+    def test_combined_gate_recomputes_ordered_path_and_rejects_stale_flags(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_ordered_path",
+        )
+        inputs = self._combined_gate_inputs()
+        accepted = module.classify_cage_anchor_gate(*inputs)
+        self.assertEqual(accepted["ordered_calibration_path_upper_bound_pass"], 1.0)
+
+        numeric_cases = (
+            ("maximum_ensemble_msd_relative_error", 0.1001),
+            ("maximum_ensemble_ngp_absolute_error", 0.3001),
+            ("maximum_ensemble_fs_absolute_error", 0.0301),
+        )
+        for key, value in numeric_cases:
+            changed = copy.deepcopy(inputs)
+            changed[6]["raw_curve_tolerance_pass"] = 1.0
+            changed[6]["curve_transfer_pass"] = 1.0
+            changed[6][key] = value
+            with self.subTest(field=key):
+                result = module.classify_cage_anchor_gate(*changed)
+                self.assertEqual(result["ordered_calibration_path_upper_bound_pass"], 0.0)
+                self.assertEqual(result["cage_anchor_memory_required"], 0.0)
+
+        provenance_cases = (
+            ("temperature", 0.58),
+            ("independent_replicate_count", 2.0),
+            ("heldout_path_used_in_prediction", 1.0),
+            ("macro_fit_parameter_count", 1.0),
+            ("calibration_path_distribution_used", 0.0),
+            ("microdynamic_closure_claim_allowed", 1.0),
+        )
+        for key, value in provenance_cases:
+            changed = copy.deepcopy(inputs)
+            changed[6][key] = value
+            with self.subTest(field=key), self.assertRaises(ValueError):
+                module.classify_cage_anchor_gate(*changed)
 
     def test_cage_anchor_return_classifier_requires_all_scales_and_primary_null(self):
         module = self._module(
@@ -6652,6 +6812,7 @@ class KACageAnchorGateTests(unittest.TestCase):
         self.assertTrue(
             all(row["heldout_events_used_in_calibration"] == 0.0 for row in result["quality_rows"])
         )
+        self.assertTrue(all(row["radial_bin_count"] == 8.0 for row in result["quality_rows"]))
 
     def test_recoil_transfer_requires_quality_before_curve_decision(self):
         module = self._module(
@@ -6706,6 +6867,7 @@ class KACageAnchorGateTests(unittest.TestCase):
         self.assertEqual(accepted["quality_pass"], 1.0)
         self.assertEqual(accepted["curve_transfer_pass"], 1.0)
         self.assertEqual(accepted["mechanism_state"], "curve_closed")
+        self.assertEqual(accepted["radial_bin_count"], 8.0)
         self.assertEqual(accepted["microdynamic_closure_claim_allowed"], 0.0)
         self.assertEqual(accepted["spatial_facilitation_claim_allowed"], 0.0)
         self.assertEqual(accepted["thermodynamic_claim_allowed"], 0.0)
