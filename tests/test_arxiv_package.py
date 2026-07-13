@@ -15,6 +15,47 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_smooth_cage_microscopic_projection_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-smooth-cage-projection.md"
+        summary_path = ROOT / "data" / "renewal_cage_ka_smooth_cage_tangent_T058_summary.csv"
+        required_paths = (
+            ROOT / "scripts" / "run_ka_smooth_cage_response.py",
+            ROOT / "scripts" / "analyze_ka_smooth_cage_tangent.py",
+            ROOT / "data" / "renewal_cage_ka_smooth_cage_tangent_stride1_T058.csv",
+            ROOT / "data" / "renewal_cage_ka_smooth_cage_tangent_stride2_T058.csv",
+            ROOT / "data" / "renewal_cage_ka_smooth_cage_tangent_stride5_T058.csv",
+        )
+        self.assertTrue(document_path.is_file())
+        self.assertTrue(all(path.is_file() for path in required_paths))
+        document = document_path.read_text()
+        for required in (
+            "wendland_c4",
+            "dp_i",
+            "delta J",
+            "0.8457",
+            "320/320",
+            "event_clock_claim_allowed = 0",
+            "autonomous_single_particle_gle_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            summary = next(csv.DictReader(handle))
+        self.assertEqual(summary["potential_protocol"], "ka_lj_c3_switch")
+        self.assertEqual(int(summary["minimum_valid_intervals_per_epsilon"]), 320)
+        self.assertEqual(summary["microscopic_smooth_cage_tangent_gate_pass"], "True")
+        self.assertEqual(summary["event_clock_claim_allowed"], "False")
+        self.assertEqual(summary["autonomous_single_particle_gle_claim_allowed"], "False")
+        self.assertEqual(summary["thermodynamic_claim_allowed"], "False")
+        self.assertLess(float(summary["maximum_jacobian_gram_condition_number"]), 2.1)
+        self.assertLess(
+            float(summary["maximum_cross_epsilon_covariance_relative_l2"]), 1.0e-3
+        )
+        self.assertGreater(
+            float(summary["minimum_cross_epsilon_covariance_correlation"]), 0.9999
+        )
+
     def test_ordered_empirical_paths_close_heldout_curves_but_nulls_fail(self):
         low_path = (
             ROOT
