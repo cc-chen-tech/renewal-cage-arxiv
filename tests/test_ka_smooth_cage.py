@@ -128,6 +128,62 @@ class SmoothCageTests(unittest.TestCase):
         self.assertGreater(result["jacobian_gram_minimum_eigenvalue"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
 
+    def test_projected_observables_accept_exact_microscopic_forces(self):
+        from ka_smooth_cage import smooth_cage_projected_observables
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 20.0
+        forces = np.arange(12, dtype=float).reshape(4, 3) / 10.0
+        result = smooth_cage_projected_observables(
+            **inputs,
+            velocities=velocities,
+            forces=forces,
+            friction=1.0,
+            temperature=0.58,
+            directional_step=1e-5,
+            potential_protocol="ka_lj_cut",
+        )
+
+        expected = np.einsum("nab,nb->a", result["jacobian"], forces)
+        np.testing.assert_allclose(result["force_drift"], expected, atol=1e-12)
+
+    def test_smooth_cage_features_are_rotation_invariant(self):
+        from ka_smooth_cage import smooth_cage_invariant_features
+
+        rotation = np.array(
+            [
+                [0.0, -1.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        )
+        observable = {
+            "relative_position": np.array([0.2, -0.3, 0.4]),
+            "relative_velocity": np.array([-0.5, 0.1, 0.3]),
+            "projected_drift": np.array([0.7, -0.2, -0.4]),
+            "jacobian_gram": np.array(
+                [
+                    [0.9, 0.1, 0.0],
+                    [0.1, 1.1, 0.2],
+                    [0.0, 0.2, 0.8],
+                ]
+            ),
+        }
+        rotated = {
+            "relative_position": rotation @ observable["relative_position"],
+            "relative_velocity": rotation @ observable["relative_velocity"],
+            "projected_drift": rotation @ observable["projected_drift"],
+            "jacobian_gram": rotation @ observable["jacobian_gram"] @ rotation.T,
+        }
+
+        feature = smooth_cage_invariant_features(observable)
+        rotated_feature = smooth_cage_invariant_features(rotated)
+        self.assertEqual(feature["geometry"].shape, (4,))
+        self.assertEqual(feature["kinematic"].shape, (6,))
+        self.assertEqual(feature["full"].shape, (9,))
+        for key in ("geometry", "kinematic", "full"):
+            np.testing.assert_allclose(feature[key], rotated_feature[key], atol=1e-12)
+
     def test_projected_drift_matches_phase_space_directional_derivative(self):
         from ka_local_cage import ka_lj_force_and_isotropic_curvature
         from ka_smooth_cage import (

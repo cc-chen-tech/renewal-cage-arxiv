@@ -110,6 +110,7 @@ def smooth_cage_projected_observables(
     positions: np.ndarray,
     *,
     velocities: np.ndarray,
+    forces: np.ndarray | None = None,
     particle_types: np.ndarray,
     box_lengths: np.ndarray,
     target_index: int,
@@ -124,6 +125,10 @@ def smooth_cage_projected_observables(
     velocities = np.asarray(velocities, dtype=float)
     if velocities.shape != positions.shape or np.any(~np.isfinite(velocities)):
         raise ValueError("velocities must be finite and align with positions")
+    if forces is not None:
+        forces = np.asarray(forces, dtype=float)
+        if forces.shape != positions.shape or np.any(~np.isfinite(forces)):
+            raise ValueError("forces must be finite and align with positions")
     if not math.isfinite(friction) or friction < 0.0:
         raise ValueError("friction must be finite and nonnegative")
     if not math.isfinite(temperature) or temperature < 0.0:
@@ -141,15 +146,18 @@ def smooth_cage_projected_observables(
     )
     jacobian = np.asarray(coordinate["jacobian"], dtype=float)
     relative_velocity = np.einsum("nab,nb->a", jacobian, velocities)
-    active = np.flatnonzero(np.any(np.abs(jacobian) > 0.0, axis=(1, 2)))
-    active_force, _ = ka_lj_force_and_isotropic_curvature(
-        positions,
-        particle_types=particle_types,
-        box_lengths=box_lengths,
-        target_indices=active,
-        potential_protocol=potential_protocol,
-    )
-    force_drift = np.einsum("nab,nb->a", jacobian[active], active_force)
+    if forces is None:
+        active = np.flatnonzero(np.any(np.abs(jacobian) > 0.0, axis=(1, 2)))
+        active_force, _ = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=active,
+            potential_protocol=potential_protocol,
+        )
+        force_drift = np.einsum("nab,nb->a", jacobian[active], active_force)
+    else:
+        force_drift = np.einsum("nab,nb->a", jacobian, forces)
 
     plus = smooth_force_support_cage(
         positions + directional_step * velocities,
@@ -190,6 +198,71 @@ def smooth_cage_projected_observables(
         "potential_protocol": np.asarray(potential_protocol),
         "thermodynamic_claim_allowed": 0.0,
     }
+
+
+def smooth_cage_invariant_features(
+    observable: dict[str, np.ndarray | float],
+) -> dict[str, np.ndarray]:
+    """Map one projected cage state to fixed rotationally invariant features."""
+
+    relative_position = np.asarray(observable["relative_position"], dtype=float)
+    relative_velocity = np.asarray(observable["relative_velocity"], dtype=float)
+    projected_drift = np.asarray(observable["projected_drift"], dtype=float)
+    gram = np.asarray(observable["jacobian_gram"], dtype=float)
+    for name, vector in (
+        ("relative_position", relative_position),
+        ("relative_velocity", relative_velocity),
+        ("projected_drift", projected_drift),
+    ):
+        if vector.shape != (3,) or np.any(~np.isfinite(vector)):
+            raise ValueError(f"{name} must be a finite three-vector")
+    if gram.shape != (3, 3) or np.any(~np.isfinite(gram)) or not np.allclose(
+        gram, gram.T, rtol=1e-12, atol=1e-12
+    ):
+        raise ValueError("jacobian_gram must be a finite symmetric 3x3 matrix")
+    eigenvalues = np.linalg.eigvalsh(gram)
+    if np.min(eigenvalues) <= 0.0:
+        raise ValueError("jacobian_gram must be positive definite")
+
+    floor = np.finfo(float).tiny
+    position_squared = float(relative_position @ relative_position)
+    velocity_squared = float(relative_velocity @ relative_velocity)
+    drift_squared = float(projected_drift @ projected_drift)
+
+    def cosine(left: np.ndarray, right: np.ndarray, norm_product: float) -> float:
+        return float(left @ right) / math.sqrt(max(norm_product, floor))
+
+    log_position = math.log(max(position_squared, floor))
+    log_velocity = math.log(max(velocity_squared, floor))
+    log_drift = math.log(max(drift_squared, floor))
+    cosine_position_velocity = cosine(
+        relative_position, relative_velocity, position_squared * velocity_squared
+    )
+    cosine_position_drift = cosine(
+        relative_position, projected_drift, position_squared * drift_squared
+    )
+    cosine_velocity_drift = cosine(
+        relative_velocity, projected_drift, velocity_squared * drift_squared
+    )
+    log_eigenvalues = np.log(eigenvalues)
+    geometry = np.array([log_position, *log_eigenvalues], dtype=float)
+    kinematic = np.array(
+        [log_position, log_velocity, cosine_position_velocity, *log_eigenvalues],
+        dtype=float,
+    )
+    full = np.array(
+        [
+            log_position,
+            log_velocity,
+            cosine_position_velocity,
+            *log_eigenvalues,
+            log_drift,
+            cosine_position_drift,
+            cosine_velocity_drift,
+        ],
+        dtype=float,
+    )
+    return {"geometry": geometry, "kinematic": kinematic, "full": full}
 
 
 def extract_smooth_cage_path(
