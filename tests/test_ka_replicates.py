@@ -1628,6 +1628,94 @@ class KAReplicatePreparationTests(unittest.TestCase):
             "non_markov_multiblock_orientation_cage_persistence_kernel",
         )
 
+    def test_path_transfer_classifier_requires_curves_and_shuffle_precision(self):
+        script_path = ROOT / "scripts" / "analyze_ka_empirical_path_transfer.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_empirical_path_transfer",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        summary_rows = [
+            {
+                "model": "contiguous_empirical_path",
+                "lag": 100.0,
+                "ensemble_msd_relative_error": 0.04,
+                "ensemble_ngp_absolute_error": 0.05,
+                "ensemble_absolute_error_fs_k2": 0.01,
+                "ensemble_absolute_error_fs_k7p25": 0.02,
+                "ensemble_msd_mc_relative_se": 0.0,
+                "ensemble_ngp_mc_se": 0.0,
+                "ensemble_fs_k2_mc_se": 0.0,
+                "ensemble_fs_k7p25_mc_se": 0.0,
+            },
+            {
+                "model": "within_particle_time_shuffle",
+                "lag": 100.0,
+                "ensemble_msd_relative_error": 0.06,
+                "ensemble_ngp_absolute_error": 0.10,
+                "ensemble_absolute_error_fs_k2": 0.01,
+                "ensemble_absolute_error_fs_k7p25": 0.04,
+                "ensemble_msd_mc_relative_se": 0.008,
+                "ensemble_ngp_mc_se": 0.02,
+                "ensemble_fs_k2_mc_se": 0.002,
+                "ensemble_fs_k7p25_mc_se": 0.004,
+            },
+        ]
+        replicate_rows = [
+            {
+                "model": model,
+                "replicate": float(replicate),
+                "ngp_absolute_error": error,
+                "absolute_error_fs_k2": error / 10.0,
+                "absolute_error_fs_k7p25": error / 10.0,
+            }
+            for replicate, contiguous, shuffled in (
+                (1, 0.10, 0.40),
+                (2, 0.12, 0.35),
+                (3, 0.20, 0.15),
+            )
+            for model, error in (
+                ("contiguous_empirical_path", contiguous),
+                ("within_particle_time_shuffle", shuffled),
+            )
+        ]
+
+        verdicts = {
+            row["model"]: row
+            for row in module.classify_path_model_transfer(
+                summary_rows,
+                replicate_rows=replicate_rows,
+            )
+        }
+
+        self.assertEqual(verdicts["contiguous_empirical_path"]["curve_transfer_pass"], 1.0)
+        self.assertEqual(verdicts["within_particle_time_shuffle"]["curve_transfer_pass"], 0.0)
+        self.assertEqual(verdicts["within_particle_time_shuffle"]["shuffle_precision_pass"], 0.0)
+        self.assertEqual(verdicts["contiguous_empirical_path"]["paired_contiguous_better_replicate_count"], 2.0)
+        self.assertEqual(verdicts["contiguous_empirical_path"]["heldout_path_used_in_prediction"], 0.0)
+        self.assertEqual(verdicts["contiguous_empirical_path"]["macro_fit_parameter_count"], 0.0)
+        self.assertEqual(verdicts["contiguous_empirical_path"]["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(verdicts["contiguous_empirical_path"]["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(verdicts["contiguous_empirical_path"]["thermodynamic_claim_allowed"], 0.0)
+
+    def test_path_transfer_seed_is_deterministic_and_replicate_specific(self):
+        script_path = ROOT / "scripts" / "analyze_ka_empirical_path_transfer.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_empirical_path_transfer_seed",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        first = module.path_shuffle_seed(45101, replicate=2, realization=3)
+
+        self.assertEqual(first, module.path_shuffle_seed(45101, replicate=2, realization=3))
+        self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=3, realization=3))
+        self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=2, realization=4))
+
     def test_ornstein_zernike_fit_recovers_length_and_rejects_negative_intercept(self):
         valid_rows = [
             {"wave_number": q, "s4": 10.0 / (1.0 + (2.0 * q) ** 2)}
