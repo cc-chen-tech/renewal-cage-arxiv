@@ -15,6 +15,77 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_smooth_cage_event_clock_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-smooth-cage-event-clock.md"
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_summary.csv"
+        )
+        model_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_models.csv"
+        )
+        for path in (
+            document_path,
+            summary_path,
+            model_path,
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_details.csv",
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_survival.csv",
+        ):
+            self.assertTrue(path.is_file())
+        document = document_path.read_text()
+        for required in (
+            "1731",
+            "829",
+            "0.00529",
+            "0.00836",
+            "event_clock_claim_allowed = 0",
+            "autonomous_single_particle_gle_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            summary = next(csv.DictReader(handle))
+        self.assertEqual(int(summary["parent_count"]), 5)
+        self.assertEqual(int(summary["distinct_parent_restart_hash_count"]), 5)
+        self.assertEqual(int(summary["clone_count_per_parent"]), 8)
+        self.assertEqual(int(summary["target_count"]), 64)
+        self.assertEqual(int(summary["observation_count"]), 2560)
+        self.assertEqual(int(summary["event_count"]), 1731)
+        self.assertEqual(int(summary["censored_count"]), 829)
+        self.assertEqual(summary["integrity_gate_pass"], "True")
+        self.assertEqual(summary["survival_gate_pass"], "True")
+        self.assertEqual(summary["microscopic_initial_escape_state_allowed"], "False")
+        self.assertEqual(summary["event_clock_claim_allowed"], "False")
+        self.assertEqual(summary["autonomous_single_particle_gle_claim_allowed"], "False")
+        self.assertEqual(summary["kramers_escape_claim_allowed"], "False")
+        self.assertEqual(summary["thermodynamic_claim_allowed"], "False")
+        self.assertLess(
+            float(summary["full_mean_heldout_brier_skill"]),
+            float(summary["geometry_mean_heldout_brier_skill"]),
+        )
+        self.assertLess(
+            float(summary["full_mean_heldout_brier_skill"]),
+            float(summary["structural_brier_reference"]),
+        )
+        self.assertLess(float(summary["full_minimum_group_log_likelihood_gain"]), 0.0)
+
+        with model_path.open() as handle:
+            models = {
+                row["model"]: row
+                for row in csv.DictReader(handle)
+                if row["record"] == "model"
+            }
+        self.assertEqual(set(models), {"geometry", "kinematic", "full"})
+
     def test_smooth_cage_microscopic_projection_is_complete_and_claim_limited(self):
         document_path = ROOT / "docs" / "microscopic-smooth-cage-projection.md"
         summary_path = ROOT / "data" / "renewal_cage_ka_smooth_cage_tangent_T058_summary.csv"
