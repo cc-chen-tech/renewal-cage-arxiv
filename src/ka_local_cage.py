@@ -12,6 +12,68 @@ from renewal_cage import event_space_correlated_diffusion, extract_nonrecrossing
 _EPSILON = np.array([[1.0, 1.5], [1.5, 0.5]], dtype=float)
 _SIGMA = np.array([[1.0, 0.8], [0.8, 0.88]], dtype=float)
 _CUTOFF_SCALE = 2.5
+_C3_SWITCH_ON_SCALE = 2.0
+
+
+def ka_lj_radial_derivatives(
+    distance: np.ndarray,
+    *,
+    epsilon: np.ndarray | float,
+    sigma: np.ndarray | float,
+    protocol: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Return `U`, `U'`, `U''`, and `U'''` for one KA pair protocol."""
+
+    radius, pair_epsilon, pair_sigma = np.broadcast_arrays(
+        np.asarray(distance, dtype=float),
+        np.asarray(epsilon, dtype=float),
+        np.asarray(sigma, dtype=float),
+    )
+    if np.any(~np.isfinite(radius)) or np.any(radius < 0.0):
+        raise ValueError("distance must be finite and nonnegative")
+    if np.any(~np.isfinite(pair_epsilon)) or np.any(pair_epsilon < 0.0):
+        raise ValueError("epsilon must be finite and nonnegative")
+    if np.any(~np.isfinite(pair_sigma)) or np.any(pair_sigma <= 0.0):
+        raise ValueError("sigma must be finite and positive")
+    if protocol not in {"ka_lj_cut", "ka_lj_c3_switch"}:
+        raise ValueError("unsupported KA pair-potential protocol")
+
+    safe_radius = np.maximum(radius, 1e-12)
+    sigma_over_r = pair_sigma / safe_radius
+    sigma_over_r6 = sigma_over_r**6
+    sigma_over_r12 = sigma_over_r6**2
+    lj = 4.0 * pair_epsilon * (sigma_over_r12 - sigma_over_r6)
+    lj_first = 24.0 * pair_epsilon * (-2.0 * sigma_over_r12 + sigma_over_r6) / safe_radius
+    lj_second = (
+        24.0 * pair_epsilon * (26.0 * sigma_over_r12 - 7.0 * sigma_over_r6) / safe_radius**2
+    )
+    lj_third = (
+        24.0 * pair_epsilon * (-364.0 * sigma_over_r12 + 56.0 * sigma_over_r6)
+        / safe_radius**3
+    )
+    active = (radius > 1e-10) & (radius < _CUTOFF_SCALE * pair_sigma)
+    if protocol == "ka_lj_cut":
+        return tuple(value * active for value in (lj, lj_first, lj_second, lj_third))
+
+    inner = _C3_SWITCH_ON_SCALE * pair_sigma
+    width = (_CUTOFF_SCALE - _C3_SWITCH_ON_SCALE) * pair_sigma
+    switch_region = active & (radius > inner)
+    x = np.where(switch_region, (radius - inner) / width, 0.0)
+    switch = 1.0 - 35.0 * x**4 + 84.0 * x**5 - 70.0 * x**6 + 20.0 * x**7
+    switch_first = (-140.0 * x**3 + 420.0 * x**4 - 420.0 * x**5 + 140.0 * x**6) / width
+    switch_second = (-420.0 * x**2 + 1680.0 * x**3 - 2100.0 * x**4 + 840.0 * x**5) / width**2
+    switch_third = (-840.0 * x + 5040.0 * x**2 - 8400.0 * x**3 + 4200.0 * x**4) / width**3
+
+    energy = lj * switch
+    first = lj_first * switch + lj * switch_first
+    second = lj_second * switch + 2.0 * lj_first * switch_first + lj * switch_second
+    third = (
+        lj_third * switch
+        + 3.0 * lj_second * switch_first
+        + 3.0 * lj_first * switch_second
+        + lj * switch_third
+    )
+    return tuple(value * active for value in (energy, first, second, third))
 
 
 def static_neighbor_cage_displacement(

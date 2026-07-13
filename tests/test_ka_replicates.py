@@ -67,6 +67,7 @@ from ka_local_cage import (  # noqa: E402
     response_residual_memory_diagnostic,
     segmented_cage_center_event_statistics,
     ka_lj_local_energy_force_hessian,
+    ka_lj_radial_derivatives,
     ka_lj_force_and_isotropic_curvature,
     ka_lj_force_generator_observables,
     ka_lj_second_force_generator,
@@ -1882,6 +1883,87 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
         self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
+    def test_ka_c3_switched_radial_derivatives_match_lj_and_vanish_through_third_order(self):
+        epsilon = 1.0
+        sigma = 1.0
+        inner = 2.0 * sigma
+        cutoff = 2.5 * sigma
+
+        switched_inner = ka_lj_radial_derivatives(
+            np.array([inner]),
+            epsilon=epsilon,
+            sigma=sigma,
+            protocol="ka_lj_c3_switch",
+        )
+        lj_inner = ka_lj_radial_derivatives(
+            np.array([inner]),
+            epsilon=epsilon,
+            sigma=sigma,
+            protocol="ka_lj_cut",
+        )
+        for switched, lj in zip(switched_inner, lj_inner):
+            np.testing.assert_allclose(switched, lj, rtol=0.0, atol=1e-13)
+
+        switched_outer = ka_lj_radial_derivatives(
+            np.array([cutoff, cutoff + 0.1]),
+            epsilon=epsilon,
+            sigma=sigma,
+            protocol="ka_lj_c3_switch",
+        )
+        for derivative in switched_outer:
+            np.testing.assert_allclose(derivative, 0.0, rtol=0.0, atol=1e-13)
+
+        offset = 1e-7
+        inner_sides = ka_lj_radial_derivatives(
+            np.array([inner - offset, inner + offset]),
+            epsilon=epsilon,
+            sigma=sigma,
+            protocol="ka_lj_c3_switch",
+        )
+        outer_inside = ka_lj_radial_derivatives(
+            np.array([cutoff - offset]),
+            epsilon=epsilon,
+            sigma=sigma,
+            protocol="ka_lj_c3_switch",
+        )
+        for derivative in inner_sides:
+            self.assertLess(abs(float(derivative[1] - derivative[0])), 2e-3)
+        for derivative in outer_inside:
+            self.assertLess(abs(float(derivative[0])), 2e-3)
+
+    def test_ka_c3_switched_radial_derivatives_form_one_consistent_derivative_chain(self):
+        epsilon = 1.5
+        sigma = 0.8
+        step = 1e-5
+        for radius in (1.1 * sigma, 2.25 * sigma):
+            center = ka_lj_radial_derivatives(
+                np.array([radius]),
+                epsilon=epsilon,
+                sigma=sigma,
+                protocol="ka_lj_c3_switch",
+            )
+            plus = ka_lj_radial_derivatives(
+                np.array([radius + step]),
+                epsilon=epsilon,
+                sigma=sigma,
+                protocol="ka_lj_c3_switch",
+            )
+            minus = ka_lj_radial_derivatives(
+                np.array([radius - step]),
+                epsilon=epsilon,
+                sigma=sigma,
+                protocol="ka_lj_c3_switch",
+            )
+            for order in range(3):
+                finite_difference = (plus[order] - minus[order]) / (2.0 * step)
+                np.testing.assert_allclose(
+                    finite_difference,
+                    center[order + 1],
+                    rtol=3e-5,
+                    atol=3e-7,
+                )
+
     def test_nearest_outer_bath_state_excludes_active_particles_and_uses_minimum_image(self):
         positions = np.array(
             [
