@@ -142,6 +142,81 @@ from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E4
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_radial_recoil_source_bins_follow_front_loaded_array_split(self):
+        source_bin = getattr(ka_replicates, "_radial_recoil_source_bin", None)
+        self.assertIsNotNone(source_bin)
+        sorted_source_radii = np.arange(1.0, 7.0)
+
+        assigned = [
+            source_bin(sorted_source_radii, radius, 4)
+            for radius in sorted_source_radii
+        ]
+
+        self.assertEqual(assigned, [0, 0, 1, 1, 2, 3])
+
+    def test_radial_recoil_markov_respects_uneven_conditional_target_support(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        path = np.zeros((1, 7, 3))
+        path[0, :, 0] = np.array([4.0, 1.0, 2.0, 3.0, 5.0, 6.0, 7.0])
+
+        generated = surrogate(path, np.random.default_rng(1301), radial_bin_count=4)
+
+        source_radii = np.linalg.norm(path[0, :-1], axis=1)
+        source_order = np.argsort(source_radii)
+        sorted_source_radii = source_radii[source_order]
+        source_groups = np.array_split(source_order, 4)
+        generated_radii = np.linalg.norm(generated[0], axis=1)
+        for source_radius, target_radius in zip(
+            generated_radii[:-1], generated_radii[1:]
+        ):
+            rank = int(np.searchsorted(sorted_source_radii, source_radius, side="left"))
+            split_boundaries = np.cumsum([len(group) for group in source_groups])
+            bin_index = min(
+                len(source_groups) - 1,
+                int(np.searchsorted(split_boundaries, rank, side="right")),
+            )
+            target_support = np.linalg.norm(path[0, source_groups[bin_index] + 1], axis=1)
+            self.assertTrue(np.any(np.isclose(target_radius, target_support)))
+
+    def test_radial_recoil_markov_samples_empirical_particle_target_radii(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        reference = np.random.default_rng(211).normal(size=(5, 19, 3))
+
+        generated = surrogate(reference, np.random.default_rng(223), radial_bin_count=6)
+
+        reference_radii = np.linalg.norm(reference, axis=2)
+        generated_radii = np.linalg.norm(generated, axis=2)
+        for particle_index in range(reference.shape[0]):
+            empirical_support = reference_radii[particle_index, 1:]
+            for target_radius in generated_radii[particle_index, 1:]:
+                self.assertTrue(np.any(np.isclose(target_radius, empirical_support)))
+
+    def test_radial_recoil_markov_azimuth_is_isotropic_and_noncoplanar(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        particle_count = 4096
+        reference = np.tile(
+            np.array([[[1.0, 0.0, 0.0], [0.0, 2.0, 0.0]]]),
+            (particle_count, 1, 1),
+        )
+
+        generated = surrogate(reference, np.random.default_rng(227), radial_bin_count=1)
+
+        directions = generated[:, 1] / np.linalg.norm(generated[:, 1], axis=1)[:, None]
+        np.testing.assert_allclose(directions[:, 0], 0.0, atol=1e-12)
+        self.assertAlmostEqual(float(np.mean(directions[:, 1])), 0.0, delta=0.025)
+        self.assertAlmostEqual(float(np.mean(directions[:, 2])), 0.0, delta=0.025)
+        self.assertAlmostEqual(float(np.mean(directions[:, 1] ** 2)), 0.5, delta=0.03)
+        self.assertAlmostEqual(float(np.mean(directions[:, 2] ** 2)), 0.5, delta=0.03)
+        self.assertAlmostEqual(
+            float(np.mean(directions[:, 1] * directions[:, 2])),
+            0.0,
+            delta=0.03,
+        )
+        self.assertGreater(float(np.mean(np.abs(directions[:, 2]) > 0.1)), 0.85)
+
     def test_radial_recoil_markov_is_deterministic_and_removes_triplet_order(self):
         surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
         self.assertIsNotNone(surrogate)
@@ -219,6 +294,21 @@ class KAReplicatePreparationTests(unittest.TestCase):
 
         errors = quality(reference, 2.0 * reference)
 
+        self.assertEqual(
+            set(errors),
+            {
+                "radial_mean_relative_error",
+                "radial_standard_deviation_relative_error",
+                "lag_one_cosine_mean_absolute_error",
+                "lag_one_cosine_quantile_0p10_absolute_error",
+                "lag_one_cosine_quantile_0p25_absolute_error",
+                "lag_one_cosine_quantile_0p50_absolute_error",
+                "lag_one_cosine_quantile_0p75_absolute_error",
+                "lag_one_cosine_quantile_0p90_absolute_error",
+                "lag_one_cosine_quantile_maximum_absolute_error",
+                "normalized_lag_one_dot_correlation_absolute_error",
+            },
+        )
         self.assertAlmostEqual(errors["radial_mean_relative_error"], 1.0)
         self.assertAlmostEqual(errors["radial_standard_deviation_relative_error"], 1.0)
         self.assertAlmostEqual(errors["lag_one_cosine_mean_absolute_error"], 0.0)
@@ -293,6 +383,28 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["geometric_return_run_mean"], 2.0)
         self.assertEqual(result["return_run_duration_p50"], 7.0)
         self.assertEqual(result["return_run_duration_p95"], 7.0)
+
+    def test_cage_anchor_return_runs_do_not_join_across_particle_boundaries(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        events = {
+            "particle": np.array([0, 0, 1, 1]),
+            "time": np.array([1.0, 4.0, 2.0, 9.0]),
+            "jump_vector": np.array(
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, 0.0, 0.0],
+                    [2.0, 0.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                ]
+            ),
+        }
+
+        result = measure(events, debye_waller_factor=0.04, radius_scale=1.0)
+
+        self.assertEqual(result["return_count"], 2.0)
+        self.assertEqual(result["return_run_count"], 2.0)
+        self.assertEqual(result["return_run_mean"], 1.0)
 
     def test_cage_anchor_returns_reject_malformed_or_unsupported_events(self):
         measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)

@@ -2659,31 +2659,39 @@ def _radial_recoil_source_bin(
     """Assign one generated source radius to the matching empirical equal-count bin."""
 
     rank = int(np.searchsorted(source_radii, current_radius, side="left"))
-    return min(radial_bin_count - 1, rank * radial_bin_count // len(source_radii))
+    minimum_group_size, longer_group_count = divmod(len(source_radii), radial_bin_count)
+    group_lengths = np.full(radial_bin_count, minimum_group_size, dtype=int)
+    group_lengths[:longer_group_count] += 1
+    split_boundaries = np.cumsum(group_lengths)
+    return min(
+        radial_bin_count - 1,
+        int(np.searchsorted(split_boundaries, rank, side="right")),
+    )
 
 
-def _isotropic_azimuth_direction(
-    source_vector: np.ndarray,
-    relative_cosine: float,
+def _isotropic_azimuth_directions(
+    source_vectors: np.ndarray,
+    relative_cosines: np.ndarray,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Draw a unit vector at a fixed polar cosine and uniform azimuth in 3D."""
+    """Vectorized fixed-polar-angle directions with uniform three-dimensional azimuths."""
 
-    source_radius = float(np.linalg.norm(source_vector))
-    source_direction = source_vector / source_radius
-    basis = np.zeros(3)
-    basis[int(np.argmin(np.abs(source_direction)))] = 1.0
-    first_perpendicular = np.cross(source_direction, basis)
-    first_perpendicular /= np.linalg.norm(first_perpendicular)
-    second_perpendicular = np.cross(source_direction, first_perpendicular)
-    azimuth = rng.uniform(0.0, 2.0 * math.pi)
-    transverse = math.sqrt(max(0.0, 1.0 - relative_cosine**2))
+    source_radii = np.linalg.norm(source_vectors, axis=1)
+    source_directions = source_vectors / source_radii[:, None]
+    basis = np.zeros_like(source_directions)
+    rows = np.arange(len(source_directions))
+    basis[rows, np.argmin(np.abs(source_directions), axis=1)] = 1.0
+    first_perpendicular = np.cross(source_directions, basis)
+    first_perpendicular /= np.linalg.norm(first_perpendicular, axis=1)[:, None]
+    second_perpendicular = np.cross(source_directions, first_perpendicular)
+    azimuths = rng.uniform(0.0, 2.0 * math.pi, size=len(source_directions))
+    transverse = np.sqrt(np.maximum(0.0, 1.0 - relative_cosines**2))
     return (
-        relative_cosine * source_direction
-        + transverse
+        relative_cosines[:, None] * source_directions
+        + transverse[:, None]
         * (
-            math.cos(azimuth) * first_perpendicular
-            + math.sin(azimuth) * second_perpendicular
+            np.cos(azimuths)[:, None] * first_perpendicular
+            + np.sin(azimuths)[:, None] * second_perpendicular
         )
     )
 
@@ -2710,31 +2718,46 @@ def radial_recoil_markov_surrogate(
         raise ValueError("radial_bin_count must be a positive integer no larger than transitions")
 
     source_order = np.argsort(radii[:, :-1], axis=1)
-    source_groups = np.array_split(source_order, radial_bin_count, axis=1)
     sorted_source_radii = np.take_along_axis(radii[:, :-1], source_order, axis=1)
+    minimum_group_size, longer_group_count = divmod(transition_count, radial_bin_count)
+    group_lengths = np.full(radial_bin_count, minimum_group_size, dtype=int)
+    group_lengths[:longer_group_count] += 1
+    group_starts = np.concatenate(([0], np.cumsum(group_lengths)[:-1]))
+    group_boundaries = np.cumsum(group_lengths)
+    particle_indices = np.arange(displacements.shape[0])
     surrogate = np.empty_like(displacements)
     surrogate[:, 0] = displacements[:, 0]
     for block_index in range(1, displacements.shape[1]):
-        for particle_index in range(displacements.shape[0]):
-            previous = surrogate[particle_index, block_index - 1]
-            bin_index = _radial_recoil_source_bin(
-                sorted_source_radii[particle_index],
-                float(np.linalg.norm(previous)),
-                radial_bin_count,
-            )
-            source_indices = source_groups[bin_index][particle_index]
-            sampled_source = int(source_indices[rng.integers(len(source_indices))])
-            target = displacements[particle_index, sampled_source + 1]
-            relative_cosine = float(
-                np.dot(displacements[particle_index, sampled_source], target)
-                / (radii[particle_index, sampled_source] * radii[particle_index, sampled_source + 1])
-            )
-            target_radius = radii[particle_index, sampled_source + 1]
-            surrogate[particle_index, block_index] = target_radius * _isotropic_azimuth_direction(
+        previous = surrogate[:, block_index - 1]
+        previous_radii = np.linalg.norm(previous, axis=1)
+        ranks = np.count_nonzero(
+            sorted_source_radii < previous_radii[:, None],
+            axis=1,
+        )
+        bin_indices = np.searchsorted(group_boundaries, ranks, side="right")
+        bin_indices = np.minimum(bin_indices, radial_bin_count - 1)
+        offsets = np.floor(
+            rng.random(len(particle_indices)) * group_lengths[bin_indices]
+        ).astype(int)
+        sampled_ranks = group_starts[bin_indices] + offsets
+        sampled_sources = source_order[particle_indices, sampled_ranks]
+        targets = displacements[particle_indices, sampled_sources + 1]
+        relative_cosines = np.sum(
+            displacements[particle_indices, sampled_sources] * targets,
+            axis=1,
+        ) / (
+            radii[particle_indices, sampled_sources]
+            * radii[particle_indices, sampled_sources + 1]
+        )
+        target_radii = radii[particle_indices, sampled_sources + 1]
+        surrogate[:, block_index] = (
+            target_radii[:, None]
+            * _isotropic_azimuth_directions(
                 previous,
-                float(np.clip(relative_cosine, -1.0, 1.0)),
+                np.clip(relative_cosines, -1.0, 1.0),
                 rng,
             )
+        )
     return surrogate
 
 
