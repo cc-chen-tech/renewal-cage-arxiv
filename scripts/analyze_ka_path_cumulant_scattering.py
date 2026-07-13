@@ -58,6 +58,7 @@ def cumulant_scattering_rows(
         {(float(row["temperature"]), float(row["lag"])) for row in rows}
     )
     output: list[dict[str, object]] = []
+    replicate_ids_by_temperature: dict[float, frozenset[int]] = {}
     for temperature, lag in groups:
         selected = [
             row
@@ -68,8 +69,33 @@ def cumulant_scattering_rows(
         replicate_ids = {int(float(row["replicate"])) for row in selected}
         if len(replicate_ids) != len(selected):
             raise ValueError("each temperature-lag group must contain unique replicates")
-        msd = float(np.mean([float(row["observed_msd"]) for row in selected]))
-        ngp = float(np.mean([float(row["observed_ngp"]) for row in selected]))
+        frozen_replicate_ids = frozenset(replicate_ids)
+        previous_replicate_ids = replicate_ids_by_temperature.setdefault(
+            temperature,
+            frozen_replicate_ids,
+        )
+        if previous_replicate_ids != frozen_replicate_ids:
+            raise ValueError("every lag must use the same independent replicate identities")
+        replicate_id_text = ";".join(str(value) for value in sorted(replicate_ids))
+        replicate_msd = np.asarray(
+            [float(row["observed_msd"]) for row in selected],
+            dtype=float,
+        )
+        replicate_ngp = np.asarray(
+            [float(row["observed_ngp"]) for row in selected],
+            dtype=float,
+        )
+        if (
+            np.any(~np.isfinite(replicate_msd))
+            or np.any(replicate_msd <= 0.0)
+            or np.any(~np.isfinite(replicate_ngp))
+            or np.any(replicate_ngp <= -1.0)
+        ):
+            raise ValueError("observed replicate moments are outside the physical domain")
+        replicate_fourth = (5.0 / 3.0) * (replicate_ngp + 1.0) * replicate_msd**2
+        msd = float(np.mean(replicate_msd))
+        fourth = float(np.mean(replicate_fourth))
+        ngp = 3.0 / 5.0 * fourth / msd**2 - 1.0
         for fs_key in fs_keys:
             wave_number = wave_number_from_observed_key(fs_key)
             observed_fs = float(np.mean([float(row[fs_key]) for row in selected]))
@@ -90,8 +116,11 @@ def cumulant_scattering_rows(
                     "lag": lag,
                     "wave_number": wave_number,
                     "independent_replicate_count": float(len(replicate_ids)),
+                    "replicate_ids": replicate_id_text,
                     "observed_msd": msd,
                     "observed_ngp": ngp,
+                    "observed_fourth_moment": fourth,
+                    "replicate_moments_pooled": 1.0,
                     "cumulant_fs": predicted_fs,
                     "observed_fs": observed_fs,
                     "absolute_error": absolute_error,
@@ -145,10 +174,18 @@ def cumulant_scattering_validity(
                 first_invalid_lag = float(row["lag"])
                 break
         all_valid = valid_count == len(selected)
+        replicate_counts = {
+            float(row["independent_replicate_count"]) for row in selected
+        }
+        replicate_id_values = {str(row["replicate_ids"]) for row in selected}
+        if len(replicate_counts) != 1 or len(replicate_id_values) != 1:
+            raise ValueError("cumulant lags have inconsistent replicate provenance")
         result.append(
             {
                 "temperature": temperature,
                 "wave_number": wave_number,
+                "independent_replicate_count": replicate_counts.pop(),
+                "replicate_ids": replicate_id_values.pop(),
                 "tested_lag_count": float(len(selected)),
                 "contiguous_valid_lag_count": float(valid_count),
                 "longest_contiguous_valid_lag": longest_valid_lag,
@@ -164,6 +201,7 @@ def cumulant_scattering_validity(
                 "error_tolerance": error_tolerance,
                 "observed_msd_used": 1.0,
                 "observed_ngp_used": 1.0,
+                "replicate_moments_pooled": 1.0,
                 "heldout_prediction_claim_allowed": 0.0,
                 "microdynamic_closure_claim_allowed": 0.0,
                 "spatial_facilitation_claim_allowed": 0.0,

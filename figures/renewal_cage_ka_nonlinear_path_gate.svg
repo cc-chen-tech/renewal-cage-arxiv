@@ -42,9 +42,9 @@
 <text x="285.0" y="452" text-anchor="middle" class="axis">NGP</text>
 <text x="425.0" y="452" text-anchor="middle" class="axis">Fs</text>
 <text x="48" y="250" transform="rotate(-90 48 250)" text-anchor="middle" class="axis">normalized error</text>
-<polyline points="600.00,431.98 674.03,431.94 730.04,431.85 786.04,431.61 860.07,430.47 916.08,427.47 972.08,418.99 1004.84,409.17 1030.00,399.94" fill="none" stroke="#167a72" stroke-width="2.5"/>
-<polyline points="600.00,431.10 674.03,429.01 730.04,424.58 786.04,413.40 860.07,366.72 916.08,260.12 972.08,82.00 1004.84,82.00 1030.00,82.00" fill="none" stroke="#d65a31" stroke-width="2.5"/>
-<polyline points="600.00,412.84 674.03,373.34 730.04,293.12 786.04,89.50 860.07,82.00 916.08,82.00 972.08,82.00 1004.84,82.00 1030.00,82.00" fill="none" stroke="#4b5563" stroke-width="2.5"/>
+<polyline points="600.00,431.98 674.03,431.94 730.04,431.85 786.04,431.60 860.07,430.48 916.08,427.68 972.08,420.14 1004.84,411.01 1030.00,403.55" fill="none" stroke="#167a72" stroke-width="2.5"/>
+<polyline points="600.00,431.09 674.03,428.97 730.04,424.48 786.04,413.24 860.07,366.83 916.08,263.14 972.08,82.00 1004.84,82.00 1030.00,82.00" fill="none" stroke="#d65a31" stroke-width="2.5"/>
+<polyline points="600.00,412.71 674.03,372.94 730.04,292.13 786.04,87.86 860.07,82.00 916.08,82.00 972.08,82.00 1004.84,82.00 1030.00,82.00" fill="none" stroke="#4b5563" stroke-width="2.5"/>
 <text x="600.00" y="452" text-anchor="middle" class="axis">20</text>
 <text x="1030.00" y="452" text-anchor="middle" class="axis">4096</text>
 <text x="815" y="480" text-anchor="middle" class="axis">lag (log scale)</text>

@@ -34,7 +34,18 @@ def _flag(row: dict[str, object], key: str) -> bool:
 
 
 def _high_resolution_state(row: dict[str, object]) -> str:
-    if _flag(row, "nonlinear_single_particle_path_memory_required"):
+    if not _flag(row, "surrogate_realization_completeness_pass"):
+        return "unresolved"
+    if _flag(row, "nonlinear_single_particle_path_memory_required") and all(
+        (
+            _flag(row, "linear_spectrum_null_rejected"),
+            _flag(
+                row,
+                "one_block_radial_plus_two_point_spectrum_sufficiency_resolved",
+            ),
+            not _flag(row, "one_block_radial_plus_two_point_spectrum_sufficient"),
+        )
+    ):
         return "nonlinear_memory_required"
     valid_null = all(
         _flag(row, key)
@@ -44,18 +55,58 @@ def _high_resolution_state(row: dict[str, object]) -> str:
             "stationarity_control_pass",
             "contiguous_ensemble_curve_pass",
             "radial_surrogate_msd_pass",
+            "one_block_radial_plus_two_point_spectrum_sufficiency_resolved",
+            "one_block_radial_plus_two_point_spectrum_sufficient",
         )
     ) and not _flag(row, "radial_surrogate_higher_order_failure")
     return "radial_spectral_null_sufficient" if valid_null else "unresolved"
 
 
-def _horizons(rows: Sequence[dict[str, object]]) -> dict[float, float]:
-    result = {
-        float(row["wave_number"]): float(row["longest_contiguous_valid_lag"])
+def _horizons(
+    rows: Sequence[dict[str, object]],
+    *,
+    expected_temperature: float,
+    expected_replicate_count: int,
+) -> dict[float, float]:
+    expected_wave_numbers = {2.0, 4.0, 7.25}
+    pairs = [
+        (
+            float(row["wave_number"]),
+            float(row["longest_contiguous_valid_lag"]),
+        )
         for row in rows
+    ]
+    result = dict(pairs)
+    temperatures = {float(row["temperature"]) for row in rows}
+    replicate_counts = {
+        int(float(row["independent_replicate_count"])) for row in rows
     }
-    if not result:
-        raise ValueError("cumulant validity rows must not be empty")
+    replicate_identity_values = {str(row["replicate_ids"]) for row in rows}
+    parsed_replicate_ids: set[int] = set()
+    if len(replicate_identity_values) == 1:
+        try:
+            parsed_replicate_ids = {
+                int(value)
+                for value in next(iter(replicate_identity_values)).split(";")
+                if value
+            }
+        except ValueError:
+            parsed_replicate_ids = set()
+    if (
+        len(pairs) != len(result)
+        or set(result) != expected_wave_numbers
+        or temperatures != {expected_temperature}
+        or replicate_counts != {expected_replicate_count}
+        or len(replicate_identity_values) != 1
+        or len(parsed_replicate_ids) != expected_replicate_count
+        or any(float(row["replicate_moments_pooled"]) != 1.0 for row in rows)
+        or any(
+            float(row["heldout_prediction_claim_allowed"]) != 0.0
+            for row in rows
+        )
+        or any(not math.isfinite(value) or value < 0.0 for value in result.values())
+    ):
+        raise ValueError("cumulant validity must cover the frozen wave numbers and temperature")
     return result
 
 
@@ -67,7 +118,25 @@ def classify_nonlinear_path_gate(
     high_cumulant_validity: Sequence[dict[str, object]],
     empirical_path_crossover: dict[str, object],
 ) -> dict[str, object]:
+    low_temperature = float(low_verdict["temperature"])
+    high_block20_temperature = float(high_block20_verdict["temperature"])
+    high_block10_temperature = float(high_block10_verdict["temperature"])
+    if not (
+        math.isfinite(low_temperature)
+        and math.isfinite(high_block20_temperature)
+        and low_temperature < high_block20_temperature
+        and high_block20_temperature == high_block10_temperature
+    ):
+        raise ValueError("verdict temperatures must identify one low and one shared high value")
     low_required_count = int(float(low_verdict["required_replicate_count"]))
+    high_required_count20 = int(float(high_block20_verdict["required_replicate_count"]))
+    high_required_count10 = int(float(high_block10_verdict["required_replicate_count"]))
+    if (
+        low_required_count < 1
+        or high_required_count20 < 1
+        or high_required_count20 != high_required_count10
+    ):
+        raise ValueError("replicate-count provenance is incomplete or inconsistent")
     low_gate_ready = all(
         _flag(low_verdict, key)
         for key in (
@@ -103,10 +172,18 @@ def classify_nonlinear_path_gate(
         and high_resolved
         and state20 == "radial_spectral_null_sufficient"
     )
-    low_horizons = _horizons(low_cumulant_validity)
-    high_horizons = _horizons(high_cumulant_validity)
+    low_horizons = _horizons(
+        low_cumulant_validity,
+        expected_temperature=low_temperature,
+        expected_replicate_count=low_required_count,
+    )
+    high_horizons = _horizons(
+        high_cumulant_validity,
+        expected_temperature=high_block20_temperature,
+        expected_replicate_count=high_required_count20,
+    )
     low_ordered = all(
-        low_horizons[left] >= low_horizons[right]
+        low_horizons[left] > low_horizons[right]
         for left, right in zip(
             sorted(low_horizons)[:-1],
             sorted(low_horizons)[1:],
@@ -117,8 +194,8 @@ def classify_nonlinear_path_gate(
         "single_particle_multiblock_path_memory_required",
     ) and _flag(empirical_path_crossover, "ordered_recoil_path_required")
     result: dict[str, object] = {
-        "low_temperature": float(low_verdict["temperature"]),
-        "high_temperature": float(high_block20_verdict["temperature"]),
+        "low_temperature": low_temperature,
+        "high_temperature": high_block20_temperature,
         "low_temperature_gate_ready": float(low_gate_ready),
         "low_temperature_nonlinear_path_memory_required": float(
             _flag(low_verdict, "nonlinear_single_particle_path_memory_required")
@@ -159,9 +236,11 @@ def classify_nonlinear_path_gate(
         "low_k_cumulant_horizon_order_pass": float(low_ordered),
         "observed_cumulant_diagnostic_only": 1.0,
         "empirical_ordered_path_result_reproduced": float(empirical_support),
-        "publication_mechanism_result_ready": float(
+        "low_temperature_mechanism_selection_artifact_ready": float(
             low_gate_ready and low_ordered and empirical_support
         ),
+        "temperature_crossover_artifact_ready": float(binary_crossover),
+        "manuscript_integration_complete": 0.0,
         "unique_microscopic_model_selected": 0.0,
         "next_minimal_model_candidate": "finite_lifetime_reversible_cage_state",
         "microdynamic_closure_claim_allowed": 0.0,
@@ -276,30 +355,54 @@ def write_svg(
         parts.append(f'<text x="{x}" y="452" text-anchor="middle" class="axis">{category}</text>')
     parts.append('<text x="48" y="250" transform="rotate(-90 48 250)" text-anchor="middle" class="axis">normalized error</text>')
 
-    valid_cumulant = [
+    plotted_cumulant = [
         row
         for row in cumulant_rows
-        if math.isfinite(float(row["absolute_error"])) and float(row["lag"]) > 0.0
+        if float(row["lag"]) > 0.0
     ]
-    lags = [float(row["lag"]) for row in valid_cumulant]
+    lags = [float(row["lag"]) for row in plotted_cumulant]
     log_min, log_max = math.log10(min(lags)), math.log10(max(lags))
     wave_colors = {2.0: "#167a72", 4.0: "#d65a31", 7.25: "#4b5563"}
-    for wave_number in sorted({float(row["wave_number"]) for row in valid_cumulant}):
+    for wave_number in sorted({float(row["wave_number"]) for row in plotted_cumulant}):
         selected = sorted(
-            (row for row in valid_cumulant if float(row["wave_number"]) == wave_number),
+            (row for row in plotted_cumulant if float(row["wave_number"]) == wave_number),
             key=lambda row: float(row["lag"]),
         )
         points = []
+        invalid_marker: tuple[float, float, float] | None = None
         for row in selected:
             lag = float(row["lag"])
-            ratio = float(row["absolute_error"]) / float(row["error_tolerance"])
             xx = right[0] + right[2] * (math.log10(lag) - log_min) / (log_max - log_min)
+            absolute_error = float(row["absolute_error"])
+            tolerance = float(row["error_tolerance"])
+            if not math.isfinite(absolute_error):
+                yy = y_coordinate(y_max, right)
+                points.append(f"{xx:.2f},{yy:.2f}")
+                invalid_marker = (xx, yy, lag)
+                break
+            ratio = absolute_error / tolerance
             yy = y_coordinate(ratio, right)
             points.append(f"{xx:.2f},{yy:.2f}")
         color = wave_colors.get(wave_number, "#6b7280")
-        parts.append(
-            f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="2.5"/>'
-        )
+        if len(points) > 1:
+            parts.append(
+                f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="2.5"/>'
+            )
+        elif points:
+            xx, yy = points[0].split(",")
+            parts.append(f'<circle cx="{xx}" cy="{yy}" r="3" fill="{color}"/>')
+        if invalid_marker is not None:
+            xx, yy, lag = invalid_marker
+            wave_label = f"{wave_number:g}"
+            lag_label = f"{lag:g}"
+            parts.extend(
+                [
+                    f'<g data-invalid-wave-number="{wave_label}" data-invalid-lag="{lag_label}">',
+                    f'<line x1="{xx-5:.2f}" y1="{yy-5:.2f}" x2="{xx+5:.2f}" y2="{yy+5:.2f}" stroke="#9b2c2c" stroke-width="2"/>',
+                    f'<line x1="{xx-5:.2f}" y1="{yy+5:.2f}" x2="{xx+5:.2f}" y2="{yy-5:.2f}" stroke="#9b2c2c" stroke-width="2"/>',
+                    '</g>',
+                ]
+            )
     for lag in sorted({min(lags), max(lags)}):
         xx = right[0] + right[2] * (math.log10(lag) - log_min) / (log_max - log_min)
         parts.append(f'<text x="{xx:.2f}" y="452" text-anchor="middle" class="axis">{lag:g}</text>')

@@ -291,11 +291,35 @@ class ArxivPackageTests(unittest.TestCase):
             / "data"
             / "renewal_cage_ka_replicates_T045_nonlinear_path_quality.csv"
         )
+        validity_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_path_cumulant_validity.csv"
+        )
+        low_verdict_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_nonlinear_path_verdict.csv"
+        )
+        high_verdict_paths = [
+            ROOT
+            / "data"
+            / f"renewal_cage_ka_replicates_T058_{block}_nonlinear_path_verdict.csv"
+            for block in ("block20", "block10")
+        ]
         svg_path = ROOT / "figures" / "renewal_cage_ka_nonlinear_path_gate.svg"
         with gate_path.open() as handle:
             gate = next(csv.DictReader(handle))
         with quality_path.open() as handle:
             quality = list(csv.DictReader(handle))
+        with validity_path.open() as handle:
+            validity = list(csv.DictReader(handle))
+        with low_verdict_path.open() as handle:
+            low_verdict = next(csv.DictReader(handle))
+        high_verdicts = []
+        for path in high_verdict_paths:
+            with path.open() as handle:
+                high_verdicts.append(next(csv.DictReader(handle)))
 
         self.assertEqual(float(gate["low_temperature_gate_ready"]), 1.0)
         self.assertEqual(
@@ -321,16 +345,63 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(gate["low_cumulant_horizon_k4"]), 200.0)
         self.assertEqual(float(gate["low_cumulant_horizon_k7p25"]), 20.0)
         self.assertEqual(len(quality), 24)
+        self.assertEqual(
+            float(low_verdict["surrogate_realization_completeness_pass"]),
+            1.0,
+        )
+        self.assertEqual(
+            float(low_verdict["required_surrogate_realizations_per_replicate"]),
+            8.0,
+        )
+        self.assertEqual(
+            float(
+                low_verdict[
+                    "one_block_radial_plus_two_point_spectrum_sufficiency_resolved"
+                ]
+            ),
+            1.0,
+        )
+        self.assertEqual(
+            float(low_verdict["one_block_radial_plus_two_point_spectrum_sufficient"]),
+            0.0,
+        )
+        for verdict in high_verdicts:
+            self.assertEqual(
+                float(
+                    verdict[
+                        "one_block_radial_plus_two_point_spectrum_sufficiency_resolved"
+                    ]
+                ),
+                0.0,
+            )
+            self.assertEqual(
+                float(verdict["calibration_nonstationarity_assessment_resolved"]),
+                0.0,
+            )
         self.assertLess(
             max(float(row["cross_spectral_matrix_nrmse"]) for row in quality),
             0.012,
         )
+        for row in quality:
+            self.assertEqual(float(row["calibration_time"]), 5000.0)
+            self.assertEqual(float(row["independent_replicate_count"]), 3.0)
+            self.assertEqual(float(row["surrogate_realizations_per_replicate"]), 8.0)
+            self.assertEqual(float(row["surrogate_iteration_count"]), 110.0)
+            self.assertEqual(float(row["surrogate_base_seed"]), 211003.0)
+            self.assertEqual(float(row["heldout_path_used_in_prediction"]), 0.0)
+        for row in validity:
+            self.assertEqual(float(row["independent_replicate_count"]), 3.0)
+            self.assertEqual(row["replicate_ids"], "1;2;3")
+            self.assertEqual(float(row["replicate_moments_pooled"]), 1.0)
+            self.assertEqual(float(row["heldout_prediction_claim_allowed"]), 0.0)
         for key in (
             "microdynamic_closure_claim_allowed",
             "spatial_facilitation_claim_allowed",
             "thermodynamic_claim_allowed",
         ):
             self.assertEqual(float(gate[key]), 0.0)
+            self.assertTrue(all(float(row[key]) == 0.0 for row in quality))
+            self.assertTrue(all(float(row[key]) == 0.0 for row in validity))
         for key, value in gate.items():
             if key in (
                 "high_block20_state",

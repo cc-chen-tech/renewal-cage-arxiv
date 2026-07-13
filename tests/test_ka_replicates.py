@@ -1948,6 +1948,35 @@ class KAReplicatePreparationTests(unittest.TestCase):
             module.surrogate_seed(211003, replicate=2, realization=4),
         )
 
+    def test_nonlinear_path_cli_requires_eight_surrogate_realizations(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_cli_minimum",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with self.assertRaises(ValueError):
+            module.main(
+                [
+                    "missing-ensemble",
+                    "--calibration-time",
+                    "20",
+                    "--heldout-factorization",
+                    "missing.csv",
+                    "--block-size",
+                    "10",
+                    "--surrogate-realizations",
+                    "7",
+                    "--iteration-count",
+                    "2",
+                    "--output-prefix",
+                    "missing-output",
+                ]
+            )
+
     def test_nonlinear_path_surrogate_requires_quality_stationarity_and_paired_consensus(self):
         script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
         spec = importlib.util.spec_from_file_location(
@@ -1983,13 +2012,16 @@ class KAReplicatePreparationTests(unittest.TestCase):
         ]
         quality_rows = [
             {
+                "replicate": float(replicate),
+                "realization": float(realization),
                 "radial_distribution_maximum_absolute_error": 1e-14,
                 "cross_spectral_matrix_nrmse": 0.011,
                 "one_block_msd_relative_error": 1e-12,
                 "one_block_ngp_absolute_error": 1e-12,
                 "one_block_fs_maximum_absolute_error": 0.001,
             }
-            for _ in range(3)
+            for replicate in range(1, 4)
+            for realization in range(8)
         ]
         replicate_scores = [
             {
@@ -2014,6 +2046,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
             replicate_scores=replicate_scores,
             stationarity_rows=stationarity_rows,
             required_replicate_count=3,
+            required_realization_count=8,
         )
 
         self.assertEqual(result["surrogate_quality_pass"], 1.0)
@@ -2021,6 +2054,13 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["stationarity_control_pass"], 1.0)
         self.assertEqual(result["nonlinear_single_particle_path_memory_required"], 1.0)
         self.assertEqual(result["paired_contiguous_better_replicate_count"], 3.0)
+        self.assertEqual(result["surrogate_realization_completeness_pass"], 1.0)
+        self.assertEqual(result["one_block_radial_heterogeneity_sufficiency_resolved"], 1.0)
+        self.assertEqual(result["one_block_radial_heterogeneity_sufficient"], 0.0)
+        self.assertEqual(
+            result["one_block_radial_plus_two_point_spectrum_sufficiency_resolved"],
+            1.0,
+        )
         self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
         self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
@@ -2029,6 +2069,7 @@ class KAReplicatePreparationTests(unittest.TestCase):
         changed = copy.deepcopy(quality_rows)
         changed[0]["cross_spectral_matrix_nrmse"] = 0.02
         failures.append((summary_rows, changed, replicate_scores, stationarity_rows))
+        failures.append((summary_rows, quality_rows[:-1], replicate_scores, stationarity_rows))
         changed = copy.deepcopy(summary_rows)
         changed[1]["ensemble_fs_k7p25_mc_se"] = 0.004
         failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
@@ -2059,11 +2100,28 @@ class KAReplicatePreparationTests(unittest.TestCase):
                 replicate_scores=paired,
                 stationarity_rows=stationarity,
                 required_replicate_count=3,
+                required_realization_count=8,
             )
             self.assertEqual(
                 rejected["nonlinear_single_particle_path_memory_required"],
                 0.0,
             )
+            if float(quality[0]["cross_spectral_matrix_nrmse"]) > 0.015:
+                self.assertEqual(
+                    rejected[
+                        "one_block_radial_plus_two_point_spectrum_sufficiency_resolved"
+                    ],
+                    0.0,
+                )
+        incomplete = module.classify_nonlinear_path_surrogate(
+            summary_rows,
+            quality_rows=quality_rows[:-1],
+            replicate_scores=replicate_scores,
+            stationarity_rows=stationarity_rows,
+            required_replicate_count=3,
+            required_realization_count=8,
+        )
+        self.assertEqual(incomplete["surrogate_realization_completeness_pass"], 0.0)
 
     def test_nonlinear_path_surrogate_aggregates_realizations_before_replicates(self):
         script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
@@ -2338,7 +2396,68 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(by_k[7.25]["longest_contiguous_valid_lag"], 1.0)
         self.assertEqual(by_k[7.25]["first_invalid_lag"], 2.0)
         self.assertGreater(by_k[7.25]["unit_interval_failure_count"], 0.0)
+        self.assertEqual(by_k[7.25]["replicate_moments_pooled"], 1.0)
         self.assertEqual(by_k[7.25]["heldout_prediction_claim_allowed"], 0.0)
+
+    def test_path_cumulant_scattering_pools_second_and_fourth_moments(self):
+        script_path = ROOT / "scripts" / "analyze_ka_path_cumulant_scattering.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_path_cumulant_scattering_pooling",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = [
+            {
+                "replicate": 1.0,
+                "temperature": 0.45,
+                "lag": 20.0,
+                "observed_msd": 1.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            },
+            {
+                "replicate": 2.0,
+                "temperature": 0.45,
+                "lag": 20.0,
+                "observed_msd": 3.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            },
+        ]
+
+        result = module.cumulant_scattering_rows(rows)[0]
+
+        self.assertAlmostEqual(result["observed_msd"], 2.0)
+        self.assertAlmostEqual(result["observed_ngp"], 0.25)
+        self.assertAlmostEqual(result["observed_fourth_moment"], 25.0 / 3.0)
+        self.assertEqual(result["replicate_moments_pooled"], 1.0)
+
+    def test_path_cumulant_scattering_requires_common_replicates_at_every_lag(self):
+        script_path = ROOT / "scripts" / "analyze_ka_path_cumulant_scattering.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_path_cumulant_scattering_replicate_identity",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = [
+            {
+                "replicate": float(replicate),
+                "temperature": 0.45,
+                "lag": float(lag),
+                "observed_msd": 1.0,
+                "observed_ngp": 0.1,
+                "observed_fs_k2": 0.5,
+            }
+            for lag, replicates in ((20, (1, 2)), (40, (3, 4)))
+            for replicate in replicates
+        ]
+
+        with self.assertRaises(ValueError):
+            module.cumulant_scattering_rows(rows)
 
     def test_nonlinear_path_gate_blocks_unresolved_temperature_crossover(self):
         script_path = ROOT / "scripts" / "summarize_ka_nonlinear_path_gate.py"
@@ -2363,6 +2482,9 @@ class KAReplicatePreparationTests(unittest.TestCase):
             "replicate_consensus_pass": 1.0,
             "nonlinear_single_particle_path_memory_required": 1.0,
             "linear_spectrum_null_rejected": 1.0,
+            "surrogate_realization_completeness_pass": 1.0,
+            "one_block_radial_plus_two_point_spectrum_sufficiency_resolved": 1.0,
+            "one_block_radial_plus_two_point_spectrum_sufficient": 0.0,
         }
         high_block20 = {
             **low,
@@ -2374,20 +2496,19 @@ class KAReplicatePreparationTests(unittest.TestCase):
             "nonlinear_single_particle_path_memory_required": 0.0,
             "linear_spectrum_null_rejected": 0.0,
             "required_replicate_count": 5.0,
+            "one_block_radial_plus_two_point_spectrum_sufficiency_resolved": 0.0,
         }
         high_block10 = {
             **high_block20,
             "radial_surrogate_higher_order_failure": 1.0,
         }
         low_cumulant = [
-            {"wave_number": 2.0, "longest_contiguous_valid_lag": 4096.0},
-            {"wave_number": 4.0, "longest_contiguous_valid_lag": 200.0},
-            {"wave_number": 7.25, "longest_contiguous_valid_lag": 20.0},
+            {"temperature": 0.45, "wave_number": wave_number, "longest_contiguous_valid_lag": horizon, "independent_replicate_count": 3.0, "replicate_ids": "1;2;3", "replicate_moments_pooled": 1.0, "heldout_prediction_claim_allowed": 0.0}
+            for wave_number, horizon in ((2.0, 4096.0), (4.0, 200.0), (7.25, 20.0))
         ]
         high_cumulant = [
-            {"wave_number": 2.0, "longest_contiguous_valid_lag": 600.0},
-            {"wave_number": 4.0, "longest_contiguous_valid_lag": 600.0},
-            {"wave_number": 7.25, "longest_contiguous_valid_lag": 0.0},
+            {"temperature": 0.58, "wave_number": wave_number, "longest_contiguous_valid_lag": horizon, "independent_replicate_count": 5.0, "replicate_ids": "1;2;3;4;5", "replicate_moments_pooled": 1.0, "heldout_prediction_claim_allowed": 0.0}
+            for wave_number, horizon in ((2.0, 600.0), (4.0, 600.0), (7.25, 0.0))
         ]
         empirical = {
             "single_particle_multiblock_path_memory_required": 1.0,
@@ -2410,6 +2531,12 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["binary_temperature_crossover_claim_allowed"], 0.0)
         self.assertEqual(result["low_k_cumulant_horizon_order_pass"], 1.0)
         self.assertEqual(result["observed_cumulant_diagnostic_only"], 1.0)
+        self.assertEqual(
+            result["low_temperature_mechanism_selection_artifact_ready"],
+            1.0,
+        )
+        self.assertEqual(result["temperature_crossover_artifact_ready"], 0.0)
+        self.assertEqual(result["manuscript_integration_complete"], 0.0)
         self.assertEqual(result["unique_microscopic_model_selected"], 0.0)
         self.assertEqual(
             result["next_minimal_model_candidate"],
@@ -2418,6 +2545,90 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
         self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+        incomplete_null = {
+            **high_block20,
+            "surrogate_quality_pass": 1.0,
+            "surrogate_precision_pass": 1.0,
+            "stationarity_control_pass": 1.0,
+            "contiguous_ensemble_curve_pass": 1.0,
+            "radial_surrogate_msd_pass": 1.0,
+            "radial_surrogate_higher_order_failure": 0.0,
+            "surrogate_realization_completeness_pass": 0.0,
+            "one_block_radial_plus_two_point_spectrum_sufficiency_resolved": 0.0,
+            "one_block_radial_plus_two_point_spectrum_sufficient": 0.0,
+        }
+        unresolved = module.classify_nonlinear_path_gate(
+            low,
+            incomplete_null,
+            incomplete_null,
+            low_cumulant,
+            high_cumulant,
+            empirical,
+        )
+        self.assertEqual(unresolved["high_temperature_mechanism_resolved"], 0.0)
+        self.assertEqual(unresolved["binary_temperature_crossover_claim_allowed"], 0.0)
+        with self.assertRaises(ValueError):
+            module.classify_nonlinear_path_gate(
+                low,
+                high_block20,
+                high_block10,
+                low_cumulant[:1],
+                high_cumulant,
+                empirical,
+            )
+        wrong_count = copy.deepcopy(high_cumulant)
+        wrong_count[0]["independent_replicate_count"] = 4.0
+        with self.assertRaises(ValueError):
+            module.classify_nonlinear_path_gate(
+                low,
+                high_block20,
+                high_block10,
+                low_cumulant,
+                wrong_count,
+                empirical,
+            )
+        swapped = copy.deepcopy(high_block20)
+        swapped["temperature"] = 0.40
+        with self.assertRaises(ValueError):
+            module.classify_nonlinear_path_gate(
+                low,
+                swapped,
+                high_block10,
+                low_cumulant,
+                high_cumulant,
+                empirical,
+            )
+
+    def test_nonlinear_path_svg_marks_and_terminates_at_nonfinite_error(self):
+        script_path = ROOT / "scripts" / "summarize_ka_nonlinear_path_gate.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_nonlinear_path_gate_svg_invalid",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        normalized = {
+            "contiguous_empirical_path": {"MSD": 0.2, "NGP": 0.3, "Fs": 0.4},
+            "radial_multivariate_surrogate": {"MSD": 0.4, "NGP": 2.0, "Fs": 3.0},
+        }
+        cumulant = [
+            {"wave_number": 2.0, "lag": 1.0, "absolute_error": 0.01, "error_tolerance": 0.03},
+            {"wave_number": 2.0, "lag": 2.0, "absolute_error": math.inf, "error_tolerance": 0.03},
+            {"wave_number": 2.0, "lag": 3.0, "absolute_error": 0.01, "error_tolerance": 0.03},
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "gate.svg"
+            module.write_svg(
+                path,
+                normalized_errors=normalized,
+                cumulant_rows=cumulant,
+            )
+            svg = path.read_text()
+
+        self.assertIn('data-invalid-wave-number="2"', svg)
+        self.assertIn('data-invalid-lag="2"', svg)
+        self.assertNotIn("inf", svg.lower())
 
     def test_empirical_path_crossover_requires_shared_higher_order_failure(self):
         script_path = ROOT / "scripts" / "summarize_ka_empirical_path_transfer.py"

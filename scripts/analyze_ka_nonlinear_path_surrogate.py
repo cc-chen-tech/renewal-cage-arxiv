@@ -576,8 +576,70 @@ def write_rows(path: Path, rows: Sequence[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
+def annotate_quality_rows(
+    rows: Sequence[dict[str, object]],
+    *,
+    metadata: dict[str, object],
+) -> list[dict[str, object]]:
+    annotated: list[dict[str, object]] = []
+    for source in rows:
+        row = dict(source)
+        row.update(metadata)
+        row.update(
+            {
+                "heldout_path_used_in_prediction": 0.0,
+                "macro_fit_parameter_count": 0.0,
+                "microdynamic_closure_claim_allowed": 0.0,
+                "spatial_facilitation_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+        )
+        annotated.append(row)
+    return annotated
+
+
 def wave_number_from_observed_key(key: str) -> float:
     return float(key.removeprefix("observed_fs_k").replace("p", "."))
+
+
+def refresh_existing_analysis(output_prefix: Path) -> None:
+    prefix = Path(output_prefix)
+    summary_rows = read_rows(prefix.with_name(prefix.name + "_summary.csv"))
+    quality_rows = read_rows(prefix.with_name(prefix.name + "_quality.csv"))
+    replicate_scores = read_rows(
+        prefix.with_name(prefix.name + "_replicate_scores.csv")
+    )
+    stationarity_rows = read_rows(
+        prefix.with_name(prefix.name + "_stationarity.csv")
+    )
+    old_verdict = read_rows(prefix.with_name(prefix.name + "_verdict.csv"))[0]
+    metadata = {
+        key: float(old_verdict[key])
+        for key in (
+            "temperature",
+            "calibration_time",
+            "block_size",
+            "independent_replicate_count",
+            "surrogate_realizations_per_replicate",
+            "surrogate_iteration_count",
+            "surrogate_base_seed",
+        )
+    }
+    quality_rows = annotate_quality_rows(quality_rows, metadata=metadata)
+    verdict = classify_nonlinear_path_surrogate(
+        summary_rows,
+        quality_rows=quality_rows,
+        replicate_scores=replicate_scores,
+        stationarity_rows=stationarity_rows,
+        required_replicate_count=int(metadata["independent_replicate_count"]),
+        required_realization_count=int(
+            metadata["surrogate_realizations_per_replicate"]
+        ),
+    )
+    verdict.update(metadata)
+    verdict["quality_realization_count"] = float(len(quality_rows))
+    write_rows(prefix.with_name(prefix.name + "_quality.csv"), quality_rows)
+    write_rows(prefix.with_name(prefix.name + "_verdict.csv"), [verdict])
 
 
 def _model_error_limits(
@@ -627,6 +689,7 @@ def classify_nonlinear_path_surrogate(
     replicate_scores: Sequence[dict[str, object]],
     stationarity_rows: Sequence[dict[str, object]],
     required_replicate_count: int,
+    required_realization_count: int,
 ) -> dict[str, object]:
     if (
         isinstance(required_replicate_count, bool)
@@ -634,6 +697,12 @@ def classify_nonlinear_path_surrogate(
         or required_replicate_count < 1
     ):
         raise ValueError("required_replicate_count must be a positive integer")
+    if (
+        isinstance(required_realization_count, bool)
+        or not isinstance(required_realization_count, int)
+        or required_realization_count < 8
+    ):
+        raise ValueError("required_realization_count must be an integer of at least eight")
     if not quality_rows or not replicate_scores or not stationarity_rows:
         raise ValueError("quality, replicate, and stationarity evidence must not be empty")
     contiguous = _model_error_limits(summary_rows, "contiguous_empirical_path")
@@ -651,6 +720,28 @@ def classify_nonlinear_path_surrogate(
     ]
     if any(not math.isfinite(value) or value < 0.0 for value in numeric_quality):
         raise ValueError("surrogate quality values must be finite and nonnegative")
+    quality_pairs = [
+        (int(float(row["replicate"])), int(float(row["realization"])))
+        for row in quality_rows
+    ]
+    expected_replicates = {
+        int(float(row["replicate"])) for row in replicate_scores
+    }
+    realization_completeness = (
+        len(expected_replicates) == required_replicate_count
+        and len(quality_pairs) == required_replicate_count * required_realization_count
+        and len(set(quality_pairs)) == len(quality_pairs)
+        and all(
+            {
+                realization
+                for replicate, realization in quality_pairs
+                if replicate == expected_replicate
+            }
+            == set(range(required_realization_count))
+            for expected_replicate in expected_replicates
+        )
+        and {replicate for replicate, _ in quality_pairs} == expected_replicates
+    )
     quality_pass = all(
         float(row["radial_distribution_maximum_absolute_error"]) <= 1e-12
         and float(row["cross_spectral_matrix_nrmse"]) <= 0.015
@@ -694,8 +785,18 @@ def classify_nonlinear_path_surrogate(
         and radial_failure_count == required_replicate_count
         and contiguous_better_count == required_replicate_count
     )
+    radial_spectral_null_accepted = (
+        realization_completeness
+        and quality_pass
+        and precision_pass
+        and stationarity_pass
+        and contiguous_curve_pass
+        and radial_msd_pass
+        and not radial_higher_order_failure
+    )
     selected = (
-        quality_pass
+        realization_completeness
+        and quality_pass
         and precision_pass
         and stationarity_pass
         and contiguous_curve_pass
@@ -710,6 +811,13 @@ def classify_nonlinear_path_surrogate(
         ),
         "maximum_cross_spectral_matrix_nrmse": max(
             float(row["cross_spectral_matrix_nrmse"]) for row in quality_rows
+        ),
+        "minimum_surrogate_realizations_per_replicate": 8.0,
+        "required_surrogate_realizations_per_replicate": float(
+            required_realization_count
+        ),
+        "surrogate_realization_completeness_pass": float(
+            realization_completeness
         ),
         "surrogate_quality_pass": float(quality_pass),
         "maximum_ensemble_msd_mc_relative_se": radial["msd_mc"],
@@ -726,8 +834,18 @@ def classify_nonlinear_path_surrogate(
         "required_replicate_count": float(required_replicate_count),
         "replicate_consensus_pass": float(replicate_consensus),
         "nonlinear_single_particle_path_memory_required": float(selected),
-        "one_block_radial_plus_two_point_spectrum_sufficient": 0.0,
+        "one_block_radial_heterogeneity_sufficiency_resolved": float(selected),
+        "one_block_radial_heterogeneity_sufficient": 0.0,
+        "one_block_radial_plus_two_point_spectrum_sufficiency_resolved": float(
+            selected or radial_spectral_null_accepted
+        ),
+        "one_block_radial_plus_two_point_spectrum_sufficient": float(
+            radial_spectral_null_accepted
+        ),
         "linear_spectrum_null_rejected": float(selected),
+        "calibration_nonstationarity_assessment_resolved": float(
+            stationarity_pass
+        ),
         "calibration_nonstationarity_supported": 0.0,
         "next_minimal_model": (
             "finite_lifetime_reversible_cage_state" if selected else "unresolved"
@@ -760,7 +878,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     if any(
         isinstance(value, bool) or not isinstance(value, int) or value < 1
         for value in controls
-    ) or args.seed < 0:
+    ) or args.seed < 0 or args.surrogate_realizations < 8:
         raise ValueError("calibration, block, realization, iteration, and seed controls are invalid")
     if args.calibration_time // args.block_size < 2:
         raise ValueError("calibration window must contain at least two complete blocks")
@@ -851,6 +969,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         replicate_scores=replicate_scores,
         stationarity_rows=stationarity_rows,
         required_replicate_count=len(replicate_specs),
+        required_realization_count=args.surrogate_realizations,
     )
     metadata = {
         "temperature": temperature,
@@ -861,6 +980,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "surrogate_iteration_count": float(args.iteration_count),
         "surrogate_base_seed": float(args.seed),
     }
+    quality_rows = annotate_quality_rows(quality_rows, metadata=metadata)
     for row in summary_rows:
         row.update(
             {
