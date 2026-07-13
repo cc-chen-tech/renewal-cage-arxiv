@@ -196,7 +196,7 @@ def main() -> None:
 
     rows = parse_thermodynamic_log(log_path)
     with trace_path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(THERMO_COLUMNS))
+        writer = csv.DictWriter(handle, fieldnames=list(THERMO_COLUMNS), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     summary = equilibration_summary(rows)
@@ -211,7 +211,7 @@ def main() -> None:
         "thermodynamic_claim_allowed": False,
     }
     with summary_path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(summary_payload))
+        writer = csv.DictWriter(handle, fieldnames=list(summary_payload), lineterminator="\n")
         writer.writeheader()
         writer.writerow(summary_payload)
 
