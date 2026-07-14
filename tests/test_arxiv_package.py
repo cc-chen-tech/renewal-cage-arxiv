@@ -1180,6 +1180,92 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertLess(float(second["paired_improvement_fraction"]), -0.61)
             self.assertEqual(float(second["all_identified_folds_pass"]), 0.0)
 
+    def test_hankel_slow_force_bath_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-hankel-slow-force-bath.md"
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_long_T058_summary.csv"
+        )
+        detail_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_long_T058_details.csv"
+        )
+        curve_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_long_T058_curve.csv"
+        )
+        extension_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_rank_extension_T058_summary.csv"
+        )
+        for path in (document_path, summary_path, detail_path, curve_path, extension_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.87341",
+            "0.93739",
+            "21.2371",
+            "17.1130",
+            "rank 16",
+            "hankel_slow_force_bath_allowed = 0",
+            "state_dependent_memory_allowed = 0",
+            "complete_event_clock_closure_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+            "nonlinear state-dependent memory",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"]: row for row in rows if row["record"] == "aggregate_model"}
+        self.assertEqual(
+            set(models),
+            {
+                "raw_force_delay_2",
+                "hankel_slow_2",
+                "hankel_slow_4",
+                "hankel_slow_8",
+                "hankel_slow_16",
+            },
+        )
+        primary = models["hankel_slow_8"]
+        self.assertEqual(int(float(primary["held_clone_count"])), 4)
+        self.assertGreater(float(primary["captured_force_history_variance_fraction"]), 0.87)
+        self.assertLess(float(primary["maximum_maximum_held_residual_state_correlation"]), 0.13)
+        self.assertGreater(float(primary["maximum_maximum_held_residual_lag_correlation"]), 0.93)
+        self.assertGreater(float(primary["terminal_diffusion_relative_error"]), 21.0)
+        self.assertGreater(float(primary["event_rate_relative_error"]), 17.0)
+        self.assertGreater(float(models["hankel_slow_16"]["terminal_diffusion_relative_error"]), 3.0)
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["numerical_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["orthogonality_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["macro_event_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["hankel_slow_force_bath_allowed"]), 0.0)
+        for key in (
+            "state_dependent_memory_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
+        with extension_path.open() as handle:
+            extension = {
+                int(float(row["slow_mode_count"])): row
+                for row in csv.DictReader(handle)
+                if row["record"] == "aggregate_model" and float(row["slow_mode_count"]) > 0
+            }
+        self.assertEqual(set(extension), {24, 32, 48, 64})
+        self.assertGreater(float(extension[64]["terminal_diffusion_relative_error"]), 4.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"

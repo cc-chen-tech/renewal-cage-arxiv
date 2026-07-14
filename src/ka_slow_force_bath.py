@@ -214,3 +214,127 @@ def simulate_slow_bath(
         paths[step] = current
     return paths
 
+
+def heldout_state_diagnostics(
+    model: dict[str, np.ndarray | float],
+    held_state: np.ndarray,
+) -> dict[str, float]:
+    """Measure one-step prediction and orthogonality on an unseen state path."""
+
+    state = np.asarray(held_state, dtype=float)
+    transition = np.asarray(model["transition_matrix"], dtype=float)
+    state_mean = np.asarray(model["state_mean"], dtype=float)
+    mode_count = len(state_mean)
+    if (
+        state.ndim != 4
+        or state.shape[2:] != (mode_count, 3)
+        or len(state) < 2
+        or not np.all(np.isfinite(state))
+    ):
+        raise ValueError("held_state must be a finite aligned state trajectory")
+    current = state[:-1] - state_mean[None, None, :, None]
+    target = state[1:] - state_mean[None, None, :, None]
+    predicted = np.einsum("ab,tpbc->tpac", transition, current)
+    residual = target - predicted
+    total = float(np.sum(target**2))
+    velocity_total = float(np.sum(target[:, :, 0] ** 2))
+    state_r_squared = 1.0 - float(np.sum(residual**2)) / max(total, np.finfo(float).tiny)
+    velocity_r_squared = 1.0 - float(np.sum(residual[:, :, 0] ** 2)) / max(
+        velocity_total,
+        np.finfo(float).tiny,
+    )
+    current_flat = np.transpose(current, (0, 1, 3, 2)).reshape(-1, mode_count)
+    residual_flat = np.transpose(residual, (0, 1, 3, 2)).reshape(-1, mode_count)
+    current_flat -= np.mean(current_flat, axis=0)
+    residual_flat -= np.mean(residual_flat, axis=0)
+    numerator = residual_flat.T @ current_flat
+    residual_norm = np.sqrt(np.sum(residual_flat**2, axis=0))
+    current_norm = np.sqrt(np.sum(current_flat**2, axis=0))
+    denominator = residual_norm[:, None] * current_norm[None, :]
+    correlations = np.divide(
+        numerator,
+        denominator,
+        out=np.zeros_like(numerator),
+        where=denominator > np.finfo(float).tiny,
+    )
+    maximum_lag_correlation = 0.0
+    for lag in range(1, min(16, len(residual) - 1) + 1):
+        left = np.transpose(residual[lag:], (0, 1, 3, 2)).reshape(-1, mode_count)
+        right = np.transpose(residual[:-lag], (0, 1, 3, 2)).reshape(-1, mode_count)
+        left -= np.mean(left, axis=0)
+        right -= np.mean(right, axis=0)
+        numerator = left.T @ right
+        left_norm = np.sqrt(np.sum(left**2, axis=0))
+        right_norm = np.sqrt(np.sum(right**2, axis=0))
+        denominator = left_norm[:, None] * right_norm[None, :]
+        lag_correlations = np.divide(
+            numerator,
+            denominator,
+            out=np.zeros_like(numerator),
+            where=denominator > np.finfo(float).tiny,
+        )
+        maximum_lag_correlation = max(
+            maximum_lag_correlation,
+            float(np.max(np.abs(lag_correlations))),
+        )
+    return {
+        "heldout_state_r_squared": float(state_r_squared),
+        "heldout_velocity_r_squared": float(velocity_r_squared),
+        "maximum_held_residual_state_correlation": float(np.max(np.abs(correlations))),
+        "maximum_held_residual_lag_correlation": maximum_lag_correlation,
+    }
+
+
+def state_paths_to_displacements(state_paths: np.ndarray, *, frame_time: float) -> np.ndarray:
+    """Integrate the first state mode as velocity by the trapezoid rule."""
+
+    paths = np.asarray(state_paths, dtype=float)
+    if (
+        paths.ndim != 4
+        or paths.shape[2] < 1
+        or paths.shape[3] != 3
+        or len(paths) < 2
+        or not np.all(np.isfinite(paths))
+    ):
+        raise ValueError("state_paths must be finite (frames, samples, modes, 3)")
+    if not np.isfinite(frame_time) or frame_time <= 0.0:
+        raise ValueError("frame_time must be positive and finite")
+    velocity = paths[:, :, 0]
+    increment = 0.5 * frame_time * (velocity[:-1] + velocity[1:])
+    displacement = np.zeros((len(paths), paths.shape[1], 3), dtype=float)
+    displacement[1:] = np.cumsum(increment, axis=0)
+    return displacement
+
+
+def simulate_slow_bath_displacements(
+    model: dict[str, np.ndarray | float],
+    *,
+    step_count: int,
+    simulation_count: int,
+    frame_time: float,
+    seed: int,
+) -> np.ndarray:
+    """Generate displacements without retaining every auxiliary-state frame."""
+
+    if step_count < 1 or simulation_count < 1:
+        raise ValueError("step_count and simulation_count must be positive")
+    if not np.isfinite(frame_time) or frame_time <= 0.0:
+        raise ValueError("frame_time must be positive and finite")
+    transition = np.asarray(model["transition_matrix"], dtype=float)
+    state_mean = np.asarray(model["state_mean"], dtype=float)
+    innovation_sqrt = np.asarray(model["innovation_square_root"], dtype=float)
+    residual_pool = np.asarray(model["standardized_residual_blocks"], dtype=float)
+    state_pool = np.asarray(model["training_state_pool"], dtype=float)
+    rng = np.random.default_rng(seed)
+    current = state_pool[rng.integers(len(state_pool), size=simulation_count)].copy()
+    displacement = np.zeros((step_count + 1, simulation_count, 3), dtype=float)
+    for step in range(1, step_count + 1):
+        previous_velocity = current[:, 0].copy()
+        centered = current - state_mean[None, :, None]
+        current = state_mean[None, :, None] + np.einsum("ab,sbc->sac", transition, centered)
+        standardized = residual_pool[rng.integers(len(residual_pool), size=simulation_count)]
+        current += np.einsum("ab,sbc->sac", innovation_sqrt, standardized)
+        displacement[step] = displacement[step - 1] + 0.5 * frame_time * (
+            previous_velocity + current[:, 0]
+        )
+    return displacement

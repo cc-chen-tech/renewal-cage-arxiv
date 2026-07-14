@@ -1,4 +1,5 @@
 import sys
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -117,6 +118,79 @@ class SlowForceBathTests(unittest.TestCase):
         )
 
         self.assertLess(relative_error, 0.08)
+
+    def test_heldout_diagnostic_and_trapezoid_displacement(self):
+        from ka_slow_force_bath import (
+            fit_covariance_contracted_model,
+            heldout_state_diagnostics,
+            state_paths_to_displacements,
+        )
+
+        rng = np.random.default_rng(44)
+        state = np.zeros((800, 2, 2, 3))
+        transition = np.array([[0.92, 0.04], [-0.02, 0.88]])
+        for frame in range(1, len(state)):
+            state[frame] = np.einsum("ab,pbc->pac", transition, state[frame - 1])
+            state[frame] += rng.normal(scale=0.08, size=state[frame].shape)
+        fit = fit_covariance_contracted_model([state[:500]])
+        diagnostic = heldout_state_diagnostics(fit, state[500:])
+
+        self.assertGreater(diagnostic["heldout_state_r_squared"], 0.7)
+        self.assertGreater(diagnostic["heldout_velocity_r_squared"], 0.7)
+        self.assertLess(diagnostic["maximum_held_residual_state_correlation"], 0.15)
+        self.assertLess(diagnostic["maximum_held_residual_lag_correlation"], 0.15)
+
+        paths = np.zeros((4, 1, 1, 3))
+        paths[:, 0, 0, 0] = [0.0, 1.0, 2.0, 3.0]
+        displacement = state_paths_to_displacements(paths, frame_time=0.5)
+        np.testing.assert_allclose(displacement[:, 0, 0], [0.0, 0.25, 1.0, 2.25])
+
+    def test_streaming_displacement_matches_full_state_simulation(self):
+        from ka_slow_force_bath import (
+            fit_covariance_contracted_model,
+            simulate_slow_bath,
+            simulate_slow_bath_displacements,
+            state_paths_to_displacements,
+        )
+
+        rng = np.random.default_rng(808)
+        state = rng.normal(size=(500, 2, 3, 3))
+        for frame in range(1, len(state)):
+            state[frame] += 0.6 * state[frame - 1]
+        fit = fit_covariance_contracted_model([state])
+        full = simulate_slow_bath(fit, step_count=30, simulation_count=40, seed=71)
+        streamed = simulate_slow_bath_displacements(
+            fit,
+            step_count=30,
+            simulation_count=40,
+            frame_time=0.01,
+            seed=71,
+        )
+
+        np.testing.assert_allclose(streamed, state_paths_to_displacements(full, frame_time=0.01))
+
+    def test_real_data_cli_exposes_fixed_slow_bath_and_event_gates(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_hankel_slow_force_bath.py"),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        for required in (
+            "--history-length",
+            "--primary-mode-count",
+            "--mode-counts",
+            "--half-window",
+            "--phop-threshold",
+            "--simulation-count",
+            "--cache-directory",
+        ):
+            self.assertIn(required, completed.stdout)
 
 
 if __name__ == "__main__":

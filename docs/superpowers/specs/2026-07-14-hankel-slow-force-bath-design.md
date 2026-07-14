@@ -107,6 +107,7 @@ For each held clone report:
 - transition spectral radius;
 - stationary covariance identity error;
 - maximum held residual-state correlation;
+- maximum held residual lag correlation over 1--16 saved steps;
 - terminal MSD/diffusion relative error at `4 tau`;
 - maximum NGP absolute error;
 - maximum relative error of `F_s(k,t)` for `k=1,3,7.25`;
@@ -122,7 +123,11 @@ multi_k_fs_max_relative_error <= 0.20
 ngp_max_absolute_error <= 0.10
 event_rate_relative_error <= 0.20
 maximum_held_residual_state_correlation <= 0.20
+maximum_held_residual_lag_correlation <= 0.20
 ```
+
+The scattering error is scaled by `max(|F_s observed|, 0.05)` so a harmless
+absolute error near a zero crossing cannot create an unbounded relative score.
 
 The covariance identity error must be at most `1e-8` and the spectral radius
 at most `1 + 1e-8`.
@@ -144,4 +149,3 @@ thermodynamic_claim_allowed
 If the rank-8 slow bath fails while covariance stability and linear-state
 identification pass, the next model must introduce nonlinear state-dependent
 feature coupling rather than more stationary linear modes.
-
