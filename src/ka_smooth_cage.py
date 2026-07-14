@@ -106,6 +106,454 @@ def smooth_force_support_cage(
     }
 
 
+def smooth_force_support_cage_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    target_batch_size: int = 16,
+    additional_vectors: np.ndarray | None = None,
+    compute_gram: bool = True,
+) -> dict[str, np.ndarray | float]:
+    """Evaluate exact smooth-cage vector coordinates for fixed targets."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets_raw = np.asarray(target_indices)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+    ):
+        raise ValueError("positions and velocities must be aligned finite (particles, 3) arrays")
+    if particle_types.shape != (len(positions),) or np.any(
+        (particle_types < 0) | (particle_types > 1)
+    ):
+        raise ValueError("particle_types must be aligned KA 0/1 labels")
+    if box_lengths.shape != (3,) or np.any(~np.isfinite(box_lengths)) or np.any(
+        box_lengths <= 0.0
+    ):
+        raise ValueError("box_lengths must be a finite positive three-vector")
+    if (
+        targets_raw.ndim != 1
+        or len(targets_raw) < 1
+        or np.any(targets_raw != targets_raw.astype(int))
+    ):
+        raise ValueError("target_indices must be a nonempty integer vector")
+    targets = targets_raw.astype(int)
+    if (
+        np.any(targets < 0)
+        or np.any(targets >= len(positions))
+        or len(np.unique(targets)) != len(targets)
+    ):
+        raise ValueError("target_indices must select distinct particles")
+    if (
+        isinstance(target_batch_size, bool)
+        or not isinstance(target_batch_size, (int, np.integer))
+        or target_batch_size < 1
+    ):
+        raise ValueError("target_batch_size must be a positive integer")
+    if not isinstance(compute_gram, (bool, np.bool_)):
+        raise ValueError("compute_gram must be Boolean")
+    if additional_vectors is None:
+        extra_vectors = np.empty((0, *positions.shape), dtype=float)
+    else:
+        extra_vectors = np.asarray(additional_vectors, dtype=float)
+        if extra_vectors.ndim == 2:
+            extra_vectors = extra_vectors[None, :, :]
+        if (
+            extra_vectors.ndim != 3
+            or extra_vectors.shape[1:] != positions.shape
+            or np.any(~np.isfinite(extra_vectors))
+        ):
+            raise ValueError("additional_vectors must contain finite aligned vector fields")
+
+    relative_position = np.empty((len(targets), 3), dtype=float)
+    relative_velocity = np.empty_like(relative_position)
+    additional_relative_velocity = np.empty(
+        (len(extra_vectors), len(targets), 3), dtype=float
+    )
+    jacobian_gram = np.empty((len(targets), 3, 3), dtype=float)
+    target_jacobian_block = np.empty_like(jacobian_gram)
+    total_weight = np.empty(len(targets), dtype=float)
+    support_count = np.empty(len(targets), dtype=int)
+    identity = np.eye(3)
+    for start in range(0, len(targets), int(target_batch_size)):
+        stop = min(start + int(target_batch_size), len(targets))
+        selected = targets[start:stop]
+        displacement = positions[None, :, :] - positions[selected, None, :]
+        displacement -= box_lengths[None, None, :] * np.rint(
+            displacement / box_lengths[None, None, :]
+        )
+        distance = np.linalg.norm(displacement, axis=2)
+        support_radius = _CUTOFF_SCALE * _SIGMA[
+            particle_types[selected, None], particle_types[None, :]
+        ]
+        weight, scaled_derivative = wendland_c4_weight(distance / support_radius)
+        local_axis = np.arange(len(selected))
+        weight[local_axis, selected] = 0.0
+        scaled_derivative[local_axis, selected] = 0.0
+        chunk_weight = np.sum(weight, axis=1)
+        if np.any(chunk_weight <= 0.0):
+            raise ValueError("a target particle has no neighbor inside the KA force support")
+        mean_offset = np.einsum("tn,tna->ta", weight, displacement) / chunk_weight[:, None]
+        unit = displacement / np.maximum(distance[:, :, None], 1e-12)
+        radial_gradient = (
+            scaled_derivative[:, :, None]
+            * unit
+            / support_radius[:, :, None]
+        )
+        centered = displacement - mean_offset[:, None, :]
+        centered_gradient = np.einsum(
+            "tna,tnb->tab", centered, radial_gradient
+        )
+        target_block = identity[None, :, :] + centered_gradient / chunk_weight[:, None, None]
+        vector_fields = np.concatenate([velocities[None, :, :], extra_vectors], axis=0)
+        vector_difference = (
+            vector_fields[:, selected, None, :] - vector_fields[:, None, :, :]
+        )
+        projected_vectors = np.einsum(
+            "tn,ktnb->ktb", weight, vector_difference
+        )
+        projected_vectors += np.einsum(
+            "tna,ktn->kta",
+            centered,
+            np.einsum("tnb,ktnb->ktn", radial_gradient, vector_difference),
+        )
+        projected_vectors /= chunk_weight[None, :, None]
+        if compute_gram:
+            gram = np.einsum("tac,tbc->tab", target_block, target_block)
+            weight_squared = np.sum(weight**2, axis=1)
+            weighted_cross = np.einsum(
+                "tn,tna,tnb->tab", weight, centered, radial_gradient
+            )
+            gradient_squared = np.einsum(
+                "tna,tna->tn", radial_gradient, radial_gradient
+            )
+            neighbor_gram = weight_squared[:, None, None] * identity[None, :, :]
+            neighbor_gram += weighted_cross + np.transpose(weighted_cross, (0, 2, 1))
+            neighbor_gram += np.einsum(
+                "tn,tna,tnb->tab", gradient_squared, centered, centered
+            )
+            gram += neighbor_gram / chunk_weight[:, None, None] ** 2
+            gram = 0.5 * (gram + np.transpose(gram, (0, 2, 1)))
+            eigenvalues = np.linalg.eigvalsh(gram)
+            if np.any(eigenvalues[:, 0] <= 0.0):
+                raise ValueError("smooth cage Jacobian Gram matrices must be positive definite")
+
+        relative_position[start:stop] = -mean_offset
+        relative_velocity[start:stop] = projected_vectors[0]
+        additional_relative_velocity[:, start:stop] = projected_vectors[1:]
+        if compute_gram:
+            jacobian_gram[start:stop] = gram
+            target_jacobian_block[start:stop] = target_block
+        total_weight[start:stop] = chunk_weight
+        support_count[start:stop] = np.sum(weight > 0.0, axis=1)
+
+    result: dict[str, np.ndarray | float] = {
+        "relative_position": relative_position,
+        "relative_velocity": relative_velocity,
+        "additional_relative_velocity": additional_relative_velocity,
+        "total_weight": total_weight,
+        "support_count": support_count,
+        "target_indices": targets,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+    if compute_gram:
+        result["jacobian_gram"] = jacobian_gram
+        result["target_jacobian_block"] = target_jacobian_block
+    return result
+
+
+def smooth_cage_joint_noise_covariance_rate(
+    jacobian_gram: np.ndarray,
+    target_jacobian_block: np.ndarray,
+    *,
+    friction: float,
+    temperature: float,
+) -> dict[str, np.ndarray | float]:
+    """Return the exact center-relative thermostat covariance-rate blocks."""
+
+    gram = np.asarray(jacobian_gram, dtype=float)
+    target_block = np.asarray(target_jacobian_block, dtype=float)
+    if (
+        gram.ndim < 2
+        or gram.shape[-2:] != (3, 3)
+        or target_block.shape != gram.shape
+        or np.any(~np.isfinite(gram))
+        or np.any(~np.isfinite(target_block))
+    ):
+        raise ValueError("Jacobian geometry must contain finite aligned 3x3 blocks")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    identity = np.broadcast_to(np.eye(3), gram.shape)
+    center_gram = (
+        identity
+        - target_block
+        - np.swapaxes(target_block, -1, -2)
+        + gram
+    )
+    center_relative_gram = np.swapaxes(target_block, -1, -2) - gram
+    noise_scale = 2.0 * friction * temperature
+    relative = noise_scale * gram
+    center = noise_scale * center_gram
+    cross = noise_scale * center_relative_gram
+    joint = np.concatenate(
+        [
+            np.concatenate([center, cross], axis=-1),
+            np.concatenate([np.swapaxes(cross, -1, -2), relative], axis=-1),
+        ],
+        axis=-2,
+    )
+    return {
+        "relative_noise_covariance_rate": relative,
+        "center_noise_covariance_rate": center,
+        "center_relative_noise_covariance_rate": cross,
+        "joint_noise_covariance_rate": joint,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def smooth_cage_projected_observables_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    forces: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    temperature: float,
+    directional_step: float,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float]:
+    """Split exact tagged Langevin drift and noise into cage and relative parts."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if forces.shape != positions.shape or np.any(~np.isfinite(forces)):
+        raise ValueError("forces must be finite and align with positions")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    if not math.isfinite(directional_step) or directional_step <= 0.0:
+        raise ValueError("directional_step must be finite and positive")
+    common = {
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "target_batch_size": target_batch_size,
+    }
+    base = smooth_force_support_cage_batch(
+        positions,
+        velocities=velocities,
+        additional_vectors=forces,
+        **common,
+    )
+    force_projection = np.asarray(base["additional_relative_velocity"])[0]
+    plus_velocity = smooth_force_support_cage_batch(
+        positions + directional_step * velocities,
+        velocities=velocities,
+        compute_gram=False,
+        **common,
+    )["relative_velocity"]
+    minus_velocity = smooth_force_support_cage_batch(
+        positions - directional_step * velocities,
+        velocities=velocities,
+        compute_gram=False,
+        **common,
+    )["relative_velocity"]
+    geometric_drift = (plus_velocity - minus_velocity) / (2.0 * directional_step)
+    relative_velocity = np.asarray(base["relative_velocity"], dtype=float)
+    relative_drift = force_projection + geometric_drift - friction * relative_velocity
+    center_velocity = velocities[targets] - relative_velocity
+    center_drift = forces[targets] - friction * velocities[targets] - relative_drift
+
+    noise = smooth_cage_joint_noise_covariance_rate(
+        np.asarray(base["jacobian_gram"], dtype=float),
+        np.asarray(base["target_jacobian_block"], dtype=float),
+        friction=friction,
+        temperature=temperature,
+    )
+    return {
+        **base,
+        **noise,
+        "projected_force": np.asarray(force_projection),
+        "geometric_drift": np.asarray(geometric_drift),
+        "relative_drift": relative_drift,
+        "center_velocity": center_velocity,
+        "center_drift": center_drift,
+        "friction": float(friction),
+        "temperature": float(temperature),
+        "directional_step": float(directional_step),
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def smooth_cage_second_generator_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    forces: np.ndarray,
+    force_generator: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    temperature: float,
+    directional_step: float,
+    phase_space_step: float,
+    trace_probes: np.ndarray | None,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float]:
+    """Return ``L p`` and ``L^2 p`` for the smooth cage-relative velocity."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    force_generator = np.asarray(force_generator, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or forces.shape != positions.shape
+        or force_generator.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+        or np.any(~np.isfinite(forces))
+        or np.any(~np.isfinite(force_generator))
+    ):
+        raise ValueError("phase-space arrays must be aligned finite (particles, 3) arrays")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    if not math.isfinite(phase_space_step) or phase_space_step <= 0.0:
+        raise ValueError("phase_space_step must be finite and positive")
+    if trace_probes is None:
+        probes = np.empty((0, *positions.shape), dtype=float)
+    else:
+        probes = np.asarray(trace_probes, dtype=float)
+        if (
+            probes.ndim != 3
+            or probes.shape[1:] != positions.shape
+            or len(probes) < 1
+            or np.any(~np.isfinite(probes))
+        ):
+            raise ValueError("trace_probes must be finite full phase-space vectors")
+    if temperature > 0.0 and not len(probes):
+        raise ValueError("positive temperature requires trace_probes")
+
+    common = {
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "friction": friction,
+        "temperature": temperature,
+        "directional_step": directional_step,
+        "target_batch_size": target_batch_size,
+    }
+
+    def relative_drift(
+        current_positions: np.ndarray,
+        current_velocities: np.ndarray,
+        current_forces: np.ndarray,
+    ) -> np.ndarray:
+        return np.asarray(
+            smooth_cage_projected_observables_batch(
+                current_positions,
+                velocities=current_velocities,
+                forces=current_forces,
+                **common,
+            )["relative_drift"],
+            dtype=float,
+        )
+
+    base = smooth_cage_projected_observables_batch(
+        positions,
+        velocities=velocities,
+        forces=forces,
+        **common,
+    )
+    base_drift = np.asarray(base["relative_drift"], dtype=float)
+    step = float(phase_space_step)
+    position_term = (
+        relative_drift(
+            positions + step * velocities,
+            velocities,
+            forces + step * force_generator,
+        )
+        - relative_drift(
+            positions - step * velocities,
+            velocities,
+            forces - step * force_generator,
+        )
+    ) / (2.0 * step)
+
+    acceleration = forces - friction * velocities
+    velocity_term = (
+        relative_drift(positions, velocities + step * acceleration, forces)
+        - relative_drift(positions, velocities - step * acceleration, forces)
+    ) / (2.0 * step)
+
+    velocity_laplacian = np.zeros_like(base_drift)
+    if len(probes):
+        common_coordinate = {
+            "particle_types": particle_types,
+            "box_lengths": box_lengths,
+            "target_indices": targets,
+            "target_batch_size": target_batch_size,
+            "compute_gram": False,
+        }
+        trace_terms = []
+        for probe in probes:
+            plus = smooth_force_support_cage_batch(
+                positions + directional_step * probe,
+                velocities=probe,
+                **common_coordinate,
+            )["relative_velocity"]
+            minus = smooth_force_support_cage_batch(
+                positions - directional_step * probe,
+                velocities=probe,
+                **common_coordinate,
+            )["relative_velocity"]
+            trace_terms.append((plus - minus) / directional_step)
+        velocity_laplacian = np.mean(np.asarray(trace_terms), axis=0)
+    ito_trace_term = friction * temperature * velocity_laplacian
+    second = position_term + velocity_term + ito_trace_term
+    probe_second_moment_error = (
+        float(np.max(np.abs(np.mean(probes**2, axis=0) - 1.0)))
+        if len(probes)
+        else 0.0
+    )
+    return {
+        **base,
+        "position_generator_term": position_term,
+        "velocity_generator_term": velocity_term,
+        "velocity_laplacian": velocity_laplacian,
+        "ito_trace_term": ito_trace_term,
+        "second_relative_generator": second,
+        "phase_space_step": step,
+        "trace_probe_count": float(len(probes)),
+        "trace_probe_second_moment_error": probe_second_moment_error,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def smooth_cage_projected_observables(
     positions: np.ndarray,
     *,

@@ -147,6 +147,421 @@ class SmoothCageTests(unittest.TestCase):
         expected = np.einsum("nab,nb->a", result["jacobian"], forces)
         np.testing.assert_allclose(result["force_drift"], expected, atol=1e-12)
 
+    def test_batched_smooth_cage_matches_scalar_jacobian_projection(self):
+        from ka_smooth_cage import (
+            smooth_force_support_cage,
+            smooth_force_support_cage_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 20.0
+        targets = np.array([0, 2])
+        batched = smooth_force_support_cage_batch(
+            inputs["positions"],
+            velocities=velocities,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+            target_batch_size=1,
+        )
+
+        for row, target in enumerate(targets):
+            scalar = smooth_force_support_cage(
+                inputs["positions"],
+                particle_types=inputs["particle_types"],
+                box_lengths=inputs["box_lengths"],
+                target_index=int(target),
+            )
+            expected_velocity = np.einsum(
+                "nab,nb->a", scalar["jacobian"], velocities
+            )
+            expected_gram = np.einsum(
+                "nab,ncb->ac", scalar["jacobian"], scalar["jacobian"]
+            )
+            np.testing.assert_allclose(
+                batched["relative_position"][row],
+                scalar["relative_position"],
+                atol=1e-12,
+            )
+            np.testing.assert_allclose(
+                batched["relative_velocity"][row], expected_velocity, atol=1e-12
+            )
+            np.testing.assert_allclose(
+                batched["jacobian_gram"][row], expected_gram, atol=1e-12
+            )
+
+    def test_batched_smooth_cage_is_rigid_motion_covariant_and_positive(self):
+        from ka_smooth_cage import smooth_force_support_cage_batch
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 17.0
+        targets = np.array([0, 1, 2])
+        result = smooth_force_support_cage_batch(
+            inputs["positions"],
+            velocities=velocities,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+        )
+        rotation = np.array(
+            [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
+        )
+        translation = np.array([2.0, -3.0, 1.5])
+        transformed = smooth_force_support_cage_batch(
+            inputs["positions"] @ rotation.T + translation,
+            velocities=velocities @ rotation.T,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+        )
+
+        np.testing.assert_allclose(
+            transformed["relative_position"],
+            result["relative_position"] @ rotation.T,
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            transformed["relative_velocity"],
+            result["relative_velocity"] @ rotation.T,
+            atol=1e-12,
+        )
+        expected_gram = np.einsum(
+            "ab,tbc,dc->tad", rotation, result["jacobian_gram"], rotation
+        )
+        np.testing.assert_allclose(
+            transformed["jacobian_gram"], expected_gram, atol=1e-12
+        )
+        self.assertGreater(
+            float(np.min(np.linalg.eigvalsh(result["jacobian_gram"]))), 0.0
+        )
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_batched_projected_drift_splits_center_and_relative_langevin_terms(self):
+        from ka_smooth_cage import (
+            smooth_cage_projected_observables,
+            smooth_cage_projected_observables_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 17.0
+        forces = np.arange(12, dtype=float).reshape(4, 3) / 11.0 - 0.4
+        targets = np.array([0, 2])
+        friction = 0.7
+        temperature = 0.58
+        directional_step = 1e-5
+        batched = smooth_cage_projected_observables_batch(
+            inputs["positions"],
+            velocities=velocities,
+            forces=forces,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+            friction=friction,
+            temperature=temperature,
+            directional_step=directional_step,
+            target_batch_size=1,
+        )
+
+        for row, target in enumerate(targets):
+            scalar = smooth_cage_projected_observables(
+                inputs["positions"],
+                velocities=velocities,
+                forces=forces,
+                particle_types=inputs["particle_types"],
+                box_lengths=inputs["box_lengths"],
+                target_index=int(target),
+                friction=friction,
+                temperature=temperature,
+                directional_step=directional_step,
+                potential_protocol="ka_lj_cut",
+            )
+            np.testing.assert_allclose(
+                batched["relative_velocity"][row],
+                scalar["relative_velocity"],
+                atol=1e-12,
+            )
+            np.testing.assert_allclose(
+                batched["relative_drift"][row],
+                scalar["projected_drift"],
+                atol=1e-10,
+            )
+            np.testing.assert_allclose(
+                batched["jacobian_gram"][row], scalar["jacobian_gram"], atol=1e-12
+            )
+        np.testing.assert_allclose(
+            batched["center_velocity"] + batched["relative_velocity"],
+            velocities[targets],
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            batched["center_drift"] + batched["relative_drift"],
+            forces[targets] - friction * velocities[targets],
+            atol=1e-12,
+        )
+        combined = np.block(
+            [
+                [
+                    batched["center_noise_covariance_rate"],
+                    batched["center_relative_noise_covariance_rate"],
+                ],
+                [
+                    np.transpose(
+                        batched["center_relative_noise_covariance_rate"],
+                        (0, 2, 1),
+                    ),
+                    batched["relative_noise_covariance_rate"],
+                ],
+            ]
+        )
+        self.assertGreaterEqual(float(np.min(np.linalg.eigvalsh(combined))), -1e-12)
+        recovered_tagged_noise = (
+            batched["center_noise_covariance_rate"]
+            + batched["relative_noise_covariance_rate"]
+            + batched["center_relative_noise_covariance_rate"]
+            + np.transpose(
+                batched["center_relative_noise_covariance_rate"], (0, 2, 1)
+            )
+        )
+        np.testing.assert_allclose(
+            recovered_tagged_noise,
+            2.0 * friction * temperature * np.broadcast_to(np.eye(3), recovered_tagged_noise.shape),
+            atol=1e-12,
+        )
+
+    def test_second_generator_recovers_linear_two_particle_relative_coordinate(self):
+        from ka_smooth_cage import smooth_cage_second_generator_batch
+
+        positions = np.array([[0.0, 0.0, 0.0], [1.1, 0.2, -0.1]])
+        velocities = np.array([[0.4, -0.3, 0.2], [-0.2, 0.1, 0.5]])
+        forces = np.array([[1.2, -0.7, 0.3], [-0.4, 0.2, -0.8]])
+        force_generator = np.array([[0.5, 0.1, -0.6], [-0.2, 0.7, 0.4]])
+        friction = 0.8
+        probes = np.random.default_rng(20260718).choice(
+            (-1.0, 1.0), size=(8, 2, 3)
+        )
+
+        result = smooth_cage_second_generator_batch(
+            positions,
+            velocities=velocities,
+            forces=forces,
+            force_generator=force_generator,
+            particle_types=np.array([0, 0]),
+            box_lengths=np.full(3, 20.0),
+            target_indices=np.array([0]),
+            friction=friction,
+            temperature=0.58,
+            directional_step=1e-5,
+            phase_space_step=2e-5,
+            trace_probes=probes,
+        )
+
+        relative_velocity = velocities[0] - velocities[1]
+        relative_force = forces[0] - forces[1]
+        expected_drift = relative_force - friction * relative_velocity
+        expected_second = (
+            force_generator[0]
+            - force_generator[1]
+            - friction * relative_force
+            + friction**2 * relative_velocity
+        )
+        np.testing.assert_allclose(
+            result["relative_drift"][0], expected_drift, atol=2e-10
+        )
+        np.testing.assert_allclose(
+            result["second_relative_generator"][0], expected_second, atol=2e-8
+        )
+        np.testing.assert_allclose(result["ito_trace_term"][0], 0.0, atol=2e-8)
+
+    def test_second_generator_matches_direct_ka_phase_space_derivative_at_zero_temperature(self):
+        from ka_local_cage import (
+            ka_lj_force_and_isotropic_curvature,
+            ka_lj_force_generator_observables,
+        )
+        from ka_smooth_cage import (
+            smooth_cage_projected_observables_batch,
+            smooth_cage_second_generator_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        velocities = np.array(
+            [
+                [0.20, -0.10, 0.30],
+                [-0.15, 0.25, -0.05],
+                [0.10, 0.05, -0.20],
+                [-0.05, -0.30, 0.15],
+            ]
+        )
+        types = inputs["particle_types"]
+        box = inputs["box_lengths"]
+        targets = np.array([0, 2])
+        friction = 0.7
+        forces = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=types,
+            box_lengths=box,
+            potential_protocol="ka_lj_c3_switch",
+        )[0]
+        force_generator = ka_lj_force_generator_observables(
+            positions,
+            velocities=velocities,
+            particle_types=types,
+            box_lengths=box,
+            target_indices=np.arange(len(positions)),
+            friction=friction,
+            temperature=0.0,
+            potential_protocol="ka_lj_c3_switch",
+        )["force_generator"]
+        result = smooth_cage_second_generator_batch(
+            positions,
+            velocities=velocities,
+            forces=forces,
+            force_generator=force_generator,
+            particle_types=types,
+            box_lengths=box,
+            target_indices=targets,
+            friction=friction,
+            temperature=0.0,
+            directional_step=1e-5,
+            phase_space_step=3e-6,
+            trace_probes=None,
+        )
+
+        acceleration = forces - friction * velocities
+        step = 8e-7
+        direct = []
+        for sign in (1.0, -1.0):
+            shifted_positions = positions + sign * step * velocities
+            shifted_velocities = velocities + sign * step * acceleration
+            shifted_forces = ka_lj_force_and_isotropic_curvature(
+                shifted_positions,
+                particle_types=types,
+                box_lengths=box,
+                potential_protocol="ka_lj_c3_switch",
+            )[0]
+            direct.append(
+                smooth_cage_projected_observables_batch(
+                    shifted_positions,
+                    velocities=shifted_velocities,
+                    forces=shifted_forces,
+                    particle_types=types,
+                    box_lengths=box,
+                    target_indices=targets,
+                    friction=friction,
+                    temperature=0.0,
+                    directional_step=2e-6,
+                )["relative_drift"]
+            )
+        expected = (direct[0] - direct[1]) / (2.0 * step)
+        np.testing.assert_allclose(
+            result["second_relative_generator"], expected, rtol=4e-4, atol=4e-4
+        )
+
+    def test_second_generator_ito_trace_matches_full_velocity_laplacian(self):
+        from ka_local_cage import (
+            ka_lj_force_and_isotropic_curvature,
+            ka_lj_force_generator_observables,
+        )
+        from ka_smooth_cage import (
+            smooth_cage_projected_observables_batch,
+            smooth_cage_second_generator_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 13.0 - 0.3
+        types = inputs["particle_types"]
+        box = inputs["box_lengths"]
+        targets = np.array([0, 2])
+        friction = 0.7
+        temperature = 0.58
+        forces = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=types,
+            box_lengths=box,
+            potential_protocol="ka_lj_c3_switch",
+        )[0]
+        force_generator = ka_lj_force_generator_observables(
+            positions,
+            velocities=velocities,
+            particle_types=types,
+            box_lengths=box,
+            target_indices=np.arange(len(positions)),
+            friction=friction,
+            temperature=temperature,
+            potential_protocol="ka_lj_c3_switch",
+        )["force_generator"]
+        dimension = velocities.size
+        probes = (
+            np.sqrt(dimension)
+            * np.eye(dimension).reshape(dimension, *velocities.shape)
+        )
+        result = smooth_cage_second_generator_batch(
+            positions,
+            velocities=velocities,
+            forces=forces,
+            force_generator=force_generator,
+            particle_types=types,
+            box_lengths=box,
+            target_indices=targets,
+            friction=friction,
+            temperature=temperature,
+            directional_step=1e-5,
+            phase_space_step=3e-6,
+            trace_probes=probes,
+        )
+
+        base = smooth_cage_projected_observables_batch(
+            positions,
+            velocities=velocities,
+            forces=forces,
+            particle_types=types,
+            box_lengths=box,
+            target_indices=targets,
+            friction=friction,
+            temperature=temperature,
+            directional_step=1e-5,
+        )["relative_drift"]
+        velocity_step = 1e-3
+        laplacian = np.zeros_like(base)
+        for coordinate in range(dimension):
+            direction = np.zeros(dimension)
+            direction[coordinate] = 1.0
+            direction = direction.reshape(velocities.shape)
+            plus = smooth_cage_projected_observables_batch(
+                positions,
+                velocities=velocities + velocity_step * direction,
+                forces=forces,
+                particle_types=types,
+                box_lengths=box,
+                target_indices=targets,
+                friction=friction,
+                temperature=temperature,
+                directional_step=1e-5,
+            )["relative_drift"]
+            minus = smooth_cage_projected_observables_batch(
+                positions,
+                velocities=velocities - velocity_step * direction,
+                forces=forces,
+                particle_types=types,
+                box_lengths=box,
+                target_indices=targets,
+                friction=friction,
+                temperature=temperature,
+                directional_step=1e-5,
+            )["relative_drift"]
+            laplacian += (plus - 2.0 * base + minus) / velocity_step**2
+
+        np.testing.assert_allclose(
+            result["velocity_laplacian"], laplacian, rtol=2e-3, atol=2e-3
+        )
+        np.testing.assert_allclose(
+            result["ito_trace_term"],
+            friction * temperature * laplacian,
+            rtol=2e-3,
+            atol=2e-3,
+        )
+
     def test_smooth_cage_features_are_rotation_invariant(self):
         from ka_smooth_cage import smooth_cage_invariant_features
 

@@ -288,7 +288,12 @@ def heldout_state_diagnostics(
     }
 
 
-def state_paths_to_displacements(state_paths: np.ndarray, *, frame_time: float) -> np.ndarray:
+def state_paths_to_displacements(
+    state_paths: np.ndarray,
+    *,
+    frame_time: float,
+    velocity_weights: np.ndarray | None = None,
+) -> np.ndarray:
     """Integrate the first state mode as velocity by the trapezoid rule."""
 
     paths = np.asarray(state_paths, dtype=float)
@@ -302,7 +307,14 @@ def state_paths_to_displacements(state_paths: np.ndarray, *, frame_time: float) 
         raise ValueError("state_paths must be finite (frames, samples, modes, 3)")
     if not np.isfinite(frame_time) or frame_time <= 0.0:
         raise ValueError("frame_time must be positive and finite")
-    velocity = paths[:, :, 0]
+    if velocity_weights is None:
+        weights = np.zeros(paths.shape[2], dtype=float)
+        weights[0] = 1.0
+    else:
+        weights = np.asarray(velocity_weights, dtype=float)
+        if weights.shape != (paths.shape[2],) or np.any(~np.isfinite(weights)):
+            raise ValueError("velocity_weights must align with the state modes")
+    velocity = np.einsum("m,tsmc->tsc", weights, paths)
     increment = 0.5 * frame_time * (velocity[:-1] + velocity[1:])
     displacement = np.zeros((len(paths), paths.shape[1], 3), dtype=float)
     displacement[1:] = np.cumsum(increment, axis=0)
@@ -316,6 +328,7 @@ def simulate_slow_bath_displacements(
     simulation_count: int,
     frame_time: float,
     seed: int,
+    velocity_weights: np.ndarray | None = None,
 ) -> np.ndarray:
     """Generate displacements without retaining every auxiliary-state frame."""
 
@@ -328,16 +341,24 @@ def simulate_slow_bath_displacements(
     innovation_sqrt = np.asarray(model["innovation_square_root"], dtype=float)
     residual_pool = np.asarray(model["standardized_residual_blocks"], dtype=float)
     state_pool = np.asarray(model["training_state_pool"], dtype=float)
+    if velocity_weights is None:
+        weights = np.zeros(len(state_mean), dtype=float)
+        weights[0] = 1.0
+    else:
+        weights = np.asarray(velocity_weights, dtype=float)
+        if weights.shape != (len(state_mean),) or np.any(~np.isfinite(weights)):
+            raise ValueError("velocity_weights must align with the model state")
     rng = np.random.default_rng(seed)
     current = state_pool[rng.integers(len(state_pool), size=simulation_count)].copy()
     displacement = np.zeros((step_count + 1, simulation_count, 3), dtype=float)
     for step in range(1, step_count + 1):
-        previous_velocity = current[:, 0].copy()
+        previous_velocity = np.einsum("m,smc->sc", weights, current)
         centered = current - state_mean[None, :, None]
         current = state_mean[None, :, None] + np.einsum("ab,sbc->sac", transition, centered)
         standardized = residual_pool[rng.integers(len(residual_pool), size=simulation_count)]
         current += np.einsum("ab,sbc->sac", innovation_sqrt, standardized)
+        current_velocity = np.einsum("m,smc->sc", weights, current)
         displacement[step] = displacement[step - 1] + 0.5 * frame_time * (
-            previous_velocity + current[:, 0]
+            previous_velocity + current_velocity
         )
     return displacement

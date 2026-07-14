@@ -70,6 +70,7 @@ from ka_local_cage import (  # noqa: E402
     ka_lj_radial_derivatives,
     ka_lj_force_and_isotropic_curvature,
     ka_lj_force_generator_observables,
+    ka_lj_sparse_force_generator_observables,
     ka_lj_second_force_generator,
     ka_lj_shell_forces,
     precursor_event_hazard_diagnostic,
@@ -3758,6 +3759,52 @@ class KAReplicatePreparationTests(unittest.TestCase):
             potential_protocol=protocol,
         )["force_generator"]
         np.testing.assert_allclose(second, (plus - minus) / (2.0 * drift_step), rtol=3e-5, atol=3e-5)
+
+    def test_sparse_ka_force_generator_matches_dense_pair_geometry(self):
+        rng = np.random.default_rng(20260718)
+        axis = np.arange(5, dtype=float) * 2.0 + 1.0
+        positions = np.stack(
+            np.meshgrid(axis, axis, axis, indexing="ij"), axis=-1
+        ).reshape(-1, 3)
+        positions += rng.normal(scale=0.035, size=positions.shape)
+        velocities = rng.normal(scale=0.7, size=positions.shape)
+        particle_types = np.arange(len(positions), dtype=int) % 2
+        box_lengths = np.full(3, 10.0)
+        targets = np.array([0, 1, 7, 31, 62, 93, 124])
+
+        for protocol in ("ka_lj_cut", "ka_lj_c3_switch"):
+            dense = ka_lj_force_generator_observables(
+                positions,
+                velocities=velocities,
+                particle_types=particle_types,
+                box_lengths=box_lengths,
+                target_indices=targets,
+                friction=1.0,
+                temperature=0.58,
+                potential_protocol=protocol,
+            )
+            sparse = ka_lj_sparse_force_generator_observables(
+                positions,
+                velocities=velocities,
+                particle_types=particle_types,
+                box_lengths=box_lengths,
+                target_indices=targets,
+                potential_protocol=protocol,
+            )
+
+            np.testing.assert_allclose(
+                sparse["force"], dense["force"], rtol=2e-13, atol=2e-13
+            )
+            np.testing.assert_allclose(
+                sparse["force_generator"],
+                dense["force_generator"],
+                rtol=2e-13,
+                atol=2e-13,
+            )
+            self.assertLess(
+                float(np.max(sparse["candidate_count"])), len(positions)
+            )
+            self.assertEqual(float(sparse["thermodynamic_claim_allowed"]), 0.0)
 
     def test_ka_force_generator_matches_directional_force_derivative_and_hessian_noise(self):
         positions = np.array([[0.0, 0.0, 0.0], [1.13, 0.17, -0.08]])
