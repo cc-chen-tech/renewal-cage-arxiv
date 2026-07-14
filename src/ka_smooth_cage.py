@@ -401,6 +401,159 @@ def smooth_cage_projected_observables_batch(
     }
 
 
+def smooth_cage_second_generator_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    forces: np.ndarray,
+    force_generator: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    temperature: float,
+    directional_step: float,
+    phase_space_step: float,
+    trace_probes: np.ndarray | None,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float]:
+    """Return ``L p`` and ``L^2 p`` for the smooth cage-relative velocity."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    force_generator = np.asarray(force_generator, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or forces.shape != positions.shape
+        or force_generator.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+        or np.any(~np.isfinite(forces))
+        or np.any(~np.isfinite(force_generator))
+    ):
+        raise ValueError("phase-space arrays must be aligned finite (particles, 3) arrays")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    if not math.isfinite(phase_space_step) or phase_space_step <= 0.0:
+        raise ValueError("phase_space_step must be finite and positive")
+    if trace_probes is None:
+        probes = np.empty((0, *positions.shape), dtype=float)
+    else:
+        probes = np.asarray(trace_probes, dtype=float)
+        if (
+            probes.ndim != 3
+            or probes.shape[1:] != positions.shape
+            or len(probes) < 1
+            or np.any(~np.isfinite(probes))
+        ):
+            raise ValueError("trace_probes must be finite full phase-space vectors")
+    if temperature > 0.0 and not len(probes):
+        raise ValueError("positive temperature requires trace_probes")
+
+    common = {
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "friction": friction,
+        "temperature": temperature,
+        "directional_step": directional_step,
+        "target_batch_size": target_batch_size,
+    }
+
+    def relative_drift(
+        current_positions: np.ndarray,
+        current_velocities: np.ndarray,
+        current_forces: np.ndarray,
+    ) -> np.ndarray:
+        return np.asarray(
+            smooth_cage_projected_observables_batch(
+                current_positions,
+                velocities=current_velocities,
+                forces=current_forces,
+                **common,
+            )["relative_drift"],
+            dtype=float,
+        )
+
+    base = smooth_cage_projected_observables_batch(
+        positions,
+        velocities=velocities,
+        forces=forces,
+        **common,
+    )
+    base_drift = np.asarray(base["relative_drift"], dtype=float)
+    step = float(phase_space_step)
+    position_term = (
+        relative_drift(
+            positions + step * velocities,
+            velocities,
+            forces + step * force_generator,
+        )
+        - relative_drift(
+            positions - step * velocities,
+            velocities,
+            forces - step * force_generator,
+        )
+    ) / (2.0 * step)
+
+    acceleration = forces - friction * velocities
+    velocity_term = (
+        relative_drift(positions, velocities + step * acceleration, forces)
+        - relative_drift(positions, velocities - step * acceleration, forces)
+    ) / (2.0 * step)
+
+    velocity_laplacian = np.zeros_like(base_drift)
+    if len(probes):
+        common_coordinate = {
+            "particle_types": particle_types,
+            "box_lengths": box_lengths,
+            "target_indices": targets,
+            "target_batch_size": target_batch_size,
+            "compute_gram": False,
+        }
+        trace_terms = []
+        for probe in probes:
+            plus = smooth_force_support_cage_batch(
+                positions + directional_step * probe,
+                velocities=probe,
+                **common_coordinate,
+            )["relative_velocity"]
+            minus = smooth_force_support_cage_batch(
+                positions - directional_step * probe,
+                velocities=probe,
+                **common_coordinate,
+            )["relative_velocity"]
+            trace_terms.append((plus - minus) / directional_step)
+        velocity_laplacian = np.mean(np.asarray(trace_terms), axis=0)
+    ito_trace_term = friction * temperature * velocity_laplacian
+    second = position_term + velocity_term + ito_trace_term
+    probe_second_moment_error = (
+        float(np.max(np.abs(np.mean(probes**2, axis=0) - 1.0)))
+        if len(probes)
+        else 0.0
+    )
+    return {
+        **base,
+        "position_generator_term": position_term,
+        "velocity_generator_term": velocity_term,
+        "velocity_laplacian": velocity_laplacian,
+        "ito_trace_term": ito_trace_term,
+        "second_relative_generator": second,
+        "phase_space_step": step,
+        "trace_probe_count": float(len(probes)),
+        "trace_probe_second_moment_error": probe_second_moment_error,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def smooth_cage_projected_observables(
     positions: np.ndarray,
     *,

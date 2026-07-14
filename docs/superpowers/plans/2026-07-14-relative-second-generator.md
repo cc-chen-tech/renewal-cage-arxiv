@@ -28,11 +28,11 @@
 - Consumes: positions, velocities, KA types, box lengths, selected particles.
 - Produces: `ka_lj_sparse_force_generator_observables(...)` with `force` and `force_generator` arrays aligned to selected particles.
 
-- [ ] Write tests comparing sparse and dense force/`LF` on both protocols and species.
-- [ ] Run the focused tests and verify they fail because the sparse API is absent.
-- [ ] Implement periodic linked cells with a cell width no smaller than the maximum KA cutoff.
-- [ ] Run the focused tests and benchmark one 4096-particle frame.
-- [ ] Commit the tested sparse Hessian action.
+- [x] Write tests comparing sparse and dense force/`LF` on both protocols and species.
+- [x] Run the focused tests and verify they fail because the sparse API is absent.
+- [x] Implement periodic linked cells with a cell width no smaller than the maximum KA cutoff.
+- [x] Run the focused tests and benchmark one 4096-particle frame.
+- [x] Commit the tested sparse Hessian action.
 
 ### Task 2: Smooth-Cage `L2p`
 
@@ -44,11 +44,11 @@
 - Consumes: full `(R,V,F,LF)`, fixed targets, finite-difference controls, and fixed trace probes.
 - Produces: `smooth_cage_second_generator_batch(...)` with `relative_drift`, `second_relative_generator`, directional terms, and Ito trace diagnostics.
 
-- [ ] Write a failing harmonic-coordinate test with an analytic `L2p` value.
-- [ ] Write a failing small-KA-system test against the conditional short-time generator definition.
-- [ ] Implement centered position and velocity derivatives plus the antithetic Ito trace.
-- [ ] Run focused tests and a three-step convergence check.
-- [ ] Commit the tested second-generator observable.
+- [x] Write a failing harmonic-coordinate test with an analytic `L2p` value.
+- [x] Write a failing small-KA-system test against the conditional short-time generator definition.
+- [x] Implement centered position and velocity derivatives plus the antithetic Ito trace.
+- [x] Run focused tests and a three-step convergence check.
+- [x] Commit the tested second-generator observable.
 
 ### Task 3: Discovery Cache And Numerical Convergence
 

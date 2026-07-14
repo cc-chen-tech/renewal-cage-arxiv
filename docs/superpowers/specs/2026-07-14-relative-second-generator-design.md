@@ -77,11 +77,15 @@ derivative; the remaining truncation error is second order in `h_R`.
 
 ### Ito trace
 
-Evaluate `Delta_V b` with fixed, antithetic Rademacher trace probes:
+Because the velocity dependence of `b` is exactly quadratic, avoid a second
+difference of nearly equal drift values. For fixed Rademacher trace probes,
+evaluate the algebraically equivalent Hessian action:
 
 ```text
-Delta_V b approximately mean_q
-  [b(V+h_I z_q)-2b(V)+b(V-h_I z_q)]/h_I^2,
+H_u[z_q,z_q] approximately
+  [J(R+h_I z_q)z_q - J(R-h_I z_q)z_q]/(2 h_I),
+
+Delta_V b approximately 2 mean_q H_u[z_q,z_q],
 E[z_q z_q^T] = I.
 ```
 
@@ -89,6 +93,12 @@ The probe seed is fixed before validation. Discovery reports convergence with
 probe counts `4,8,16,32` and at least three finite-difference steps. The final
 validation uses one frozen probe count and step; it does not select them from
 held-clone closure scores.
+
+On the first real-frame canary, varying the phase-space step from `3e-6` to
+`3e-5` and the cage directional step from `5e-6` to `2e-5` changed `L2p` by
+at most `4.6e-8` in relative L2 norm. The Ito term had RMS `1.29`, compared
+with total `L2p` RMS `532.11`; it is retained for generator correctness even
+though it is not the dominant contribution at this state point.
 
 ## Preliminary Proxy No-Go
 
