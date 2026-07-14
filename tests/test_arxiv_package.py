@@ -1919,6 +1919,138 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_colored_block_noise_closes_relative_matrix_mori_simulation(self):
+        discovery_stem = "renewal_cage_ka_relative_generator_noise_discovery_T058"
+        validation_stems = (
+            "renewal_cage_ka_relative_generator_noise_validation_highstat_T058",
+            "renewal_cage_ka_relative_generator_noise_validation_highstat_seedB_T058",
+        )
+        required_paths = (
+            ROOT / "scripts" / "analyze_ka_relative_generator_noise_closure.py",
+            ROOT / "docs" / "microscopic-relative-generator-noise-closure.md",
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "specs"
+            / "2026-07-14-relative-generator-noise-closure-design.md",
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-07-14-relative-generator-noise-closure.md",
+        )
+        for path in required_paths:
+            self.assertTrue(path.is_file(), path)
+        for stem in (discovery_stem, *validation_stems):
+            for suffix in ("details", "summary", "curve"):
+                path = ROOT / "data" / f"{stem}_{suffix}.csv"
+                self.assertTrue(path.is_file(), path)
+
+        document = required_paths[1].read_text()
+        for required in (
+            "0.79545",
+            "0.27484",
+            "0.06023",
+            "0.23928",
+            "0.20661",
+            "0.20338",
+            "selected_innovation_block_length = 40",
+            "iid_innovation_noise_allowed = 0",
+            "colored_orthogonal_noise_required = 1",
+            "empirical_block_noise_generation_closed = 1",
+            "autonomous_relative_matrix_mori_simulation_allowed = 1",
+            "thermal_fdt_adjoint_audit_pass = 0",
+            "microscopic_thermal_noise_model_closed = 0",
+            "autonomous_single_particle_gle_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with (ROOT / "data" / f"{discovery_stem}_summary.csv").open() as handle:
+            discovery = list(csv.DictReader(handle))
+        iid = next(
+            row
+            for row in discovery
+            if row["record"] == "model_aggregate"
+            and int(float(row["innovation_block_length"])) == 1
+        )
+        selected = next(
+            row
+            for row in discovery
+            if row["record"] == "model_aggregate"
+            and int(float(row["innovation_block_length"])) == 40
+        )
+        self.assertEqual(float(iid["empirical_block_noise_gate_pass"]), 0.0)
+        self.assertGreater(
+            float(iid["maximum_stationary_covariance_maximum_error"]), 0.79
+        )
+        self.assertLess(float(iid["minimum_terminal_variance_ratio"]), 0.28)
+        self.assertEqual(float(selected["empirical_block_noise_gate_pass"]), 1.0)
+        self.assertLess(
+            float(selected["maximum_stationary_covariance_rmse"]), 0.061
+        )
+        discovery_verdict = next(
+            row for row in discovery if row["record"] == "verdict"
+        )
+        self.assertEqual(
+            int(float(discovery_verdict["selected_innovation_block_length"])), 40
+        )
+        self.assertEqual(float(discovery_verdict["iid_innovation_noise_allowed"]), 0.0)
+        self.assertEqual(
+            float(discovery_verdict["colored_orthogonal_noise_required"]), 1.0
+        )
+        self.assertEqual(
+            float(discovery_verdict["empirical_block_noise_generation_closed"]),
+            0.0,
+        )
+
+        expected_seeds = (20260716.0, 20270716.0)
+        for stem, expected_seed in zip(validation_stems, expected_seeds, strict=True):
+            with (ROOT / "data" / f"{stem}_summary.csv").open() as handle:
+                rows = list(csv.DictReader(handle))
+            aggregate = next(row for row in rows if row["record"] == "model_aggregate")
+            self.assertEqual(int(float(aggregate["held_clone_count"])), 2)
+            self.assertEqual(float(aggregate["empirical_block_noise_gate_pass"]), 1.0)
+            self.assertLess(
+                float(aggregate["maximum_stationary_covariance_rmse"]), 0.055
+            )
+            self.assertLess(
+                float(aggregate["maximum_stationary_covariance_maximum_error"]),
+                0.207,
+            )
+            self.assertLess(
+                float(aggregate["maximum_target_correlation_maximum_error"]), 0.157
+            )
+            self.assertLess(
+                float(aggregate["maximum_marginal_excess_kurtosis_maximum_error"]),
+                0.150,
+            )
+            verdict = next(row for row in rows if row["record"] == "verdict")
+            for key in (
+                "empirical_block_noise_generation_closed",
+                "autonomous_relative_matrix_mori_simulation_allowed",
+                "colored_orthogonal_noise_required",
+            ):
+                self.assertEqual(float(verdict[key]), 1.0)
+            for key in (
+                "iid_innovation_noise_allowed",
+                "thermal_fdt_adjoint_audit_pass",
+                "microscopic_thermal_noise_model_closed",
+                "autonomous_single_particle_gle_allowed",
+                "complete_event_clock_closure_allowed",
+                "kramers_escape_claim_allowed",
+                "thermodynamic_claim_allowed",
+            ):
+                self.assertEqual(float(verdict[key]), 0.0)
+
+            details_path = ROOT / "data" / f"{stem}_details.csv"
+            with details_path.open() as handle:
+                details = list(csv.DictReader(handle))
+            self.assertEqual(
+                {float(row["simulation_seed"]) for row in details},
+                {expected_seed, expected_seed + 1000.0},
+            )
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"

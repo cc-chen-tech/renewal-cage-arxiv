@@ -12,6 +12,7 @@ from ka_relative_mori import (  # noqa: E402
     bias_centered_phase_state,
     discrete_mori_gfd_diagnostic,
     discrete_mori_noise,
+    finite_memory_innovation_series,
     parity_detailed_balance_diagnostic,
     propagate_discrete_mori_correlation,
 )
@@ -51,6 +52,22 @@ class RelativeMoriTests(unittest.TestCase):
         )
         np.testing.assert_allclose(noise[0, :, 0, 0], expected_w0[: len(noise[0])])
         np.testing.assert_allclose(noise[1, :, 0, 0], expected_w1[: len(noise[1])])
+
+    def test_finite_memory_innovation_series_recovers_ar2_driving(self):
+        operators = np.array([[[0.7]], [[-0.2]]])
+        driving = np.array([0.3, -0.1, 0.4, 0.2, -0.5, 0.1])
+        state = np.empty((len(driving) + 2, 1, 1))
+        state[:2, 0, 0] = [1.0, 0.5]
+        for frame, value in enumerate(driving, start=1):
+            state[frame + 1, 0, 0] = (
+                0.7 * state[frame, 0, 0]
+                - 0.2 * state[frame - 1, 0, 0]
+                + value
+            )
+
+        innovation = finite_memory_innovation_series(state, operators)
+
+        np.testing.assert_allclose(innovation[:, 0, 0], driving)
 
     def test_correlation_propagation_uses_finite_memory_tail(self):
         operators = np.array([[[0.8]], [[-0.15]]])
@@ -179,6 +196,28 @@ class RelativeMoriTests(unittest.TestCase):
         )
         self.assertIn("--training-drift-cache-directory", completed.stdout)
         self.assertIn("--validation-drift-cache-directory", completed.stdout)
+
+    def test_noise_closure_cli_exposes_block_discovery_and_fixed_validation(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    ROOT
+                    / "scripts"
+                    / "analyze_ka_relative_generator_noise_closure.py"
+                ),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for required in (
+            "--innovation-block-lengths",
+            "--fixed-innovation-block-length",
+            "--validation-drift-cache-directory",
+        ):
+            self.assertIn(required, completed.stdout)
 
 
 if __name__ == "__main__":

@@ -69,6 +69,38 @@ def discrete_mori_noise(
     return noise
 
 
+def finite_memory_innovation_series(
+    resolved_state: np.ndarray,
+    operators: np.ndarray,
+) -> np.ndarray:
+    """Return the sliding residual used by a finite-memory simulator."""
+
+    state = np.asarray(resolved_state, dtype=float)
+    memory = np.asarray(operators, dtype=float)
+    if (
+        state.ndim != 3
+        or memory.ndim != 3
+        or memory.shape[1] != memory.shape[2]
+        or state.shape[2] != memory.shape[1]
+        or len(memory) < 1
+        or len(state) < len(memory) + 1
+        or np.any(~np.isfinite(state))
+        or np.any(~np.isfinite(memory))
+    ):
+        raise ValueError("resolved state and finite-memory operators must align")
+    memory_order = len(memory) - 1
+    innovation = np.empty(
+        (len(state) - memory_order - 1, state.shape[1], state.shape[2]),
+        dtype=float,
+    )
+    for output_index, current in enumerate(range(memory_order, len(state) - 1)):
+        prediction = sum(
+            state[current - lag] @ memory[lag].T for lag in range(len(memory))
+        )
+        innovation[output_index] = state[current + 1] - prediction
+    return innovation
+
+
 def discrete_mori_gfd_diagnostic(
     resolved_state: np.ndarray,
     operators: np.ndarray,
