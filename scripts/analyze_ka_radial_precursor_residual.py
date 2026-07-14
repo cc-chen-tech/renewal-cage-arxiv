@@ -235,6 +235,9 @@ def load_parent_state_and_labels(
     return {
         "parent_restart_sha256": str(manifest["parent_restart_sha256"]),
         "target_indices": target_indices,
+        "positions": parent_positions,
+        "particle_types": parent_types,
+        "box_lengths": parent_box,
         "first_passage": np.asarray(first_passage_rows),
         "escaped": np.asarray(escaped_rows),
         "geometry": geometry,

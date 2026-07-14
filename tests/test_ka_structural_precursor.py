@@ -230,6 +230,60 @@ class StructuralPrecursorTests(unittest.TestCase):
         )
         np.testing.assert_allclose(feature[0], expected, rtol=0.0, atol=1e-12)
 
+    def test_softmode_residual_analysis_freezes_same_label_protocol(self):
+        source = (
+            ROOT / "scripts" / "analyze_ka_softmode_precursor_residual.py"
+        ).read_text()
+
+        for required in (
+            "CLUSTER_CUTOFF = 1.5",
+            "MODE_RANKS = (0, 3)",
+            "EIGENVALUE_FLOOR = 1e-6",
+            "EXPECTED_EVENT_COUNT = 1731",
+            "EXPECTED_CENSORED_COUNT = 829",
+            '"geometry_softmode"',
+            "grouped_exponential_escape_diagnostic",
+            "grouped_binomial_logistic_committor_diagnostic",
+            "geometry_reproduction_gate_pass",
+            "clone_invariance_gate_pass",
+            '"event_clock_claim_allowed": False',
+            '"autonomous_single_particle_gle_claim_allowed": False',
+            '"kramers_escape_claim_allowed": False',
+            '"thermodynamic_claim_allowed": False',
+        ):
+            self.assertIn(required, source)
+
+    def test_softmode_precursor_gate_requires_uniform_held_parent_transfer(self):
+        from analyze_ka_softmode_precursor_residual import (
+            evaluate_softmode_precursor_gates,
+        )
+
+        metrics = {
+            "integrity_gate_pass": True,
+            "geometry_reproduction_gate_pass": True,
+            "clone_invariance_gate_pass": True,
+            "geometry_mean_heldout_brier_skill": 0.008,
+            "softmode_mean_heldout_brier_skill": 0.015,
+            "geometry_softmode_mean_heldout_brier_skill": 0.04,
+            "geometry_softmode_mean_heldout_log_likelihood_gain_per_observation": 0.01,
+            "geometry_softmode_minimum_group_log_likelihood_gain": 0.1,
+            "geometry_softmode_maximum_heldout_survival_calibration_error": 0.09,
+            "geometry_binomial_mean_heldout_brier_skill": 0.01,
+            "geometry_softmode_binomial_mean_heldout_brier_skill": 0.03,
+        }
+        passing = evaluate_softmode_precursor_gates(metrics)
+        self.assertTrue(passing["instantaneous_local_softmode_precursor_allowed"])
+        failing = evaluate_softmode_precursor_gates(
+            {
+                **metrics,
+                "geometry_softmode_minimum_group_log_likelihood_gain": -1e-6,
+            }
+        )
+        self.assertFalse(failing["likelihood_gate_pass"])
+        self.assertFalse(
+            failing["instantaneous_local_softmode_precursor_allowed"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
