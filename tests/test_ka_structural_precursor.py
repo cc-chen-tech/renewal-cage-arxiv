@@ -173,6 +173,63 @@ class StructuralPrecursorTests(unittest.TestCase):
         self.assertFalse(failing["likelihood_gate_pass"])
         self.assertFalse(failing["static_radial_precursor_allowed"])
 
+    def test_local_soft_mode_features_match_exact_cluster_hessian(self):
+        from ka_local_cage import ka_local_cluster_hessian
+        from ka_structural_precursor import instantaneous_local_soft_mode_features
+
+        positions = np.array([[0.0, 0.0, 0.0], [1.2, 0.0, 0.0]])
+        particle_types = np.array([0, 0])
+        box_lengths = np.array([20.0, 20.0, 20.0])
+        floor = 1e-8
+        cluster = ka_local_cluster_hessian(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_index=0,
+            cluster_cutoff=2.0,
+        )
+        eigenvalue, eigenvector = np.linalg.eigh(cluster["hessian"])
+        positive = np.flatnonzero(eigenvalue > floor)
+        mode = int(positive[0])
+        local_target = int(np.flatnonzero(cluster["cluster_indices"] == 0)[0])
+        target_weight = float(
+            np.sum(
+                eigenvector[
+                    3 * local_target : 3 * local_target + 3, mode
+                ]
+                ** 2
+            )
+        )
+        expected = np.array(
+            [
+                np.log(1.0 / eigenvalue[mode]),
+                np.log(target_weight / eigenvalue[mode]),
+                np.log(len(cluster["cluster_indices"])),
+                np.sum(eigenvalue <= floor),
+            ]
+        )
+
+        feature, names = instantaneous_local_soft_mode_features(
+            positions,
+            particle_types,
+            box_lengths,
+            np.array([0]),
+            cluster_cutoff=2.0,
+            ranks=(0,),
+            eigenvalue_floor=floor,
+        )
+
+        self.assertEqual(
+            names,
+            (
+                "log_inverse_eigenvalue_rank_0",
+                "log_target_weighted_softness_rank_0",
+                "log_cluster_particle_count",
+                "negative_or_zero_mode_count",
+            ),
+        )
+        np.testing.assert_allclose(feature[0], expected, rtol=0.0, atol=1e-12)
+
 
 if __name__ == "__main__":
     unittest.main()

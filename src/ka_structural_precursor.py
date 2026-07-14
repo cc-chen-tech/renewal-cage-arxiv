@@ -6,6 +6,8 @@ import math
 
 import numpy as np
 
+from ka_local_cage import ka_local_cluster_hessian
+
 
 def species_resolved_radial_features(
     positions: np.ndarray,
@@ -166,3 +168,91 @@ def expand_isoconfigurational_structural_rows(
         "trials": np.full(parent_count * target_count, float(clone_count)),
         "configuration_groups": configuration_groups,
     }
+
+
+def instantaneous_local_soft_mode_features(
+    positions: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    *,
+    cluster_cutoff: float = 1.5,
+    ranks: tuple[int, ...] = (0, 3),
+    eigenvalue_floor: float = 1e-6,
+) -> tuple[np.ndarray, tuple[str, ...]]:
+    """Return directional local-Hessian softness at selected KA particles."""
+
+    target_indices = np.asarray(target_indices)
+    if (
+        target_indices.ndim != 1
+        or len(target_indices) < 1
+        or np.any(target_indices != target_indices.astype(int))
+    ):
+        raise ValueError("target_indices must be a nonempty integer vector")
+    target_indices = target_indices.astype(int)
+    if len(np.unique(target_indices)) != len(target_indices):
+        raise ValueError("target_indices must select distinct particles")
+    if not math.isfinite(cluster_cutoff) or cluster_cutoff <= 0.0:
+        raise ValueError("cluster_cutoff must be positive and finite")
+    if not ranks or any(
+        isinstance(rank, bool) or not isinstance(rank, (int, np.integer)) or rank < 0
+        for rank in ranks
+    ) or len(set(ranks)) != len(ranks):
+        raise ValueError("ranks must be unique nonnegative integers")
+    if not math.isfinite(eigenvalue_floor) or eigenvalue_floor <= 0.0:
+        raise ValueError("eigenvalue_floor must be positive and finite")
+
+    names = tuple(
+        name
+        for rank in ranks
+        for name in (
+            f"log_inverse_eigenvalue_rank_{rank}",
+            f"log_target_weighted_softness_rank_{rank}",
+        )
+    ) + ("log_cluster_particle_count", "negative_or_zero_mode_count")
+    rows: list[np.ndarray] = []
+    floor = np.finfo(float).tiny
+    for target_index in target_indices:
+        cluster = ka_local_cluster_hessian(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_index=int(target_index),
+            cluster_cutoff=cluster_cutoff,
+        )
+        eigenvalue, eigenvector = np.linalg.eigh(cluster["hessian"])
+        positive = np.flatnonzero(eigenvalue > eigenvalue_floor)
+        if len(positive) <= max(ranks):
+            raise ValueError("cluster has too few positive modes for requested ranks")
+        local_target = int(
+            np.flatnonzero(cluster["cluster_indices"] == target_index)[0]
+        )
+        row: list[float] = []
+        for rank in ranks:
+            mode = int(positive[rank])
+            stiffness = float(eigenvalue[mode])
+            target_weight = float(
+                np.sum(
+                    eigenvector[
+                        3 * local_target : 3 * local_target + 3, mode
+                    ]
+                    ** 2
+                )
+            )
+            row.extend(
+                [
+                    math.log(1.0 / stiffness),
+                    math.log(max(target_weight / stiffness, floor)),
+                ]
+            )
+        row.extend(
+            [
+                math.log(len(cluster["cluster_indices"])),
+                float(np.sum(eigenvalue <= eigenvalue_floor)),
+            ]
+        )
+        rows.append(np.asarray(row, dtype=float))
+    features = np.asarray(rows)
+    if np.any(~np.isfinite(features)):
+        raise ValueError("local soft-mode features must be finite")
+    return features, names
