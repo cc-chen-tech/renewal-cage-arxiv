@@ -1565,6 +1565,78 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_additive_correlated_noise_closure_keeps_cross_noise(self):
+        stem = "renewal_cage_ka_additive_correlated_noise_closure_T058"
+        document_path = ROOT / "docs" / "microscopic-additive-correlated-noise-closure.md"
+        summary_path = ROOT / "data" / f"{stem}_summary.csv"
+        detail_path = ROOT / "data" / f"{stem}_details.csv"
+        script_path = (
+            ROOT / "scripts" / "analyze_ka_additive_correlated_noise_closure.py"
+        )
+        for path in (document_path, summary_path, detail_path, script_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.17633",
+            "-0.86023",
+            "0.00170",
+            "0.82362",
+            "constant_correlated_projected_noise_allowed = 1",
+            "configuration_dependent_noise_required = 0",
+            "center_relative_cross_noise_required = 1",
+            "autonomous_drift_closure_allowed = 0",
+            "autonomous_single_particle_gle_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"]: row for row in rows if row["record"] == "pooled_model"}
+        self.assertEqual(
+            set(models),
+            {
+                "exact_configuration_dependent",
+                "constant_full",
+                "constant_block_isotropic",
+                "constant_block_uncorrelated",
+                "constant_single_scalar",
+            },
+        )
+        primary = models["constant_block_isotropic"]
+        uncorrelated = models["constant_block_uncorrelated"]
+        self.assertEqual(
+            float(primary["every_held_clone_local_noise_gate_pass"]), 1.0
+        )
+        self.assertLess(
+            float(primary["maximum_absolute_whitened_covariance_error"]), 0.07
+        )
+        self.assertGreater(
+            float(uncorrelated["maximum_absolute_whitened_covariance_error"]), 0.82
+        )
+        self.assertEqual(
+            float(uncorrelated["every_held_clone_local_noise_gate_pass"]), 0.0
+        )
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertLess(
+            float(verdict["maximum_primary_to_exact_metric_difference"]), 0.002
+        )
+        self.assertEqual(
+            float(verdict["constant_correlated_projected_noise_allowed"]), 1.0
+        )
+        self.assertEqual(float(verdict["configuration_dependent_noise_required"]), 0.0)
+        self.assertEqual(float(verdict["center_relative_cross_noise_required"]), 1.0)
+        for key in (
+            "autonomous_drift_closure_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"

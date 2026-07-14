@@ -7,6 +7,63 @@ import math
 import numpy as np
 
 
+def fit_constant_joint_covariance(
+    covariance_paths: np.ndarray,
+    *,
+    model: str,
+) -> np.ndarray:
+    """Fit a constant six-dimensional center-relative covariance model."""
+
+    covariance = np.asarray(covariance_paths, dtype=float)
+    if (
+        covariance.ndim < 3
+        or covariance.shape[-2:] != (6, 6)
+        or np.any(~np.isfinite(covariance))
+        or not np.allclose(
+            covariance,
+            np.swapaxes(covariance, -1, -2),
+            rtol=1e-10,
+            atol=1e-12,
+        )
+    ):
+        raise ValueError("covariance paths must contain finite symmetric 6x6 matrices")
+    eigenvalues = np.linalg.eigvalsh(covariance)
+    scale = np.max(np.abs(eigenvalues), axis=-1)
+    if np.any(eigenvalues[..., 0] < -1e-10 * np.maximum(scale, 1.0)):
+        raise ValueError("covariance paths must be positive semidefinite")
+    if model not in {
+        "full",
+        "block_isotropic",
+        "block_isotropic_uncorrelated",
+        "single_scalar",
+    }:
+        raise ValueError("unknown constant covariance model")
+
+    mean = np.mean(covariance.reshape(-1, 6, 6), axis=0)
+    mean = 0.5 * (mean + mean.T)
+    if model == "full":
+        fitted = mean
+    elif model == "single_scalar":
+        fitted = np.eye(6) * np.trace(mean) / 6.0
+    else:
+        center_scale = np.trace(mean[:3, :3]) / 3.0
+        relative_scale = np.trace(mean[3:, 3:]) / 3.0
+        cross_scale = (
+            np.trace(mean[:3, 3:]) / 3.0
+            if model == "block_isotropic"
+            else 0.0
+        )
+        fitted = np.block(
+            [
+                [center_scale * np.eye(3), cross_scale * np.eye(3)],
+                [cross_scale * np.eye(3), relative_scale * np.eye(3)],
+            ]
+        )
+    if np.min(np.linalg.eigvalsh(fitted)) < -1e-12:
+        raise ValueError("constant covariance projection must remain positive semidefinite")
+    return fitted
+
+
 def block_projected_ito_increments(
     state: np.ndarray,
     drift: np.ndarray,

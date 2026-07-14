@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ka_projected_innovation import (  # noqa: E402
     block_projected_ito_increments,
+    fit_constant_joint_covariance,
     multivariate_noise_covariance_diagnostic,
 )
 
@@ -113,6 +114,29 @@ class ProjectedInnovationTests(unittest.TestCase):
                 scheme="left",
             )
 
+    def test_constant_joint_covariance_models_preserve_requested_symmetry(self):
+        rng = np.random.default_rng(91)
+        raw = rng.normal(size=(30, 6, 6))
+        covariance = np.einsum("nik,njk->nij", raw, raw) + np.eye(6)
+
+        full = fit_constant_joint_covariance(covariance, model="full")
+        isotropic = fit_constant_joint_covariance(covariance, model="block_isotropic")
+        uncorrelated = fit_constant_joint_covariance(
+            covariance, model="block_isotropic_uncorrelated"
+        )
+        scalar = fit_constant_joint_covariance(covariance, model="single_scalar")
+
+        np.testing.assert_allclose(full, np.mean(covariance, axis=0))
+        for block in (isotropic[:3, :3], isotropic[3:, 3:]):
+            np.testing.assert_allclose(block, np.eye(3) * np.trace(block) / 3.0)
+        np.testing.assert_allclose(
+            isotropic[:3, 3:], np.eye(3) * np.trace(isotropic[:3, 3:]) / 3.0
+        )
+        np.testing.assert_allclose(uncorrelated[:3, 3:], np.zeros((3, 3)))
+        np.testing.assert_allclose(scalar, np.eye(6) * np.trace(scalar) / 6.0)
+        for fitted in (full, isotropic, uncorrelated, scalar):
+            self.assertGreater(float(np.min(np.linalg.eigvalsh(fitted))), 0.0)
+
     def test_real_data_cli_exposes_fixed_ito_sensitivity_controls(self):
         completed = subprocess.run(
             [
@@ -129,6 +153,28 @@ class ProjectedInnovationTests(unittest.TestCase):
             "--covariance-cache-directory",
             "--strides",
             "--schemes",
+        ):
+            self.assertIn(required, completed.stdout)
+
+    def test_additive_noise_cli_exposes_fixed_held_clone_controls(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    ROOT
+                    / "scripts"
+                    / "analyze_ka_additive_correlated_noise_closure.py"
+                ),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for required in (
+            "--drift-cache-directory",
+            "--covariance-cache-directory",
+            "--maximum-exact-metric-difference",
         ):
             self.assertIn(required, completed.stdout)
 
