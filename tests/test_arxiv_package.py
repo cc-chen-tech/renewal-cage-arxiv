@@ -15,6 +15,87 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_softmode_precursor_residual_gate_is_complete(self):
+        document_path = ROOT / "docs" / "microscopic-softmode-precursor-residual.md"
+        summary_path = (
+            ROOT / "data" / "renewal_cage_ka_softmode_precursor_T058_summary.csv"
+        )
+        model_path = (
+            ROOT / "data" / "renewal_cage_ka_softmode_precursor_T058_models.csv"
+        )
+        committor_path = (
+            ROOT / "data" / "renewal_cage_ka_softmode_precursor_T058_committor.csv"
+        )
+        for path in (document_path, summary_path, model_path, committor_path):
+            self.assertTrue(path.is_file())
+        document = document_path.read_text()
+        for required in (
+            "-0.00799",
+            "-0.00087",
+            "-0.00096",
+            "-3.7375",
+            "instantaneous_local_softmode_precursor_allowed = 0",
+            "event_clock_claim_allowed = 0",
+            "autonomous_single_particle_gle_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+            "stop adding scalar static local descriptors",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            summary = next(csv.DictReader(handle))
+        for key, expected in (
+            ("parent_count", 5),
+            ("distinct_parent_restart_hash_count", 5),
+            ("clone_count_per_parent", 8),
+            ("target_count", 64),
+            ("observation_count", 2560),
+            ("configuration_count", 320),
+            ("event_count", 1731),
+            ("censored_count", 829),
+        ):
+            self.assertEqual(int(summary[key]), expected)
+        self.assertEqual(float(summary["maximum_clone_position_difference"]), 0.0)
+        self.assertEqual(float(summary["maximum_geometry_reference_error"]), 0.0)
+        self.assertEqual(summary["integrity_gate_pass"], "True")
+        self.assertEqual(summary["geometry_reproduction_gate_pass"], "True")
+        self.assertEqual(summary["clone_invariance_gate_pass"], "True")
+        self.assertEqual(summary["brier_increment_gate_pass"], "False")
+        self.assertEqual(summary["brier_reference_gate_pass"], "False")
+        self.assertEqual(summary["likelihood_gate_pass"], "False")
+        self.assertEqual(summary["survival_gate_pass"], "True")
+        self.assertEqual(summary["binomial_gate_pass"], "False")
+        self.assertEqual(
+            summary["instantaneous_local_softmode_precursor_allowed"], "False"
+        )
+        self.assertEqual(summary["event_clock_claim_allowed"], "False")
+        self.assertEqual(
+            summary["autonomous_single_particle_gle_claim_allowed"], "False"
+        )
+        self.assertEqual(summary["kramers_escape_claim_allowed"], "False")
+        self.assertEqual(summary["thermodynamic_claim_allowed"], "False")
+        self.assertLess(float(summary["softmode_mean_heldout_brier_skill"]), 0.0)
+        self.assertLess(
+            float(summary["geometry_softmode_mean_heldout_brier_skill"]), 0.0
+        )
+        self.assertLess(
+            float(summary["geometry_softmode_minimum_group_log_likelihood_gain"]),
+            0.0,
+        )
+        self.assertLess(
+            float(summary["geometry_softmode_binomial_mean_heldout_brier_skill"]),
+            0.0,
+        )
+
+        with model_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(
+            {row["model"] for row in rows if row["record"] == "censored_model"},
+            {"geometry", "softmode", "geometry_softmode"},
+        )
+        self.assertEqual(sum(row["record"] == "held_parent" for row in rows), 15)
+
     def test_radial_precursor_residual_gate_is_complete_and_claim_limited(self):
         document_path = ROOT / "docs" / "microscopic-radial-precursor-residual.md"
         summary_path = (
