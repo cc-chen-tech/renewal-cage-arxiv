@@ -1701,6 +1701,83 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_relative_volterra_predicts_correlations_but_fails_fdt(self):
+        stem = "renewal_cage_ka_relative_harmonic_volterra_fdt_T058"
+        document_path = ROOT / "docs" / "microscopic-relative-harmonic-volterra-fdt.md"
+        summary_path = ROOT / "data" / f"{stem}_summary.csv"
+        detail_path = ROOT / "data" / f"{stem}_details.csv"
+        curve_path = ROOT / "data" / f"{stem}_curve.csv"
+        kernel_path = ROOT / "data" / f"{stem}_kernel.csv"
+        script_path = (
+            ROOT / "scripts" / "analyze_ka_relative_harmonic_volterra_fdt.py"
+        )
+        for path in (
+            document_path,
+            summary_path,
+            detail_path,
+            curve_path,
+            kernel_path,
+            script_path,
+        ):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.79011",
+            "0.06382",
+            "0.18326",
+            "0.27149",
+            "0.94666",
+            "isoconfigurational_cage_bias_supported = 1",
+            "relative_correlation_volterra_allowed = 1",
+            "relative_mori_fdt_closure_allowed = 0",
+            "physical_scalar_relative_gle_allowed = 0",
+            "relative_orthogonal_force_closure_required = 1",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        aggregate = next(row for row in rows if row["record"] == "aggregate")
+        self.assertEqual(int(float(aggregate["held_clone_count"])), 4)
+        self.assertGreater(float(aggregate["minimum_held_bias_correlation"]), 0.79)
+        self.assertLess(
+            float(aggregate["maximum_held_extrapolation_correlation_rmse"]), 0.064
+        )
+        self.assertLess(
+            float(
+                aggregate["maximum_held_extrapolation_maximum_correlation_error"]
+            ),
+            0.184,
+        )
+        self.assertLess(
+            float(aggregate["maximum_fdt_random_force_shape_correlation"]), 0.28
+        )
+        self.assertGreater(
+            float(aggregate["minimum_fdt_random_force_normalized_rmse"]), 0.94
+        )
+        self.assertLess(
+            float(aggregate["maximum_kernel_toeplitz_minimum_eigenvalue"]), -3.8e4
+        )
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["isoconfigurational_cage_bias_supported"]), 1.0)
+        self.assertEqual(float(verdict["relative_correlation_volterra_allowed"]), 1.0)
+        self.assertEqual(float(verdict["relative_mori_fdt_closure_allowed"]), 0.0)
+        self.assertEqual(float(verdict["physical_scalar_relative_gle_allowed"]), 0.0)
+        for key in (
+            "relative_orthogonal_force_closure_required",
+        ):
+            self.assertEqual(float(verdict[key]), 1.0)
+        for key in (
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
