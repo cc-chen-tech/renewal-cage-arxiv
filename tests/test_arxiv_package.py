@@ -2051,6 +2051,208 @@ class ArxivPackageTests(unittest.TestCase):
                 {expected_seed, expected_seed + 1000.0},
             )
 
+    def test_non_gaussian_white_markov_bath_closes_relative_mori_state(self):
+        gaussian_stem = "renewal_cage_ka_relative_generator_markov_bath_discovery_T058"
+        empirical_discovery_stem = (
+            "renewal_cage_ka_relative_generator_markov_bath_empirical_discovery_T058"
+        )
+        validation_stems = (
+            "renewal_cage_ka_relative_generator_markov_bath_empirical_validation_T058",
+            "renewal_cage_ka_relative_generator_markov_bath_empirical_validation_seedB_T058",
+        )
+        required_paths = (
+            ROOT / "src" / "ka_markov_bath.py",
+            ROOT / "scripts" / "analyze_ka_relative_generator_markov_bath.py",
+            ROOT / "docs" / "microscopic-relative-generator-markov-bath.md",
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "specs"
+            / "2026-07-14-relative-generator-markov-bath-design.md",
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-07-14-relative-generator-markov-bath.md",
+        )
+        for path in required_paths:
+            self.assertTrue(path.is_file(), path)
+        stems = (gaussian_stem, empirical_discovery_stem, *validation_stems)
+        for stem in stems:
+            for suffix in ("details", "summary", "curve"):
+                path = ROOT / "data" / f"{stem}_{suffix}.csv"
+                self.assertTrue(path.is_file(), path)
+
+        document = required_paths[2].read_text()
+        for required in (
+            "0.86722",
+            "0.01161",
+            "2.80920",
+            "0.42796",
+            "0.16672",
+            "0.32873",
+            "0.31293",
+            "selected_bath_order = 16",
+            "finite_dimensional_discrete_markov_bath_supported = 1",
+            "empirical_non_gaussian_white_driving_supported = 1",
+            "autonomous_relative_matrix_mori_simulation_allowed = 1",
+            "gaussian_markov_bath_generation_closed = 0",
+            "continuous_time_ou_embedding_audited = 0",
+            "thermal_fdt_adjoint_audit_pass = 0",
+            "microscopic_thermal_noise_model_closed = 0",
+            "autonomous_single_particle_gle_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with (ROOT / "data" / f"{gaussian_stem}_summary.csv").open() as handle:
+            gaussian = list(csv.DictReader(handle))
+        gaussian_order_16 = next(
+            row
+            for row in gaussian
+            if row["record"] == "model_aggregate"
+            and int(float(row["bath_order"])) == 16
+        )
+        self.assertEqual(float(gaussian_order_16["markov_bath_gate_pass"]), 0.0)
+        self.assertLess(
+            float(gaussian_order_16["maximum_stationary_covariance_maximum_error"]),
+            0.158,
+        )
+        self.assertLess(
+            float(gaussian_order_16["maximum_target_correlation_maximum_error"]),
+            0.198,
+        )
+        self.assertGreater(
+            float(
+                gaussian_order_16[
+                    "maximum_marginal_excess_kurtosis_maximum_error"
+                ]
+            ),
+            0.427,
+        )
+        gaussian_verdict = next(
+            row for row in gaussian if row["record"] == "verdict"
+        )
+        self.assertEqual(
+            float(gaussian_verdict["stable_white_driven_markov_bath_found"]),
+            0.0,
+        )
+
+        with (
+            ROOT / "data" / f"{empirical_discovery_stem}_summary.csv"
+        ).open() as handle:
+            empirical = list(csv.DictReader(handle))
+        empirical_order_8 = next(
+            row
+            for row in empirical
+            if row["record"] == "model_aggregate"
+            and int(float(row["bath_order"])) == 8
+        )
+        empirical_order_16 = next(
+            row
+            for row in empirical
+            if row["record"] == "model_aggregate"
+            and int(float(row["bath_order"])) == 16
+        )
+        self.assertEqual(float(empirical_order_8["markov_bath_gate_pass"]), 0.0)
+        self.assertEqual(float(empirical_order_16["markov_bath_gate_pass"]), 1.0)
+        self.assertLess(
+            float(empirical_order_16["maximum_var_spectral_radius"]), 0.868
+        )
+        self.assertLess(
+            float(
+                empirical_order_16[
+                    "maximum_maximum_white_residual_correlation_through_40_frames"
+                ]
+            ),
+            0.012,
+        )
+        self.assertLess(
+            float(
+                empirical_order_16[
+                    "maximum_maximum_held_white_residual_correlation_through_40_frames"
+                ]
+            ),
+            0.018,
+        )
+        self.assertGreater(
+            float(
+                empirical_order_16[
+                    "maximum_maximum_absolute_white_residual_excess_kurtosis"
+                ]
+            ),
+            2.80,
+        )
+        empirical_verdict = next(
+            row for row in empirical if row["record"] == "verdict"
+        )
+        self.assertEqual(int(float(empirical_verdict["selected_bath_order"])), 16)
+        self.assertEqual(
+            float(empirical_verdict["empirical_non_gaussian_white_driving_supported"]),
+            1.0,
+        )
+
+        expected_base_seeds = (20260717.0, 20360717.0)
+        for stem, expected_seed in zip(
+            validation_stems, expected_base_seeds, strict=True
+        ):
+            with (ROOT / "data" / f"{stem}_summary.csv").open() as handle:
+                rows = list(csv.DictReader(handle))
+            aggregate = next(row for row in rows if row["record"] == "model_aggregate")
+            self.assertEqual(float(aggregate["markov_bath_gate_pass"]), 1.0)
+            self.assertLess(float(aggregate["maximum_var_spectral_radius"]), 0.866)
+            self.assertLess(
+                float(
+                    aggregate[
+                        "maximum_maximum_held_white_residual_correlation_through_40_frames"
+                    ]
+                ),
+                0.014,
+            )
+            self.assertLess(
+                float(aggregate["maximum_stationary_covariance_rmse"]), 0.0231
+            )
+            self.assertLess(
+                float(aggregate["maximum_stationary_covariance_maximum_error"]),
+                0.108,
+            )
+            self.assertLess(
+                float(aggregate["maximum_target_correlation_maximum_error"]), 0.156
+            )
+            self.assertLess(
+                float(aggregate["maximum_marginal_excess_kurtosis_maximum_error"]),
+                0.329,
+            )
+            verdict = next(row for row in rows if row["record"] == "verdict")
+            for key in (
+                "finite_dimensional_discrete_markov_bath_supported",
+                "autonomous_relative_matrix_mori_simulation_allowed",
+                "empirical_non_gaussian_white_driving_supported",
+                "empirical_white_markov_bath_generation_closed",
+            ):
+                self.assertEqual(float(verdict[key]), 1.0)
+            for key in (
+                "gaussian_markov_bath_generation_closed",
+                "continuous_time_ou_embedding_audited",
+                "thermal_fdt_adjoint_audit_pass",
+                "microscopic_thermal_noise_model_closed",
+                "autonomous_single_particle_gle_allowed",
+                "complete_event_clock_closure_allowed",
+                "kramers_escape_claim_allowed",
+                "thermodynamic_claim_allowed",
+            ):
+                self.assertEqual(float(verdict[key]), 0.0)
+            with (ROOT / "data" / f"{stem}_details.csv").open() as handle:
+                details = list(csv.DictReader(handle))
+            self.assertEqual(
+                {float(row["var_fit_source_count"]) for row in details},
+                {768.0},
+            )
+            self.assertEqual(
+                {float(row["simulation_seed"]) for row in details},
+                {expected_seed, expected_seed + 10000.0},
+            )
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
