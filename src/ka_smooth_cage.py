@@ -114,6 +114,8 @@ def smooth_force_support_cage_batch(
     box_lengths: np.ndarray,
     target_indices: np.ndarray,
     target_batch_size: int = 16,
+    additional_vectors: np.ndarray | None = None,
+    compute_gram: bool = True,
 ) -> dict[str, np.ndarray | float]:
     """Evaluate exact smooth-cage vector coordinates for fixed targets."""
 
@@ -157,10 +159,28 @@ def smooth_force_support_cage_batch(
         or target_batch_size < 1
     ):
         raise ValueError("target_batch_size must be a positive integer")
+    if not isinstance(compute_gram, (bool, np.bool_)):
+        raise ValueError("compute_gram must be Boolean")
+    if additional_vectors is None:
+        extra_vectors = np.empty((0, *positions.shape), dtype=float)
+    else:
+        extra_vectors = np.asarray(additional_vectors, dtype=float)
+        if extra_vectors.ndim == 2:
+            extra_vectors = extra_vectors[None, :, :]
+        if (
+            extra_vectors.ndim != 3
+            or extra_vectors.shape[1:] != positions.shape
+            or np.any(~np.isfinite(extra_vectors))
+        ):
+            raise ValueError("additional_vectors must contain finite aligned vector fields")
 
     relative_position = np.empty((len(targets), 3), dtype=float)
     relative_velocity = np.empty_like(relative_position)
+    additional_relative_velocity = np.empty(
+        (len(extra_vectors), len(targets), 3), dtype=float
+    )
     jacobian_gram = np.empty((len(targets), 3, 3), dtype=float)
+    target_jacobian_block = np.empty_like(jacobian_gram)
     total_weight = np.empty(len(targets), dtype=float)
     support_count = np.empty(len(targets), dtype=int)
     identity = np.eye(3)
@@ -194,46 +214,145 @@ def smooth_force_support_cage_batch(
             "tna,tnb->tab", centered, radial_gradient
         )
         target_block = identity[None, :, :] + centered_gradient / chunk_weight[:, None, None]
-        velocity_difference = velocities[selected, None, :] - velocities[None, :, :]
-        projected_velocity = np.einsum(
-            "tn,tnb->tb", weight, velocity_difference
+        vector_fields = np.concatenate([velocities[None, :, :], extra_vectors], axis=0)
+        vector_difference = (
+            vector_fields[:, selected, None, :] - vector_fields[:, None, :, :]
         )
-        projected_velocity += np.einsum(
-            "tna,tn->ta",
+        projected_vectors = np.einsum(
+            "tn,ktnb->ktb", weight, vector_difference
+        )
+        projected_vectors += np.einsum(
+            "tna,ktn->kta",
             centered,
-            np.einsum("tnb,tnb->tn", radial_gradient, velocity_difference),
+            np.einsum("tnb,ktnb->ktn", radial_gradient, vector_difference),
         )
-        projected_velocity /= chunk_weight[:, None]
-        gram = np.einsum("tac,tbc->tab", target_block, target_block)
-        weight_squared = np.sum(weight**2, axis=1)
-        weighted_cross = np.einsum(
-            "tn,tna,tnb->tab", weight, centered, radial_gradient
-        )
-        gradient_squared = np.einsum("tna,tna->tn", radial_gradient, radial_gradient)
-        neighbor_gram = weight_squared[:, None, None] * identity[None, :, :]
-        neighbor_gram += weighted_cross + np.transpose(weighted_cross, (0, 2, 1))
-        neighbor_gram += np.einsum(
-            "tn,tna,tnb->tab", gradient_squared, centered, centered
-        )
-        gram += neighbor_gram / chunk_weight[:, None, None] ** 2
-        gram = 0.5 * (gram + np.transpose(gram, (0, 2, 1)))
-        eigenvalues = np.linalg.eigvalsh(gram)
-        if np.any(eigenvalues[:, 0] <= 0.0):
-            raise ValueError("smooth cage Jacobian Gram matrices must be positive definite")
+        projected_vectors /= chunk_weight[None, :, None]
+        if compute_gram:
+            gram = np.einsum("tac,tbc->tab", target_block, target_block)
+            weight_squared = np.sum(weight**2, axis=1)
+            weighted_cross = np.einsum(
+                "tn,tna,tnb->tab", weight, centered, radial_gradient
+            )
+            gradient_squared = np.einsum(
+                "tna,tna->tn", radial_gradient, radial_gradient
+            )
+            neighbor_gram = weight_squared[:, None, None] * identity[None, :, :]
+            neighbor_gram += weighted_cross + np.transpose(weighted_cross, (0, 2, 1))
+            neighbor_gram += np.einsum(
+                "tn,tna,tnb->tab", gradient_squared, centered, centered
+            )
+            gram += neighbor_gram / chunk_weight[:, None, None] ** 2
+            gram = 0.5 * (gram + np.transpose(gram, (0, 2, 1)))
+            eigenvalues = np.linalg.eigvalsh(gram)
+            if np.any(eigenvalues[:, 0] <= 0.0):
+                raise ValueError("smooth cage Jacobian Gram matrices must be positive definite")
 
         relative_position[start:stop] = -mean_offset
-        relative_velocity[start:stop] = projected_velocity
-        jacobian_gram[start:stop] = gram
+        relative_velocity[start:stop] = projected_vectors[0]
+        additional_relative_velocity[:, start:stop] = projected_vectors[1:]
+        if compute_gram:
+            jacobian_gram[start:stop] = gram
+            target_jacobian_block[start:stop] = target_block
         total_weight[start:stop] = chunk_weight
         support_count[start:stop] = np.sum(weight > 0.0, axis=1)
 
-    return {
+    result: dict[str, np.ndarray | float] = {
         "relative_position": relative_position,
         "relative_velocity": relative_velocity,
-        "jacobian_gram": jacobian_gram,
+        "additional_relative_velocity": additional_relative_velocity,
         "total_weight": total_weight,
         "support_count": support_count,
         "target_indices": targets,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+    if compute_gram:
+        result["jacobian_gram"] = jacobian_gram
+        result["target_jacobian_block"] = target_jacobian_block
+    return result
+
+
+def smooth_cage_projected_observables_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    forces: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    temperature: float,
+    directional_step: float,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float]:
+    """Split exact tagged Langevin drift and noise into cage and relative parts."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if forces.shape != positions.shape or np.any(~np.isfinite(forces)):
+        raise ValueError("forces must be finite and align with positions")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    if not math.isfinite(directional_step) or directional_step <= 0.0:
+        raise ValueError("directional_step must be finite and positive")
+    common = {
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "target_batch_size": target_batch_size,
+    }
+    base = smooth_force_support_cage_batch(
+        positions,
+        velocities=velocities,
+        additional_vectors=forces,
+        **common,
+    )
+    force_projection = np.asarray(base["additional_relative_velocity"])[0]
+    plus_velocity = smooth_force_support_cage_batch(
+        positions + directional_step * velocities,
+        velocities=velocities,
+        compute_gram=False,
+        **common,
+    )["relative_velocity"]
+    minus_velocity = smooth_force_support_cage_batch(
+        positions - directional_step * velocities,
+        velocities=velocities,
+        compute_gram=False,
+        **common,
+    )["relative_velocity"]
+    geometric_drift = (plus_velocity - minus_velocity) / (2.0 * directional_step)
+    relative_velocity = np.asarray(base["relative_velocity"], dtype=float)
+    relative_drift = force_projection + geometric_drift - friction * relative_velocity
+    center_velocity = velocities[targets] - relative_velocity
+    center_drift = forces[targets] - friction * velocities[targets] - relative_drift
+
+    gram = np.asarray(base["jacobian_gram"], dtype=float)
+    target_block = np.asarray(base["target_jacobian_block"], dtype=float)
+    identity = np.broadcast_to(np.eye(3), gram.shape)
+    center_gram = (
+        identity
+        - target_block
+        - np.transpose(target_block, (0, 2, 1))
+        + gram
+    )
+    center_relative_gram = np.transpose(target_block, (0, 2, 1)) - gram
+    noise_scale = 2.0 * friction * temperature
+    return {
+        **base,
+        "projected_force": np.asarray(force_projection),
+        "geometric_drift": np.asarray(geometric_drift),
+        "relative_drift": relative_drift,
+        "center_velocity": center_velocity,
+        "center_drift": center_drift,
+        "relative_noise_covariance_rate": noise_scale * gram,
+        "center_noise_covariance_rate": noise_scale * center_gram,
+        "center_relative_noise_covariance_rate": noise_scale * center_relative_gram,
+        "friction": float(friction),
+        "temperature": float(temperature),
+        "directional_step": float(directional_step),
         "thermodynamic_claim_allowed": 0.0,
     }
 

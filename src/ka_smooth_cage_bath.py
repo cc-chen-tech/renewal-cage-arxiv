@@ -144,3 +144,43 @@ def heldout_residual_lag_profile(
         "maximum_overall_residual_lag_correlation": float(np.max(maximum_by_mode)),
         "thermodynamic_claim_allowed": 0.0,
     }
+
+
+def heldout_linear_velocity_diagnostic(
+    model: dict[str, np.ndarray | float],
+    held_state: np.ndarray,
+    *,
+    velocity_weights: np.ndarray,
+) -> dict[str, float]:
+    """Evaluate a tagged velocity reconstructed as a fixed state-mode sum."""
+
+    state = np.asarray(held_state, dtype=float)
+    transition = np.asarray(model["transition_matrix"], dtype=float)
+    state_mean = np.asarray(model["state_mean"], dtype=float)
+    weights = np.asarray(velocity_weights, dtype=float)
+    mode_count = len(state_mean)
+    if (
+        state.ndim != 4
+        or state.shape[2:] != (mode_count, 3)
+        or len(state) < 2
+        or np.any(~np.isfinite(state))
+        or transition.shape != (mode_count, mode_count)
+        or weights.shape != (mode_count,)
+        or np.any(~np.isfinite(weights))
+    ):
+        raise ValueError("model, state, and velocity weights must be finite and aligned")
+    current = state[:-1] - state_mean[None, None, :, None]
+    target = state[1:] - state_mean[None, None, :, None]
+    predicted = np.einsum("ab,tpbc->tpac", transition, current)
+    residual = target - predicted
+    tagged_target = np.einsum("m,tpmc->tpc", weights, target)
+    tagged_residual = np.einsum("m,tpmc->tpc", weights, residual)
+    total = float(np.sum(tagged_target**2))
+    return {
+        "heldout_linear_velocity_r_squared": 1.0
+        - float(np.sum(tagged_residual**2)) / max(total, np.finfo(float).tiny),
+        "heldout_linear_velocity_residual_mean_squared": float(
+            np.mean(tagged_residual**2)
+        ),
+        "thermodynamic_claim_allowed": 0.0,
+    }

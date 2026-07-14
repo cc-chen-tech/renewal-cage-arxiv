@@ -169,6 +169,22 @@ class SlowForceBathTests(unittest.TestCase):
 
         np.testing.assert_allclose(streamed, state_paths_to_displacements(full, frame_time=0.01))
 
+        velocity_weights = np.array([1.0, 1.0, 0.0])
+        combined_streamed = simulate_slow_bath_displacements(
+            fit,
+            step_count=30,
+            simulation_count=40,
+            frame_time=0.01,
+            seed=71,
+            velocity_weights=velocity_weights,
+        )
+        combined_full = state_paths_to_displacements(
+            full,
+            frame_time=0.01,
+            velocity_weights=velocity_weights,
+        )
+        np.testing.assert_allclose(combined_streamed, combined_full)
+
     def test_real_data_cli_exposes_fixed_slow_bath_and_event_gates(self):
         completed = subprocess.run(
             [

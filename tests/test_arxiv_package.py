@@ -1417,6 +1417,79 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_decomposed_cage_drift_bath_is_complete_and_not_promoted(self):
+        stem = "renewal_cage_ka_decomposed_cage_drift_bath_T058"
+        document_path = ROOT / "docs" / "microscopic-decomposed-cage-drift-bath.md"
+        summary_path = ROOT / "data" / f"{stem}_summary.csv"
+        detail_path = ROOT / "data" / f"{stem}_details.csv"
+        curve_path = ROOT / "data" / f"{stem}_curve.csv"
+        script_path = ROOT / "scripts" / "analyze_ka_decomposed_cage_drift_bath.py"
+        for path in (document_path, summary_path, detail_path, curve_path, script_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.16663",
+            "0.91516",
+            "20.3305",
+            "16.0207",
+            "0.85097",
+            "0.66952",
+            "decomposed_cage_drift_bath_allowed = 0",
+            "autonomous_single_particle_gle_allowed = 0",
+            "complete_event_clock_closure_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"]: row for row in rows if row["record"] == "aggregate_model"}
+        self.assertEqual(
+            set(models),
+            {"raw_hankel_16", "split_cage_drift_8", "split_cage_drift_16"},
+        )
+        baseline = models["raw_hankel_16"]
+        primary = models["split_cage_drift_8"]
+        diagnostic = models["split_cage_drift_16"]
+        self.assertEqual(int(float(primary["held_clone_count"])), 4)
+        self.assertGreater(
+            float(primary["maximum_maximum_held_residual_lag_correlation"]),
+            float(baseline["maximum_maximum_held_residual_lag_correlation"]),
+        )
+        self.assertGreater(float(primary["terminal_diffusion_relative_error"]), 20.0)
+        self.assertLess(
+            float(diagnostic["maximum_maximum_held_residual_lag_correlation"]),
+            float(baseline["maximum_maximum_held_residual_lag_correlation"]),
+        )
+        self.assertGreater(
+            float(diagnostic["maximum_maximum_held_residual_state_correlation"]),
+            0.66,
+        )
+        self.assertLess(float(primary["maximum_force_cache_relative_rms_error"]), 2e-5)
+        self.assertGreater(float(primary["minimum_force_cache_correlation"]), 0.99999999)
+        self.assertLess(
+            float(primary["maximum_maximum_noise_reconstruction_relative_error"]),
+            1e-10,
+        )
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["numerical_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["every_fold_lag_improves"]), 0.0)
+        self.assertEqual(float(verdict["residual_memory_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["macro_event_gate_pass"]), 0.0)
+        self.assertGreater(float(verdict["primary_to_baseline_lag_ratio"]), 1.06)
+        for key in (
+            "decomposed_cage_drift_bath_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"

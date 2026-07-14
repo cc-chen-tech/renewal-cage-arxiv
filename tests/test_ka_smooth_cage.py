@@ -236,6 +236,98 @@ class SmoothCageTests(unittest.TestCase):
         )
         self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
 
+    def test_batched_projected_drift_splits_center_and_relative_langevin_terms(self):
+        from ka_smooth_cage import (
+            smooth_cage_projected_observables,
+            smooth_cage_projected_observables_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 17.0
+        forces = np.arange(12, dtype=float).reshape(4, 3) / 11.0 - 0.4
+        targets = np.array([0, 2])
+        friction = 0.7
+        temperature = 0.58
+        directional_step = 1e-5
+        batched = smooth_cage_projected_observables_batch(
+            inputs["positions"],
+            velocities=velocities,
+            forces=forces,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+            friction=friction,
+            temperature=temperature,
+            directional_step=directional_step,
+            target_batch_size=1,
+        )
+
+        for row, target in enumerate(targets):
+            scalar = smooth_cage_projected_observables(
+                inputs["positions"],
+                velocities=velocities,
+                forces=forces,
+                particle_types=inputs["particle_types"],
+                box_lengths=inputs["box_lengths"],
+                target_index=int(target),
+                friction=friction,
+                temperature=temperature,
+                directional_step=directional_step,
+                potential_protocol="ka_lj_cut",
+            )
+            np.testing.assert_allclose(
+                batched["relative_velocity"][row],
+                scalar["relative_velocity"],
+                atol=1e-12,
+            )
+            np.testing.assert_allclose(
+                batched["relative_drift"][row],
+                scalar["projected_drift"],
+                atol=1e-10,
+            )
+            np.testing.assert_allclose(
+                batched["jacobian_gram"][row], scalar["jacobian_gram"], atol=1e-12
+            )
+        np.testing.assert_allclose(
+            batched["center_velocity"] + batched["relative_velocity"],
+            velocities[targets],
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            batched["center_drift"] + batched["relative_drift"],
+            forces[targets] - friction * velocities[targets],
+            atol=1e-12,
+        )
+        combined = np.block(
+            [
+                [
+                    batched["center_noise_covariance_rate"],
+                    batched["center_relative_noise_covariance_rate"],
+                ],
+                [
+                    np.transpose(
+                        batched["center_relative_noise_covariance_rate"],
+                        (0, 2, 1),
+                    ),
+                    batched["relative_noise_covariance_rate"],
+                ],
+            ]
+        )
+        self.assertGreaterEqual(float(np.min(np.linalg.eigvalsh(combined))), -1e-12)
+        recovered_tagged_noise = (
+            batched["center_noise_covariance_rate"]
+            + batched["relative_noise_covariance_rate"]
+            + batched["center_relative_noise_covariance_rate"]
+            + np.transpose(
+                batched["center_relative_noise_covariance_rate"], (0, 2, 1)
+            )
+        )
+        np.testing.assert_allclose(
+            recovered_tagged_noise,
+            2.0 * friction * temperature * np.broadcast_to(np.eye(3), recovered_tagged_noise.shape),
+            atol=1e-12,
+        )
+
     def test_smooth_cage_features_are_rotation_invariant(self):
         from ka_smooth_cage import smooth_cage_invariant_features
 

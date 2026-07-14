@@ -82,6 +82,19 @@ class SmoothCageBathTests(unittest.TestCase):
             places=12,
         )
 
+        from ka_smooth_cage_bath import heldout_linear_velocity_diagnostic
+
+        linear_velocity = heldout_linear_velocity_diagnostic(
+            model,
+            held,
+            velocity_weights=np.array([1.0, 0.0, 0.0, 0.0, 0.0]),
+        )
+        self.assertAlmostEqual(
+            linear_velocity["heldout_linear_velocity_r_squared"],
+            generic["heldout_velocity_r_squared"],
+            places=12,
+        )
+
     def test_real_data_cli_exposes_fixed_cage_hankel_gates(self):
         completed = subprocess.run(
             [
@@ -104,6 +117,40 @@ class SmoothCageBathTests(unittest.TestCase):
             "--phop-threshold",
         ):
             self.assertIn(required, completed.stdout)
+
+    def test_decomposed_drift_cli_exposes_fixed_split_bath_gates(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_decomposed_cage_drift_bath.py"),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        for required in (
+            "--drift-cache-directory",
+            "--directional-step",
+            "--sensitivity-steps",
+            "--split-mode-counts",
+            "--primary-split-mode-count",
+            "--lag-improvement-fraction",
+        ):
+            self.assertIn(required, completed.stdout)
+
+        source = (
+            ROOT / "scripts" / "analyze_ka_decomposed_cage_drift_bath.py"
+        ).read_text()
+        for required in (
+            "rerun {source_trajectory} dump x y z ix iy iz vx vy vz box yes",
+            '"maximum_force_cache_absolute_error"',
+            '"force_cache_relative_rms_error"',
+            '"force_cache_correlation"',
+            '"lammps_binary_sha256"',
+        ):
+            self.assertIn(required, source)
 
 
 if __name__ == "__main__":
