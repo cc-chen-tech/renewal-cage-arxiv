@@ -265,6 +265,52 @@ def smooth_cage_invariant_features(
     return {"geometry": geometry, "kinematic": kinematic, "full": full}
 
 
+def smooth_cage_geometry_features(
+    positions: np.ndarray,
+    *,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+) -> np.ndarray:
+    """Return the configuration-only part of the projected cage state."""
+
+    target_indices = np.asarray(target_indices)
+    if (
+        target_indices.ndim != 1
+        or len(target_indices) < 1
+        or np.any(target_indices != target_indices.astype(int))
+    ):
+        raise ValueError("target_indices must be a nonempty integer vector")
+    target_indices = target_indices.astype(int)
+    if len(np.unique(target_indices)) != len(target_indices):
+        raise ValueError("target_indices must select distinct particles")
+
+    floor = np.finfo(float).tiny
+    rows: list[np.ndarray] = []
+    for target_index in target_indices:
+        coordinate = smooth_force_support_cage(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_index=int(target_index),
+        )
+        relative_position = np.asarray(coordinate["relative_position"], dtype=float)
+        jacobian = np.asarray(coordinate["jacobian"], dtype=float)
+        gram = np.einsum("nab,ncb->ac", jacobian, jacobian)
+        gram = 0.5 * (gram + gram.T)
+        eigenvalues = np.linalg.eigvalsh(gram)
+        if np.min(eigenvalues) <= 0.0:
+            raise ValueError("jacobian_gram must be positive definite")
+        position_squared = float(relative_position @ relative_position)
+        rows.append(
+            np.array(
+                [math.log(max(position_squared, floor)), *np.log(eigenvalues)],
+                dtype=float,
+            )
+        )
+    return np.asarray(rows)
+
+
 def grouped_exponential_escape_diagnostic(
     features: np.ndarray,
     first_passage: np.ndarray,

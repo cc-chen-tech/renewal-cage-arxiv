@@ -184,6 +184,37 @@ class SmoothCageTests(unittest.TestCase):
         for key in ("geometry", "kinematic", "full"):
             np.testing.assert_allclose(feature[key], rotated_feature[key], atol=1e-12)
 
+    def test_geometry_only_features_match_full_projected_geometry(self):
+        from ka_smooth_cage import (
+            smooth_cage_geometry_features,
+            smooth_cage_invariant_features,
+            smooth_cage_projected_observables,
+        )
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 20.0
+        observable = smooth_cage_projected_observables(
+            **inputs,
+            velocities=velocities,
+            friction=1.0,
+            temperature=0.58,
+            directional_step=1e-5,
+            potential_protocol="ka_lj_c3_switch",
+        )
+        geometry = smooth_cage_geometry_features(
+            inputs["positions"],
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=np.array([inputs["target_index"]]),
+        )
+
+        np.testing.assert_allclose(
+            geometry[0],
+            smooth_cage_invariant_features(observable)["geometry"],
+            rtol=0.0,
+            atol=1e-12,
+        )
+
     def test_grouped_exponential_escape_recovers_transferable_microscopic_rate(self):
         from ka_smooth_cage import grouped_exponential_escape_diagnostic
 
