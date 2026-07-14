@@ -128,6 +128,180 @@ class SmoothCageTests(unittest.TestCase):
         self.assertGreater(result["jacobian_gram_minimum_eigenvalue"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
 
+    def test_projected_observables_accept_exact_microscopic_forces(self):
+        from ka_smooth_cage import smooth_cage_projected_observables
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 20.0
+        forces = np.arange(12, dtype=float).reshape(4, 3) / 10.0
+        result = smooth_cage_projected_observables(
+            **inputs,
+            velocities=velocities,
+            forces=forces,
+            friction=1.0,
+            temperature=0.58,
+            directional_step=1e-5,
+            potential_protocol="ka_lj_cut",
+        )
+
+        expected = np.einsum("nab,nb->a", result["jacobian"], forces)
+        np.testing.assert_allclose(result["force_drift"], expected, atol=1e-12)
+
+    def test_smooth_cage_features_are_rotation_invariant(self):
+        from ka_smooth_cage import smooth_cage_invariant_features
+
+        rotation = np.array(
+            [
+                [0.0, -1.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        )
+        observable = {
+            "relative_position": np.array([0.2, -0.3, 0.4]),
+            "relative_velocity": np.array([-0.5, 0.1, 0.3]),
+            "projected_drift": np.array([0.7, -0.2, -0.4]),
+            "jacobian_gram": np.array(
+                [
+                    [0.9, 0.1, 0.0],
+                    [0.1, 1.1, 0.2],
+                    [0.0, 0.2, 0.8],
+                ]
+            ),
+        }
+        rotated = {
+            "relative_position": rotation @ observable["relative_position"],
+            "relative_velocity": rotation @ observable["relative_velocity"],
+            "projected_drift": rotation @ observable["projected_drift"],
+            "jacobian_gram": rotation @ observable["jacobian_gram"] @ rotation.T,
+        }
+
+        feature = smooth_cage_invariant_features(observable)
+        rotated_feature = smooth_cage_invariant_features(rotated)
+        self.assertEqual(feature["geometry"].shape, (4,))
+        self.assertEqual(feature["kinematic"].shape, (6,))
+        self.assertEqual(feature["full"].shape, (9,))
+        for key in ("geometry", "kinematic", "full"):
+            np.testing.assert_allclose(feature[key], rotated_feature[key], atol=1e-12)
+
+    def test_geometry_only_features_match_full_projected_geometry(self):
+        from ka_smooth_cage import (
+            smooth_cage_geometry_features,
+            smooth_cage_invariant_features,
+            smooth_cage_projected_observables,
+        )
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 20.0
+        observable = smooth_cage_projected_observables(
+            **inputs,
+            velocities=velocities,
+            friction=1.0,
+            temperature=0.58,
+            directional_step=1e-5,
+            potential_protocol="ka_lj_c3_switch",
+        )
+        geometry = smooth_cage_geometry_features(
+            inputs["positions"],
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=np.array([inputs["target_index"]]),
+        )
+
+        np.testing.assert_allclose(
+            geometry[0],
+            smooth_cage_invariant_features(observable)["geometry"],
+            rtol=0.0,
+            atol=1e-12,
+        )
+
+    def test_grouped_exponential_escape_recovers_transferable_microscopic_rate(self):
+        from ka_smooth_cage import grouped_exponential_escape_diagnostic
+
+        rng = np.random.default_rng(20260714)
+        groups = np.repeat(np.arange(5), 800)
+        feature = rng.normal(size=(len(groups), 2))
+        rate = np.exp(-3.0 + 0.8 * feature[:, 0] - 0.5 * feature[:, 1])
+        raw_first_passage = rng.exponential(1.0 / rate)
+        horizon = 20.0
+        escaped = raw_first_passage <= horizon
+        first_passage = np.minimum(raw_first_passage, horizon)
+        result = grouped_exponential_escape_diagnostic(
+            feature,
+            first_passage,
+            escaped,
+            groups,
+            horizon=horizon,
+            survival_times=np.array([1, 2, 4, 8, 12, 16, 20], dtype=float),
+            l2_regularization=1.0,
+        )
+
+        self.assertGreater(result["mean_heldout_brier_skill"], 0.05)
+        self.assertGreater(
+            result["mean_heldout_log_likelihood_gain_per_observation"], 0.01
+        )
+        self.assertLess(result["maximum_heldout_survival_calibration_error"], 0.05)
+        self.assertGreater(np.corrcoef(result["out_of_group_rate"], rate)[0, 1], 0.95)
+
+    def test_grouped_exponential_escape_rejects_invalid_censoring_and_groups(self):
+        from ka_smooth_cage import grouped_exponential_escape_diagnostic
+
+        feature = np.ones((4, 1))
+        escaped = np.ones(4, dtype=bool)
+        with self.assertRaisesRegex(ValueError, "at least two parent groups"):
+            grouped_exponential_escape_diagnostic(
+                feature,
+                np.ones(4),
+                escaped,
+                np.zeros(4),
+                horizon=2.0,
+                survival_times=np.array([1.0, 2.0]),
+            )
+        with self.assertRaisesRegex(ValueError, "first_passage"):
+            grouped_exponential_escape_diagnostic(
+                feature,
+                np.full(4, 21.0),
+                escaped,
+                np.arange(4) % 2,
+                horizon=20.0,
+                survival_times=np.array([1.0, 20.0]),
+            )
+
+    def test_initial_state_reconstruction_uses_recorded_seeds_and_run_zero(self):
+        source = (
+            ROOT / "scripts" / "reconstruct_ka_clone_initial_state.py"
+        ).read_text()
+
+        for required in (
+            "velocity all create",
+            "run 0",
+            "vx vy vz fx fy fz",
+            "maximum_position_reconstruction_error",
+            "parent_restart_sha256",
+            "os.replace",
+            "unlink",
+        ):
+            self.assertIn(required, source)
+
+    def test_smooth_event_clock_analysis_preregisters_claim_limited_gates(self):
+        source = (
+            ROOT / "scripts" / "analyze_ka_smooth_cage_event_clock.py"
+        ).read_text()
+
+        for required in (
+            "TARGET_SEED = 20260714",
+            "PHOP_THRESHOLD = 0.08",
+            "HALF_WINDOW = 8",
+            "TARGET_COUNT = 64",
+            "STRUCTURAL_BRIER_REFERENCE = 0.026964",
+            "microscopic_initial_escape_state_allowed",
+            "event_clock_claim_allowed",
+            "autonomous_single_particle_gle_claim_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertIn(required, source)
+
     def test_projected_drift_matches_phase_space_directional_derivative(self):
         from ka_local_cage import ka_lj_force_and_isotropic_curvature
         from ka_smooth_cage import (

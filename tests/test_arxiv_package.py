@@ -15,6 +15,235 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_softmode_precursor_residual_gate_is_complete(self):
+        document_path = ROOT / "docs" / "microscopic-softmode-precursor-residual.md"
+        summary_path = (
+            ROOT / "data" / "renewal_cage_ka_softmode_precursor_T058_summary.csv"
+        )
+        model_path = (
+            ROOT / "data" / "renewal_cage_ka_softmode_precursor_T058_models.csv"
+        )
+        committor_path = (
+            ROOT / "data" / "renewal_cage_ka_softmode_precursor_T058_committor.csv"
+        )
+        for path in (document_path, summary_path, model_path, committor_path):
+            self.assertTrue(path.is_file())
+        document = document_path.read_text()
+        for required in (
+            "-0.00799",
+            "-0.00087",
+            "-0.00096",
+            "-3.7375",
+            "instantaneous_local_softmode_precursor_allowed = 0",
+            "event_clock_claim_allowed = 0",
+            "autonomous_single_particle_gle_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+            "stop adding scalar static local descriptors",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            summary = next(csv.DictReader(handle))
+        for key, expected in (
+            ("parent_count", 5),
+            ("distinct_parent_restart_hash_count", 5),
+            ("clone_count_per_parent", 8),
+            ("target_count", 64),
+            ("observation_count", 2560),
+            ("configuration_count", 320),
+            ("event_count", 1731),
+            ("censored_count", 829),
+        ):
+            self.assertEqual(int(summary[key]), expected)
+        self.assertEqual(float(summary["maximum_clone_position_difference"]), 0.0)
+        self.assertEqual(float(summary["maximum_geometry_reference_error"]), 0.0)
+        self.assertEqual(summary["integrity_gate_pass"], "True")
+        self.assertEqual(summary["geometry_reproduction_gate_pass"], "True")
+        self.assertEqual(summary["clone_invariance_gate_pass"], "True")
+        self.assertEqual(summary["brier_increment_gate_pass"], "False")
+        self.assertEqual(summary["brier_reference_gate_pass"], "False")
+        self.assertEqual(summary["likelihood_gate_pass"], "False")
+        self.assertEqual(summary["survival_gate_pass"], "True")
+        self.assertEqual(summary["binomial_gate_pass"], "False")
+        self.assertEqual(
+            summary["instantaneous_local_softmode_precursor_allowed"], "False"
+        )
+        self.assertEqual(summary["event_clock_claim_allowed"], "False")
+        self.assertEqual(
+            summary["autonomous_single_particle_gle_claim_allowed"], "False"
+        )
+        self.assertEqual(summary["kramers_escape_claim_allowed"], "False")
+        self.assertEqual(summary["thermodynamic_claim_allowed"], "False")
+        self.assertLess(float(summary["softmode_mean_heldout_brier_skill"]), 0.0)
+        self.assertLess(
+            float(summary["geometry_softmode_mean_heldout_brier_skill"]), 0.0
+        )
+        self.assertLess(
+            float(summary["geometry_softmode_minimum_group_log_likelihood_gain"]),
+            0.0,
+        )
+        self.assertLess(
+            float(summary["geometry_softmode_binomial_mean_heldout_brier_skill"]),
+            0.0,
+        )
+
+        with model_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(
+            {row["model"] for row in rows if row["record"] == "censored_model"},
+            {"geometry", "softmode", "geometry_softmode"},
+        )
+        self.assertEqual(sum(row["record"] == "held_parent" for row in rows), 15)
+
+    def test_radial_precursor_residual_gate_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-radial-precursor-residual.md"
+        summary_path = (
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_summary.csv"
+        )
+        model_path = (
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_models.csv"
+        )
+        for path in (
+            document_path,
+            summary_path,
+            model_path,
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_details.csv",
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_survival.csv",
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_committor.csv",
+        ):
+            self.assertTrue(path.is_file())
+        document = document_path.read_text()
+        for required in (
+            "0.00825",
+            "0.00798",
+            "0.00848",
+            "0.00744",
+            "static_radial_precursor_allowed = 0",
+            "event_clock_claim_allowed = 0",
+            "autonomous_single_particle_gle_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            summary = next(csv.DictReader(handle))
+        self.assertEqual(int(summary["parent_count"]), 5)
+        self.assertEqual(int(summary["distinct_parent_restart_hash_count"]), 5)
+        self.assertEqual(int(summary["clone_count_per_parent"]), 8)
+        self.assertEqual(int(summary["target_count"]), 64)
+        self.assertEqual(int(summary["observation_count"]), 2560)
+        self.assertEqual(int(summary["configuration_count"]), 320)
+        self.assertEqual(int(summary["event_count"]), 1731)
+        self.assertEqual(int(summary["censored_count"]), 829)
+        self.assertEqual(float(summary["maximum_clone_position_difference"]), 0.0)
+        self.assertEqual(float(summary["maximum_geometry_reference_error"]), 0.0)
+        self.assertEqual(summary["integrity_gate_pass"], "True")
+        self.assertEqual(summary["geometry_reproduction_gate_pass"], "True")
+        self.assertEqual(summary["clone_invariance_gate_pass"], "True")
+        self.assertEqual(summary["brier_increment_gate_pass"], "False")
+        self.assertEqual(summary["brier_reference_gate_pass"], "False")
+        self.assertEqual(summary["likelihood_gate_pass"], "True")
+        self.assertEqual(summary["survival_gate_pass"], "True")
+        self.assertEqual(summary["binomial_gate_pass"], "False")
+        self.assertEqual(summary["static_radial_precursor_allowed"], "False")
+        self.assertEqual(summary["event_clock_claim_allowed"], "False")
+        self.assertEqual(
+            summary["autonomous_single_particle_gle_claim_allowed"], "False"
+        )
+        self.assertEqual(summary["kramers_escape_claim_allowed"], "False")
+        self.assertEqual(summary["thermodynamic_claim_allowed"], "False")
+        self.assertLess(
+            float(summary["geometry_radial_mean_heldout_brier_skill"]),
+            float(summary["geometry_mean_heldout_brier_skill"]),
+        )
+        self.assertLess(
+            float(summary["geometry_radial_mean_heldout_brier_skill"]),
+            float(summary["radial_mean_heldout_brier_skill"]),
+        )
+        self.assertLess(
+            float(summary["geometry_radial_binomial_mean_heldout_brier_skill"]),
+            float(summary["geometry_binomial_mean_heldout_brier_skill"]),
+        )
+
+        with model_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"] for row in rows if row["record"] == "censored_model"}
+        self.assertEqual(models, {"geometry", "radial", "geometry_radial"})
+        self.assertEqual(sum(row["record"] == "held_parent" for row in rows), 15)
+
+    def test_smooth_cage_event_clock_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-smooth-cage-event-clock.md"
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_summary.csv"
+        )
+        model_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_models.csv"
+        )
+        for path in (
+            document_path,
+            summary_path,
+            model_path,
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_details.csv",
+            ROOT
+            / "data"
+            / "renewal_cage_ka_smooth_cage_event_clock_T058_survival.csv",
+        ):
+            self.assertTrue(path.is_file())
+        document = document_path.read_text()
+        for required in (
+            "1731",
+            "829",
+            "0.00529",
+            "0.00836",
+            "event_clock_claim_allowed = 0",
+            "autonomous_single_particle_gle_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            summary = next(csv.DictReader(handle))
+        self.assertEqual(int(summary["parent_count"]), 5)
+        self.assertEqual(int(summary["distinct_parent_restart_hash_count"]), 5)
+        self.assertEqual(int(summary["clone_count_per_parent"]), 8)
+        self.assertEqual(int(summary["target_count"]), 64)
+        self.assertEqual(int(summary["observation_count"]), 2560)
+        self.assertEqual(int(summary["event_count"]), 1731)
+        self.assertEqual(int(summary["censored_count"]), 829)
+        self.assertEqual(summary["integrity_gate_pass"], "True")
+        self.assertEqual(summary["survival_gate_pass"], "True")
+        self.assertEqual(summary["microscopic_initial_escape_state_allowed"], "False")
+        self.assertEqual(summary["event_clock_claim_allowed"], "False")
+        self.assertEqual(summary["autonomous_single_particle_gle_claim_allowed"], "False")
+        self.assertEqual(summary["kramers_escape_claim_allowed"], "False")
+        self.assertEqual(summary["thermodynamic_claim_allowed"], "False")
+        self.assertLess(
+            float(summary["full_mean_heldout_brier_skill"]),
+            float(summary["geometry_mean_heldout_brier_skill"]),
+        )
+        self.assertLess(
+            float(summary["full_mean_heldout_brier_skill"]),
+            float(summary["structural_brier_reference"]),
+        )
+        self.assertLess(float(summary["full_minimum_group_log_likelihood_gain"]), 0.0)
+
+        with model_path.open() as handle:
+            models = {
+                row["model"]: row
+                for row in csv.DictReader(handle)
+                if row["record"] == "model"
+            }
+        self.assertEqual(set(models), {"geometry", "kinematic", "full"})
+
     def test_smooth_cage_microscopic_projection_is_complete_and_claim_limited(self):
         document_path = ROOT / "docs" / "microscopic-smooth-cage-projection.md"
         summary_path = ROOT / "data" / "renewal_cage_ka_smooth_cage_tangent_T058_summary.csv"
@@ -886,6 +1115,235 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertLess(float(fidelity["scaled_pair_histogram_total_variation"]), 0.02)
         self.assertLess(abs(float(fidelity["force_norm_mean_relative_difference"])), 0.02)
         self.assertEqual(fidelity["thermodynamic_claim_allowed"], "False")
+
+    def test_second_generator_response_is_complete_and_claim_limited(self):
+        document_path = (
+            ROOT / "docs" / "microscopic-second-generator-krylov-response.md"
+        )
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_second_generator_response_T058_summary.csv"
+        )
+        curve_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_second_generator_response_T058_curve.csv"
+        )
+        for path in (document_path, summary_path, curve_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "32 matched paths",
+            "0.17569",
+            "0.23290",
+            "second_generator_response_allowed = 0",
+            "one_tau_generator_response_allowed = 0",
+            "autonomous_stochastic_single_particle_gle_allowed = 0",
+            "event_clock_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+            "explicit slow bath or state-dependent memory",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["primary_fit_time"]), 0.2)
+        for key in (
+            "second_generator_response_allowed",
+            "one_tau_generator_response_allowed",
+            "autonomous_stochastic_single_particle_gle_allowed",
+            "event_clock_claim_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
+        primary = {
+            (row["model"], row["evaluation_epsilon"]): row
+            for row in rows
+            if row["record"] == "aggregate_gate"
+            and row["fit_time"] == "0.2"
+            and row["horizon_time"] == "0.2"
+        }
+        for epsilon in ("0.001", "0.002"):
+            first = primary[("first_generator_constrained", epsilon)]
+            second = primary[("second_generator_constrained", epsilon)]
+            self.assertEqual(int(second["identified_fold_count"]), 8)
+            self.assertEqual(int(second["evaluable_fold_count"]), 8)
+            self.assertLess(float(first["position_relative_l2_error"]), 0.18)
+            self.assertGreater(float(second["position_relative_l2_error"]), 0.23)
+            self.assertLess(float(second["paired_improvement_fraction"]), -0.61)
+            self.assertEqual(float(second["all_identified_folds_pass"]), 0.0)
+
+    def test_hankel_slow_force_bath_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-hankel-slow-force-bath.md"
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_long_T058_summary.csv"
+        )
+        detail_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_long_T058_details.csv"
+        )
+        curve_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_long_T058_curve.csv"
+        )
+        extension_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_hankel_slow_force_bath_rank_extension_T058_summary.csv"
+        )
+        for path in (document_path, summary_path, detail_path, curve_path, extension_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.87341",
+            "0.93739",
+            "21.2371",
+            "17.1130",
+            "rank 16",
+            "hankel_slow_force_bath_allowed = 0",
+            "state_dependent_memory_allowed = 0",
+            "complete_event_clock_closure_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+            "nonlinear state-dependent memory",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"]: row for row in rows if row["record"] == "aggregate_model"}
+        self.assertEqual(
+            set(models),
+            {
+                "raw_force_delay_2",
+                "hankel_slow_2",
+                "hankel_slow_4",
+                "hankel_slow_8",
+                "hankel_slow_16",
+            },
+        )
+        primary = models["hankel_slow_8"]
+        self.assertEqual(int(float(primary["held_clone_count"])), 4)
+        self.assertGreater(float(primary["captured_force_history_variance_fraction"]), 0.87)
+        self.assertLess(float(primary["maximum_maximum_held_residual_state_correlation"]), 0.13)
+        self.assertGreater(float(primary["maximum_maximum_held_residual_lag_correlation"]), 0.93)
+        self.assertGreater(float(primary["terminal_diffusion_relative_error"]), 21.0)
+        self.assertGreater(float(primary["event_rate_relative_error"]), 17.0)
+        self.assertGreater(float(models["hankel_slow_16"]["terminal_diffusion_relative_error"]), 3.0)
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["numerical_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["orthogonality_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["macro_event_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["hankel_slow_force_bath_allowed"]), 0.0)
+        for key in (
+            "state_dependent_memory_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
+        with extension_path.open() as handle:
+            extension = {
+                int(float(row["slow_mode_count"])): row
+                for row in csv.DictReader(handle)
+                if row["record"] == "aggregate_model" and float(row["slow_mode_count"]) > 0
+            }
+        self.assertEqual(set(extension), {24, 32, 48, 64})
+        self.assertGreater(float(extension[64]["terminal_diffusion_relative_error"]), 4.0)
+
+    def test_bilinear_state_dependent_memory_is_complete_and_not_promoted(self):
+        document_path = ROOT / "docs" / "microscopic-bilinear-state-dependent-memory.md"
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_bilinear_state_dependent_memory_T058_summary.csv"
+        )
+        detail_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_bilinear_state_dependent_memory_T058_details.csv"
+        )
+        sensitivity_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_bilinear_state_dependent_memory_T058_ridge_sensitivity.csv"
+        )
+        for path in (document_path, summary_path, detail_path, sensitivity_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.02182",
+            "0.86078",
+            "1.00407",
+            "None of the four held",
+            "teacher_forced_state_dependent_memory_gate_pass = 0",
+            "autonomous_state_dependent_gle_allowed = 0",
+            "complete_event_clock_closure_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"]: row for row in rows if row["record"] == "aggregate_model"}
+        self.assertEqual(
+            set(models),
+            {"stationary_rank16", "bilinear_energy", "bilinear_energy_power"},
+        )
+        baseline = models["stationary_rank16"]
+        full = models["bilinear_energy_power"]
+        self.assertEqual(int(float(full["held_clone_count"])), 4)
+        self.assertLess(
+            float(full["maximum_maximum_held_residual_state_correlation"]),
+            0.022,
+        )
+        self.assertGreater(
+            float(full["maximum_maximum_held_residual_lag_correlation"]),
+            float(baseline["maximum_maximum_held_residual_lag_correlation"]),
+        )
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["velocity_prediction_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["residual_state_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["residual_lag_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["every_fold_lag_improves"]), 0.0)
+        self.assertGreater(float(verdict["bilinear_to_baseline_lag_ratio"]), 1.0)
+        for key in (
+            "teacher_forced_state_dependent_memory_gate_pass",
+            "autonomous_state_dependent_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
+        with sensitivity_path.open() as handle:
+            sensitivity = list(csv.DictReader(handle))
+        self.assertEqual(len(sensitivity), 5)
+        self.assertTrue(
+            all(float(row["teacher_forced_state_dependent_memory_gate_pass"]) == 0.0 for row in sensitivity)
+        )
+        self.assertTrue(
+            all(float(row["every_fold_lag_improves"]) == 0.0 for row in sensitivity)
+        )
 
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"

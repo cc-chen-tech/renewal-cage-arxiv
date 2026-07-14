@@ -110,6 +110,7 @@ def smooth_cage_projected_observables(
     positions: np.ndarray,
     *,
     velocities: np.ndarray,
+    forces: np.ndarray | None = None,
     particle_types: np.ndarray,
     box_lengths: np.ndarray,
     target_index: int,
@@ -124,6 +125,10 @@ def smooth_cage_projected_observables(
     velocities = np.asarray(velocities, dtype=float)
     if velocities.shape != positions.shape or np.any(~np.isfinite(velocities)):
         raise ValueError("velocities must be finite and align with positions")
+    if forces is not None:
+        forces = np.asarray(forces, dtype=float)
+        if forces.shape != positions.shape or np.any(~np.isfinite(forces)):
+            raise ValueError("forces must be finite and align with positions")
     if not math.isfinite(friction) or friction < 0.0:
         raise ValueError("friction must be finite and nonnegative")
     if not math.isfinite(temperature) or temperature < 0.0:
@@ -141,15 +146,18 @@ def smooth_cage_projected_observables(
     )
     jacobian = np.asarray(coordinate["jacobian"], dtype=float)
     relative_velocity = np.einsum("nab,nb->a", jacobian, velocities)
-    active = np.flatnonzero(np.any(np.abs(jacobian) > 0.0, axis=(1, 2)))
-    active_force, _ = ka_lj_force_and_isotropic_curvature(
-        positions,
-        particle_types=particle_types,
-        box_lengths=box_lengths,
-        target_indices=active,
-        potential_protocol=potential_protocol,
-    )
-    force_drift = np.einsum("nab,nb->a", jacobian[active], active_force)
+    if forces is None:
+        active = np.flatnonzero(np.any(np.abs(jacobian) > 0.0, axis=(1, 2)))
+        active_force, _ = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=active,
+            potential_protocol=potential_protocol,
+        )
+        force_drift = np.einsum("nab,nb->a", jacobian[active], active_force)
+    else:
+        force_drift = np.einsum("nab,nb->a", jacobian, forces)
 
     plus = smooth_force_support_cage(
         positions + directional_step * velocities,
@@ -188,6 +196,351 @@ def smooth_cage_projected_observables(
         "temperature": float(temperature),
         "directional_step": float(directional_step),
         "potential_protocol": np.asarray(potential_protocol),
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def smooth_cage_invariant_features(
+    observable: dict[str, np.ndarray | float],
+) -> dict[str, np.ndarray]:
+    """Map one projected cage state to fixed rotationally invariant features."""
+
+    relative_position = np.asarray(observable["relative_position"], dtype=float)
+    relative_velocity = np.asarray(observable["relative_velocity"], dtype=float)
+    projected_drift = np.asarray(observable["projected_drift"], dtype=float)
+    gram = np.asarray(observable["jacobian_gram"], dtype=float)
+    for name, vector in (
+        ("relative_position", relative_position),
+        ("relative_velocity", relative_velocity),
+        ("projected_drift", projected_drift),
+    ):
+        if vector.shape != (3,) or np.any(~np.isfinite(vector)):
+            raise ValueError(f"{name} must be a finite three-vector")
+    if gram.shape != (3, 3) or np.any(~np.isfinite(gram)) or not np.allclose(
+        gram, gram.T, rtol=1e-12, atol=1e-12
+    ):
+        raise ValueError("jacobian_gram must be a finite symmetric 3x3 matrix")
+    eigenvalues = np.linalg.eigvalsh(gram)
+    if np.min(eigenvalues) <= 0.0:
+        raise ValueError("jacobian_gram must be positive definite")
+
+    floor = np.finfo(float).tiny
+    position_squared = float(relative_position @ relative_position)
+    velocity_squared = float(relative_velocity @ relative_velocity)
+    drift_squared = float(projected_drift @ projected_drift)
+
+    def cosine(left: np.ndarray, right: np.ndarray, norm_product: float) -> float:
+        return float(left @ right) / math.sqrt(max(norm_product, floor))
+
+    log_position = math.log(max(position_squared, floor))
+    log_velocity = math.log(max(velocity_squared, floor))
+    log_drift = math.log(max(drift_squared, floor))
+    cosine_position_velocity = cosine(
+        relative_position, relative_velocity, position_squared * velocity_squared
+    )
+    cosine_position_drift = cosine(
+        relative_position, projected_drift, position_squared * drift_squared
+    )
+    cosine_velocity_drift = cosine(
+        relative_velocity, projected_drift, velocity_squared * drift_squared
+    )
+    log_eigenvalues = np.log(eigenvalues)
+    geometry = np.array([log_position, *log_eigenvalues], dtype=float)
+    kinematic = np.array(
+        [log_position, log_velocity, cosine_position_velocity, *log_eigenvalues],
+        dtype=float,
+    )
+    full = np.array(
+        [
+            log_position,
+            log_velocity,
+            cosine_position_velocity,
+            *log_eigenvalues,
+            log_drift,
+            cosine_position_drift,
+            cosine_velocity_drift,
+        ],
+        dtype=float,
+    )
+    return {"geometry": geometry, "kinematic": kinematic, "full": full}
+
+
+def smooth_cage_geometry_features(
+    positions: np.ndarray,
+    *,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+) -> np.ndarray:
+    """Return the configuration-only part of the projected cage state."""
+
+    target_indices = np.asarray(target_indices)
+    if (
+        target_indices.ndim != 1
+        or len(target_indices) < 1
+        or np.any(target_indices != target_indices.astype(int))
+    ):
+        raise ValueError("target_indices must be a nonempty integer vector")
+    target_indices = target_indices.astype(int)
+    if len(np.unique(target_indices)) != len(target_indices):
+        raise ValueError("target_indices must select distinct particles")
+
+    floor = np.finfo(float).tiny
+    rows: list[np.ndarray] = []
+    for target_index in target_indices:
+        coordinate = smooth_force_support_cage(
+            positions,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_index=int(target_index),
+        )
+        relative_position = np.asarray(coordinate["relative_position"], dtype=float)
+        jacobian = np.asarray(coordinate["jacobian"], dtype=float)
+        gram = np.einsum("nab,ncb->ac", jacobian, jacobian)
+        gram = 0.5 * (gram + gram.T)
+        eigenvalues = np.linalg.eigvalsh(gram)
+        if np.min(eigenvalues) <= 0.0:
+            raise ValueError("jacobian_gram must be positive definite")
+        position_squared = float(relative_position @ relative_position)
+        rows.append(
+            np.array(
+                [math.log(max(position_squared, floor)), *np.log(eigenvalues)],
+                dtype=float,
+            )
+        )
+    return np.asarray(rows)
+
+
+def grouped_exponential_escape_diagnostic(
+    features: np.ndarray,
+    first_passage: np.ndarray,
+    escaped: np.ndarray,
+    groups: np.ndarray,
+    *,
+    horizon: float,
+    survival_times: np.ndarray,
+    l2_regularization: float = 1.0,
+    maximum_iterations: int = 100,
+) -> dict[str, np.ndarray | float]:
+    """Fit a censored exponential reaction coordinate across held-out parents."""
+
+    features = np.asarray(features, dtype=float)
+    first_passage = np.asarray(first_passage, dtype=float)
+    escaped_raw = np.asarray(escaped)
+    groups = np.asarray(groups)
+    survival_times = np.asarray(survival_times, dtype=float)
+    if features.ndim != 2 or features.shape[0] < 2 or features.shape[1] < 1 or np.any(
+        ~np.isfinite(features)
+    ):
+        raise ValueError("features must be a finite nonempty two-dimensional array")
+    sample_count = len(features)
+    if first_passage.shape != (sample_count,) or np.any(~np.isfinite(first_passage)):
+        raise ValueError("first_passage must be finite and align with features")
+    if escaped_raw.shape != (sample_count,) or not np.all(
+        np.isin(escaped_raw, (False, True, 0, 1))
+    ):
+        raise ValueError("escaped must be an aligned Boolean array")
+    escaped = escaped_raw.astype(bool)
+    if groups.shape != (sample_count,):
+        raise ValueError("groups must align with feature rows")
+    if not math.isfinite(horizon) or horizon <= 0.0:
+        raise ValueError("horizon must be positive and finite")
+    if np.any(first_passage <= 0.0) or np.any(first_passage > horizon) or np.any(
+        (~escaped) & ~np.isclose(first_passage, horizon, rtol=0.0, atol=1e-12)
+    ):
+        raise ValueError(
+            "first_passage must contain positive observed times or horizon censoring"
+        )
+    if (
+        survival_times.ndim != 1
+        or len(survival_times) < 1
+        or np.any(~np.isfinite(survival_times))
+        or np.any(survival_times <= 0.0)
+        or np.any(survival_times > horizon)
+        or np.any(np.diff(survival_times) <= 0.0)
+    ):
+        raise ValueError("survival_times must increase inside the common horizon")
+    if (
+        not math.isfinite(l2_regularization)
+        or l2_regularization < 0.0
+        or isinstance(maximum_iterations, bool)
+        or not isinstance(maximum_iterations, (int, np.integer))
+        or maximum_iterations < 1
+    ):
+        raise ValueError("regularization and iteration controls must be valid")
+    unique_groups = np.unique(groups)
+    if len(unique_groups) < 2:
+        raise ValueError("at least two parent groups are required")
+
+    out_rate = np.full(sample_count, np.nan, dtype=float)
+    out_probability = np.full(sample_count, np.nan, dtype=float)
+    out_baseline_rate = np.full(sample_count, np.nan, dtype=float)
+    out_baseline_probability = np.full(sample_count, np.nan, dtype=float)
+    group_brier_skill: list[float] = []
+    group_log_likelihood_gain: list[float] = []
+    group_log_likelihood_gain_per_observation: list[float] = []
+    group_survival_error: list[float] = []
+    group_baseline_survival_error: list[float] = []
+    group_iteration_count: list[float] = []
+
+    for held_group in unique_groups:
+        held = groups == held_group
+        train = ~held
+        train_event = escaped[train].astype(float)
+        held_event = escaped[held].astype(float)
+        training_event_count = float(np.sum(train_event))
+        training_exposure = float(np.sum(first_passage[train]))
+        if training_event_count <= 0.0 or training_exposure <= 0.0:
+            raise ValueError("every training fold must contain event exposure")
+        if not np.any(held_event) or np.all(held_event):
+            raise ValueError("every held parent must contain escaped and censored rows")
+
+        mean = np.mean(features[train], axis=0)
+        scale = np.std(features[train], axis=0)
+        scale[scale < 1e-12] = 1.0
+        train_x = np.column_stack(
+            [np.ones(np.sum(train)), (features[train] - mean) / scale]
+        )
+        held_x = np.column_stack(
+            [np.ones(np.sum(held)), (features[held] - mean) / scale]
+        )
+        baseline_rate = training_event_count / training_exposure
+        coefficient = np.zeros(train_x.shape[1], dtype=float)
+        coefficient[0] = math.log(baseline_rate)
+        penalty = np.diag(
+            np.concatenate(
+                [[0.0], np.full(train_x.shape[1] - 1, l2_regularization)]
+            )
+        )
+        penalty_diagonal = np.diag(penalty)
+
+        def objective(value: np.ndarray) -> float:
+            eta = np.clip(np.einsum("ij,j->i", train_x, value), -30.0, 30.0)
+            rate = np.exp(eta)
+            return float(
+                np.sum(rate * first_passage[train] - train_event * eta)
+                + 0.5 * np.sum(penalty_diagonal * value**2)
+            )
+
+        iteration_count = maximum_iterations
+        for iteration in range(maximum_iterations):
+            eta = np.clip(
+                np.einsum("ij,j->i", train_x, coefficient), -30.0, 30.0
+            )
+            rate = np.exp(eta)
+            weighted_exposure = rate * first_passage[train]
+            gradient = np.einsum(
+                "ij,i->j", train_x, weighted_exposure - train_event
+            ) + penalty_diagonal * coefficient
+            hessian = np.einsum(
+                "ia,i,ib->ab", train_x, weighted_exposure, train_x
+            ) + penalty
+            step = np.linalg.solve(hessian, gradient)
+            if float(np.max(np.abs(step))) < 1e-9:
+                iteration_count = iteration + 1
+                break
+            current_objective = objective(coefficient)
+            step_scale = 1.0
+            while step_scale >= 2.0**-20:
+                candidate = coefficient - step_scale * step
+                if objective(candidate) <= current_objective:
+                    coefficient = candidate
+                    break
+                step_scale *= 0.5
+            else:
+                raise ValueError("censored exponential Newton step failed to decrease")
+
+        held_rate = np.exp(
+            np.clip(np.einsum("ij,j->i", held_x, coefficient), -30.0, 30.0)
+        )
+        held_probability = -np.expm1(-held_rate * horizon)
+        baseline_probability = -math.expm1(-baseline_rate * horizon)
+        out_rate[held] = held_rate
+        out_probability[held] = held_probability
+        out_baseline_rate[held] = baseline_rate
+        out_baseline_probability[held] = baseline_probability
+
+        model_brier = float(np.mean((held_probability - held_event) ** 2))
+        baseline_brier = float(np.mean((baseline_probability - held_event) ** 2))
+        model_log_likelihood = float(
+            np.sum(held_event * np.log(held_rate) - held_rate * first_passage[held])
+        )
+        baseline_log_likelihood = float(
+            np.sum(
+                held_event * math.log(baseline_rate)
+                - baseline_rate * first_passage[held]
+            )
+        )
+        likelihood_gain = model_log_likelihood - baseline_log_likelihood
+        held_first_passage = first_passage[held]
+        held_escaped = escaped[held]
+        observed_survival = np.array(
+            [
+                np.mean(
+                    (held_escaped & (held_first_passage > time))
+                    | (~held_escaped & (held_first_passage >= time))
+                )
+                for time in survival_times
+            ],
+            dtype=float,
+        )
+        predicted_survival = np.array(
+            [np.mean(np.exp(-held_rate * time)) for time in survival_times],
+            dtype=float,
+        )
+        baseline_survival = np.exp(-baseline_rate * survival_times)
+        group_brier_skill.append(
+            1.0 - model_brier / baseline_brier if baseline_brier > 0.0 else math.nan
+        )
+        group_log_likelihood_gain.append(likelihood_gain)
+        group_log_likelihood_gain_per_observation.append(
+            likelihood_gain / float(np.sum(held))
+        )
+        group_survival_error.append(
+            float(np.max(np.abs(predicted_survival - observed_survival)))
+        )
+        group_baseline_survival_error.append(
+            float(np.max(np.abs(baseline_survival - observed_survival)))
+        )
+        group_iteration_count.append(float(iteration_count))
+
+    if np.any(~np.isfinite(out_rate)) or np.any(~np.isfinite(out_probability)):
+        raise ValueError("every observation must receive an out-of-group prediction")
+    return {
+        "parent_groups": unique_groups,
+        "out_of_group_rate": out_rate,
+        "out_of_group_event_probability": out_probability,
+        "out_of_group_baseline_rate": out_baseline_rate,
+        "out_of_group_baseline_event_probability": out_baseline_probability,
+        "group_brier_skill": np.asarray(group_brier_skill),
+        "group_log_likelihood_gain": np.asarray(group_log_likelihood_gain),
+        "group_log_likelihood_gain_per_observation": np.asarray(
+            group_log_likelihood_gain_per_observation
+        ),
+        "group_survival_calibration_error": np.asarray(group_survival_error),
+        "group_baseline_survival_calibration_error": np.asarray(
+            group_baseline_survival_error
+        ),
+        "group_iteration_count": np.asarray(group_iteration_count),
+        "mean_heldout_brier_skill": float(np.mean(group_brier_skill)),
+        "mean_heldout_log_likelihood_gain_per_observation": float(
+            np.mean(group_log_likelihood_gain_per_observation)
+        ),
+        "minimum_group_log_likelihood_gain": float(
+            np.min(group_log_likelihood_gain)
+        ),
+        "maximum_heldout_survival_calibration_error": float(
+            np.max(group_survival_error)
+        ),
+        "maximum_baseline_survival_calibration_error": float(
+            np.max(group_baseline_survival_error)
+        ),
+        "parent_group_count": float(len(unique_groups)),
+        "observation_count": float(sample_count),
+        "event_count": float(np.sum(escaped)),
+        "horizon": float(horizon),
+        "l2_regularization": float(l2_regularization),
+        "fit_parameters_from_macro_observables": 0.0,
         "thermodynamic_claim_allowed": 0.0,
     }
 
