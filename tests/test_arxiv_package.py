@@ -2253,6 +2253,85 @@ class ArxivPackageTests(unittest.TestCase):
                 {expected_seed, expected_seed + 10000.0},
             )
 
+    def test_relative_second_generator_improves_lp_but_fails_full_gaussian_closure(self):
+        stem = "renewal_cage_ka_relative_second_generator_discovery200_T058"
+        required_paths = (
+            ROOT / "scripts" / "cache_ka_relative_second_generator.py",
+            ROOT / "scripts" / "analyze_ka_relative_second_generator_closure.py",
+            ROOT / "docs" / "microscopic-relative-second-generator.md",
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "specs"
+            / "2026-07-14-relative-second-generator-design.md",
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-07-14-relative-second-generator.md",
+        )
+        for path in required_paths:
+            self.assertTrue(path.is_file(), path)
+        for suffix in ("details", "summary", "correlation"):
+            path = ROOT / "data" / f"{stem}_{suffix}.csv"
+            self.assertTrue(path.is_file(), path)
+
+        document = required_paths[2].read_text()
+        for required in (
+            "ka_lj_cut",
+            "trace_probe_count = 4",
+            "0.32917",
+            "0.19946",
+            "3.17998",
+            "1.68713",
+            "0.37876",
+            "5.02707",
+            "l2p_improves_lp_shape_on_aggregate = 1",
+            "finite_discrete_gaussian_l2p_closure_supported = 0",
+            "continuous_gaussian_langevin_bath_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with (ROOT / "data" / f"{stem}_summary.csv").open() as handle:
+            rows = list(csv.DictReader(handle))
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["l2p_improves_lp_shape_on_aggregate"]), 1.0)
+        self.assertEqual(
+            float(verdict["finite_discrete_gaussian_l2p_closure_supported"]), 0.0
+        )
+        self.assertLess(
+            float(verdict["extension_maximum_lp_squared_residual_correlation"]),
+            float(verdict["baseline_maximum_lp_squared_residual_correlation"]),
+        )
+        self.assertLess(
+            float(verdict["extension_maximum_absolute_lp_residual_excess_kurtosis"]),
+            float(verdict["baseline_maximum_absolute_lp_residual_excess_kurtosis"]),
+        )
+        for key in (
+            "continuous_gaussian_langevin_bath_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
+        extension = next(
+            row
+            for row in rows
+            if row["record"] == "model_aggregate"
+            and row["model"] == "relative_phase_generator_l2p"
+        )
+        self.assertGreater(
+            float(extension["maximum_maximum_held_squared_white_residual_correlation"]),
+            0.37,
+        )
+        self.assertGreater(
+            float(extension["maximum_maximum_absolute_held_white_residual_excess_kurtosis"]),
+            5.0,
+        )
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"

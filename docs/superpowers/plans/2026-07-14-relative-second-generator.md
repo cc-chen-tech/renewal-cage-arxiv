@@ -60,10 +60,11 @@
 - Consumes: full-state clone trajectories and existing decomposed-drift caches.
 - Produces: per-clone `relative_second_generator` caches with source hashes, step sensitivity, probe sensitivity, and exact target alignment.
 
-- [ ] Write a failing CLI contract test for separate source, cache, and numerical controls.
-- [ ] Implement resumable cache generation without retaining additional full trajectories.
+- [x] Write a failing CLI contract test for separate source, cache, and numerical controls.
+- [x] Implement resumable cache generation without retaining additional full trajectories.
 - [ ] Run discovery subsets for probe counts `4,8,16,32` and three step sizes.
 - [ ] Freeze the shortest converged controls before reading validation scores.
+- [x] Run a four-clone, 200-frame, four-probe LJ-cut canary before authorizing the full C3 convergence study.
 - [ ] Commit the cache protocol and reduced discovery diagnostics.
 
 ### Task 4: Held Gaussian-Closure Test
@@ -77,10 +78,10 @@
 - Consumes: fixed discovery and validation `L2p` caches.
 - Produces: detail, summary, and correlation tables comparing `(u,p,Lp)` with `(u,p,Lp,L2p)` under Gaussian VAR driving.
 
-- [ ] Write failing tests for squared-residual correlation and frozen validation controls.
-- [ ] Implement the matched baseline/extension analysis with memory order `40` and VAR order `16`.
+- [x] Write failing tests for squared-residual correlation and frozen validation controls.
+- [x] Implement the matched baseline/extension analysis with memory order `40` and VAR order `16`.
 - [ ] Run discovery and two independent validation clones with disjoint Monte Carlo seed sets.
-- [ ] Apply every preregistered gate without relaxing thresholds.
+- [x] Apply every preregistered gate without relaxing thresholds to the discovery canary.
 - [ ] Commit only the analyzer, tests, reduced tables, and claim-limited report.
 
 ### Task 5: Verification And Scientific Verdict
@@ -96,3 +97,14 @@
 - [ ] Verify the report numbers directly against the reduced CSV outputs.
 - [ ] Record either the passing Gaussian closure or the precise failed gate.
 - [ ] Commit the checkpoint without adding unrelated untracked artifacts.
+
+## Discovery Canary Decision
+
+The four-probe LJ-cut canary found a real but incomplete hierarchy effect:
+adding `L2p` reduced the worst held `Lp` squared-residual correlation from
+`0.32917` to `0.19946` and the worst absolute `Lp` excess kurtosis from
+`3.17998` to `1.68713`, with improvement in every fold.  The new `L2p`
+coordinate itself retained squared-residual correlation `0.37876` and excess
+kurtosis `5.02707`.  Therefore a second-order Gaussian closure is rejected,
+and the expensive C3 validation is deferred until the exact state-dependent
+diffusion of `L2p` is included.

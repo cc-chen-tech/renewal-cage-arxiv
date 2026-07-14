@@ -510,6 +510,7 @@ def smooth_cage_second_generator_batch(
         - relative_drift(positions, velocities - step * acceleration, forces)
     ) / (2.0 * step)
 
+    trace_laplacian_terms = np.empty((0, *base_drift.shape), dtype=float)
     velocity_laplacian = np.zeros_like(base_drift)
     if len(probes):
         common_coordinate = {
@@ -532,7 +533,8 @@ def smooth_cage_second_generator_batch(
                 **common_coordinate,
             )["relative_velocity"]
             trace_terms.append((plus - minus) / directional_step)
-        velocity_laplacian = np.mean(np.asarray(trace_terms), axis=0)
+        trace_laplacian_terms = np.asarray(trace_terms)
+        velocity_laplacian = np.mean(trace_laplacian_terms, axis=0)
     ito_trace_term = friction * temperature * velocity_laplacian
     second = position_term + velocity_term + ito_trace_term
     probe_second_moment_error = (
@@ -545,6 +547,7 @@ def smooth_cage_second_generator_batch(
         "position_generator_term": position_term,
         "velocity_generator_term": velocity_term,
         "velocity_laplacian": velocity_laplacian,
+        "trace_probe_velocity_laplacian_terms": trace_laplacian_terms,
         "ito_trace_term": ito_trace_term,
         "second_relative_generator": second,
         "phase_space_step": step,

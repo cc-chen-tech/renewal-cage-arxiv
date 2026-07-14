@@ -142,6 +142,38 @@ target (u,p) correlation maximum error <= 0.25.
 The comparison against `(u,p,Lp)` uses identical targets, time windows,
 normalization, memory order, VAR order, and Monte Carlo seed sets.
 
+## Four-Probe Discovery Canary
+
+Before generating new C3 validation trajectories, a four-clone, 200-frame
+`ka_lj_cut` canary tested whether the exact coordinate had enough signal to
+justify that cost.  It did carry new information: in every held fold, adding
+`L2p` reduced both the `Lp` squared-residual correlation and the absolute `Lp`
+excess kurtosis.  The worst-fold values changed as follows:
+
+```text
+Lp squared-residual correlation: 0.32917 -> 0.19946
+absolute Lp excess kurtosis:      3.17998 -> 1.68713.
+```
+
+However, the new coordinate inherited a larger non-Gaussian defect:
+
+```text
+maximum squared-residual correlation including L2p = 0.37876
+maximum absolute excess kurtosis including L2p = 5.02707.
+```
+
+Thus `L2p` supports the microscopic generator hierarchy but fails the full
+Gaussian closure gate.  A C3 validation of this same constant-covariance
+second-order truncation is not authorized.  The next exact object is the
+state-dependent diffusion
+
+```text
+Q_c(X) = 2 gamma T grad_V(L2p) grad_V(L2p)^T,
+```
+
+which must be tested before adding an empirical latent clock or an explicit
+`L3p` drift coordinate.
+
 ## Claim Boundary
 
 Passing establishes a finite discrete microscopic Markov embedding for the
