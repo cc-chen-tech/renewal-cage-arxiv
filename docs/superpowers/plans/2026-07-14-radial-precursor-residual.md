@@ -31,7 +31,7 @@
 
 **Interfaces:**
 - Produces: `species_resolved_radial_features(positions, particle_types, box_lengths, target_indices, *, radii, width, cutoff, block_size=128) -> np.ndarray` with shape `(targets, 2*len(radii))`.
-- Produces: `expand_isoconfigurational_structural_rows(features, first_passage, escaped) -> dict[str, np.ndarray]`, where features have shape `(parents, targets, dimensions)` and labels have shape `(parents, clones, targets)`.
+- Produces: `expand_isoconfigurational_structural_rows(features, first_passage, escaped, *, horizon) -> dict[str, np.ndarray]`, where features have shape `(parents, targets, dimensions)` and labels have shape `(parents, clones, targets)`.
 - Produces: `smooth_cage_geometry_features(positions, *, particle_types, box_lengths, target_indices) -> np.ndarray` with columns `log|u|^2` and sorted `log eig(JJ^T)`.
 - Consumes: existing `smooth_force_support_cage` and existing grouped diagnostics.
 
@@ -157,7 +157,9 @@ Assert that clone-level rows follow parent, clone, target order and that the
 aggregated successes are sums over the clone axis.
 
 ```python
-result = expand_isoconfigurational_structural_rows(features, first_passage, escaped)
+result = expand_isoconfigurational_structural_rows(
+    features, first_passage, escaped, horizon=20.0
+)
 np.testing.assert_array_equal(result["groups"], [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1])
 np.testing.assert_array_equal(result["successes"], escaped.sum(axis=1).reshape(-1))
 np.testing.assert_array_equal(result["trials"], np.full(4, 3))

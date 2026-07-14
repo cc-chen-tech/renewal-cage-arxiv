@@ -77,6 +77,48 @@ class StructuralPrecursorTests(unittest.TestCase):
                 cutoff=2.5,
             )
 
+    def test_isoconfigurational_expansion_preserves_parent_clone_target_order(self):
+        from ka_structural_precursor import expand_isoconfigurational_structural_rows
+
+        features = np.array([[[10.0], [11.0]], [[20.0], [21.0]]])
+        first_passage = np.array(
+            [
+                [[1.0, 20.0], [2.0, 3.0], [20.0, 4.0]],
+                [[5.0, 20.0], [6.0, 7.0], [8.0, 20.0]],
+            ]
+        )
+        escaped = first_passage < 20.0
+
+        result = expand_isoconfigurational_structural_rows(
+            features, first_passage, escaped, horizon=20.0
+        )
+
+        np.testing.assert_array_equal(
+            result["features"][:, 0],
+            [10.0, 11.0, 10.0, 11.0, 10.0, 11.0, 20.0, 21.0, 20.0, 21.0, 20.0, 21.0],
+        )
+        np.testing.assert_array_equal(
+            result["groups"], [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
+        )
+        np.testing.assert_array_equal(
+            result["successes"], escaped.sum(axis=1).reshape(-1)
+        )
+        np.testing.assert_array_equal(result["trials"], np.full(4, 3))
+        np.testing.assert_array_equal(
+            result["configuration_groups"], [0, 0, 1, 1]
+        )
+
+    def test_isoconfigurational_expansion_requires_horizon_censoring(self):
+        from ka_structural_precursor import expand_isoconfigurational_structural_rows
+
+        with self.assertRaisesRegex(ValueError, "horizon censoring"):
+            expand_isoconfigurational_structural_rows(
+                np.ones((2, 1, 1)),
+                np.array([[[1.0], [19.0]], [[2.0], [20.0]]]),
+                np.array([[[True], [False]], [[True], [False]]]),
+                horizon=20.0,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

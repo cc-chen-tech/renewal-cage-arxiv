@@ -94,3 +94,75 @@ def species_resolved_radial_features(
                 start:stop, species * len(radii) : (species + 1) * len(radii)
             ] = np.einsum("ij,ijn->in", species_weight, shell_weight)
     return output
+
+
+def expand_isoconfigurational_structural_rows(
+    features: np.ndarray,
+    first_passage: np.ndarray,
+    escaped: np.ndarray,
+    *,
+    horizon: float,
+) -> dict[str, np.ndarray]:
+    """Expand parent-target structure over clones and aggregate propensity."""
+
+    features = np.asarray(features, dtype=float)
+    first_passage = np.asarray(first_passage, dtype=float)
+    escaped_raw = np.asarray(escaped)
+    if (
+        features.ndim != 3
+        or features.shape[0] < 2
+        or features.shape[1] < 1
+        or features.shape[2] < 1
+        or np.any(~np.isfinite(features))
+    ):
+        raise ValueError(
+            "features must be finite (parents, targets, dimensions) with at least two parents"
+        )
+    parent_count, target_count, feature_count = features.shape
+    if (
+        first_passage.ndim != 3
+        or first_passage.shape[0] != parent_count
+        or first_passage.shape[1] < 2
+        or first_passage.shape[2] != target_count
+        or np.any(~np.isfinite(first_passage))
+    ):
+        raise ValueError(
+            "first_passage must align as (parents, clones, targets) with at least two clones"
+        )
+    if escaped_raw.shape != first_passage.shape or not np.all(
+        np.isin(escaped_raw, (False, True, 0, 1))
+    ):
+        raise ValueError("escaped must be an aligned Boolean tensor")
+    escaped = escaped_raw.astype(bool)
+    if not math.isfinite(horizon) or horizon <= 0.0:
+        raise ValueError("horizon must be positive and finite")
+    if np.any(first_passage <= 0.0) or np.any(first_passage > horizon):
+        raise ValueError("first_passage must be positive and no larger than horizon")
+    if np.any(
+        (~escaped)
+        & ~np.isclose(first_passage, horizon, rtol=0.0, atol=1e-12)
+    ):
+        raise ValueError("unescaped rows must use exact horizon censoring")
+
+    clone_count = first_passage.shape[1]
+    clone_features = np.broadcast_to(
+        features[:, None, :, :],
+        (parent_count, clone_count, target_count, feature_count),
+    ).reshape(-1, feature_count)
+    groups = np.broadcast_to(
+        np.arange(parent_count)[:, None, None],
+        (parent_count, clone_count, target_count),
+    ).reshape(-1)
+    configuration_groups = np.broadcast_to(
+        np.arange(parent_count)[:, None], (parent_count, target_count)
+    ).reshape(-1)
+    return {
+        "features": clone_features.copy(),
+        "first_passage": first_passage.reshape(-1),
+        "escaped": escaped.reshape(-1),
+        "groups": groups,
+        "configuration_features": features.reshape(-1, feature_count),
+        "successes": np.sum(escaped, axis=1).reshape(-1).astype(float),
+        "trials": np.full(parent_count * target_count, float(clone_count)),
+        "configuration_groups": configuration_groups,
+    }
