@@ -1,4 +1,9 @@
+import csv
+import hashlib
+import json
 import sys
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -6,6 +11,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 class SecondGeneratorKrylovTests(unittest.TestCase):
@@ -115,6 +121,113 @@ class SecondGeneratorKrylovTests(unittest.TestCase):
 
         self.assertLess(diagnostic["residual_relative_l2"], 1e-10)
         self.assertEqual(diagnostic["maximum_abs_residual_state_correlation"], 0.0)
+
+    def test_second_generator_cli_exposes_preregistered_gates(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_second_generator_response.py"),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("--fit-times", completed.stdout)
+        self.assertIn("--horizons", completed.stdout)
+        self.assertIn("--linearity-tolerance", completed.stdout)
+        self.assertIn("--expected-member-count", completed.stdout)
+
+    def test_second_generator_cli_validates_manifest_and_keeps_claims_limited(self):
+        states, _, frame_time, _ = self.synthetic_second_generator_states()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            records = []
+            time = np.arange(states.shape[1]) * frame_time
+            for member in range(1, 9):
+                response = states[member - 1]
+                for epsilon in (0.001, 0.002):
+                    for sign in (-1, 1):
+                        path = root / f"member{member}_epsilon{epsilon}_sign{sign}.npz"
+                        np.savez_compressed(
+                            path,
+                            time=time,
+                            position=sign * epsilon * response[:, 0:3],
+                            velocity=sign * epsilon * response[:, 3:6],
+                            force=sign * epsilon * response[:, 6:9],
+                            force_generator=sign * epsilon * response[:, 9:12],
+                            second_force_generator=sign * epsilon * response[:, 12:15],
+                            potential_protocol=np.asarray("ka_lj_c3_switch"),
+                            thermodynamic_claim_allowed=0.0,
+                        )
+                        records.append(
+                            {
+                                "member_index": member,
+                                "epsilon": epsilon,
+                                "sign": sign,
+                                "velocity_seed": 100 + member,
+                                "langevin_seed": 200 + member,
+                                "path": path.name,
+                                "path_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                                "frame_count": len(time),
+                                "frame_time_tau": frame_time,
+                                "potential_protocol": "ka_lj_c3_switch",
+                                "fit_parameters_from_macro_observables": False,
+                                "thermodynamic_claim_allowed": False,
+                            }
+                        )
+            manifest = {
+                "protocol": "full_KA_common_noise_generator_response",
+                "potential_protocol": "ka_lj_c3_switch",
+                "member_count": 8,
+                "record_count": len(records),
+                "epsilons": [0.001, 0.002],
+                "saved_frame_interval_tau": frame_time,
+                "duration_tau": float(time[-1]),
+                "friction": 1.0,
+                "fit_parameters_from_macro_observables": False,
+                "thermodynamic_claim_allowed": False,
+                "records": records,
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest))
+            prefix = root / "result"
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "analyze_ka_second_generator_response.py"),
+                    str(manifest_path),
+                    "--output-prefix",
+                    str(prefix),
+                    "--fit-times",
+                    "0.20",
+                    "--horizons",
+                    "0.20",
+                    "0.50",
+                    "1.00",
+                    "--expected-member-count",
+                    "8",
+                ],
+                check=True,
+            )
+
+            with prefix.with_name(prefix.name + "_summary.csv").open() as handle:
+                rows = list(csv.DictReader(handle))
+            self.assertEqual(
+                {row["model"] for row in rows if row["record"] == "leave_one_member_out"},
+                {
+                    "first_generator_constrained",
+                    "second_generator_constrained",
+                    "free_second_generator_transition",
+                },
+            )
+            for row in rows:
+                self.assertEqual(row["autonomous_stochastic_single_particle_gle_allowed"], "0.0")
+                self.assertEqual(row["event_clock_claim_allowed"], "0.0")
+                self.assertEqual(row["kramers_escape_claim_allowed"], "0.0")
+                self.assertEqual(row["thermodynamic_claim_allowed"], "0.0")
 
 
 if __name__ == "__main__":
