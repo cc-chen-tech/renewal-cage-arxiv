@@ -1116,6 +1116,70 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertLess(abs(float(fidelity["force_norm_mean_relative_difference"])), 0.02)
         self.assertEqual(fidelity["thermodynamic_claim_allowed"], "False")
 
+    def test_second_generator_response_is_complete_and_claim_limited(self):
+        document_path = (
+            ROOT / "docs" / "microscopic-second-generator-krylov-response.md"
+        )
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_second_generator_response_T058_summary.csv"
+        )
+        curve_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_second_generator_response_T058_curve.csv"
+        )
+        for path in (document_path, summary_path, curve_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "32 matched paths",
+            "0.17569",
+            "0.23290",
+            "second_generator_response_allowed = 0",
+            "one_tau_generator_response_allowed = 0",
+            "autonomous_stochastic_single_particle_gle_allowed = 0",
+            "event_clock_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+            "explicit slow bath or state-dependent memory",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["primary_fit_time"]), 0.2)
+        for key in (
+            "second_generator_response_allowed",
+            "one_tau_generator_response_allowed",
+            "autonomous_stochastic_single_particle_gle_allowed",
+            "event_clock_claim_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
+        primary = {
+            (row["model"], row["evaluation_epsilon"]): row
+            for row in rows
+            if row["record"] == "aggregate_gate"
+            and row["fit_time"] == "0.2"
+            and row["horizon_time"] == "0.2"
+        }
+        for epsilon in ("0.001", "0.002"):
+            first = primary[("first_generator_constrained", epsilon)]
+            second = primary[("second_generator_constrained", epsilon)]
+            self.assertEqual(int(second["identified_fold_count"]), 8)
+            self.assertEqual(int(second["evaluable_fold_count"]), 8)
+            self.assertLess(float(first["position_relative_l2_error"]), 0.18)
+            self.assertGreater(float(second["position_relative_l2_error"]), 0.23)
+            self.assertLess(float(second["paired_improvement_fraction"]), -0.61)
+            self.assertEqual(float(second["all_identified_folds_pass"]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
