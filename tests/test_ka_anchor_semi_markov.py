@@ -1,4 +1,5 @@
 import sys
+import importlib.util
 import unittest
 from pathlib import Path
 
@@ -14,6 +15,16 @@ from ka_anchor_semi_markov import (  # noqa: E402
     extract_anchor_transition_kernel,
     simulate_anchor_semi_markov,
 )
+
+
+def load_script_module(filename: str, module_name: str):
+    path = ROOT / "scripts" / filename
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def exact_anchor_events() -> dict[str, np.ndarray]:
@@ -325,6 +336,242 @@ class AnchorSemiMarkovSimulationTests(unittest.TestCase):
         self.assertLess(anchor_quality["geometric_return_fraction_absolute_error"], 0.05)
         self.assertGreater(control_quality["geometric_return_fraction_absolute_error"], 0.05)
         self.assertTrue(np.isfinite(anchor_quality["return_closure_quantile_maximum_error_over_dw"]))
+
+
+def passing_transfer_rows(
+    *,
+    model: str = "anchor_aware_semi_markov",
+    replicate_count: int = 2,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+    quality_rows = []
+    for replicate in range(1, replicate_count + 1):
+        for realization in range(16):
+            quality_rows.append(
+                {
+                    "model": model,
+                    "replicate": float(replicate),
+                    "realization": float(realization),
+                    "temperature": 0.45,
+                    "calibration_time": 5000.0,
+                    "block_size": 20.0,
+                    "radial_bin_count": 8.0,
+                    "required_realizations_per_replicate": 16.0,
+                    "surrogate_base_seed": 84031.0,
+                    "scheduled_return_fraction_absolute_error": 0.01,
+                    "scheduled_return_given_return_absolute_error": 0.02,
+                    "scheduled_return_given_escape_absolute_error": 0.02,
+                    "return_holding_time_mean_relative_error": 0.04,
+                    "escape_holding_time_mean_relative_error": 0.04,
+                    "return_holding_time_quantile_maximum_relative_error": 0.08,
+                    "escape_holding_time_quantile_maximum_relative_error": 0.08,
+                    "radial_mean_relative_error": 0.01,
+                    "radial_standard_deviation_relative_error": 0.01,
+                    "lag_one_cosine_mean_absolute_error": 0.01,
+                    "lag_one_cosine_quantile_maximum_absolute_error": 0.02,
+                    "geometric_return_fraction_absolute_error": 0.01,
+                    "return_closure_quantile_maximum_error_over_dw": 0.04,
+                    "geometric_return_quality_required": float(
+                        model == "anchor_aware_semi_markov"
+                    ),
+                    "unsupported_tuple_count": 0.0,
+                    "calibration_events_only": 1.0,
+                    "heldout_events_used_in_calibration": 0.0,
+                    "heldout_cage_residual_used_in_prediction": 0.0,
+                    "macro_fit_parameter_count": 0.0,
+                    "microdynamic_closure_claim_allowed": 0.0,
+                    "spatial_facilitation_claim_allowed": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                }
+            )
+    summary_rows = []
+    for lag in (20.0, 40.0):
+        summary_rows.append(
+            {
+                "model": model,
+                "lag": lag,
+                "independent_replicate_count": float(replicate_count),
+                "ensemble_msd_relative_error": 0.05,
+                "ensemble_ngp_absolute_error": 0.10,
+                "ensemble_absolute_error_fs_k2": 0.01,
+                "ensemble_absolute_error_fs_k4": 0.02,
+                "ensemble_absolute_error_fs_k7p25": 0.02,
+                "ensemble_msd_mc_relative_se": 0.005,
+                "ensemble_ngp_mc_se": 0.01,
+                "ensemble_fs_k2_mc_se": 0.001,
+                "ensemble_fs_k4_mc_se": 0.001,
+                "ensemble_fs_k7p25_mc_se": 0.002,
+            }
+        )
+    replicate_rows = []
+    for replicate in range(1, replicate_count + 1):
+        for lag in (20.0, 40.0):
+            replicate_rows.append(
+                {
+                    "model": model,
+                    "replicate": float(replicate),
+                    "lag": lag,
+                    "msd_relative_error": 0.05,
+                    "ngp_absolute_error": 0.10,
+                    "absolute_error_fs_k2": 0.01,
+                    "absolute_error_fs_k4": 0.02,
+                    "absolute_error_fs_k7p25": 0.02,
+                }
+            )
+    return quality_rows, summary_rows, replicate_rows
+
+
+class AnchorTransferAnalysisTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.module = load_script_module(
+            "analyze_ka_anchor_semi_markov_transfer.py",
+            "analyze_ka_anchor_semi_markov_transfer_test",
+        )
+
+    def test_classifier_accepts_complete_quality_precision_and_curves(self):
+        quality, summary, replicates = passing_transfer_rows()
+        verdict = self.module.classify_anchor_transfer(
+            quality,
+            summary,
+            replicates,
+            model="anchor_aware_semi_markov",
+            expected_replicates=2,
+        )
+        self.assertEqual(verdict["quality_realization_completeness_pass"], 1.0)
+        self.assertEqual(verdict["quality_pass"], 1.0)
+        self.assertEqual(verdict["precision_pass"], 1.0)
+        self.assertEqual(verdict["curve_transfer_pass"], 1.0)
+        self.assertEqual(verdict["mechanism_state"], "curve_closed")
+
+    def test_each_shared_quality_limit_can_reject_transfer(self):
+        cases = {
+            "scheduled_return_fraction_absolute_error": 0.021,
+            "scheduled_return_given_return_absolute_error": 0.031,
+            "scheduled_return_given_escape_absolute_error": 0.031,
+            "return_holding_time_mean_relative_error": 0.051,
+            "escape_holding_time_mean_relative_error": 0.051,
+            "return_holding_time_quantile_maximum_relative_error": 0.101,
+            "escape_holding_time_quantile_maximum_relative_error": 0.101,
+            "radial_mean_relative_error": 0.021,
+            "radial_standard_deviation_relative_error": 0.021,
+            "lag_one_cosine_mean_absolute_error": 0.021,
+            "lag_one_cosine_quantile_maximum_absolute_error": 0.031,
+            "unsupported_tuple_count": 1.0,
+        }
+        for key, value in cases.items():
+            with self.subTest(key=key):
+                quality, summary, replicates = passing_transfer_rows()
+                quality[0][key] = value
+                verdict = self.module.classify_anchor_transfer(
+                    quality,
+                    summary,
+                    replicates,
+                    model="anchor_aware_semi_markov",
+                    expected_replicates=2,
+                )
+                self.assertEqual(verdict["quality_pass"], 0.0)
+                self.assertEqual(verdict["curve_transfer_pass"], 0.0)
+
+    def test_geometry_limits_apply_only_to_anchor_model(self):
+        for key, value in (
+            ("geometric_return_fraction_absolute_error", 0.021),
+            ("return_closure_quantile_maximum_error_over_dw", 0.051),
+        ):
+            anchor_quality, anchor_summary, anchor_replicates = passing_transfer_rows()
+            anchor_quality[0][key] = value
+            anchor = self.module.classify_anchor_transfer(
+                anchor_quality,
+                anchor_summary,
+                anchor_replicates,
+                model="anchor_aware_semi_markov",
+                expected_replicates=2,
+            )
+            self.assertEqual(anchor["quality_pass"], 0.0)
+
+            control_quality, control_summary, control_replicates = passing_transfer_rows(
+                model="state_schedule_without_anchor_geometry"
+            )
+            control_quality[0][key] = 10.0
+            control = self.module.classify_anchor_transfer(
+                control_quality,
+                control_summary,
+                control_replicates,
+                model="state_schedule_without_anchor_geometry",
+                expected_replicates=2,
+            )
+            self.assertEqual(control["quality_pass"], 1.0)
+
+    def test_precision_and_each_curve_class_are_independent_gates(self):
+        for key, value, expected_gate in (
+            ("ensemble_msd_mc_relative_se", 0.011, "precision_pass"),
+            ("ensemble_ngp_mc_se", 0.031, "precision_pass"),
+            ("ensemble_fs_k7p25_mc_se", 0.0031, "precision_pass"),
+            ("ensemble_msd_relative_error", 0.101, "raw_curve_transfer_pass"),
+            ("ensemble_ngp_absolute_error", 0.301, "raw_curve_transfer_pass"),
+            ("ensemble_absolute_error_fs_k4", 0.031, "raw_curve_transfer_pass"),
+        ):
+            with self.subTest(key=key):
+                quality, summary, replicates = passing_transfer_rows()
+                summary[0][key] = value
+                verdict = self.module.classify_anchor_transfer(
+                    quality,
+                    summary,
+                    replicates,
+                    model="anchor_aware_semi_markov",
+                    expected_replicates=2,
+                )
+                self.assertEqual(verdict[expected_gate], 0.0)
+                self.assertEqual(verdict["curve_transfer_pass"], 0.0)
+
+    def test_provenance_and_exact_realization_grid_are_mandatory(self):
+        quality, summary, replicates = passing_transfer_rows()
+        for mutation in ("missing", "duplicate", "calibration", "claim"):
+            with self.subTest(mutation=mutation):
+                changed = [dict(row) for row in quality]
+                if mutation == "missing":
+                    changed.pop()
+                elif mutation == "duplicate":
+                    changed.append(dict(changed[0]))
+                elif mutation == "calibration":
+                    changed[0]["calibration_time"] = 4999.0
+                else:
+                    changed[0]["thermodynamic_claim_allowed"] = 1.0
+                with self.assertRaises(ValueError):
+                    self.module.classify_anchor_transfer(
+                        changed,
+                        summary,
+                        replicates,
+                        model="anchor_aware_semi_markov",
+                        expected_replicates=2,
+                    )
+
+    def test_protocol_is_frozen_by_temperature(self):
+        self.module.validate_anchor_protocol(
+            temperature=0.45,
+            calibration_time=5000,
+            block_size=20,
+            radial_bin_count=8,
+            surrogate_realizations=16,
+            replicate_count=3,
+        )
+        for key, value in (
+            ("calibration_time", 4999),
+            ("block_size", 10),
+            ("radial_bin_count", 7),
+            ("surrogate_realizations", 15),
+            ("replicate_count", 2),
+        ):
+            arguments = {
+                "temperature": 0.45,
+                "calibration_time": 5000,
+                "block_size": 20,
+                "radial_bin_count": 8,
+                "surrogate_realizations": 16,
+                "replicate_count": 3,
+            }
+            arguments[key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.module.validate_anchor_protocol(**arguments)
 
 
 if __name__ == "__main__":
