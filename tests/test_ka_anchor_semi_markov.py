@@ -573,6 +573,24 @@ class AnchorTransferAnalysisTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 self.module.validate_anchor_protocol(**arguments)
 
+    def test_incomplete_terminal_block_is_excluded(self):
+        synthetic = {
+            "particle": np.array([0, 0, 0]),
+            "time": np.array([20, 740, 741]),
+            "jump_vector": np.array(
+                [[1.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 4.0]]
+            ),
+        }
+        blocks = self.module._events_to_blocks(
+            synthetic,
+            particle_count=1,
+            duration=750,
+            block_size=20,
+        )
+        self.assertEqual(blocks.shape, (1, 37, 3))
+        np.testing.assert_allclose(blocks[0, 0], [1.0, 0.0, 0.0])
+        np.testing.assert_allclose(blocks[0, -1], [0.0, 2.0, 0.0])
+
 
 if __name__ == "__main__":
     unittest.main()
