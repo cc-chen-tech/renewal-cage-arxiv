@@ -591,6 +591,90 @@ class AnchorTransferAnalysisTests(unittest.TestCase):
         np.testing.assert_allclose(blocks[0, 0], [1.0, 0.0, 0.0])
         np.testing.assert_allclose(blocks[0, -1], [0.0, 2.0, 0.0])
 
+    def test_seed_and_factorization_index_are_deterministic_and_strict(self):
+        first = self.module.anchor_seed(84031, replicate=2, realization=7)
+        self.assertEqual(
+            first,
+            self.module.anchor_seed(84031, replicate=2, realization=7),
+        )
+        self.assertNotEqual(
+            first,
+            self.module.anchor_seed(84031, replicate=2, realization=8),
+        )
+        for arguments in (
+            {"base_seed": True, "replicate": 2, "realization": 7},
+            {"base_seed": 84031, "replicate": -1, "realization": 7},
+        ):
+            with self.assertRaises(ValueError):
+                self.module.anchor_seed(**arguments)
+
+        rows = [
+            {"replicate": "1", "lag": "20", "observed_msd": "1"},
+            {"replicate": "1", "lag": "25", "observed_msd": "2"},
+            {"replicate": "2", "lag": "40", "observed_msd": "3"},
+            {"replicate": "2", "lag": "120", "observed_msd": "4"},
+        ]
+        indexed = self.module._index_factorization_rows(
+            rows,
+            calibration_time=100,
+            block_size=20,
+        )
+        self.assertEqual(set(indexed), {(1, 20), (2, 40)})
+        with self.assertRaises(ValueError):
+            self.module._index_factorization_rows(
+                [rows[0], dict(rows[0])],
+                calibration_time=100,
+                block_size=20,
+            )
+
+    def test_realizations_are_aggregated_within_replicate_before_ensemble(self):
+        rows = []
+        predictions = {
+            1: (1.0, 3.0),
+            2: (5.0, 9.0),
+        }
+        observed = {1: 1.0, 2: 3.0}
+        for replicate, values in predictions.items():
+            for realization, prediction in enumerate(values):
+                row = {
+                    "model": "anchor_aware_semi_markov",
+                    "replicate": float(replicate),
+                    "realization": float(realization),
+                    "lag": 20.0,
+                    "predicted_msd": prediction,
+                    "observed_msd": observed[replicate],
+                    "predicted_ngp": prediction / 10.0,
+                    "observed_ngp": observed[replicate] / 10.0,
+                }
+                for wave_number in self.module.WAVE_NUMBERS:
+                    suffix = f"k{wave_number:g}".replace(".", "p")
+                    row[f"predicted_fs_{suffix}"] = prediction / 20.0
+                    row[f"observed_fs_{suffix}"] = observed[replicate] / 20.0
+                rows.append(row)
+
+        replicate_rows, summary_rows = self.module.summarize_anchor_realizations(rows)
+
+        self.assertEqual(len(replicate_rows), 2)
+        self.assertEqual([row["realization_count"] for row in replicate_rows], [2.0, 2.0])
+        self.assertAlmostEqual(replicate_rows[0]["predicted_msd"], 2.0)
+        self.assertAlmostEqual(replicate_rows[0]["predicted_msd_mc_se"], 1.0)
+        self.assertAlmostEqual(replicate_rows[1]["predicted_msd"], 7.0)
+        self.assertAlmostEqual(replicate_rows[1]["predicted_msd_mc_se"], 2.0)
+
+        self.assertEqual(len(summary_rows), 1)
+        summary = summary_rows[0]
+        self.assertEqual(summary["replicate_first_aggregation"], 1.0)
+        self.assertEqual(summary["independent_replicate_count"], 2.0)
+        self.assertAlmostEqual(summary["predicted_msd"], 4.5)
+        self.assertAlmostEqual(summary["observed_msd"], 2.0)
+        self.assertAlmostEqual(summary["ensemble_msd_relative_error"], 1.25)
+        self.assertAlmostEqual(
+            summary["ensemble_msd_mc_relative_se"],
+            np.sqrt(5.0) / 4.0,
+        )
+        self.assertEqual(summary["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(summary["thermodynamic_claim_allowed"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
