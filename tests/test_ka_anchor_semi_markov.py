@@ -591,6 +591,175 @@ class AnchorTransferAnalysisTests(unittest.TestCase):
         np.testing.assert_allclose(blocks[0, 0], [1.0, 0.0, 0.0])
         np.testing.assert_allclose(blocks[0, -1], [0.0, 2.0, 0.0])
 
+
+def gate_fixture_rows():
+    low_quality = []
+    low_summary = []
+    low_replicates = []
+    high_quality = []
+    high_summary = []
+    high_replicates = []
+    for model in (
+        "anchor_aware_semi_markov",
+        "state_schedule_without_anchor_geometry",
+    ):
+        quality, summary, replicates = passing_transfer_rows(model=model, replicate_count=3)
+        low_quality.extend(quality)
+        low_summary.extend(summary)
+        low_replicates.extend(replicates)
+        quality, summary, replicates = passing_transfer_rows(model=model, replicate_count=5)
+        for row in quality:
+            row["temperature"] = 0.58
+            row["calibration_time"] = 750.0
+        high_quality.extend(quality)
+        high_summary.extend(summary)
+        high_replicates.extend(replicates)
+
+    low_recoil_rows = []
+    for replicate in range(1, 4):
+        for lag in (20.0, 40.0):
+            low_recoil_rows.append(
+                {
+                    "replicate": float(replicate),
+                    "lag": lag,
+                    "ngp_absolute_error": 0.20,
+                    "absolute_error_fs_k2": 0.025,
+                    "absolute_error_fs_k4": 0.025,
+                    "absolute_error_fs_k7p25": 0.025,
+                }
+            )
+    recoil_verdicts = [
+        {
+            "temperature": temperature,
+            "calibration_time": calibration,
+            "block_size": 20.0,
+            "required_realizations_per_replicate": 16.0,
+            "quality_pass": 1.0,
+            "heldout_events_used_in_calibration": 0.0,
+            "microdynamic_closure_claim_allowed": 0.0,
+            "spatial_facilitation_claim_allowed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        for temperature, calibration in ((0.45, 5000.0), (0.58, 750.0))
+    ]
+    empirical_verdicts = [
+        {
+            "model": "contiguous_empirical_path",
+            "temperature": temperature,
+            "curve_transfer_pass": 1.0,
+            "heldout_path_used_in_prediction": 0.0,
+            "macro_fit_parameter_count": 0.0,
+            "microdynamic_closure_claim_allowed": 0.0,
+            "spatial_facilitation_claim_allowed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        for temperature in (0.45, 0.58)
+    ]
+    return {
+        "low_quality_rows": low_quality,
+        "low_summary_rows": low_summary,
+        "low_replicate_rows": low_replicates,
+        "high_quality_rows": high_quality,
+        "high_summary_rows": high_summary,
+        "high_replicate_rows": high_replicates,
+        "low_recoil_rows": low_recoil_rows,
+        "recoil_verdict_rows": recoil_verdicts,
+        "empirical_verdict_rows": empirical_verdicts,
+    }
+
+
+class AnchorGateSelectionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.module = load_script_module(
+            "summarize_ka_anchor_semi_markov_gate.py",
+            "summarize_ka_anchor_semi_markov_gate_test",
+        )
+
+    def test_both_models_closing_selects_state_clock_without_anchor_identification(self):
+        verdict = self.module.classify_anchor_semi_markov_gate(**gate_fixture_rows())
+        self.assertEqual(
+            verdict["mechanism_state"],
+            "semi_markov_state_clock_sufficient_anchor_not_identified",
+        )
+
+    def test_anchor_only_low_higher_order_closure_requires_anchor_geometry(self):
+        inputs = gate_fixture_rows()
+        for row in inputs["low_summary_rows"]:
+            if row["model"] == "state_schedule_without_anchor_geometry":
+                row["ensemble_ngp_absolute_error"] = 0.31
+        verdict = self.module.classify_anchor_semi_markov_gate(**inputs)
+        self.assertEqual(
+            verdict["mechanism_state"],
+            "anchor_geometry_required_within_tested_models",
+        )
+        self.assertEqual(verdict["all_low_anchor_replicates_improve_over_recoil"], 1.0)
+
+    def test_anchor_failure_is_an_explicit_rejection(self):
+        for table, key, value in (
+            ("low_quality_rows", "radial_mean_relative_error", 0.021),
+            ("high_summary_rows", "ensemble_msd_mc_relative_se", 0.011),
+            ("low_summary_rows", "ensemble_msd_relative_error", 0.101),
+        ):
+            with self.subTest(table=table, key=key):
+                inputs = gate_fixture_rows()
+                rows = inputs[table]
+                target = next(row for row in rows if row["model"] == "anchor_aware_semi_markov")
+                target[key] = value
+                verdict = self.module.classify_anchor_semi_markov_gate(**inputs)
+                self.assertEqual(verdict["mechanism_state"], "anchor_aware_model_rejected")
+
+    def test_incomplete_competitor_or_bad_provenance_is_unresolved(self):
+        for mutation in ("empirical", "recoil_claim", "missing_replicate"):
+            with self.subTest(mutation=mutation):
+                inputs = gate_fixture_rows()
+                if mutation == "empirical":
+                    inputs["empirical_verdict_rows"][0]["curve_transfer_pass"] = 0.0
+                elif mutation == "recoil_claim":
+                    inputs["recoil_verdict_rows"][0]["thermodynamic_claim_allowed"] = 1.0
+                else:
+                    inputs["low_recoil_rows"] = [
+                        row for row in inputs["low_recoil_rows"] if int(row["replicate"]) != 3
+                    ]
+                verdict = self.module.classify_anchor_semi_markov_gate(**inputs)
+                self.assertEqual(verdict["mechanism_state"], "mechanism_unresolved")
+
+    def test_control_msd_only_failure_does_not_identify_anchor_geometry(self):
+        inputs = gate_fixture_rows()
+        for row in inputs["low_summary_rows"]:
+            if row["model"] == "state_schedule_without_anchor_geometry":
+                row["ensemble_msd_relative_error"] = 0.11
+        verdict = self.module.classify_anchor_semi_markov_gate(**inputs)
+        self.assertEqual(verdict["mechanism_state"], "mechanism_unresolved")
+
+    def test_low_replicate_tie_does_not_count_as_improvement(self):
+        inputs = gate_fixture_rows()
+        for row in inputs["low_summary_rows"]:
+            if row["model"] == "state_schedule_without_anchor_geometry":
+                row["ensemble_ngp_absolute_error"] = 0.31
+        anchor = next(
+            row
+            for row in inputs["low_replicate_rows"]
+            if row["model"] == "anchor_aware_semi_markov" and int(row["replicate"]) == 1
+        )
+        recoil = next(
+            row for row in inputs["low_recoil_rows"] if int(row["replicate"]) == 1
+        )
+        anchor["ngp_absolute_error"] = recoil["ngp_absolute_error"]
+        anchor["absolute_error_fs_k7p25"] = recoil["absolute_error_fs_k7p25"]
+        verdict = self.module.classify_anchor_semi_markov_gate(**inputs)
+        self.assertEqual(verdict["mechanism_state"], "mechanism_unresolved")
+        self.assertEqual(verdict["all_low_anchor_replicates_improve_over_recoil"], 0.0)
+
+
+class AnchorTransferAggregationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.module = load_script_module(
+            "analyze_ka_anchor_semi_markov_transfer.py",
+            "analyze_ka_anchor_semi_markov_transfer_aggregation_test",
+        )
+
     def test_seed_and_factorization_index_are_deterministic_and_strict(self):
         first = self.module.anchor_seed(84031, replicate=2, realization=7)
         self.assertEqual(
