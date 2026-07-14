@@ -280,6 +280,9 @@ def heldout_state_diagnostics(
     return {
         "heldout_state_r_squared": float(state_r_squared),
         "heldout_velocity_r_squared": float(velocity_r_squared),
+        "heldout_velocity_residual_mean_squared": float(
+            np.mean(residual[:, :, 0] ** 2)
+        ),
         "maximum_held_residual_state_correlation": float(np.max(np.abs(correlations))),
         "maximum_held_residual_lag_correlation": maximum_lag_correlation,
     }

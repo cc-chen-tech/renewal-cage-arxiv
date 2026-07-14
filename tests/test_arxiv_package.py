@@ -1266,6 +1266,85 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(set(extension), {24, 32, 48, 64})
         self.assertGreater(float(extension[64]["terminal_diffusion_relative_error"]), 4.0)
 
+    def test_bilinear_state_dependent_memory_is_complete_and_not_promoted(self):
+        document_path = ROOT / "docs" / "microscopic-bilinear-state-dependent-memory.md"
+        summary_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_bilinear_state_dependent_memory_T058_summary.csv"
+        )
+        detail_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_bilinear_state_dependent_memory_T058_details.csv"
+        )
+        sensitivity_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_bilinear_state_dependent_memory_T058_ridge_sensitivity.csv"
+        )
+        for path in (document_path, summary_path, detail_path, sensitivity_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.02182",
+            "0.86078",
+            "1.00407",
+            "None of the four held",
+            "teacher_forced_state_dependent_memory_gate_pass = 0",
+            "autonomous_state_dependent_gle_allowed = 0",
+            "complete_event_clock_closure_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"]: row for row in rows if row["record"] == "aggregate_model"}
+        self.assertEqual(
+            set(models),
+            {"stationary_rank16", "bilinear_energy", "bilinear_energy_power"},
+        )
+        baseline = models["stationary_rank16"]
+        full = models["bilinear_energy_power"]
+        self.assertEqual(int(float(full["held_clone_count"])), 4)
+        self.assertLess(
+            float(full["maximum_maximum_held_residual_state_correlation"]),
+            0.022,
+        )
+        self.assertGreater(
+            float(full["maximum_maximum_held_residual_lag_correlation"]),
+            float(baseline["maximum_maximum_held_residual_lag_correlation"]),
+        )
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["velocity_prediction_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["residual_state_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["residual_lag_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["every_fold_lag_improves"]), 0.0)
+        self.assertGreater(float(verdict["bilinear_to_baseline_lag_ratio"]), 1.0)
+        for key in (
+            "teacher_forced_state_dependent_memory_gate_pass",
+            "autonomous_state_dependent_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
+        with sensitivity_path.open() as handle:
+            sensitivity = list(csv.DictReader(handle))
+        self.assertEqual(len(sensitivity), 5)
+        self.assertTrue(
+            all(float(row["teacher_forced_state_dependent_memory_gate_pass"]) == 0.0 for row in sensitivity)
+        )
+        self.assertTrue(
+            all(float(row["every_fold_lag_improves"]) == 0.0 for row in sensitivity)
+        )
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
