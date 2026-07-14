@@ -153,6 +153,10 @@ leave-one-member-out fold:
 - report horizons `0.20`, `0.50`, and `1.00 tau`;
 - fit no macroscopic observable.
 
+The `0.20 tau` fit is the preregistered primary model for every boolean claim
+gate.  The shorter fits diagnose rank and temporal convergence only; they
+cannot be selected post hoc to promote a claim.
+
 Cross-epsilon mismatch determines whether a member/horizon remains in the
 linear-response regime.  A horizon with position-response mismatch above
 `0.02` is marked unidentified rather than scored as a model failure.

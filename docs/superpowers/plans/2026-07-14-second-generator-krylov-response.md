@@ -185,6 +185,9 @@ members with the existing first-generator fit and both new 15-state fits.
 Propagate from each held initial state and score position response at
 `0.20,0.50,1.00 tau` for both epsilon values.
 
+Use only the `0.20 tau` fit for boolean claim gates. Treat the shorter fits as
+rank and convergence diagnostics, never as selectable alternatives.
+
 - [ ] **Step 5: Implement linearity and claim gates**
 
 Mark a member/horizon identified only when the cross-epsilon position mismatch
