@@ -1778,6 +1778,96 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_generator_augmented_matrix_mori_passes_independent_clones(self):
+        discovery_stem = "renewal_cage_ka_relative_generator_mori_discovery_T058"
+        validation_stem = "renewal_cage_ka_relative_generator_mori_validation_T058"
+        document_path = ROOT / "docs" / "microscopic-relative-generator-mori.md"
+        script_path = ROOT / "scripts" / "analyze_ka_relative_generator_mori.py"
+        cache_script_path = ROOT / "scripts" / "cache_ka_decomposed_drift.py"
+        for path in (document_path, script_path, cache_script_path):
+            self.assertTrue(path.is_file())
+        for stem in (discovery_stem, validation_stem):
+            for suffix in ("details", "summary", "curve"):
+                self.assertTrue((ROOT / "data" / f"{stem}_{suffix}.csv").is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.09059",
+            "0.19297",
+            "0.04129",
+            "0.07652",
+            "0.99853",
+            "0.15001",
+            "projected_relative_generator_mori_representation_allowed = 1",
+            "thermal_fdt_adjoint_audit_pass = 0",
+            "physical_relative_generator_gle_allowed = 0",
+            "orthogonal_noise_generation_closed = 0",
+            "autonomous_single_particle_gle_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with (ROOT / "data" / f"{discovery_stem}_summary.csv").open() as handle:
+            discovery = list(csv.DictReader(handle))
+        selected = next(
+            row
+            for row in discovery
+            if row["record"] == "model_aggregate"
+            and row["basis"] == "relative_phase_generator"
+            and int(float(row["memory_order"])) == 40
+        )
+        self.assertEqual(float(selected["physical_representation_gate_pass"]), 1.0)
+        self.assertLess(float(selected["maximum_gfd_operator_normalized_rmse"]), 0.091)
+        self.assertLess(
+            float(selected["maximum_held_target_correlation_extrapolation_maximum_error"]),
+            0.193,
+        )
+        discovery_verdict = next(
+            row for row in discovery if row["record"] == "verdict"
+        )
+        self.assertEqual(
+            float(discovery_verdict["hyperparameter_selection_uses_held_folds"]), 1.0
+        )
+        self.assertEqual(float(discovery_verdict["independent_validation_available"]), 0.0)
+        self.assertEqual(float(discovery_verdict["physical_relative_generator_gle_allowed"]), 0.0)
+
+        with (ROOT / "data" / f"{validation_stem}_summary.csv").open() as handle:
+            validation = list(csv.DictReader(handle))
+        aggregate = next(
+            row for row in validation if row["record"] == "model_aggregate"
+        )
+        self.assertEqual(int(float(aggregate["held_clone_count"])), 2)
+        self.assertEqual(float(aggregate["physical_representation_gate_pass"]), 1.0)
+        self.assertLess(
+            float(aggregate["maximum_maximum_noise_initial_state_correlation"]), 0.042
+        )
+        self.assertLess(float(aggregate["maximum_gfd_operator_normalized_rmse"]), 0.077)
+        self.assertGreater(float(aggregate["minimum_gfd_operator_shape_correlation"]), 0.9985)
+        self.assertLess(
+            float(aggregate["maximum_held_target_correlation_extrapolation_rmse"]), 0.050
+        )
+        self.assertLess(
+            float(aggregate["maximum_held_target_correlation_extrapolation_maximum_error"]),
+            0.151,
+        )
+        verdict = next(row for row in validation if row["record"] == "verdict")
+        self.assertEqual(float(verdict["hyperparameter_selection_uses_held_folds"]), 0.0)
+        self.assertEqual(float(verdict["confirmatory_matrix_mori_gfd_closure_supported"]), 1.0)
+        self.assertEqual(
+            float(verdict["projected_relative_generator_mori_representation_allowed"]),
+            1.0,
+        )
+        self.assertEqual(float(verdict["thermal_fdt_adjoint_audit_pass"]), 0.0)
+        self.assertEqual(float(verdict["physical_relative_generator_gle_allowed"]), 0.0)
+        self.assertEqual(float(verdict["orthogonal_noise_generation_closed"]), 0.0)
+        for key in (
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
