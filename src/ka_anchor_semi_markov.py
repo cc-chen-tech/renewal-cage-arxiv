@@ -318,6 +318,17 @@ def simulate_anchor_semi_markov(
     radial_bin_count = int(kernel["radial_bin_count"])
     threshold = float(kernel["radius_threshold"])
     horizon = duration + maximum_lag
+    conditional_candidates = {
+        (state, radial_bin): np.flatnonzero(
+            (current_states == state) & (source_bins == radial_bin)
+        )
+        for state in (ESCAPE_STATE, RETURN_STATE)
+        for radial_bin in range(radial_bin_count)
+    }
+    geometry_candidates = {
+        radial_bin: np.flatnonzero(source_bins == radial_bin)
+        for radial_bin in range(radial_bin_count)
+    }
 
     output: dict[str, list[Any]] = {
         "particle": [],
@@ -357,26 +368,48 @@ def simulate_anchor_semi_markov(
                 current_radius,
                 radial_bin_count,
             )
-            candidates = np.flatnonzero(
-                (current_states == current_state) & (source_bins == source_bin)
-            )
-            supported: list[int] = []
-            for candidate in candidates:
+            candidates = conditional_candidates[(current_state, source_bin)]
+            if len(candidates) == 0:
+                raise ValueError(
+                    "empty conditional support for current state and radial bin"
+                )
+
+            # Most same-bin return records satisfy the triangle inequality. Rejection
+            # sampling preserves the exact conditional law without rescanning the full
+            # transition table at every event; the exhaustive fallback proves support.
+            record = -1
+            for _ in range(min(64, 2 * len(candidates))):
+                candidate = int(candidates[int(state_rng.integers(0, len(candidates)))])
                 target_radius = _profile_radius(
                     profile,
                     float(target_quantiles[candidate]),
                 )
                 if next_states[candidate] != RETURN_STATE:
-                    supported.append(int(candidate))
-                    continue
+                    record = candidate
+                    break
                 closure = float(closure_distances[candidate])
                 if abs(current_radius - target_radius) <= closure <= current_radius + target_radius:
-                    supported.append(int(candidate))
-            if not supported:
-                raise ValueError(
-                    "empty conditional support for current state, radial bin, and geometry"
-                )
-            record = supported[int(state_rng.integers(0, len(supported)))]
+                    record = candidate
+                    break
+            if record < 0:
+                supported: list[int] = []
+                for candidate_value in candidates:
+                    candidate = int(candidate_value)
+                    target_radius = _profile_radius(
+                        profile,
+                        float(target_quantiles[candidate]),
+                    )
+                    if next_states[candidate] != RETURN_STATE:
+                        supported.append(candidate)
+                        continue
+                    closure = float(closure_distances[candidate])
+                    if abs(current_radius - target_radius) <= closure <= current_radius + target_radius:
+                        supported.append(candidate)
+                if not supported:
+                    raise ValueError(
+                        "empty conditional support for current state, radial bin, and geometry"
+                    )
+                record = supported[int(state_rng.integers(0, len(supported)))]
             scheduled_state = int(next_states[record])
             holding_time = max(1, int(round(normalized_waits[record] * mean_wait)))
             event_time = current_time + holding_time
@@ -391,11 +424,11 @@ def simulate_anchor_semi_markov(
                 if not -1.0 <= relative_cosine <= 1.0:
                     raise ValueError("unsupported return tuple cannot be clipped")
             elif model == "state_schedule_without_anchor_geometry":
-                geometry_candidates = np.flatnonzero(source_bins == source_bin)
-                if len(geometry_candidates) == 0:
+                local_geometry_candidates = geometry_candidates[source_bin]
+                if len(local_geometry_candidates) == 0:
                     raise ValueError("state-schedule control lacks recoil geometry support")
-                geometry_record = geometry_candidates[
-                    int(geometry_rng.integers(0, len(geometry_candidates)))
+                geometry_record = local_geometry_candidates[
+                    int(geometry_rng.integers(0, len(local_geometry_candidates)))
                 ]
                 relative_cosine = float(relative_cosines[geometry_record])
             else:
