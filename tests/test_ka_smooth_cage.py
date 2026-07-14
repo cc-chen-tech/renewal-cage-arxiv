@@ -147,6 +147,95 @@ class SmoothCageTests(unittest.TestCase):
         expected = np.einsum("nab,nb->a", result["jacobian"], forces)
         np.testing.assert_allclose(result["force_drift"], expected, atol=1e-12)
 
+    def test_batched_smooth_cage_matches_scalar_jacobian_projection(self):
+        from ka_smooth_cage import (
+            smooth_force_support_cage,
+            smooth_force_support_cage_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 20.0
+        targets = np.array([0, 2])
+        batched = smooth_force_support_cage_batch(
+            inputs["positions"],
+            velocities=velocities,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+            target_batch_size=1,
+        )
+
+        for row, target in enumerate(targets):
+            scalar = smooth_force_support_cage(
+                inputs["positions"],
+                particle_types=inputs["particle_types"],
+                box_lengths=inputs["box_lengths"],
+                target_index=int(target),
+            )
+            expected_velocity = np.einsum(
+                "nab,nb->a", scalar["jacobian"], velocities
+            )
+            expected_gram = np.einsum(
+                "nab,ncb->ac", scalar["jacobian"], scalar["jacobian"]
+            )
+            np.testing.assert_allclose(
+                batched["relative_position"][row],
+                scalar["relative_position"],
+                atol=1e-12,
+            )
+            np.testing.assert_allclose(
+                batched["relative_velocity"][row], expected_velocity, atol=1e-12
+            )
+            np.testing.assert_allclose(
+                batched["jacobian_gram"][row], expected_gram, atol=1e-12
+            )
+
+    def test_batched_smooth_cage_is_rigid_motion_covariant_and_positive(self):
+        from ka_smooth_cage import smooth_force_support_cage_batch
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 17.0
+        targets = np.array([0, 1, 2])
+        result = smooth_force_support_cage_batch(
+            inputs["positions"],
+            velocities=velocities,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+        )
+        rotation = np.array(
+            [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
+        )
+        translation = np.array([2.0, -3.0, 1.5])
+        transformed = smooth_force_support_cage_batch(
+            inputs["positions"] @ rotation.T + translation,
+            velocities=velocities @ rotation.T,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+        )
+
+        np.testing.assert_allclose(
+            transformed["relative_position"],
+            result["relative_position"] @ rotation.T,
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            transformed["relative_velocity"],
+            result["relative_velocity"] @ rotation.T,
+            atol=1e-12,
+        )
+        expected_gram = np.einsum(
+            "ab,tbc,dc->tad", rotation, result["jacobian_gram"], rotation
+        )
+        np.testing.assert_allclose(
+            transformed["jacobian_gram"], expected_gram, atol=1e-12
+        )
+        self.assertGreater(
+            float(np.min(np.linalg.eigvalsh(result["jacobian_gram"]))), 0.0
+        )
+        self.assertEqual(float(result["thermodynamic_claim_allowed"]), 0.0)
+
     def test_smooth_cage_features_are_rotation_invariant(self):
         from ka_smooth_cage import smooth_cage_invariant_features
 

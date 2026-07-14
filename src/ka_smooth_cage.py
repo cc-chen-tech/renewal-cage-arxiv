@@ -106,6 +106,138 @@ def smooth_force_support_cage(
     }
 
 
+def smooth_force_support_cage_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float]:
+    """Evaluate exact smooth-cage vector coordinates for fixed targets."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets_raw = np.asarray(target_indices)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+    ):
+        raise ValueError("positions and velocities must be aligned finite (particles, 3) arrays")
+    if particle_types.shape != (len(positions),) or np.any(
+        (particle_types < 0) | (particle_types > 1)
+    ):
+        raise ValueError("particle_types must be aligned KA 0/1 labels")
+    if box_lengths.shape != (3,) or np.any(~np.isfinite(box_lengths)) or np.any(
+        box_lengths <= 0.0
+    ):
+        raise ValueError("box_lengths must be a finite positive three-vector")
+    if (
+        targets_raw.ndim != 1
+        or len(targets_raw) < 1
+        or np.any(targets_raw != targets_raw.astype(int))
+    ):
+        raise ValueError("target_indices must be a nonempty integer vector")
+    targets = targets_raw.astype(int)
+    if (
+        np.any(targets < 0)
+        or np.any(targets >= len(positions))
+        or len(np.unique(targets)) != len(targets)
+    ):
+        raise ValueError("target_indices must select distinct particles")
+    if (
+        isinstance(target_batch_size, bool)
+        or not isinstance(target_batch_size, (int, np.integer))
+        or target_batch_size < 1
+    ):
+        raise ValueError("target_batch_size must be a positive integer")
+
+    relative_position = np.empty((len(targets), 3), dtype=float)
+    relative_velocity = np.empty_like(relative_position)
+    jacobian_gram = np.empty((len(targets), 3, 3), dtype=float)
+    total_weight = np.empty(len(targets), dtype=float)
+    support_count = np.empty(len(targets), dtype=int)
+    identity = np.eye(3)
+    for start in range(0, len(targets), int(target_batch_size)):
+        stop = min(start + int(target_batch_size), len(targets))
+        selected = targets[start:stop]
+        displacement = positions[None, :, :] - positions[selected, None, :]
+        displacement -= box_lengths[None, None, :] * np.rint(
+            displacement / box_lengths[None, None, :]
+        )
+        distance = np.linalg.norm(displacement, axis=2)
+        support_radius = _CUTOFF_SCALE * _SIGMA[
+            particle_types[selected, None], particle_types[None, :]
+        ]
+        weight, scaled_derivative = wendland_c4_weight(distance / support_radius)
+        local_axis = np.arange(len(selected))
+        weight[local_axis, selected] = 0.0
+        scaled_derivative[local_axis, selected] = 0.0
+        chunk_weight = np.sum(weight, axis=1)
+        if np.any(chunk_weight <= 0.0):
+            raise ValueError("a target particle has no neighbor inside the KA force support")
+        mean_offset = np.einsum("tn,tna->ta", weight, displacement) / chunk_weight[:, None]
+        unit = displacement / np.maximum(distance[:, :, None], 1e-12)
+        radial_gradient = (
+            scaled_derivative[:, :, None]
+            * unit
+            / support_radius[:, :, None]
+        )
+        centered = displacement - mean_offset[:, None, :]
+        centered_gradient = np.einsum(
+            "tna,tnb->tab", centered, radial_gradient
+        )
+        target_block = identity[None, :, :] + centered_gradient / chunk_weight[:, None, None]
+        velocity_difference = velocities[selected, None, :] - velocities[None, :, :]
+        projected_velocity = np.einsum(
+            "tn,tnb->tb", weight, velocity_difference
+        )
+        projected_velocity += np.einsum(
+            "tna,tn->ta",
+            centered,
+            np.einsum("tnb,tnb->tn", radial_gradient, velocity_difference),
+        )
+        projected_velocity /= chunk_weight[:, None]
+        gram = np.einsum("tac,tbc->tab", target_block, target_block)
+        weight_squared = np.sum(weight**2, axis=1)
+        weighted_cross = np.einsum(
+            "tn,tna,tnb->tab", weight, centered, radial_gradient
+        )
+        gradient_squared = np.einsum("tna,tna->tn", radial_gradient, radial_gradient)
+        neighbor_gram = weight_squared[:, None, None] * identity[None, :, :]
+        neighbor_gram += weighted_cross + np.transpose(weighted_cross, (0, 2, 1))
+        neighbor_gram += np.einsum(
+            "tn,tna,tnb->tab", gradient_squared, centered, centered
+        )
+        gram += neighbor_gram / chunk_weight[:, None, None] ** 2
+        gram = 0.5 * (gram + np.transpose(gram, (0, 2, 1)))
+        eigenvalues = np.linalg.eigvalsh(gram)
+        if np.any(eigenvalues[:, 0] <= 0.0):
+            raise ValueError("smooth cage Jacobian Gram matrices must be positive definite")
+
+        relative_position[start:stop] = -mean_offset
+        relative_velocity[start:stop] = projected_velocity
+        jacobian_gram[start:stop] = gram
+        total_weight[start:stop] = chunk_weight
+        support_count[start:stop] = np.sum(weight > 0.0, axis=1)
+
+    return {
+        "relative_position": relative_position,
+        "relative_velocity": relative_velocity,
+        "jacobian_gram": jacobian_gram,
+        "total_weight": total_weight,
+        "support_count": support_count,
+        "target_indices": targets,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def smooth_cage_projected_observables(
     positions: np.ndarray,
     *,

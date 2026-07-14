@@ -1345,6 +1345,78 @@ class ArxivPackageTests(unittest.TestCase):
             all(float(row["every_fold_lag_improves"]) == 0.0 for row in sensitivity)
         )
 
+    def test_smooth_cage_hankel_bath_is_complete_and_not_promoted(self):
+        document_path = ROOT / "docs" / "microscopic-smooth-cage-hankel-bath.md"
+        summary_path = (
+            ROOT / "data" / "renewal_cage_ka_smooth_cage_hankel_bath_T058_summary.csv"
+        )
+        detail_path = (
+            ROOT / "data" / "renewal_cage_ka_smooth_cage_hankel_bath_T058_details.csv"
+        )
+        curve_path = (
+            ROOT / "data" / "renewal_cage_ka_smooth_cage_hankel_bath_T058_curve.csv"
+        )
+        for path in (document_path, summary_path, detail_path, curve_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.03973",
+            "0.32131",
+            "0.85589",
+            "0.99836",
+            "3.6344",
+            "1.8431",
+            "smooth_cage_hankel_bath_allowed = 0",
+            "autonomous_single_particle_gle_allowed = 0",
+            "complete_event_clock_closure_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"]: row for row in rows if row["record"] == "aggregate_model"}
+        self.assertEqual(
+            set(models),
+            {
+                "hankel_slow_16",
+                "hankel_slow_16_position",
+                "hankel_slow_16_position_velocity",
+            },
+        )
+        baseline = models["hankel_slow_16"]
+        primary = models["hankel_slow_16_position_velocity"]
+        self.assertEqual(int(float(primary["held_clone_count"])), 4)
+        self.assertLess(
+            float(primary["maximum_maximum_held_velocity_residual_lag_correlation"]),
+            float(baseline["maximum_maximum_held_velocity_residual_lag_correlation"]),
+        )
+        self.assertGreater(
+            float(primary["maximum_maximum_held_force_residual_lag_correlation"]),
+            0.85,
+        )
+        self.assertGreater(float(primary["terminal_diffusion_relative_error"]), 3.6)
+        self.assertGreater(float(primary["event_rate_relative_error"]), 1.8)
+        self.assertLess(float(primary["normalized_trapezoidal_kinematic_error"]), 0.04)
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["integrity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["numerical_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["every_fold_lag_improves"]), 1.0)
+        self.assertEqual(float(verdict["residual_memory_gate_pass"]), 0.0)
+        self.assertEqual(float(verdict["macro_event_gate_pass"]), 0.0)
+        self.assertGreater(float(verdict["primary_to_baseline_lag_ratio"]), 0.99)
+        for key in (
+            "smooth_cage_hankel_bath_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
