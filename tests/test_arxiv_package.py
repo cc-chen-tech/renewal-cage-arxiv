@@ -1637,6 +1637,70 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_relative_pmf_closes_static_force_but_not_markov_dynamics(self):
+        stem = "renewal_cage_ka_relative_pmf_ou_boundary_T058"
+        document_path = ROOT / "docs" / "microscopic-relative-pmf-ou-boundary.md"
+        summary_path = ROOT / "data" / f"{stem}_summary.csv"
+        detail_path = ROOT / "data" / f"{stem}_details.csv"
+        curve_path = ROOT / "data" / f"{stem}_curve.csv"
+        script_path = ROOT / "scripts" / "analyze_ka_relative_pmf_ou_boundary.py"
+        for path in (document_path, summary_path, detail_path, curve_path, script_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "-0.49809",
+            "0.00585",
+            "0.99056",
+            "0.06961",
+            "1.09340",
+            "0.94227",
+            "relative_pmf_static_closure_allowed = 1",
+            "markovian_relative_ou_allowed = 0",
+            "relative_force_memory_required = 1",
+            "autonomous_relative_dynamics_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        aggregate = next(row for row in rows if row["record"] == "aggregate")
+        self.assertEqual(int(float(aggregate["held_clone_count"])), 4)
+        self.assertLess(
+            float(aggregate["maximum_fdt_velocity_variance_relative_error"]), 0.006
+        )
+        self.assertGreater(
+            float(aggregate["minimum_conditional_radial_force_correlation"]), 0.99
+        )
+        self.assertLess(
+            float(aggregate["maximum_conditional_radial_force_normalized_rmse"]),
+            0.07,
+        )
+        self.assertGreater(
+            float(aggregate["minimum_temperature_naive_force_normalized_rmse"]),
+            1.58,
+        )
+        self.assertGreater(
+            float(aggregate["maximum_mean_force_residual_lag_correlation"]), 0.94
+        )
+        self.assertGreater(
+            float(aggregate["maximum_maximum_markov_ou_correlation_error"]), 1.09
+        )
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["relative_pmf_static_closure_allowed"]), 1.0)
+        self.assertEqual(float(verdict["markovian_relative_ou_allowed"]), 0.0)
+        self.assertEqual(float(verdict["relative_force_memory_required"]), 1.0)
+        for key in (
+            "autonomous_relative_dynamics_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"
