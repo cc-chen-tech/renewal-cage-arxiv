@@ -12,6 +12,7 @@ from ka_relative_mori import (  # noqa: E402
     bias_centered_phase_state,
     discrete_mori_gfd_diagnostic,
     discrete_mori_noise,
+    parity_detailed_balance_diagnostic,
     propagate_discrete_mori_correlation,
 )
 from ka_collective_memory import discrete_mori_zwanzig_operators  # noqa: E402
@@ -94,6 +95,30 @@ class RelativeMoriTests(unittest.TestCase):
         self.assertLess(float(result["gfd_operator_normalized_rmse"]), 0.04)
         self.assertGreater(float(result["gfd_operator_shape_correlation"]), 0.99)
 
+    def test_parity_detailed_balance_recovers_reversible_oscillator(self):
+        rng = np.random.default_rng(20260715)
+        samples = 400
+        time = np.arange(120)[:, None]
+        phase = 0.08 * time
+        cosine = np.cos(phase)
+        sine = np.sin(phase)
+        amplitude = rng.normal(size=(1, samples))
+        quadrature = rng.normal(size=(1, samples))
+        position = amplitude * cosine + quadrature * sine
+        velocity = -amplitude * sine + quadrature * cosine
+        static_even = np.broadcast_to(rng.normal(size=(1, samples)), position.shape)
+        state = np.stack([position, velocity, static_even], axis=2)
+
+        correct = parity_detailed_balance_diagnostic(
+            state, parity=np.array([1, -1, 1]), maximum_lag=40
+        )
+        wrong = parity_detailed_balance_diagnostic(
+            state, parity=np.ones(3), maximum_lag=40
+        )
+
+        self.assertLess(float(correct["parity_defect_normalized_rmse"]), 0.03)
+        self.assertGreater(float(wrong["parity_defect_normalized_rmse"]), 0.5)
+
     def test_invalid_bias_shape_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "bias"):
             bias_centered_phase_state(
@@ -140,6 +165,20 @@ class RelativeMoriTests(unittest.TestCase):
             "--parent-restart",
         ):
             self.assertIn(required, completed.stdout)
+
+    def test_parity_audit_cli_exposes_separate_training_and_validation(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "analyze_ka_relative_generator_parity.py"),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn("--training-drift-cache-directory", completed.stdout)
+        self.assertIn("--validation-drift-cache-directory", completed.stdout)
 
 
 if __name__ == "__main__":

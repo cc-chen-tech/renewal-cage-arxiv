@@ -1868,6 +1868,57 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_generator_parity_basis_passes_detailed_balance_necessary_condition(self):
+        stem = "renewal_cage_ka_relative_generator_parity_validation_T058"
+        document_path = ROOT / "docs" / "microscopic-relative-generator-parity.md"
+        script_path = ROOT / "scripts" / "analyze_ka_relative_generator_parity.py"
+        for path in (document_path, script_path):
+            self.assertTrue(path.is_file())
+        for suffix in ("details", "summary", "curve"):
+            self.assertTrue((ROOT / "data" / f"{stem}_{suffix}.csv").is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.02192",
+            "0.00871",
+            "0.00078",
+            "1.07727",
+            "parity_definite_generator_basis_allowed = 1",
+            "resolved_generalized_detailed_balance_supported = 1",
+            "thermal_fdt_adjoint_audit_pass = 0",
+            "physical_relative_generator_gle_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with (ROOT / "data" / f"{stem}_summary.csv").open() as handle:
+            rows = list(csv.DictReader(handle))
+        aggregate = next(row for row in rows if row["record"] == "aggregate")
+        self.assertEqual(int(float(aggregate["held_clone_count"])), 2)
+        self.assertLess(float(aggregate["maximum_parity_defect_normalized_rmse"]), 0.022)
+        self.assertLess(
+            float(aggregate["maximum_parity_defect_maximum_absolute_error"]), 0.0088
+        )
+        self.assertLess(
+            float(aggregate["maximum_equal_time_maximum_forbidden_parity_correlation"]),
+            0.0008,
+        )
+        self.assertGreater(
+            float(aggregate["minimum_wrong_all_even_parity_defect_normalized_rmse"]),
+            1.077,
+        )
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["parity_definite_generator_basis_allowed"]), 1.0)
+        self.assertEqual(float(verdict["resolved_generalized_detailed_balance_supported"]), 1.0)
+        self.assertEqual(float(verdict["wrong_all_even_parity_rejected"]), 1.0)
+        for key in (
+            "thermal_fdt_adjoint_audit_pass",
+            "physical_relative_generator_gle_allowed",
+            "orthogonal_noise_generation_closed",
+            "autonomous_single_particle_gle_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"

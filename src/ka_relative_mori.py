@@ -180,3 +180,63 @@ def propagate_discrete_mori_correlation(
             for lag in range(len(memory))
         )
     return output
+
+
+def parity_detailed_balance_diagnostic(
+    resolved_state: np.ndarray,
+    *,
+    parity: np.ndarray,
+    maximum_lag: int,
+) -> dict[str, np.ndarray | float]:
+    """Test ``C(t) = E C(t)^T E`` for parity-definite observables."""
+
+    state = np.asarray(resolved_state, dtype=float)
+    signs = np.asarray(parity, dtype=float)
+    if (
+        state.ndim != 3
+        or state.shape[2] < 1
+        or signs.shape != (state.shape[2],)
+        or np.any(~np.isin(signs, (-1.0, 1.0)))
+        or maximum_lag < 1
+        or maximum_lag >= len(state)
+        or np.any(~np.isfinite(state))
+    ):
+        raise ValueError("state, parity signs, and maximum lag must be finite and aligned")
+    correlation = np.empty(
+        (maximum_lag + 1, state.shape[2], state.shape[2]), dtype=float
+    )
+    for lag in range(maximum_lag + 1):
+        left = state[lag:]
+        right = state[: len(state) - lag]
+        correlation[lag] = np.einsum("tni,tnj->ij", left, right) / (
+            left.shape[0] * left.shape[1]
+        )
+    reversed_correlation = (
+        signs[None, :, None]
+        * np.transpose(correlation, (0, 2, 1))
+        * signs[None, None, :]
+    )
+    defect = correlation - reversed_correlation
+    equal_time_scale = np.sqrt(
+        np.maximum(np.diag(correlation[0]), 1e-30)
+    )
+    equal_time_normalized = correlation[0] / np.outer(
+        equal_time_scale, equal_time_scale
+    )
+    forbidden = np.multiply.outer(signs, signs) < 0.0
+    maximum_forbidden = (
+        float(np.max(np.abs(equal_time_normalized[forbidden])))
+        if np.any(forbidden)
+        else 0.0
+    )
+    return {
+        "correlation": correlation,
+        "parity_reversed_correlation": reversed_correlation,
+        "parity_defect": defect,
+        "parity_defect_normalized_rmse": float(
+            np.linalg.norm(defect) / max(np.linalg.norm(correlation), 1e-30)
+        ),
+        "parity_defect_maximum_absolute_error": float(np.max(np.abs(defect))),
+        "equal_time_maximum_forbidden_parity_correlation": maximum_forbidden,
+        "thermodynamic_claim_allowed": 0.0,
+    }
