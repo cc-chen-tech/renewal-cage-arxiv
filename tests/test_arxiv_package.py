@@ -15,6 +15,83 @@ from build_arxiv_package import build_arxiv_package  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_radial_precursor_residual_gate_is_complete_and_claim_limited(self):
+        document_path = ROOT / "docs" / "microscopic-radial-precursor-residual.md"
+        summary_path = (
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_summary.csv"
+        )
+        model_path = (
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_models.csv"
+        )
+        for path in (
+            document_path,
+            summary_path,
+            model_path,
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_details.csv",
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_survival.csv",
+            ROOT / "data" / "renewal_cage_ka_radial_precursor_T058_committor.csv",
+        ):
+            self.assertTrue(path.is_file())
+        document = document_path.read_text()
+        for required in (
+            "0.00825",
+            "0.00798",
+            "0.00848",
+            "0.00744",
+            "static_radial_precursor_allowed = 0",
+            "event_clock_claim_allowed = 0",
+            "autonomous_single_particle_gle_claim_allowed = 0",
+            "kramers_escape_claim_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            summary = next(csv.DictReader(handle))
+        self.assertEqual(int(summary["parent_count"]), 5)
+        self.assertEqual(int(summary["distinct_parent_restart_hash_count"]), 5)
+        self.assertEqual(int(summary["clone_count_per_parent"]), 8)
+        self.assertEqual(int(summary["target_count"]), 64)
+        self.assertEqual(int(summary["observation_count"]), 2560)
+        self.assertEqual(int(summary["configuration_count"]), 320)
+        self.assertEqual(int(summary["event_count"]), 1731)
+        self.assertEqual(int(summary["censored_count"]), 829)
+        self.assertEqual(float(summary["maximum_clone_position_difference"]), 0.0)
+        self.assertEqual(float(summary["maximum_geometry_reference_error"]), 0.0)
+        self.assertEqual(summary["integrity_gate_pass"], "True")
+        self.assertEqual(summary["geometry_reproduction_gate_pass"], "True")
+        self.assertEqual(summary["clone_invariance_gate_pass"], "True")
+        self.assertEqual(summary["brier_increment_gate_pass"], "False")
+        self.assertEqual(summary["brier_reference_gate_pass"], "False")
+        self.assertEqual(summary["likelihood_gate_pass"], "True")
+        self.assertEqual(summary["survival_gate_pass"], "True")
+        self.assertEqual(summary["binomial_gate_pass"], "False")
+        self.assertEqual(summary["static_radial_precursor_allowed"], "False")
+        self.assertEqual(summary["event_clock_claim_allowed"], "False")
+        self.assertEqual(
+            summary["autonomous_single_particle_gle_claim_allowed"], "False"
+        )
+        self.assertEqual(summary["kramers_escape_claim_allowed"], "False")
+        self.assertEqual(summary["thermodynamic_claim_allowed"], "False")
+        self.assertLess(
+            float(summary["geometry_radial_mean_heldout_brier_skill"]),
+            float(summary["geometry_mean_heldout_brier_skill"]),
+        )
+        self.assertLess(
+            float(summary["geometry_radial_mean_heldout_brier_skill"]),
+            float(summary["radial_mean_heldout_brier_skill"]),
+        )
+        self.assertLess(
+            float(summary["geometry_radial_binomial_mean_heldout_brier_skill"]),
+            float(summary["geometry_binomial_mean_heldout_brier_skill"]),
+        )
+
+        with model_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        models = {row["model"] for row in rows if row["record"] == "censored_model"}
+        self.assertEqual(models, {"geometry", "radial", "geometry_radial"})
+        self.assertEqual(sum(row["record"] == "held_parent" for row in rows), 15)
+
     def test_smooth_cage_event_clock_is_complete_and_claim_limited(self):
         document_path = ROOT / "docs" / "microscopic-smooth-cage-event-clock.md"
         summary_path = (
