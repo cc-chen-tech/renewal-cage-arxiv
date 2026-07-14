@@ -1490,6 +1490,81 @@ class ArxivPackageTests(unittest.TestCase):
         ):
             self.assertEqual(float(verdict[key]), 0.0)
 
+    def test_projected_ito_innovation_audit_preserves_primary_failure(self):
+        stem = "renewal_cage_ka_projected_ito_innovations_T058"
+        document_path = ROOT / "docs" / "microscopic-projected-ito-innovation-audit.md"
+        summary_path = ROOT / "data" / f"{stem}_summary.csv"
+        detail_path = ROOT / "data" / f"{stem}_details.csv"
+        script_path = ROOT / "scripts" / "analyze_ka_projected_ito_innovations.py"
+        for path in (document_path, summary_path, detail_path, script_path):
+            self.assertTrue(path.is_file())
+
+        document = document_path.read_text()
+        for required in (
+            "0.22274",
+            "0.08674",
+            "0.93279",
+            "0.03043",
+            "projected_ito_local_gate_pass = 0",
+            "adapted_second_order_consistency_gate_pass = 1",
+            "projected_sde_numerically_supported = 1",
+            "microscopic_projected_sde_allowed = 0",
+            "autonomous_single_particle_gle_allowed = 0",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(required, document)
+
+        with summary_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        pooled = {
+            (row["scheme"], int(float(row["stride"]))): row
+            for row in rows
+            if row["record"] == "pooled"
+        }
+        self.assertEqual(
+            set(pooled),
+            {
+                (scheme, stride)
+                for scheme in ("left", "adams_bashforth2", "trapezoid")
+                for stride in (1, 2, 4, 8)
+            },
+        )
+        left = pooled[("left", 1)]
+        adapted = pooled[("adams_bashforth2", 1)]
+        trapezoid = pooled[("trapezoid", 1)]
+        self.assertGreater(
+            float(left["maximum_absolute_whitened_state_correlation"]), 0.22
+        )
+        self.assertGreater(
+            float(left["maximum_absolute_whitened_lag1_correlation"]), 0.08
+        )
+        for row in (adapted, trapezoid):
+            self.assertLess(
+                float(row["maximum_absolute_whitened_state_correlation"]), 0.05
+            )
+            self.assertLess(
+                float(row["maximum_absolute_whitened_lag1_correlation"]), 0.05
+            )
+            self.assertLess(
+                float(row["maximum_absolute_whitened_covariance_error"]), 0.07
+            )
+
+        verdict = next(row for row in rows if row["record"] == "verdict")
+        self.assertEqual(float(verdict["projected_ito_local_gate_pass"]), 0.0)
+        self.assertEqual(
+            float(verdict["adapted_second_order_consistency_gate_pass"]), 1.0
+        )
+        self.assertEqual(float(verdict["trapezoid_sensitivity_gate_pass"]), 1.0)
+        self.assertEqual(float(verdict["projected_sde_numerically_supported"]), 1.0)
+        for key in (
+            "microscopic_projected_sde_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(verdict[key]), 0.0)
+
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"
         fit_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_fit.csv"

@@ -271,6 +271,57 @@ def smooth_force_support_cage_batch(
     return result
 
 
+def smooth_cage_joint_noise_covariance_rate(
+    jacobian_gram: np.ndarray,
+    target_jacobian_block: np.ndarray,
+    *,
+    friction: float,
+    temperature: float,
+) -> dict[str, np.ndarray | float]:
+    """Return the exact center-relative thermostat covariance-rate blocks."""
+
+    gram = np.asarray(jacobian_gram, dtype=float)
+    target_block = np.asarray(target_jacobian_block, dtype=float)
+    if (
+        gram.ndim < 2
+        or gram.shape[-2:] != (3, 3)
+        or target_block.shape != gram.shape
+        or np.any(~np.isfinite(gram))
+        or np.any(~np.isfinite(target_block))
+    ):
+        raise ValueError("Jacobian geometry must contain finite aligned 3x3 blocks")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    identity = np.broadcast_to(np.eye(3), gram.shape)
+    center_gram = (
+        identity
+        - target_block
+        - np.swapaxes(target_block, -1, -2)
+        + gram
+    )
+    center_relative_gram = np.swapaxes(target_block, -1, -2) - gram
+    noise_scale = 2.0 * friction * temperature
+    relative = noise_scale * gram
+    center = noise_scale * center_gram
+    cross = noise_scale * center_relative_gram
+    joint = np.concatenate(
+        [
+            np.concatenate([center, cross], axis=-1),
+            np.concatenate([np.swapaxes(cross, -1, -2), relative], axis=-1),
+        ],
+        axis=-2,
+    )
+    return {
+        "relative_noise_covariance_rate": relative,
+        "center_noise_covariance_rate": center,
+        "center_relative_noise_covariance_rate": cross,
+        "joint_noise_covariance_rate": joint,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def smooth_cage_projected_observables_batch(
     positions: np.ndarray,
     *,
@@ -329,27 +380,20 @@ def smooth_cage_projected_observables_batch(
     center_velocity = velocities[targets] - relative_velocity
     center_drift = forces[targets] - friction * velocities[targets] - relative_drift
 
-    gram = np.asarray(base["jacobian_gram"], dtype=float)
-    target_block = np.asarray(base["target_jacobian_block"], dtype=float)
-    identity = np.broadcast_to(np.eye(3), gram.shape)
-    center_gram = (
-        identity
-        - target_block
-        - np.transpose(target_block, (0, 2, 1))
-        + gram
+    noise = smooth_cage_joint_noise_covariance_rate(
+        np.asarray(base["jacobian_gram"], dtype=float),
+        np.asarray(base["target_jacobian_block"], dtype=float),
+        friction=friction,
+        temperature=temperature,
     )
-    center_relative_gram = np.transpose(target_block, (0, 2, 1)) - gram
-    noise_scale = 2.0 * friction * temperature
     return {
         **base,
+        **noise,
         "projected_force": np.asarray(force_projection),
         "geometric_drift": np.asarray(geometric_drift),
         "relative_drift": relative_drift,
         "center_velocity": center_velocity,
         "center_drift": center_drift,
-        "relative_noise_covariance_rate": noise_scale * gram,
-        "center_noise_covariance_rate": noise_scale * center_gram,
-        "center_relative_noise_covariance_rate": noise_scale * center_relative_gram,
         "friction": float(friction),
         "temperature": float(temperature),
         "directional_step": float(directional_step),
