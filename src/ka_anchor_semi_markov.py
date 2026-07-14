@@ -265,11 +265,22 @@ def _fixed_polar_direction(
     if radius <= 0.0 or not math.isfinite(relative_cosine) or abs(relative_cosine) > 1.0:
         raise ValueError("polar geometry requires a nonzero source and cosine in [-1, 1]")
     source_direction = source_vector / radius
-    basis = np.zeros(3, dtype=float)
-    basis[int(np.argmin(np.abs(source_direction)))] = 1.0
-    first = np.cross(source_direction, basis)
+    basis_index = int(np.argmin(np.abs(source_direction)))
+    x_value, y_value, z_value = source_direction
+    if basis_index == 0:
+        first = np.array([0.0, z_value, -y_value])
+    elif basis_index == 1:
+        first = np.array([-z_value, 0.0, x_value])
+    else:
+        first = np.array([y_value, -x_value, 0.0])
     first /= np.linalg.norm(first)
-    second = np.cross(source_direction, first)
+    second = np.array(
+        [
+            y_value * first[2] - z_value * first[1],
+            z_value * first[0] - x_value * first[2],
+            x_value * first[1] - y_value * first[0],
+        ]
+    )
     azimuth = float(rng.uniform(0.0, 2.0 * math.pi))
     transverse = math.sqrt(max(0.0, 1.0 - relative_cosine**2))
     return (
@@ -360,14 +371,19 @@ def simulate_anchor_semi_markov(
             or np.linalg.norm(current_vector) <= 0.0
         ):
             raise ValueError("active particle profiles contain invalid values")
+        profile_radii = np.asarray(profile["jump_radii"], dtype=float)
+        if (
+            profile_radii.ndim != 1
+            or len(profile_radii) < 1
+            or np.any(~np.isfinite(profile_radii))
+            or np.any(profile_radii <= 0.0)
+            or np.any(np.diff(profile_radii) < 0.0)
+        ):
+            raise ValueError("particle profile radii must be positive and sorted")
         current_radius = float(np.linalg.norm(current_vector))
         current_time = 0
         while current_time < horizon:
-            source_bin = _profile_radius_bin(
-                profile,
-                current_radius,
-                radial_bin_count,
-            )
+            source_bin = _rank_bin(profile_radii, current_radius, radial_bin_count)
             candidates = conditional_candidates[(current_state, source_bin)]
             if len(candidates) == 0:
                 raise ValueError(
@@ -380,9 +396,10 @@ def simulate_anchor_semi_markov(
             record = -1
             for _ in range(min(64, 2 * len(candidates))):
                 candidate = int(candidates[int(state_rng.integers(0, len(candidates)))])
-                target_radius = _profile_radius(
-                    profile,
-                    float(target_quantiles[candidate]),
+                target_radius = float(
+                    profile_radii[
+                        int(np.rint(float(target_quantiles[candidate]) * (len(profile_radii) - 1)))
+                    ]
                 )
                 if next_states[candidate] != RETURN_STATE:
                     record = candidate
@@ -395,9 +412,15 @@ def simulate_anchor_semi_markov(
                 supported: list[int] = []
                 for candidate_value in candidates:
                     candidate = int(candidate_value)
-                    target_radius = _profile_radius(
-                        profile,
-                        float(target_quantiles[candidate]),
+                    target_radius = float(
+                        profile_radii[
+                            int(
+                                np.rint(
+                                    float(target_quantiles[candidate])
+                                    * (len(profile_radii) - 1)
+                                )
+                            )
+                        ]
                     )
                     if next_states[candidate] != RETURN_STATE:
                         supported.append(candidate)
@@ -415,7 +438,11 @@ def simulate_anchor_semi_markov(
             event_time = current_time + holding_time
             if event_time > horizon:
                 break
-            target_radius = _profile_radius(profile, float(target_quantiles[record]))
+            target_radius = float(
+                profile_radii[
+                    int(np.rint(float(target_quantiles[record]) * (len(profile_radii) - 1)))
+                ]
+            )
             sampled_closure = float(closure_distances[record])
             if model == "anchor_aware_semi_markov" and scheduled_state == RETURN_STATE:
                 relative_cosine = (
