@@ -3,6 +3,7 @@ import importlib.util
 import math
 import pickle
 import csv
+import copy
 import subprocess
 import sys
 import tempfile
@@ -141,6 +142,296 @@ from analyze_ka_active_cluster_residual import concatenate_residuals  # noqa: E4
 
 
 class KAReplicatePreparationTests(unittest.TestCase):
+    def test_radial_recoil_source_bins_follow_front_loaded_array_split(self):
+        source_bin = getattr(ka_replicates, "_radial_recoil_source_bin", None)
+        self.assertIsNotNone(source_bin)
+        sorted_source_radii = np.arange(1.0, 7.0)
+
+        assigned = [
+            source_bin(sorted_source_radii, radius, 4)
+            for radius in sorted_source_radii
+        ]
+
+        self.assertEqual(assigned, [0, 0, 1, 1, 2, 3])
+
+    def test_radial_recoil_markov_respects_uneven_conditional_target_support(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        path = np.zeros((1, 7, 3))
+        path[0, :, 0] = np.array([4.0, 1.0, 2.0, 3.0, 5.0, 6.0, 7.0])
+
+        generated = surrogate(path, np.random.default_rng(1301), radial_bin_count=4)
+
+        source_radii = np.linalg.norm(path[0, :-1], axis=1)
+        source_order = np.argsort(source_radii)
+        sorted_source_radii = source_radii[source_order]
+        source_groups = np.array_split(source_order, 4)
+        generated_radii = np.linalg.norm(generated[0], axis=1)
+        for source_radius, target_radius in zip(
+            generated_radii[:-1], generated_radii[1:]
+        ):
+            rank = int(np.searchsorted(sorted_source_radii, source_radius, side="left"))
+            split_boundaries = np.cumsum([len(group) for group in source_groups])
+            bin_index = min(
+                len(source_groups) - 1,
+                int(np.searchsorted(split_boundaries, rank, side="right")),
+            )
+            target_support = np.linalg.norm(path[0, source_groups[bin_index] + 1], axis=1)
+            self.assertTrue(np.any(np.isclose(target_radius, target_support)))
+
+    def test_radial_recoil_markov_samples_empirical_particle_target_radii(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        reference = np.random.default_rng(211).normal(size=(5, 19, 3))
+
+        generated = surrogate(reference, np.random.default_rng(223), radial_bin_count=6)
+
+        reference_radii = np.linalg.norm(reference, axis=2)
+        generated_radii = np.linalg.norm(generated, axis=2)
+        for particle_index in range(reference.shape[0]):
+            empirical_support = reference_radii[particle_index, 1:]
+            for target_radius in generated_radii[particle_index, 1:]:
+                self.assertTrue(np.any(np.isclose(target_radius, empirical_support)))
+
+    def test_radial_recoil_markov_azimuth_is_isotropic_and_noncoplanar(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        particle_count = 4096
+        reference = np.tile(
+            np.array([[[1.0, 0.0, 0.0], [0.0, 2.0, 0.0]]]),
+            (particle_count, 1, 1),
+        )
+
+        generated = surrogate(reference, np.random.default_rng(227), radial_bin_count=1)
+
+        directions = generated[:, 1] / np.linalg.norm(generated[:, 1], axis=1)[:, None]
+        np.testing.assert_allclose(directions[:, 0], 0.0, atol=1e-12)
+        self.assertAlmostEqual(float(np.mean(directions[:, 1])), 0.0, delta=0.025)
+        self.assertAlmostEqual(float(np.mean(directions[:, 2])), 0.0, delta=0.025)
+        self.assertAlmostEqual(float(np.mean(directions[:, 1] ** 2)), 0.5, delta=0.03)
+        self.assertAlmostEqual(float(np.mean(directions[:, 2] ** 2)), 0.5, delta=0.03)
+        self.assertAlmostEqual(
+            float(np.mean(directions[:, 1] * directions[:, 2])),
+            0.0,
+            delta=0.03,
+        )
+        self.assertGreater(float(np.mean(np.abs(directions[:, 2]) > 0.1)), 0.85)
+
+    def test_radial_recoil_markov_is_deterministic_and_removes_triplet_order(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        path = np.array(
+            [
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                    [-0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-1.0, -math.sqrt(3.0), 0.0],
+                    [-1.0, 0.0, 0.0],
+                ]
+            ]
+        )
+
+        first = surrogate(path, np.random.default_rng(7), 2)
+        second = surrogate(path, np.random.default_rng(7), 2)
+
+        np.testing.assert_allclose(first, second)
+        self.assertFalse(np.array_equal(first, path))
+
+    def test_radial_recoil_markov_preserves_particle_conditioned_transitions(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        path = np.array(
+            [
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                    [-0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-1.0, -math.sqrt(3.0), 0.0],
+                    [-1.0, 0.0, 0.0],
+                ],
+                [
+                    [2.0, 0.0, 0.0],
+                    [-2.0, 2.0 * math.sqrt(3.0), 0.0],
+                    [1.0, math.sqrt(3.0), 0.0],
+                    [-4.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [-2.0, -2.0 * math.sqrt(3.0), 0.0],
+                    [-2.0, 0.0, 0.0],
+                ],
+            ]
+        )
+
+        generated = surrogate(path, np.random.default_rng(17), radial_bin_count=2)
+        radii = np.linalg.norm(generated, axis=2)
+        cosines = np.sum(generated[:, :-1] * generated[:, 1:], axis=2) / (
+            radii[:, :-1] * radii[:, 1:]
+        )
+
+        np.testing.assert_allclose(radii, np.linalg.norm(path, axis=2))
+        np.testing.assert_allclose(cosines[:, ::2], -0.5)
+        np.testing.assert_allclose(cosines[:, 1::2], 0.5)
+
+    def test_radial_recoil_markov_quality_reports_named_errors(self):
+        quality = getattr(ka_replicates, "radial_recoil_markov_quality", None)
+        self.assertIsNotNone(quality)
+        reference = np.array(
+            [
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, math.sqrt(3.0), 0.0],
+                    [0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                    [-0.5, math.sqrt(3.0) / 2.0, 0.0],
+                    [-1.0, -math.sqrt(3.0), 0.0],
+                ]
+            ]
+        )
+
+        errors = quality(reference, 2.0 * reference)
+
+        self.assertEqual(
+            set(errors),
+            {
+                "radial_mean_relative_error",
+                "radial_standard_deviation_relative_error",
+                "lag_one_cosine_mean_absolute_error",
+                "lag_one_cosine_quantile_0p10_absolute_error",
+                "lag_one_cosine_quantile_0p25_absolute_error",
+                "lag_one_cosine_quantile_0p50_absolute_error",
+                "lag_one_cosine_quantile_0p75_absolute_error",
+                "lag_one_cosine_quantile_0p90_absolute_error",
+                "lag_one_cosine_quantile_maximum_absolute_error",
+                "normalized_lag_one_dot_correlation_absolute_error",
+            },
+        )
+        self.assertAlmostEqual(errors["radial_mean_relative_error"], 1.0)
+        self.assertAlmostEqual(errors["radial_standard_deviation_relative_error"], 1.0)
+        self.assertAlmostEqual(errors["lag_one_cosine_mean_absolute_error"], 0.0)
+        self.assertAlmostEqual(
+            errors["lag_one_cosine_quantile_maximum_absolute_error"], 0.0
+        )
+        self.assertAlmostEqual(
+            errors["normalized_lag_one_dot_correlation_absolute_error"], 0.0
+        )
+
+    def test_radial_recoil_markov_rejects_invalid_paths_bins_and_rng(self):
+        surrogate = getattr(ka_replicates, "radial_recoil_markov_surrogate", None)
+        quality = getattr(ka_replicates, "radial_recoil_markov_quality", None)
+        self.assertIsNotNone(surrogate)
+        self.assertIsNotNone(quality)
+        valid = np.array([[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]])
+
+        with self.assertRaisesRegex(ValueError, "three-dimensional"):
+            surrogate(np.ones((1, 3, 2)), np.random.default_rng(3), radial_bin_count=1)
+        with self.assertRaisesRegex(ValueError, "nonzero"):
+            surrogate(np.zeros((1, 3, 3)), np.random.default_rng(3), radial_bin_count=1)
+        with self.assertRaisesRegex(ValueError, "radial_bin_count"):
+            surrogate(valid, np.random.default_rng(3), radial_bin_count=2)
+        with self.assertRaisesRegex(ValueError, "NumPy Generator"):
+            surrogate(valid, object(), radial_bin_count=1)
+        with self.assertRaisesRegex(ValueError, "equal shapes"):
+            quality(valid, np.ones((1, 3, 3)))
+
+    def test_cage_anchor_returns_detect_exact_backtrack_and_analytic_null(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        events = {
+            "particle": np.array([0, 0, 0]),
+            "time": np.array([1.0, 2.0, 3.0]),
+            "jump_vector": np.array(
+                [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]]
+            ),
+            "jump_duration": np.array([1.0, 1.0, 1.0]),
+        }
+
+        result = measure(events, debye_waller_factor=0.04, radius_scale=1.0)
+
+        self.assertEqual(result["return_count"], 2.0)
+        self.assertAlmostEqual(result["isotropic_null_fraction"], 0.01)
+        self.assertGreater(result["return_fraction"], result["isotropic_null_fraction"])
+
+    def test_cage_anchor_returns_respect_particle_boundaries_and_summarize_runs(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        events = {
+            "particle": np.array([0, 0, 0, 0, 1, 1]),
+            "time": np.array([1.0, 3.0, 8.0, 21.0, 2.0, 6.0]),
+            "jump_vector": np.array(
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0],
+                    [2.0, 0.0, 0.0],
+                    [2.0, 0.0, 0.0],
+                ]
+            ),
+        }
+
+        result = measure(events, debye_waller_factor=0.04, radius_scale=1.0)
+
+        self.assertEqual(result["pair_count"], 4.0)
+        self.assertEqual(result["return_count"], 2.0)
+        self.assertAlmostEqual(result["return_fraction"], 0.5)
+        self.assertEqual(result["return_run_count"], 1.0)
+        self.assertEqual(result["return_run_mean"], 2.0)
+        self.assertEqual(result["geometric_return_run_mean"], 2.0)
+        self.assertEqual(result["return_run_duration_p50"], 7.0)
+        self.assertEqual(result["return_run_duration_p95"], 7.0)
+
+    def test_cage_anchor_return_runs_do_not_join_across_particle_boundaries(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        events = {
+            "particle": np.array([0, 0, 1, 1]),
+            "time": np.array([1.0, 4.0, 2.0, 9.0]),
+            "jump_vector": np.array(
+                [
+                    [1.0, 0.0, 0.0],
+                    [-1.0, 0.0, 0.0],
+                    [2.0, 0.0, 0.0],
+                    [-2.0, 0.0, 0.0],
+                ]
+            ),
+        }
+
+        result = measure(events, debye_waller_factor=0.04, radius_scale=1.0)
+
+        self.assertEqual(result["return_count"], 2.0)
+        self.assertEqual(result["return_run_count"], 2.0)
+        self.assertEqual(result["return_run_mean"], 1.0)
+
+    def test_cage_anchor_returns_reject_malformed_or_unsupported_events(self):
+        measure = getattr(ka_replicates, "consecutive_cage_anchor_returns", None)
+        self.assertIsNotNone(measure)
+        valid = {
+            "particle": np.array([0, 0]),
+            "time": np.array([1.0, 2.0]),
+            "jump_vector": np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]),
+        }
+
+        with self.assertRaisesRegex(ValueError, "nonzero"):
+            measure(
+                {**valid, "jump_vector": np.zeros((2, 3))},
+                debye_waller_factor=0.04,
+                radius_scale=1.0,
+            )
+        with self.assertRaisesRegex(ValueError, "at least one consecutive"):
+            measure(
+                {**valid, "particle": np.array([0, 1])},
+                debye_waller_factor=0.04,
+                radius_scale=1.0,
+            )
+        with self.assertRaisesRegex(ValueError, "debye_waller_factor"):
+            measure(valid, debye_waller_factor=0.0, radius_scale=1.0)
+        with self.assertRaisesRegex(ValueError, "radius_scale"):
+            measure(valid, debye_waller_factor=0.04, radius_scale=float("nan"))
+
     def test_independent_group_ratio_reports_growth_and_equivalence_separately(self):
         compare = getattr(ka_replicates, "independent_group_ratio", None)
         self.assertIsNotNone(compare)
@@ -876,6 +1167,103 @@ class KAReplicatePreparationTests(unittest.TestCase):
             result["characteristic_k1"],
             (math.sin(1.0) / 1.0) ** 2,
         )
+
+    def test_shared_phase_projection_preserves_cross_spectral_matrix(self):
+        project = getattr(ka_replicates, "shared_phase_spectral_projection", None)
+        spectral_error = getattr(
+            ka_replicates,
+            "cross_spectral_matrix_nrmse",
+            None,
+        )
+        self.assertIsNotNone(project)
+        self.assertIsNotNone(spectral_error)
+        reference = np.random.default_rng(3).normal(size=(2, 8, 3))
+        candidate = np.random.default_rng(5).normal(size=(2, 8, 3))
+
+        projected = project(reference, candidate)
+
+        self.assertLess(spectral_error(reference, projected), 1e-12)
+
+    def test_phase_randomization_preserves_spectrum_and_mean_not_path(self):
+        randomize = getattr(ka_replicates, "phase_randomized_cross_spectrum", None)
+        spectral_error = getattr(
+            ka_replicates,
+            "cross_spectral_matrix_nrmse",
+            None,
+        )
+        self.assertIsNotNone(randomize)
+        self.assertIsNotNone(spectral_error)
+        reference = np.random.default_rng(7).normal(size=(2, 9, 3))
+
+        first = randomize(reference, np.random.default_rng(11))
+        second = randomize(reference, np.random.default_rng(13))
+
+        self.assertLess(spectral_error(reference, first), 1e-12)
+        np.testing.assert_allclose(np.mean(first, axis=1), np.mean(reference, axis=1))
+        self.assertFalse(np.allclose(first, second))
+
+    def test_radial_projection_preserves_particle_radius_multisets(self):
+        project = getattr(ka_replicates, "radial_rank_projection", None)
+        self.assertIsNotNone(project)
+        reference = np.random.default_rng(17).normal(size=(2, 8, 3))
+        candidate = np.random.default_rng(19).normal(size=(2, 8, 3))
+
+        projected = project(reference, candidate)
+
+        np.testing.assert_allclose(
+            np.sort(np.linalg.norm(projected, axis=2), axis=1),
+            np.sort(np.linalg.norm(reference, axis=2), axis=1),
+        )
+
+    def test_radial_multivariate_surrogate_is_deterministic_and_improves_spectrum(self):
+        surrogate = getattr(ka_replicates, "radial_multivariate_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        reference = np.random.default_rng(23).normal(size=(2, 12, 3))
+
+        first = surrogate(reference, np.random.default_rng(29), iteration_count=20)
+        repeated = surrogate(reference, np.random.default_rng(29), iteration_count=20)
+        different = surrogate(reference, np.random.default_rng(31), iteration_count=20)
+
+        np.testing.assert_allclose(first["displacements"], repeated["displacements"])
+        self.assertFalse(np.allclose(first["displacements"], different["displacements"]))
+        self.assertLess(first["radial_distribution_maximum_absolute_error"], 1e-12)
+        self.assertLess(
+            first["cross_spectral_matrix_nrmse"],
+            first["initial_cross_spectral_matrix_nrmse"],
+        )
+        self.assertEqual(first["iteration_count"], 20.0)
+
+    def test_radial_multivariate_surrogate_rejects_invalid_controls(self):
+        surrogate = getattr(ka_replicates, "radial_multivariate_surrogate", None)
+        self.assertIsNotNone(surrogate)
+        reference = np.ones((1, 4, 3))
+
+        with self.assertRaises(ValueError):
+            surrogate(reference, np.random.default_rng(37), iteration_count=0)
+        with self.assertRaises(ValueError):
+            surrogate(reference, object(), iteration_count=2)
+
+    def test_fourth_cumulant_scattering_matches_isotropic_expansion(self):
+        scattering = getattr(ka_replicates, "fourth_cumulant_scattering", None)
+        self.assertIsNotNone(scattering)
+        msd = np.array([0.3, 0.6])
+        ngp = np.array([0.2, 0.4])
+        expected = np.exp(-4.0 * msd / 6.0 + 16.0 * ngp * msd**2 / 72.0)
+
+        result = scattering(msd, ngp, 2.0)
+
+        np.testing.assert_allclose(result, expected)
+
+    def test_fourth_cumulant_scattering_rejects_unphysical_inputs(self):
+        scattering = getattr(ka_replicates, "fourth_cumulant_scattering", None)
+        self.assertIsNotNone(scattering)
+
+        with self.assertRaises(ValueError):
+            scattering(np.array([0.2]), np.array([-1.1]), 2.0)
+        with self.assertRaises(ValueError):
+            scattering(np.array([0.2]), np.array([0.1, 0.2]), 2.0)
+        with self.assertRaises(ValueError):
+            scattering(np.array([0.2]), np.array([0.1]), 0.0)
 
     def test_two_clock_hmm_hybrid_gate_separates_rate_drift_from_shape_closure(self):
         script_path = ROOT / "scripts" / "analyze_ka_two_clock_hmm_mixture.py"
@@ -1824,6 +2212,713 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertEqual(first, module.path_shuffle_seed(45101, replicate=2, realization=3))
         self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=3, realization=3))
         self.assertNotEqual(first, module.path_shuffle_seed(45101, replicate=2, realization=4))
+
+    def test_nonlinear_path_surrogate_seed_is_deterministic(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_seed",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        first = module.surrogate_seed(211003, replicate=2, realization=3)
+
+        self.assertEqual(
+            first,
+            module.surrogate_seed(211003, replicate=2, realization=3),
+        )
+        self.assertNotEqual(
+            first,
+            module.surrogate_seed(211003, replicate=3, realization=3),
+        )
+        self.assertNotEqual(
+            first,
+            module.surrogate_seed(211003, replicate=2, realization=4),
+        )
+
+    def test_nonlinear_path_cli_requires_eight_surrogate_realizations(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_cli_minimum",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with self.assertRaises(ValueError):
+            module.main(
+                [
+                    "missing-ensemble",
+                    "--calibration-time",
+                    "20",
+                    "--heldout-factorization",
+                    "missing.csv",
+                    "--block-size",
+                    "10",
+                    "--surrogate-realizations",
+                    "7",
+                    "--iteration-count",
+                    "2",
+                    "--output-prefix",
+                    "missing-output",
+                ]
+            )
+
+    def test_nonlinear_path_surrogate_requires_quality_stationarity_and_paired_consensus(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_classifier",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        summary_rows = [
+            {
+                "model": "contiguous_empirical_path",
+                "ensemble_msd_relative_error": 0.05,
+                "ensemble_ngp_absolute_error": 0.10,
+                "ensemble_absolute_error_fs_k2": 0.01,
+                "ensemble_absolute_error_fs_k7p25": 0.02,
+                "ensemble_msd_mc_relative_se": 0.0,
+                "ensemble_ngp_mc_se": 0.0,
+                "ensemble_fs_k2_mc_se": 0.0,
+                "ensemble_fs_k7p25_mc_se": 0.0,
+            },
+            {
+                "model": "radial_multivariate_surrogate",
+                "ensemble_msd_relative_error": 0.03,
+                "ensemble_ngp_absolute_error": 1.20,
+                "ensemble_absolute_error_fs_k2": 0.02,
+                "ensemble_absolute_error_fs_k7p25": 0.09,
+                "ensemble_msd_mc_relative_se": 0.002,
+                "ensemble_ngp_mc_se": 0.01,
+                "ensemble_fs_k2_mc_se": 0.001,
+                "ensemble_fs_k7p25_mc_se": 0.002,
+            },
+        ]
+        quality_rows = [
+            {
+                "replicate": float(replicate),
+                "realization": float(realization),
+                "radial_distribution_maximum_absolute_error": 1e-14,
+                "cross_spectral_matrix_nrmse": 0.011,
+                "one_block_msd_relative_error": 1e-12,
+                "one_block_ngp_absolute_error": 1e-12,
+                "one_block_fs_maximum_absolute_error": 0.001,
+            }
+            for replicate in range(1, 4)
+            for realization in range(8)
+        ]
+        replicate_scores = [
+            {
+                "replicate": float(replicate),
+                "radial_higher_order_score": radial,
+                "contiguous_higher_order_score": contiguous,
+            }
+            for replicate, radial, contiguous in (
+                (1, 4.2, 0.9),
+                (2, 5.1, 2.1),
+                (3, 4.0, 3.3),
+            )
+        ]
+        stationarity_rows = [
+            {"comparison": comparison, "curve_transfer_pass": 1.0}
+            for comparison in ("early_late", "early_heldout", "late_heldout")
+        ]
+
+        result = module.classify_nonlinear_path_surrogate(
+            summary_rows,
+            quality_rows=quality_rows,
+            replicate_scores=replicate_scores,
+            stationarity_rows=stationarity_rows,
+            required_replicate_count=3,
+            required_realization_count=8,
+        )
+
+        self.assertEqual(result["surrogate_quality_pass"], 1.0)
+        self.assertEqual(result["surrogate_precision_pass"], 1.0)
+        self.assertEqual(result["stationarity_control_pass"], 1.0)
+        self.assertEqual(result["nonlinear_single_particle_path_memory_required"], 1.0)
+        self.assertEqual(result["paired_contiguous_better_replicate_count"], 3.0)
+        self.assertEqual(result["surrogate_realization_completeness_pass"], 1.0)
+        self.assertEqual(result["one_block_radial_heterogeneity_sufficiency_resolved"], 1.0)
+        self.assertEqual(result["one_block_radial_heterogeneity_sufficient"], 0.0)
+        self.assertEqual(
+            result["one_block_radial_plus_two_point_spectrum_sufficiency_resolved"],
+            1.0,
+        )
+        self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
+        failures = []
+        changed = copy.deepcopy(quality_rows)
+        changed[0]["cross_spectral_matrix_nrmse"] = 0.02
+        failures.append((summary_rows, changed, replicate_scores, stationarity_rows))
+        failures.append((summary_rows, quality_rows[:-1], replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(summary_rows)
+        changed[1]["ensemble_fs_k7p25_mc_se"] = 0.004
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(stationarity_rows)
+        changed[0]["curve_transfer_pass"] = 0.0
+        failures.append((summary_rows, quality_rows, replicate_scores, changed))
+        changed = copy.deepcopy(summary_rows)
+        changed[0]["ensemble_msd_relative_error"] = 0.11
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(summary_rows)
+        changed[1]["ensemble_msd_relative_error"] = 0.11
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(summary_rows)
+        changed[1]["ensemble_ngp_absolute_error"] = 0.20
+        changed[1]["ensemble_absolute_error_fs_k7p25"] = 0.02
+        failures.append((changed, quality_rows, replicate_scores, stationarity_rows))
+        changed = copy.deepcopy(replicate_scores)
+        changed[0]["radial_higher_order_score"] = 0.9
+        failures.append((summary_rows, quality_rows, changed, stationarity_rows))
+        changed = copy.deepcopy(replicate_scores)
+        changed[0]["contiguous_higher_order_score"] = 4.3
+        failures.append((summary_rows, quality_rows, changed, stationarity_rows))
+
+        for summaries, quality, paired, stationarity in failures:
+            rejected = module.classify_nonlinear_path_surrogate(
+                summaries,
+                quality_rows=quality,
+                replicate_scores=paired,
+                stationarity_rows=stationarity,
+                required_replicate_count=3,
+                required_realization_count=8,
+            )
+            self.assertEqual(
+                rejected["nonlinear_single_particle_path_memory_required"],
+                0.0,
+            )
+            if float(quality[0]["cross_spectral_matrix_nrmse"]) > 0.015:
+                self.assertEqual(
+                    rejected[
+                        "one_block_radial_plus_two_point_spectrum_sufficiency_resolved"
+                    ],
+                    0.0,
+                )
+        incomplete = module.classify_nonlinear_path_surrogate(
+            summary_rows,
+            quality_rows=quality_rows[:-1],
+            replicate_scores=replicate_scores,
+            stationarity_rows=stationarity_rows,
+            required_replicate_count=3,
+            required_realization_count=8,
+        )
+        self.assertEqual(incomplete["surrogate_realization_completeness_pass"], 0.0)
+
+    def test_nonlinear_path_surrogate_aggregates_realizations_before_replicates(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_aggregation",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = []
+        for replicate, predictions, observed_msd in (
+            (1, ((1.0, 0.1, 0.8), (3.0, 0.3, 0.6)), 2.0),
+            (2, ((3.0, 0.2, 0.7), (5.0, 0.4, 0.5)), 4.0),
+        ):
+            for realization, (msd, ngp, fs) in enumerate(predictions):
+                rows.append(
+                    {
+                        "model": "radial_multivariate_surrogate",
+                        "replicate": float(replicate),
+                        "realization": float(realization),
+                        "lag": 20.0,
+                        "predicted_msd": msd,
+                        "observed_msd": observed_msd,
+                        "predicted_ngp": ngp,
+                        "observed_ngp": 0.25,
+                        "predicted_fs_k2": fs,
+                        "observed_fs_k2": 0.65,
+                    }
+                )
+
+        replicate_rows, summary_rows = module.summarize_surrogate_realizations(
+            rows,
+            fs_keys=["observed_fs_k2"],
+        )
+
+        self.assertEqual(len(replicate_rows), 2)
+        self.assertEqual(len(summary_rows), 1)
+        first = replicate_rows[0]
+        self.assertAlmostEqual(first["predicted_msd"], 2.0)
+        self.assertAlmostEqual(first["predicted_msd_mc_se"], 1.0)
+        self.assertAlmostEqual(first["predicted_ngp"], 0.2)
+        summary = summary_rows[0]
+        self.assertEqual(summary["independent_replicate_count"], 2.0)
+        self.assertAlmostEqual(summary["predicted_msd"], 3.0)
+        self.assertAlmostEqual(summary["observed_msd"], 3.0)
+        self.assertAlmostEqual(summary["ensemble_msd_relative_error"], 0.0)
+        self.assertAlmostEqual(
+            summary["ensemble_msd_mc_relative_se"],
+            math.sqrt(2.0) / 2.0 / 3.0,
+        )
+
+    def test_nonlinear_path_stationarity_scores_three_frozen_comparisons(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_stationarity",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = [
+            {
+                "replicate": float(replicate),
+                "lag": 20.0,
+                "early_msd": early_msd,
+                "late_msd": late_msd,
+                "observed_msd": observed_msd,
+                "early_ngp": 0.20,
+                "late_ngp": 0.24,
+                "observed_ngp": 0.22,
+                "early_fs_k2": 0.80,
+                "late_fs_k2": 0.79,
+                "observed_fs_k2": 0.795,
+            }
+            for replicate, early_msd, late_msd, observed_msd in (
+                (1, 1.0, 1.05, 1.02),
+                (2, 3.0, 3.10, 3.05),
+            )
+        ]
+
+        result = module.stationarity_comparisons(
+            rows,
+            fs_keys=["observed_fs_k2"],
+        )
+
+        self.assertEqual(
+            {row["comparison"] for row in result},
+            {"early_late", "early_heldout", "late_heldout"},
+        )
+        self.assertTrue(all(row["curve_transfer_pass"] == 1.0 for row in result))
+        changed = copy.deepcopy(rows)
+        changed[0]["late_ngp"] = 1.2
+        rejected = module.stationarity_comparisons(
+            changed,
+            fs_keys=["observed_fs_k2"],
+        )
+        self.assertEqual(
+            next(row for row in rejected if row["comparison"] == "early_late")[
+                "curve_transfer_pass"
+            ],
+            0.0,
+        )
+
+    def test_nonlinear_path_replicate_analysis_keeps_surrogates_calibration_only(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_replicate",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        blocks = np.random.default_rng(101).normal(size=(3, 12, 3))
+        wave_numbers = np.array([2.0])
+        heldout = {}
+        for block_count in (1, 2, 4):
+            observed = ka_replicates.cumulative_block_observables(
+                blocks,
+                block_count=block_count,
+                wave_numbers=wave_numbers,
+            )
+            lag = 20 * block_count
+            heldout[lag] = {
+                "observed_msd": observed["msd"],
+                "observed_ngp": observed["ngp"],
+                "observed_fs_k2": observed["characteristic_k2"],
+            }
+
+        result = module.analyze_replicate_block_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=wave_numbers,
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=2,
+            iteration_count=3,
+            base_seed=211003,
+        )
+        repeated = module.analyze_replicate_block_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=wave_numbers,
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=2,
+            iteration_count=3,
+            base_seed=211003,
+        )
+
+        self.assertEqual(result, repeated)
+        self.assertEqual(
+            {row["model"] for row in result["rows"]},
+            {
+                "contiguous_empirical_path",
+                "phase_randomized_cross_spectrum",
+                "radial_multivariate_surrogate",
+            },
+        )
+        self.assertEqual(len(result["rows"]), 15)
+        self.assertEqual(len(result["quality_rows"]), 2)
+        self.assertEqual(len(result["stationarity_detail_rows"]), 3)
+        self.assertTrue(
+            all(row["heldout_path_used_in_prediction"] == 0.0 for row in result["rows"])
+        )
+        self.assertTrue(
+            all(
+                row["radial_distribution_maximum_absolute_error"] < 1e-12
+                for row in result["quality_rows"]
+            )
+        )
+
+    def test_nonlinear_path_replicate_scores_use_each_paths_worst_lag(self):
+        script_path = ROOT / "scripts" / "analyze_ka_nonlinear_path_surrogate.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_nonlinear_path_surrogate_scores",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = []
+        for model, ngp_errors, fs_errors in (
+            ("contiguous_empirical_path", (0.15, 0.03), (0.012, 0.006)),
+            ("radial_multivariate_surrogate", (0.60, 0.90), (0.06, 0.03)),
+        ):
+            for replicate, (ngp_error, fs_error) in enumerate(
+                zip(ngp_errors, fs_errors),
+                start=1,
+            ):
+                for lag_scale in (0.5, 1.0):
+                    rows.append(
+                        {
+                            "model": model,
+                            "replicate": float(replicate),
+                            "lag": 20.0 * lag_scale,
+                            "ngp_absolute_error": ngp_error * lag_scale,
+                            "absolute_error_fs_k2": fs_error * lag_scale,
+                        }
+                    )
+
+        result = module.replicate_higher_order_scores(rows)
+
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result[0]["contiguous_higher_order_score"], 0.5)
+        self.assertAlmostEqual(result[0]["radial_higher_order_score"], 2.0)
+        self.assertAlmostEqual(result[1]["contiguous_higher_order_score"], 0.2)
+        self.assertAlmostEqual(result[1]["radial_higher_order_score"], 3.0)
+        self.assertEqual(result[0]["paired_contiguous_better"], 1.0)
+
+    def test_path_cumulant_scattering_reports_contiguous_validity_horizon(self):
+        script_path = ROOT / "scripts" / "analyze_ka_path_cumulant_scattering.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_path_cumulant_scattering",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = []
+        for replicate in (1, 2):
+            for lag, msd, ngp in (
+                (1, 0.1, 0.1),
+                (2, 0.6, 1.0),
+                (3, 0.8, 0.5),
+            ):
+                predicted_k2 = float(
+                    ka_replicates.fourth_cumulant_scattering(
+                        np.array([msd]),
+                        np.array([ngp]),
+                        2.0,
+                    )[0]
+                )
+                predicted_k7p25 = float(
+                    ka_replicates.fourth_cumulant_scattering(
+                        np.array([msd]),
+                        np.array([ngp]),
+                        7.25,
+                    )[0]
+                )
+                rows.append(
+                    {
+                        "replicate": float(replicate),
+                        "temperature": 0.45,
+                        "lag": float(lag),
+                        "observed_msd": msd,
+                        "observed_ngp": ngp,
+                        "observed_fs_k2": predicted_k2 - (0.05 if lag == 3 else 0.0),
+                        "observed_fs_k7p25": min(predicted_k7p25, 0.95),
+                    }
+                )
+
+        diagnostic_rows = module.cumulant_scattering_rows(rows)
+        validity = module.cumulant_scattering_validity(rows)
+
+        self.assertEqual(len(diagnostic_rows), 6)
+        self.assertTrue(
+            all(row["independent_replicate_count"] == 2.0 for row in diagnostic_rows)
+        )
+        self.assertTrue(all(row["observed_msd_used"] == 1.0 for row in diagnostic_rows))
+        self.assertTrue(all(row["observed_ngp_used"] == 1.0 for row in diagnostic_rows))
+        self.assertTrue(
+            all(row["heldout_prediction_claim_allowed"] == 0.0 for row in diagnostic_rows)
+        )
+        by_k = {row["wave_number"]: row for row in validity}
+        self.assertEqual(by_k[2.0]["longest_contiguous_valid_lag"], 2.0)
+        self.assertEqual(by_k[2.0]["first_invalid_lag"], 3.0)
+        self.assertEqual(by_k[7.25]["longest_contiguous_valid_lag"], 1.0)
+        self.assertEqual(by_k[7.25]["first_invalid_lag"], 2.0)
+        self.assertGreater(by_k[7.25]["unit_interval_failure_count"], 0.0)
+        self.assertEqual(by_k[7.25]["replicate_moments_pooled"], 1.0)
+        self.assertEqual(by_k[7.25]["heldout_prediction_claim_allowed"], 0.0)
+
+    def test_path_cumulant_scattering_pools_second_and_fourth_moments(self):
+        script_path = ROOT / "scripts" / "analyze_ka_path_cumulant_scattering.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_path_cumulant_scattering_pooling",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = [
+            {
+                "replicate": 1.0,
+                "temperature": 0.45,
+                "lag": 20.0,
+                "observed_msd": 1.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            },
+            {
+                "replicate": 2.0,
+                "temperature": 0.45,
+                "lag": 20.0,
+                "observed_msd": 3.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            },
+        ]
+
+        result = module.cumulant_scattering_rows(rows)[0]
+
+        self.assertAlmostEqual(result["observed_msd"], 2.0)
+        self.assertAlmostEqual(result["observed_ngp"], 0.25)
+        self.assertAlmostEqual(result["observed_fourth_moment"], 25.0 / 3.0)
+        self.assertEqual(result["replicate_moments_pooled"], 1.0)
+
+    def test_path_cumulant_scattering_requires_common_replicates_at_every_lag(self):
+        script_path = ROOT / "scripts" / "analyze_ka_path_cumulant_scattering.py"
+        spec = importlib.util.spec_from_file_location(
+            "analyze_ka_path_cumulant_scattering_replicate_identity",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        rows = [
+            {
+                "replicate": float(replicate),
+                "temperature": 0.45,
+                "lag": float(lag),
+                "observed_msd": 1.0,
+                "observed_ngp": 0.1,
+                "observed_fs_k2": 0.5,
+            }
+            for lag, replicates in ((20, (1, 2)), (40, (3, 4)))
+            for replicate in replicates
+        ]
+
+        with self.assertRaises(ValueError):
+            module.cumulant_scattering_rows(rows)
+
+    def test_nonlinear_path_gate_blocks_unresolved_temperature_crossover(self):
+        script_path = ROOT / "scripts" / "summarize_ka_nonlinear_path_gate.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_nonlinear_path_gate",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        low = {
+            "temperature": 0.45,
+            "surrogate_quality_pass": 1.0,
+            "surrogate_precision_pass": 1.0,
+            "stationarity_control_pass": 1.0,
+            "contiguous_ensemble_curve_pass": 1.0,
+            "radial_surrogate_msd_pass": 1.0,
+            "radial_surrogate_higher_order_failure": 1.0,
+            "surrogate_failure_replicate_count": 3.0,
+            "paired_contiguous_better_replicate_count": 3.0,
+            "required_replicate_count": 3.0,
+            "replicate_consensus_pass": 1.0,
+            "nonlinear_single_particle_path_memory_required": 1.0,
+            "linear_spectrum_null_rejected": 1.0,
+            "surrogate_realization_completeness_pass": 1.0,
+            "one_block_radial_plus_two_point_spectrum_sufficiency_resolved": 1.0,
+            "one_block_radial_plus_two_point_spectrum_sufficient": 0.0,
+        }
+        high_block20 = {
+            **low,
+            "temperature": 0.58,
+            "surrogate_quality_pass": 0.0,
+            "stationarity_control_pass": 0.0,
+            "radial_surrogate_higher_order_failure": 0.0,
+            "replicate_consensus_pass": 0.0,
+            "nonlinear_single_particle_path_memory_required": 0.0,
+            "linear_spectrum_null_rejected": 0.0,
+            "required_replicate_count": 5.0,
+            "one_block_radial_plus_two_point_spectrum_sufficiency_resolved": 0.0,
+        }
+        high_block10 = {
+            **high_block20,
+            "radial_surrogate_higher_order_failure": 1.0,
+        }
+        low_cumulant = [
+            {"temperature": 0.45, "wave_number": wave_number, "longest_contiguous_valid_lag": horizon, "independent_replicate_count": 3.0, "replicate_ids": "1;2;3", "replicate_moments_pooled": 1.0, "heldout_prediction_claim_allowed": 0.0}
+            for wave_number, horizon in ((2.0, 4096.0), (4.0, 200.0), (7.25, 20.0))
+        ]
+        high_cumulant = [
+            {"temperature": 0.58, "wave_number": wave_number, "longest_contiguous_valid_lag": horizon, "independent_replicate_count": 5.0, "replicate_ids": "1;2;3;4;5", "replicate_moments_pooled": 1.0, "heldout_prediction_claim_allowed": 0.0}
+            for wave_number, horizon in ((2.0, 600.0), (4.0, 600.0), (7.25, 0.0))
+        ]
+        empirical = {
+            "single_particle_multiblock_path_memory_required": 1.0,
+            "ordered_recoil_path_required": 1.0,
+        }
+
+        result = module.classify_nonlinear_path_gate(
+            low,
+            high_block20,
+            high_block10,
+            low_cumulant,
+            high_cumulant,
+            empirical,
+        )
+
+        self.assertEqual(result["low_temperature_nonlinear_path_memory_required"], 1.0)
+        self.assertEqual(result["low_temperature_gate_ready"], 1.0)
+        self.assertEqual(result["high_temperature_resolution_sensitivity"], 1.0)
+        self.assertEqual(result["high_temperature_mechanism_resolved"], 0.0)
+        self.assertEqual(result["binary_temperature_crossover_claim_allowed"], 0.0)
+        self.assertEqual(result["low_k_cumulant_horizon_order_pass"], 1.0)
+        self.assertEqual(result["observed_cumulant_diagnostic_only"], 1.0)
+        self.assertEqual(
+            result["low_temperature_mechanism_selection_artifact_ready"],
+            1.0,
+        )
+        self.assertEqual(result["temperature_crossover_artifact_ready"], 0.0)
+        self.assertEqual(result["manuscript_integration_complete"], 0.0)
+        self.assertEqual(result["unique_microscopic_model_selected"], 0.0)
+        self.assertEqual(
+            result["next_minimal_model_candidate"],
+            "finite_lifetime_reversible_cage_state",
+        )
+        self.assertEqual(result["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(result["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+        incomplete_null = {
+            **high_block20,
+            "surrogate_quality_pass": 1.0,
+            "surrogate_precision_pass": 1.0,
+            "stationarity_control_pass": 1.0,
+            "contiguous_ensemble_curve_pass": 1.0,
+            "radial_surrogate_msd_pass": 1.0,
+            "radial_surrogate_higher_order_failure": 0.0,
+            "surrogate_realization_completeness_pass": 0.0,
+            "one_block_radial_plus_two_point_spectrum_sufficiency_resolved": 0.0,
+            "one_block_radial_plus_two_point_spectrum_sufficient": 0.0,
+        }
+        unresolved = module.classify_nonlinear_path_gate(
+            low,
+            incomplete_null,
+            incomplete_null,
+            low_cumulant,
+            high_cumulant,
+            empirical,
+        )
+        self.assertEqual(unresolved["high_temperature_mechanism_resolved"], 0.0)
+        self.assertEqual(unresolved["binary_temperature_crossover_claim_allowed"], 0.0)
+        with self.assertRaises(ValueError):
+            module.classify_nonlinear_path_gate(
+                low,
+                high_block20,
+                high_block10,
+                low_cumulant[:1],
+                high_cumulant,
+                empirical,
+            )
+        wrong_count = copy.deepcopy(high_cumulant)
+        wrong_count[0]["independent_replicate_count"] = 4.0
+        with self.assertRaises(ValueError):
+            module.classify_nonlinear_path_gate(
+                low,
+                high_block20,
+                high_block10,
+                low_cumulant,
+                wrong_count,
+                empirical,
+            )
+        swapped = copy.deepcopy(high_block20)
+        swapped["temperature"] = 0.40
+        with self.assertRaises(ValueError):
+            module.classify_nonlinear_path_gate(
+                low,
+                swapped,
+                high_block10,
+                low_cumulant,
+                high_cumulant,
+                empirical,
+            )
+
+    def test_nonlinear_path_svg_marks_and_terminates_at_nonfinite_error(self):
+        script_path = ROOT / "scripts" / "summarize_ka_nonlinear_path_gate.py"
+        spec = importlib.util.spec_from_file_location(
+            "summarize_ka_nonlinear_path_gate_svg_invalid",
+            script_path,
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        normalized = {
+            "contiguous_empirical_path": {"MSD": 0.2, "NGP": 0.3, "Fs": 0.4},
+            "radial_multivariate_surrogate": {"MSD": 0.4, "NGP": 2.0, "Fs": 3.0},
+        }
+        cumulant = [
+            {"wave_number": 2.0, "lag": 1.0, "absolute_error": 0.01, "error_tolerance": 0.03},
+            {"wave_number": 2.0, "lag": 2.0, "absolute_error": math.inf, "error_tolerance": 0.03},
+            {"wave_number": 2.0, "lag": 3.0, "absolute_error": 0.01, "error_tolerance": 0.03},
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "gate.svg"
+            module.write_svg(
+                path,
+                normalized_errors=normalized,
+                cumulant_rows=cumulant,
+            )
+            svg = path.read_text()
+
+        self.assertIn('data-invalid-wave-number="2"', svg)
+        self.assertIn('data-invalid-lag="2"', svg)
+        self.assertNotIn("inf", svg.lower())
 
     def test_empirical_path_crossover_requires_shared_higher_order_failure(self):
         script_path = ROOT / "scripts" / "summarize_ka_empirical_path_transfer.py"
@@ -5154,6 +6249,628 @@ ITEM: ATOMS id type x y z ix iy iz vx vy vz
             input_text = (root / "ensemble" / "replicate_01" / "in.production").read_text()
             self.assertEqual(manifest["dynamics"], "langevin")
             self.assertIn("fix bath all langevin 0.58 0.58 1 99173", input_text)
+
+
+class KACageAnchorGateTests(unittest.TestCase):
+    def _module(self, filename: str, module_name: str):
+        script_path = ROOT / "scripts" / filename
+        spec = importlib.util.spec_from_file_location(module_name, script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    def _combined_gate_inputs(self):
+        claims = {
+            "microdynamic_closure_claim_allowed": 0.0,
+            "spatial_facilitation_claim_allowed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        low_returns = [
+            {
+                "replicate": float(replicate),
+                "temperature": 0.45,
+                "calibration_time": 5000.0,
+                "radius_scale": scale,
+                "return_fraction": 0.70 + 0.01 * replicate,
+                "isotropic_null_fraction": 0.50,
+                "fluctuation_half_window": 5.0,
+                "calibration_events_only": 1.0,
+                "heldout_events_used_in_calibration": 0.0,
+                **claims,
+            }
+            for replicate in (1, 2, 3)
+            for scale in (0.5, 1.0, 1.5)
+        ]
+        high_returns = [
+            {
+                "replicate": float(replicate),
+                "temperature": 0.58,
+                "calibration_time": 750.0,
+                "radius_scale": scale,
+                "return_fraction": 0.40 + 0.01 * replicate,
+                "isotropic_null_fraction": 0.40,
+                "fluctuation_half_window": 5.0,
+                "calibration_events_only": 1.0,
+                "heldout_events_used_in_calibration": 0.0,
+                **claims,
+            }
+            for replicate in (1, 2, 3, 4, 5)
+            for scale in (0.5, 1.0, 1.5)
+        ]
+        def quality_rows(temperature, calibration_time, replicate_count):
+            return [
+                {
+                    "replicate": float(replicate),
+                    "realization": float(realization),
+                    "temperature": temperature,
+                    "calibration_time": float(calibration_time),
+                    "block_size": 20.0,
+                    "radial_bin_count": 8.0,
+                    "surrogate_seed": float(
+                        (781031 + 1_000_003 * replicate + 97_409 * realization)
+                        % (2**63 - 1)
+                    ),
+                    "radial_mean_relative_error": 0.01,
+                    "radial_standard_deviation_relative_error": 0.01,
+                    "lag_one_cosine_mean_absolute_error": 0.01,
+                    "lag_one_cosine_quantile_maximum_absolute_error": 0.02,
+                    "normalized_lag_one_dot_correlation_absolute_error": 0.01,
+                    "calibration_path_used_in_kernel": 1.0,
+                    "heldout_events_used_in_calibration": 0.0,
+                    "surrogate_realizations_per_replicate": 16.0,
+                    "surrogate_base_seed": 781031.0,
+                    **claims,
+                }
+                for replicate in range(1, replicate_count + 1)
+                for realization in range(16)
+            ]
+
+        low_quality = quality_rows(0.45, 5000, 3)
+        high_quality = quality_rows(0.58, 750, 5)
+        low_recoil = {
+            "temperature": 0.45,
+            "calibration_time": 5000.0,
+            "block_size": 20.0,
+            "radial_bin_count": 8.0,
+            "independent_replicate_count": 3.0,
+            "required_replicate_count": 3.0,
+            "required_realizations_per_replicate": 16.0,
+            "surrogate_realizations_per_replicate": 16.0,
+            "surrogate_base_seed": 781031.0,
+            "quality_realization_completeness_pass": 0.0,
+            "quality_pass": 0.0,
+            "precision_pass": 0.0,
+            "curve_transfer_pass": 1.0,
+            "maximum_ensemble_msd_relative_error": 0.08,
+            "maximum_ensemble_ngp_absolute_error": 0.31,
+            "maximum_ensemble_fs_absolute_error": 0.031,
+            "maximum_ensemble_msd_mc_relative_se": 0.009,
+            "maximum_ensemble_ngp_mc_se": 0.029,
+            "maximum_ensemble_fs_mc_se": 0.0029,
+            "heldout_events_used_in_calibration": 0.0,
+            **claims,
+        }
+        high_recoil = {
+            "temperature": 0.58,
+            "calibration_time": 750.0,
+            "block_size": 20.0,
+            "radial_bin_count": 8.0,
+            "independent_replicate_count": 5.0,
+            "required_replicate_count": 5.0,
+            "required_realizations_per_replicate": 16.0,
+            "surrogate_realizations_per_replicate": 16.0,
+            "surrogate_base_seed": 781031.0,
+            "quality_realization_completeness_pass": 0.0,
+            "quality_pass": 0.0,
+            "precision_pass": 0.0,
+            "curve_transfer_pass": 0.0,
+            "maximum_ensemble_msd_relative_error": 0.10,
+            "maximum_ensemble_ngp_absolute_error": 0.30,
+            "maximum_ensemble_fs_absolute_error": 0.03,
+            "maximum_ensemble_msd_mc_relative_se": 0.01,
+            "maximum_ensemble_ngp_mc_se": 0.03,
+            "maximum_ensemble_fs_mc_se": 0.003,
+            "heldout_events_used_in_calibration": 0.0,
+            **claims,
+        }
+        ordered_path = {
+            "model": "contiguous_empirical_path",
+            "temperature": 0.45,
+            "independent_replicate_count": 3.0,
+            "maximum_ensemble_msd_relative_error": 0.10,
+            "maximum_ensemble_ngp_absolute_error": 0.30,
+            "maximum_ensemble_fs_absolute_error": 0.03,
+            "raw_curve_tolerance_pass": 0.0,
+            "curve_transfer_pass": 0.0,
+            "heldout_path_used_in_prediction": 0.0,
+            "macro_fit_parameter_count": 0.0,
+            "calibration_path_distribution_used": 1.0,
+            **claims,
+        }
+        return (
+            low_returns,
+            high_returns,
+            low_quality,
+            high_quality,
+            low_recoil,
+            high_recoil,
+            ordered_path,
+        )
+
+    def test_combined_gate_selects_anchor_only_for_every_frozen_condition(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_decision_table",
+        )
+        inputs = self._combined_gate_inputs()
+
+        accepted = module.classify_cage_anchor_gate(*inputs)
+
+        self.assertEqual(accepted["cage_anchor_memory_required"], 1.0)
+        self.assertEqual(accepted["mechanism_state"], "cage_anchor_memory_required")
+        self.assertEqual(accepted["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(accepted["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(accepted["thermodynamic_claim_allowed"], 0.0)
+
+        cases = (
+            ("return separation", 0, 0, "return_fraction", 0.40),
+            ("primary null excess", 0, 1, "isotropic_null_fraction", 0.60),
+            ("low quality", 2, 0, "radial_mean_relative_error", 0.021),
+            ("high precision", 5, None, "maximum_ensemble_fs_mc_se", 0.0031),
+            ("high closure", 5, None, "maximum_ensemble_fs_absolute_error", 0.031),
+            ("low NGP failure", 4, None, "maximum_ensemble_ngp_absolute_error", 0.30),
+            ("low Fs failure", 4, None, "maximum_ensemble_fs_absolute_error", 0.03),
+            ("ordered path bound", 6, None, "maximum_ensemble_msd_relative_error", 0.101),
+        )
+        for name, target, index, key, value in cases:
+            changed = copy.deepcopy(inputs)
+            selected = changed[target]
+            if index is None:
+                selected[key] = value
+            else:
+                selected[index][key] = value
+            with self.subTest(condition=name):
+                rejected = module.classify_cage_anchor_gate(*changed)
+                self.assertEqual(rejected["cage_anchor_memory_required"], 0.0)
+
+    def test_combined_gate_rejects_return_provenance_mismatches(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_return_provenance",
+        )
+        inputs = self._combined_gate_inputs()
+        cases = (
+            ("temperature", "temperature", 0.46),
+            ("calibration time", "calibration_time", 4999.0),
+            ("half-window", "fluctuation_half_window", 4.0),
+            ("calibration-only provenance", "calibration_events_only", 0.0),
+            ("held-out contamination", "heldout_events_used_in_calibration", 1.0),
+            ("claim boundary", "thermodynamic_claim_allowed", 1.0),
+        )
+        for name, key, value in cases:
+            changed = copy.deepcopy(inputs)
+            changed[0][0][key] = value
+            with self.subTest(condition=name), self.assertRaises(ValueError):
+                module.classify_cage_anchor_gate(*changed)
+
+        duplicate = copy.deepcopy(inputs)
+        duplicate[0].append(dict(duplicate[0][0]))
+        with self.assertRaisesRegex(ValueError, "one row per replicate and radius scale"):
+            module.classify_cage_anchor_gate(*duplicate)
+
+    def test_combined_gate_rejects_recoil_provenance_and_completeness_mismatches(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_recoil_provenance",
+        )
+        inputs = self._combined_gate_inputs()
+        cases = (
+            ("calibration time", 2, 0, "calibration_time", 4999.0),
+            ("radial bins", 2, 0, "radial_bin_count", 7.0),
+            ("verdict temperature", 5, None, "temperature", 0.57),
+            ("verdict calibration time", 4, None, "calibration_time", 4999.0),
+            ("verdict block size", 5, None, "block_size", 10.0),
+            ("verdict radial bins", 4, None, "radial_bin_count", 7.0),
+            ("realization metadata", 4, None, "surrogate_realizations_per_replicate", 15.0),
+            ("calibration kernel", 2, 0, "calibration_path_used_in_kernel", 0.0),
+            ("held-out contamination", 2, 0, "heldout_events_used_in_calibration", 1.0),
+            ("verdict held-out contamination", 5, None, "heldout_events_used_in_calibration", 1.0),
+            ("seed metadata", 2, 0, "surrogate_base_seed", 781032.0),
+            ("claim boundary", 3, 0, "spatial_facilitation_claim_allowed", 1.0),
+            ("verdict claim boundary", 4, None, "thermodynamic_claim_allowed", 1.0),
+        )
+        for name, target, index, key, value in cases:
+            changed = copy.deepcopy(inputs)
+            selected = changed[target]
+            if index is None:
+                selected[key] = value
+            else:
+                selected[index][key] = value
+            with self.subTest(condition=name), self.assertRaises(ValueError):
+                module.classify_cage_anchor_gate(*changed)
+
+        missing = copy.deepcopy(inputs)
+        missing[2].pop()
+        with self.assertRaisesRegex(ValueError, "complete replicate-realization grid"):
+            module.classify_cage_anchor_gate(*missing)
+        duplicate = copy.deepcopy(inputs)
+        duplicate[3].append(dict(duplicate[3][0]))
+        with self.assertRaisesRegex(ValueError, "complete replicate-realization grid"):
+            module.classify_cage_anchor_gate(*duplicate)
+
+    def test_combined_gate_recomputes_all_quality_precision_and_curve_limits(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_numeric_limits",
+        )
+        inputs = self._combined_gate_inputs()
+        cases = (
+            (2, 0, "radial_mean_relative_error", 0.0201),
+            (2, 0, "radial_standard_deviation_relative_error", 0.0201),
+            (2, 0, "lag_one_cosine_mean_absolute_error", 0.0201),
+            (2, 0, "lag_one_cosine_quantile_maximum_absolute_error", 0.0301),
+            (2, 0, "normalized_lag_one_dot_correlation_absolute_error", 0.0201),
+            (4, None, "maximum_ensemble_msd_mc_relative_se", 0.0101),
+            (5, None, "maximum_ensemble_ngp_mc_se", 0.0301),
+            (5, None, "maximum_ensemble_fs_mc_se", 0.0031),
+            (5, None, "maximum_ensemble_msd_relative_error", 0.1001),
+            (5, None, "maximum_ensemble_ngp_absolute_error", 0.3001),
+            (5, None, "maximum_ensemble_fs_absolute_error", 0.0301),
+            (4, None, "maximum_ensemble_ngp_absolute_error", 0.30),
+            (4, None, "maximum_ensemble_fs_absolute_error", 0.03),
+        )
+        for target, index, key, value in cases:
+            changed = copy.deepcopy(inputs)
+            selected = changed[target]
+            if index is None:
+                selected[key] = value
+            else:
+                selected[index][key] = value
+            with self.subTest(field=key, value=value):
+                result = module.classify_cage_anchor_gate(*changed)
+                self.assertEqual(result["cage_anchor_memory_required"], 0.0)
+
+    def test_combined_gate_recomputes_ordered_path_and_rejects_stale_flags(self):
+        module = self._module(
+            "summarize_ka_cage_anchor_gate.py",
+            "summarize_ka_cage_anchor_gate_ordered_path",
+        )
+        inputs = self._combined_gate_inputs()
+        accepted = module.classify_cage_anchor_gate(*inputs)
+        self.assertEqual(accepted["ordered_calibration_path_upper_bound_pass"], 1.0)
+
+        numeric_cases = (
+            ("maximum_ensemble_msd_relative_error", 0.1001),
+            ("maximum_ensemble_ngp_absolute_error", 0.3001),
+            ("maximum_ensemble_fs_absolute_error", 0.0301),
+        )
+        for key, value in numeric_cases:
+            changed = copy.deepcopy(inputs)
+            changed[6]["raw_curve_tolerance_pass"] = 1.0
+            changed[6]["curve_transfer_pass"] = 1.0
+            changed[6][key] = value
+            with self.subTest(field=key):
+                result = module.classify_cage_anchor_gate(*changed)
+                self.assertEqual(result["ordered_calibration_path_upper_bound_pass"], 0.0)
+                self.assertEqual(result["cage_anchor_memory_required"], 0.0)
+
+        provenance_cases = (
+            ("temperature", 0.58),
+            ("independent_replicate_count", 2.0),
+            ("heldout_path_used_in_prediction", 1.0),
+            ("macro_fit_parameter_count", 1.0),
+            ("calibration_path_distribution_used", 0.0),
+            ("microdynamic_closure_claim_allowed", 1.0),
+        )
+        for key, value in provenance_cases:
+            changed = copy.deepcopy(inputs)
+            changed[6][key] = value
+            with self.subTest(field=key), self.assertRaises(ValueError):
+                module.classify_cage_anchor_gate(*changed)
+
+    def test_cage_anchor_return_classifier_requires_all_scales_and_primary_null(self):
+        module = self._module(
+            "analyze_ka_cage_anchor_returns.py",
+            "analyze_ka_cage_anchor_returns_classifier",
+        )
+        low_rows = [
+            {
+                "replicate": float(replicate),
+                "radius_scale": scale,
+                "return_fraction": 0.70 + 0.01 * replicate,
+                "isotropic_null_fraction": 0.50,
+            }
+            for replicate in (1, 2, 3)
+            for scale in (0.5, 1.0, 1.5)
+        ]
+        high_rows = [
+            {
+                "replicate": float(replicate),
+                "radius_scale": scale,
+                "return_fraction": 0.40 + 0.01 * replicate,
+                "isotropic_null_fraction": 0.40,
+            }
+            for replicate in (1, 2, 3, 4, 5)
+            for scale in (0.5, 1.0, 1.5)
+        ]
+
+        verdict = module.classify_cage_anchor_returns(low_rows, high_rows)
+
+        self.assertEqual(verdict["all_radius_scales_separated"], 1.0)
+        self.assertEqual(verdict["primary_radius_null_excess_pass"], 1.0)
+        self.assertEqual(verdict["cage_anchor_return_signal_ready"], 1.0)
+        self.assertEqual(verdict["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(verdict["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(verdict["thermodynamic_claim_allowed"], 0.0)
+
+        low_rows[0]["return_fraction"] = 0.40
+        rejected = module.classify_cage_anchor_returns(low_rows, high_rows)
+        self.assertEqual(rejected["all_radius_scales_separated"], 0.0)
+        self.assertEqual(rejected["cage_anchor_return_signal_ready"], 0.0)
+
+    def test_recoil_seed_and_replicate_summary_are_deterministic_and_replicate_first(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_aggregation",
+        )
+        first = module.recoil_seed(781031, replicate=2, realization=3)
+        self.assertEqual(first, module.recoil_seed(781031, replicate=2, realization=3))
+        self.assertNotEqual(first, module.recoil_seed(781031, replicate=3, realization=3))
+        self.assertNotEqual(first, module.recoil_seed(781031, replicate=2, realization=4))
+
+        rows = [
+            {
+                "replicate": float(replicate),
+                "realization": float(realization),
+                "lag": 20.0,
+                "predicted_msd": msd,
+                "observed_msd": observed_msd,
+                "predicted_ngp": ngp,
+                "observed_ngp": 0.25,
+                "predicted_fs_k2": fs,
+                "observed_fs_k2": 0.65,
+            }
+            for replicate, observed_msd, values in (
+                (1, 2.0, ((1.0, 0.10, 0.80), (3.0, 0.30, 0.60))),
+                (2, 4.0, ((3.0, 0.20, 0.70), (5.0, 0.40, 0.50))),
+            )
+            for realization, (msd, ngp, fs) in enumerate(values)
+        ]
+
+        replicate_rows, summary_rows = module.summarize_recoil_realizations(
+            rows,
+            fs_keys=["observed_fs_k2"],
+        )
+
+        self.assertEqual(len(replicate_rows), 2)
+        self.assertEqual(len(summary_rows), 1)
+        self.assertAlmostEqual(replicate_rows[0]["predicted_msd"], 2.0)
+        self.assertAlmostEqual(replicate_rows[0]["predicted_msd_mc_se"], 1.0)
+        self.assertEqual(summary_rows[0]["independent_replicate_count"], 2.0)
+        self.assertAlmostEqual(summary_rows[0]["predicted_msd"], 3.0)
+        self.assertAlmostEqual(summary_rows[0]["observed_msd"], 3.0)
+        self.assertAlmostEqual(summary_rows[0]["ensemble_msd_relative_error"], 0.0)
+
+    def test_recoil_analysis_requires_frozen_block_size(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_function_block_size",
+        )
+        blocks = np.random.default_rng(701).normal(size=(2, 9, 3))
+        heldout = {
+            20: {
+                "observed_msd": 1.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            }
+        }
+
+        with self.assertRaisesRegex(ValueError, "exactly 20"):
+            module.analyze_replicate_recoil_paths(
+                blocks,
+                heldout,
+                replicate=1,
+                temperature=0.45,
+                block_size=10,
+                wave_numbers=np.array([2.0]),
+                fs_keys=["observed_fs_k2"],
+                surrogate_realizations=16,
+                base_seed=781031,
+            )
+
+    def test_recoil_analysis_requires_frozen_realization_count(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_function_realizations",
+        )
+        blocks = np.random.default_rng(703).normal(size=(2, 9, 3))
+        heldout = {
+            20: {
+                "observed_msd": 1.0,
+                "observed_ngp": 0.0,
+                "observed_fs_k2": 0.5,
+            }
+        }
+
+        with self.assertRaisesRegex(ValueError, "exactly 16"):
+            module.analyze_replicate_recoil_paths(
+                blocks,
+                heldout,
+                replicate=1,
+                temperature=0.45,
+                block_size=20,
+                wave_numbers=np.array([2.0]),
+                fs_keys=["observed_fs_k2"],
+                surrogate_realizations=15,
+                base_seed=781031,
+            )
+
+    def test_recoil_cli_requires_frozen_block_size(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_cli_block_size",
+        )
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            (root / "ensemble_manifest.json").write_text(
+                json.dumps({"temperature": 0.45, "replicates": []})
+            )
+
+            with self.assertRaisesRegex(ValueError, "exactly 20"):
+                module.main(
+                    [
+                        str(root),
+                        "--calibration-time",
+                        "160",
+                        "--heldout-factorization",
+                        str(root / "missing.csv"),
+                        "--block-size",
+                        "10",
+                        "--surrogate-realizations",
+                        "16",
+                        "--output-prefix",
+                        str(root / "output"),
+                    ]
+                )
+
+    def test_recoil_cli_requires_frozen_realization_count(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_cli_realizations",
+        )
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+
+            with self.assertRaisesRegex(ValueError, "exactly 16"):
+                module.main(
+                    [
+                        str(root),
+                        "--calibration-time",
+                        "160",
+                        "--heldout-factorization",
+                        str(root / "missing.csv"),
+                        "--block-size",
+                        "20",
+                        "--surrogate-realizations",
+                        "15",
+                        "--output-prefix",
+                        str(root / "output"),
+                    ]
+                )
+
+    def test_recoil_analysis_uses_only_calibration_paths_for_surrogate_kernels(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_provenance",
+        )
+        blocks = np.random.default_rng(721).normal(size=(4, 10, 3))
+        heldout = {}
+        for block_count in (1, 2):
+            observed = ka_replicates.cumulative_block_observables(
+                blocks,
+                block_count=block_count,
+                wave_numbers=np.array([2.0]),
+            )
+            heldout[20 * block_count] = {
+                "observed_msd": observed["msd"],
+                "observed_ngp": observed["ngp"],
+                "observed_fs_k2": observed["characteristic_k2"],
+            }
+
+        result = module.analyze_replicate_recoil_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=np.array([2.0]),
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=16,
+            base_seed=781031,
+        )
+
+        self.assertEqual(result, module.analyze_replicate_recoil_paths(
+            blocks,
+            heldout,
+            replicate=1,
+            temperature=0.45,
+            block_size=20,
+            wave_numbers=np.array([2.0]),
+            fs_keys=["observed_fs_k2"],
+            surrogate_realizations=16,
+            base_seed=781031,
+        ))
+        self.assertEqual(len(result["rows"]), 32)
+        self.assertEqual(len(result["quality_rows"]), 16)
+        self.assertTrue(
+            all(row["heldout_path_used_in_prediction"] == 0.0 for row in result["rows"])
+        )
+        self.assertTrue(
+            all(row["calibration_path_used_in_kernel"] == 1.0 for row in result["rows"])
+        )
+        self.assertTrue(
+            all(row["heldout_events_used_in_calibration"] == 0.0 for row in result["quality_rows"])
+        )
+        self.assertTrue(all(row["radial_bin_count"] == 8.0 for row in result["quality_rows"]))
+
+    def test_recoil_transfer_requires_quality_before_curve_decision(self):
+        module = self._module(
+            "analyze_ka_recoil_markov_transfer.py",
+            "analyze_ka_recoil_markov_transfer_classifier",
+        )
+        quality_rows = [
+            {
+                "replicate": float(replicate),
+                "realization": float(realization),
+                "radial_mean_relative_error": 0.01,
+                "radial_standard_deviation_relative_error": 0.01,
+                "lag_one_cosine_mean_absolute_error": 0.01,
+                "lag_one_cosine_quantile_maximum_absolute_error": 0.01,
+                "normalized_lag_one_dot_correlation_absolute_error": 0.01,
+            }
+            for replicate in (1, 2, 3)
+            for realization in range(16)
+        ]
+        summary_rows = [
+            {
+                "lag": 20.0,
+                "ensemble_msd_relative_error": 0.05,
+                "ensemble_ngp_absolute_error": 0.10,
+                "ensemble_absolute_error_fs_k2": 0.02,
+                "ensemble_msd_mc_relative_se": 0.005,
+                "ensemble_ngp_mc_se": 0.02,
+                "ensemble_fs_k2_mc_se": 0.002,
+            }
+        ]
+
+        quality_rows[0]["radial_mean_relative_error"] = 0.03
+        verdict = module.classify_recoil_transfer(
+            quality_rows,
+            summary_rows,
+            required_replicate_count=3,
+            required_realization_count=16,
+        )
+
+        self.assertEqual(verdict["quality_pass"], 0.0)
+        self.assertEqual(verdict["curve_transfer_pass"], 0.0)
+        self.assertEqual(verdict["mechanism_state"], "unresolved_quality")
+        self.assertEqual(verdict["cage_anchor_memory_required"], 0.0)
+
+        quality_rows[0]["radial_mean_relative_error"] = 0.01
+        accepted = module.classify_recoil_transfer(
+            quality_rows,
+            summary_rows,
+            required_replicate_count=3,
+            required_realization_count=16,
+        )
+        self.assertEqual(accepted["quality_pass"], 1.0)
+        self.assertEqual(accepted["curve_transfer_pass"], 1.0)
+        self.assertEqual(accepted["mechanism_state"], "curve_closed")
+        self.assertEqual(accepted["radial_bin_count"], 8.0)
+        self.assertEqual(accepted["microdynamic_closure_claim_allowed"], 0.0)
+        self.assertEqual(accepted["spatial_facilitation_claim_allowed"], 0.0)
+        self.assertEqual(accepted["thermodynamic_claim_allowed"], 0.0)
 
 
 if __name__ == "__main__":

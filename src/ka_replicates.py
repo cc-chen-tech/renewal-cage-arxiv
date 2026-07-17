@@ -453,6 +453,208 @@ def direction_randomized_block_observables(
     return result
 
 
+def _validate_spectral_block_path(
+    block_displacements: np.ndarray,
+    *,
+    name: str,
+) -> np.ndarray:
+    displacements = np.asarray(block_displacements, dtype=float)
+    if (
+        displacements.ndim != 3
+        or displacements.shape[0] < 1
+        or displacements.shape[1] < 2
+        or displacements.shape[2] < 1
+        or np.any(~np.isfinite(displacements))
+    ):
+        raise ValueError(
+            f"{name} must be a finite particle-block-vector array with at least two blocks"
+        )
+    return displacements
+
+
+def _validate_spectral_block_path_pair(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    reference = _validate_spectral_block_path(reference, name="reference")
+    candidate = _validate_spectral_block_path(candidate, name="candidate")
+    if candidate.shape != reference.shape:
+        raise ValueError("reference and candidate block paths must have equal shapes")
+    return reference, candidate
+
+
+def cross_spectral_matrix_nrmse(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> float:
+    """Return normalized error between particle-resolved spectral matrices."""
+
+    reference, candidate = _validate_spectral_block_path_pair(reference, candidate)
+    reference_fft = np.fft.rfft(reference, axis=1)
+    candidate_fft = np.fft.rfft(candidate, axis=1)
+    reference_matrix = reference_fft[:, :, :, np.newaxis] * np.conjugate(
+        reference_fft[:, :, np.newaxis, :]
+    )
+    candidate_matrix = candidate_fft[:, :, :, np.newaxis] * np.conjugate(
+        candidate_fft[:, :, np.newaxis, :]
+    )
+    scale = float(np.sqrt(np.mean(np.abs(reference_matrix) ** 2)))
+    if scale == 0.0:
+        raise ValueError("reference block path must have nonzero spectral energy")
+    return float(np.sqrt(np.mean(np.abs(candidate_matrix - reference_matrix) ** 2)) / scale)
+
+
+def shared_phase_spectral_projection(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> np.ndarray:
+    """Project a path onto the reference amplitudes and relative channel phases."""
+
+    reference, candidate = _validate_spectral_block_path_pair(reference, candidate)
+    reference_fft = np.fft.rfft(reference, axis=1)
+    candidate_fft = np.fft.rfft(candidate, axis=1)
+    reference_amplitude = np.abs(reference_fft)
+    candidate_amplitude = np.abs(candidate_fft)
+    epsilon = np.finfo(float).eps
+    reference_unit = np.divide(
+        reference_fft,
+        reference_amplitude,
+        out=np.ones_like(reference_fft),
+        where=reference_amplitude > epsilon,
+    )
+    candidate_unit = np.divide(
+        candidate_fft,
+        candidate_amplitude,
+        out=np.ones_like(candidate_fft),
+        where=candidate_amplitude > epsilon,
+    )
+    common_phase = np.sum(
+        reference_amplitude**2 * candidate_unit * np.conjugate(reference_unit),
+        axis=2,
+    )
+    common_phase = np.divide(
+        common_phase,
+        np.abs(common_phase),
+        out=np.ones_like(common_phase),
+        where=np.abs(common_phase) > epsilon,
+    )
+    projected_fft = reference_amplitude * reference_unit * common_phase[:, :, np.newaxis]
+    return np.fft.irfft(projected_fft, n=reference.shape[1], axis=1)
+
+
+def phase_randomized_cross_spectrum(
+    reference: np.ndarray,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Randomize common Fourier phases while preserving every spectral matrix."""
+
+    reference = _validate_spectral_block_path(reference, name="reference")
+    if not isinstance(rng, np.random.Generator):
+        raise ValueError("rng must be a NumPy Generator")
+    reference_fft = np.fft.rfft(reference, axis=1)
+    angles = rng.uniform(0.0, 2.0 * math.pi, size=reference_fft.shape[:2])
+    phase = np.exp(1j * angles)
+    phase[:, 0] = 1.0
+    if reference.shape[1] % 2 == 0:
+        phase[:, -1] = rng.choice(np.array([-1.0, 1.0]), size=reference.shape[0])
+    return np.fft.irfft(
+        reference_fft * phase[:, :, np.newaxis],
+        n=reference.shape[1],
+        axis=1,
+    )
+
+
+def radial_rank_projection(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> np.ndarray:
+    """Restore each particle's radius multiset while retaining candidate directions."""
+
+    reference, candidate = _validate_spectral_block_path_pair(reference, candidate)
+    reference_radii = np.sort(np.linalg.norm(reference, axis=2), axis=1)
+    candidate_radii = np.linalg.norm(candidate, axis=2)
+    candidate_order = np.argsort(candidate_radii, axis=1)
+    assigned_radii = np.empty_like(candidate_radii)
+    np.put_along_axis(assigned_radii, candidate_order, reference_radii, axis=1)
+    zero_direction = candidate_radii == 0.0
+    if np.any(zero_direction & (assigned_radii > 0.0)):
+        raise ValueError("candidate contains a zero direction for a positive assigned radius")
+    directions = np.divide(
+        candidate,
+        candidate_radii[:, :, np.newaxis],
+        out=np.zeros_like(candidate),
+        where=candidate_radii[:, :, np.newaxis] > 0.0,
+    )
+    return directions * assigned_radii[:, :, np.newaxis]
+
+
+def radial_multivariate_surrogate(
+    reference: np.ndarray,
+    rng: np.random.Generator,
+    *,
+    iteration_count: int,
+) -> dict[str, object]:
+    """Iteratively preserve radial disorder and the multichannel path spectrum."""
+
+    reference = _validate_spectral_block_path(reference, name="reference")
+    if not isinstance(rng, np.random.Generator):
+        raise ValueError("rng must be a NumPy Generator")
+    if (
+        isinstance(iteration_count, bool)
+        or not isinstance(iteration_count, int)
+        or iteration_count < 1
+    ):
+        raise ValueError("iteration_count must be a positive integer")
+    surrogate = within_particle_time_shuffle(reference, rng)
+    initial_error = cross_spectral_matrix_nrmse(reference, surrogate)
+    for _ in range(iteration_count):
+        surrogate = radial_rank_projection(
+            reference,
+            shared_phase_spectral_projection(reference, surrogate),
+        )
+    final_error = cross_spectral_matrix_nrmse(reference, surrogate)
+    radial_error = float(
+        np.max(
+            np.abs(
+                np.sort(np.linalg.norm(surrogate, axis=2), axis=1)
+                - np.sort(np.linalg.norm(reference, axis=2), axis=1)
+            )
+        )
+    )
+    return {
+        "displacements": surrogate,
+        "iteration_count": float(iteration_count),
+        "initial_cross_spectral_matrix_nrmse": initial_error,
+        "cross_spectral_matrix_nrmse": final_error,
+        "radial_distribution_maximum_absolute_error": radial_error,
+    }
+
+
+def fourth_cumulant_scattering(
+    msd: np.ndarray,
+    ngp: np.ndarray,
+    wave_number: float,
+) -> np.ndarray:
+    """Fourth-order isotropic cumulant expansion of one-component scattering."""
+
+    msd = np.asarray(msd, dtype=float)
+    ngp = np.asarray(ngp, dtype=float)
+    if msd.shape != ngp.shape or msd.size < 1:
+        raise ValueError("msd and ngp must be nonempty aligned arrays")
+    if np.any(~np.isfinite(msd)) or np.any(msd < 0.0):
+        raise ValueError("msd must be finite and nonnegative")
+    if np.any(~np.isfinite(ngp)) or np.any(ngp <= -1.0):
+        raise ValueError("ngp must be finite and greater than -1")
+    if not math.isfinite(wave_number) or wave_number <= 0.0:
+        raise ValueError("wave_number must be positive and finite")
+    exponent = (
+        -(wave_number**2) * msd / 6.0
+        + wave_number**4 * ngp * msd**2 / 72.0
+    )
+    with np.errstate(over="ignore"):
+        return np.exp(exponent)
+
+
 def particle_event_count_matrix(
     events: dict[str, np.ndarray],
     *,
@@ -2314,6 +2516,317 @@ def extract_debye_waller_cage_jumps(
         "jump_duration": np.array([event[8] for event in retained], dtype=float),
         "pre_cage_duration": np.array([event[9] for event in retained], dtype=float),
         "post_cage_duration": np.array([event[10] for event in retained], dtype=float),
+    }
+
+
+def consecutive_cage_anchor_returns(
+    events: dict[str, np.ndarray],
+    *,
+    debye_waller_factor: float,
+    radius_scale: float,
+) -> dict[str, float]:
+    """Measure consecutive cage-center returns against a length-preserving null."""
+
+    if not math.isfinite(debye_waller_factor) or debye_waller_factor <= 0.0:
+        raise ValueError("debye_waller_factor must be positive and finite")
+    if not math.isfinite(radius_scale) or radius_scale <= 0.0:
+        raise ValueError("radius_scale must be positive and finite")
+    try:
+        particles = np.asarray(events["particle"])
+        times = np.asarray(events["time"], dtype=float)
+        jumps = np.asarray(events["jump_vector"], dtype=float)
+    except KeyError as error:
+        raise ValueError(f"events must contain {error.args[0]!r}") from error
+    if (
+        particles.ndim != 1
+        or times.shape != particles.shape
+        or jumps.shape != (len(particles), 3)
+        or len(particles) < 2
+    ):
+        raise ValueError("events must contain aligned particle, time, and three-dimensional jump vectors")
+    if not np.issubdtype(particles.dtype, np.integer) or np.any(particles < 0):
+        raise ValueError("event particles must be nonnegative integers")
+    if np.any(~np.isfinite(times)) or np.any(~np.isfinite(jumps)):
+        raise ValueError("event times and jump vectors must be finite")
+    if np.any(np.diff(particles) < 0):
+        raise ValueError("events must be grouped by particle")
+    adjacent = particles[:-1] == particles[1:]
+    if np.any(np.diff(times)[adjacent] <= 0.0):
+        raise ValueError("event times must increase within each particle")
+    pair_indices = np.flatnonzero(adjacent)
+    if len(pair_indices) == 0:
+        raise ValueError("at least one consecutive same-particle event pair is required")
+
+    first = jumps[pair_indices]
+    second = jumps[pair_indices + 1]
+    first_length = np.linalg.norm(first, axis=1)
+    second_length = np.linalg.norm(second, axis=1)
+    if np.any(first_length <= 0.0) or np.any(second_length <= 0.0):
+        raise ValueError("consecutive jump vectors must be nonzero")
+    threshold = radius_scale * math.sqrt(debye_waller_factor)
+    returned = np.linalg.norm(first + second, axis=1) <= threshold
+    cosine_limit = (
+        threshold**2 - first_length**2 - second_length**2
+    ) / (2.0 * first_length * second_length)
+    isotropic_probability = np.clip((cosine_limit + 1.0) / 2.0, 0.0, 1.0)
+
+    run_lengths: list[int] = []
+    run_durations: list[float] = []
+    run_start: int | None = None
+    previous_pair_index: int | None = None
+    for pair_index, is_return in zip(pair_indices, returned):
+        if is_return and (previous_pair_index is None or pair_index == previous_pair_index + 1):
+            if run_start is None:
+                run_start = int(pair_index)
+        elif is_return:
+            if run_start is not None:
+                run_length = previous_pair_index - run_start + 1
+                run_lengths.append(run_length)
+                run_durations.append(float(times[previous_pair_index + 1] - times[run_start]))
+            run_start = int(pair_index)
+        elif run_start is not None:
+            run_length = previous_pair_index - run_start + 1
+            run_lengths.append(run_length)
+            run_durations.append(float(times[previous_pair_index + 1] - times[run_start]))
+            run_start = None
+        previous_pair_index = int(pair_index) if is_return else None
+    if run_start is not None and previous_pair_index is not None:
+        run_length = previous_pair_index - run_start + 1
+        run_lengths.append(run_length)
+        run_durations.append(float(times[previous_pair_index + 1] - times[run_start]))
+
+    return_fraction = float(np.mean(returned))
+    isotropic_null_fraction = float(np.mean(isotropic_probability))
+    return_run_mean = float(np.mean(run_lengths)) if run_lengths else 0.0
+    geometric_return_run_mean = (
+        math.inf if return_fraction == 1.0 else 1.0 / (1.0 - return_fraction)
+    )
+    duration_values = np.asarray(run_durations, dtype=float)
+    return {
+        "radius_threshold": threshold,
+        "pair_count": float(len(pair_indices)),
+        "return_count": float(np.sum(returned)),
+        "return_fraction": return_fraction,
+        "isotropic_null_fraction": isotropic_null_fraction,
+        "return_excess_ratio": (
+            return_fraction / isotropic_null_fraction
+            if isotropic_null_fraction > 0.0
+            else 0.0
+        ),
+        "return_run_count": float(len(run_lengths)),
+        "return_run_mean": return_run_mean,
+        "geometric_return_run_mean": geometric_return_run_mean,
+        "mean_return_run_duration": float(np.mean(duration_values)) if len(duration_values) else 0.0,
+        "return_run_duration_p50": float(np.quantile(duration_values, 0.50)) if len(duration_values) else 0.0,
+        "return_run_duration_p75": float(np.quantile(duration_values, 0.75)) if len(duration_values) else 0.0,
+        "return_run_duration_p90": float(np.quantile(duration_values, 0.90)) if len(duration_values) else 0.0,
+        "return_run_duration_p95": float(np.quantile(duration_values, 0.95)) if len(duration_values) else 0.0,
+    }
+
+
+def _validate_radial_recoil_block_path(
+    block_displacements: np.ndarray,
+    *,
+    name: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Validate a nondegenerate three-dimensional block path for the recoil null."""
+
+    try:
+        displacements = np.asarray(block_displacements, dtype=float)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} must be a finite three-dimensional block path") from error
+    if (
+        displacements.ndim != 3
+        or displacements.shape[0] < 1
+        or displacements.shape[1] < 2
+        or displacements.shape[2] != 3
+        or np.any(~np.isfinite(displacements))
+    ):
+        raise ValueError(
+            f"{name} must be a finite particle-block array of three-dimensional vectors"
+        )
+    radii = np.linalg.norm(displacements, axis=2)
+    if np.any(radii <= 0.0):
+        raise ValueError(f"{name} must contain only nonzero vectors")
+    return displacements, radii
+
+
+def _radial_recoil_source_bin(
+    source_radii: np.ndarray,
+    current_radius: float,
+    radial_bin_count: int,
+) -> int:
+    """Assign one generated source radius to the matching empirical equal-count bin."""
+
+    rank = int(np.searchsorted(source_radii, current_radius, side="left"))
+    minimum_group_size, longer_group_count = divmod(len(source_radii), radial_bin_count)
+    group_lengths = np.full(radial_bin_count, minimum_group_size, dtype=int)
+    group_lengths[:longer_group_count] += 1
+    split_boundaries = np.cumsum(group_lengths)
+    return min(
+        radial_bin_count - 1,
+        int(np.searchsorted(split_boundaries, rank, side="right")),
+    )
+
+
+def _isotropic_azimuth_directions(
+    source_vectors: np.ndarray,
+    relative_cosines: np.ndarray,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Vectorized fixed-polar-angle directions with uniform three-dimensional azimuths."""
+
+    source_radii = np.linalg.norm(source_vectors, axis=1)
+    source_directions = source_vectors / source_radii[:, None]
+    basis = np.zeros_like(source_directions)
+    rows = np.arange(len(source_directions))
+    basis[rows, np.argmin(np.abs(source_directions), axis=1)] = 1.0
+    first_perpendicular = np.cross(source_directions, basis)
+    first_perpendicular /= np.linalg.norm(first_perpendicular, axis=1)[:, None]
+    second_perpendicular = np.cross(source_directions, first_perpendicular)
+    azimuths = rng.uniform(0.0, 2.0 * math.pi, size=len(source_directions))
+    transverse = np.sqrt(np.maximum(0.0, 1.0 - relative_cosines**2))
+    return (
+        relative_cosines[:, None] * source_directions
+        + transverse[:, None]
+        * (
+            np.cos(azimuths)[:, None] * first_perpendicular
+            + np.sin(azimuths)[:, None] * second_perpendicular
+        )
+    )
+
+
+def radial_recoil_markov_surrogate(
+    block_displacements: np.ndarray,
+    rng: np.random.Generator,
+    radial_bin_count: int,
+) -> np.ndarray:
+    """Sample a particle-local radial recoil Markov path with isotropic azimuths."""
+
+    displacements, radii = _validate_radial_recoil_block_path(
+        block_displacements,
+        name="block_displacements",
+    )
+    if not isinstance(rng, np.random.Generator):
+        raise ValueError("rng must be a NumPy Generator")
+    transition_count = displacements.shape[1] - 1
+    if (
+        isinstance(radial_bin_count, bool)
+        or not isinstance(radial_bin_count, int)
+        or not 1 <= radial_bin_count <= transition_count
+    ):
+        raise ValueError("radial_bin_count must be a positive integer no larger than transitions")
+
+    source_order = np.argsort(radii[:, :-1], axis=1)
+    sorted_source_radii = np.take_along_axis(radii[:, :-1], source_order, axis=1)
+    minimum_group_size, longer_group_count = divmod(transition_count, radial_bin_count)
+    group_lengths = np.full(radial_bin_count, minimum_group_size, dtype=int)
+    group_lengths[:longer_group_count] += 1
+    group_starts = np.concatenate(([0], np.cumsum(group_lengths)[:-1]))
+    group_boundaries = np.cumsum(group_lengths)
+    particle_indices = np.arange(displacements.shape[0])
+    surrogate = np.empty_like(displacements)
+    surrogate[:, 0] = displacements[:, 0]
+    for block_index in range(1, displacements.shape[1]):
+        previous = surrogate[:, block_index - 1]
+        previous_radii = np.linalg.norm(previous, axis=1)
+        ranks = np.count_nonzero(
+            sorted_source_radii < previous_radii[:, None],
+            axis=1,
+        )
+        bin_indices = np.searchsorted(group_boundaries, ranks, side="right")
+        bin_indices = np.minimum(bin_indices, radial_bin_count - 1)
+        offsets = np.floor(
+            rng.random(len(particle_indices)) * group_lengths[bin_indices]
+        ).astype(int)
+        sampled_ranks = group_starts[bin_indices] + offsets
+        sampled_sources = source_order[particle_indices, sampled_ranks]
+        targets = displacements[particle_indices, sampled_sources + 1]
+        relative_cosines = np.sum(
+            displacements[particle_indices, sampled_sources] * targets,
+            axis=1,
+        ) / (
+            radii[particle_indices, sampled_sources]
+            * radii[particle_indices, sampled_sources + 1]
+        )
+        target_radii = radii[particle_indices, sampled_sources + 1]
+        surrogate[:, block_index] = (
+            target_radii[:, None]
+            * _isotropic_azimuth_directions(
+                previous,
+                np.clip(relative_cosines, -1.0, 1.0),
+                rng,
+            )
+        )
+    return surrogate
+
+
+def radial_recoil_markov_quality(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+) -> dict[str, float]:
+    """Report the one-step radial and recoil-law errors used by the transfer gate."""
+
+    reference, reference_radii = _validate_radial_recoil_block_path(
+        reference,
+        name="reference",
+    )
+    candidate, candidate_radii = _validate_radial_recoil_block_path(
+        candidate,
+        name="candidate",
+    )
+    if reference.shape != candidate.shape:
+        raise ValueError("reference and candidate block paths must have equal shapes")
+
+    reference_radial_mean = float(np.mean(reference_radii))
+    reference_radial_standard_deviation = float(np.std(reference_radii))
+    if reference_radial_standard_deviation == 0.0:
+        raise ValueError("reference radial standard deviation must be positive")
+    candidate_radial_mean = float(np.mean(candidate_radii))
+    candidate_radial_standard_deviation = float(np.std(candidate_radii))
+
+    def lag_one_cosines(vectors: np.ndarray, radii: np.ndarray) -> np.ndarray:
+        return np.sum(vectors[:, :-1] * vectors[:, 1:], axis=2) / (
+            radii[:, :-1] * radii[:, 1:]
+        )
+
+    reference_cosines = lag_one_cosines(reference, reference_radii)
+    candidate_cosines = lag_one_cosines(candidate, candidate_radii)
+    quantile_errors = {
+        quantile: abs(
+            float(np.quantile(candidate_cosines, quantile))
+            - float(np.quantile(reference_cosines, quantile))
+        )
+        for quantile in (0.10, 0.25, 0.50, 0.75, 0.90)
+    }
+    reference_dot_correlation = float(
+        np.mean(np.sum(reference[:, :-1] * reference[:, 1:], axis=2))
+    )
+    candidate_dot_correlation = float(
+        np.mean(np.sum(candidate[:, :-1] * candidate[:, 1:], axis=2))
+    )
+    reference_msd = float(np.mean(reference_radii**2))
+    candidate_msd = float(np.mean(candidate_radii**2))
+    return {
+        "radial_mean_relative_error": abs(
+            candidate_radial_mean / reference_radial_mean - 1.0
+        ),
+        "radial_standard_deviation_relative_error": abs(
+            candidate_radial_standard_deviation / reference_radial_standard_deviation - 1.0
+        ),
+        "lag_one_cosine_mean_absolute_error": abs(
+            float(np.mean(candidate_cosines)) - float(np.mean(reference_cosines))
+        ),
+        "lag_one_cosine_quantile_0p10_absolute_error": quantile_errors[0.10],
+        "lag_one_cosine_quantile_0p25_absolute_error": quantile_errors[0.25],
+        "lag_one_cosine_quantile_0p50_absolute_error": quantile_errors[0.50],
+        "lag_one_cosine_quantile_0p75_absolute_error": quantile_errors[0.75],
+        "lag_one_cosine_quantile_0p90_absolute_error": quantile_errors[0.90],
+        "lag_one_cosine_quantile_maximum_absolute_error": max(quantile_errors.values()),
+        "normalized_lag_one_dot_correlation_absolute_error": abs(
+            candidate_dot_correlation / candidate_msd
+            - reference_dot_correlation / reference_msd
+        ),
     }
 
 

@@ -12,9 +12,136 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from build_arxiv_package import build_arxiv_package  # noqa: E402
+from summarize_ka_cage_anchor_gate import classify_cage_anchor_gate  # noqa: E402
+from summarize_ka_anchor_semi_markov_gate import (  # noqa: E402
+    classify_anchor_semi_markov_gate,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        prefixes = {
+            "low": data / "renewal_cage_ka_replicates_T045_anchor_semi_markov",
+            "high": data / "renewal_cage_ka_replicates_T058_anchor_semi_markov",
+        }
+        tables = {}
+        for label, prefix in prefixes.items():
+            tables[label] = {}
+            for suffix in (
+                "transitions",
+                "quality",
+                "realizations",
+                "rows",
+                "summary",
+                "verdict",
+            ):
+                path = prefix.with_name(f"{prefix.name}_{suffix}.csv")
+                self.assertTrue(path.is_file(), path)
+                with path.open() as handle:
+                    tables[label][suffix] = list(csv.DictReader(handle))
+
+        gate_path = data / "renewal_cage_ka_anchor_semi_markov_gate.csv"
+        sota_path = data / "renewal_cage_ka_anchor_semi_markov_sota_audit.csv"
+        svg_path = ROOT / "figures" / "renewal_cage_ka_anchor_semi_markov_gate.svg"
+        self.assertTrue(gate_path.is_file())
+        self.assertTrue(sota_path.is_file())
+        self.assertTrue(svg_path.is_file())
+        with gate_path.open() as handle:
+            stored = next(csv.DictReader(handle))
+        with sota_path.open() as handle:
+            sota_rows = list(csv.DictReader(handle))
+        with (
+            data / "renewal_cage_ka_replicates_T045_recoil_markov_rows.csv"
+        ).open() as handle:
+            low_recoil_rows = list(csv.DictReader(handle))
+        recoil_verdicts = []
+        empirical_verdicts = []
+        for label in ("T045", "T058"):
+            with (
+                data / f"renewal_cage_ka_replicates_{label}_recoil_markov_verdict.csv"
+            ).open() as handle:
+                recoil_verdicts.extend(csv.DictReader(handle))
+            with (
+                data / f"renewal_cage_ka_replicates_{label}_empirical_path_verdict.csv"
+            ).open() as handle:
+                empirical_verdicts.extend(
+                    row
+                    for row in csv.DictReader(handle)
+                    if row["model"] == "contiguous_empirical_path"
+                )
+        recomputed = classify_anchor_semi_markov_gate(
+            low_quality_rows=tables["low"]["quality"],
+            low_summary_rows=tables["low"]["summary"],
+            low_replicate_rows=tables["low"]["rows"],
+            high_quality_rows=tables["high"]["quality"],
+            high_summary_rows=tables["high"]["summary"],
+            high_replicate_rows=tables["high"]["rows"],
+            low_recoil_rows=low_recoil_rows,
+            recoil_verdict_rows=recoil_verdicts,
+            empirical_verdict_rows=empirical_verdicts,
+        )
+
+        self.assertEqual(len(tables["low"]["quality"]), 3 * 16 * 2)
+        self.assertEqual(len(tables["high"]["quality"]), 5 * 16 * 2)
+        for label, replicate_count in (("low", 3), ("high", 5)):
+            quality = tables[label]["quality"]
+            for model in (
+                "anchor_aware_semi_markov",
+                "state_schedule_without_anchor_geometry",
+            ):
+                grid = {
+                    (int(float(row["replicate"])), int(float(row["realization"])))
+                    for row in quality
+                    if row["model"] == model
+                }
+                self.assertEqual(
+                    grid,
+                    {
+                        (replicate, realization)
+                        for replicate in range(1, replicate_count + 1)
+                        for realization in range(16)
+                    },
+                )
+            for suffix in ("quality", "realizations", "rows", "summary", "verdict"):
+                for row in tables[label][suffix]:
+                    self.assertEqual(float(row["microdynamic_closure_claim_allowed"]), 0.0)
+                    self.assertEqual(float(row["spatial_facilitation_claim_allowed"]), 0.0)
+                    self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            for row in tables[label]["quality"]:
+                self.assertEqual(float(row["calibration_events_only"]), 1.0)
+                self.assertEqual(float(row["external_cage_channel_used"]), 1.0)
+                self.assertEqual(float(row["calibration_cage_residual_transfer"]), 1.0)
+                self.assertEqual(float(row["heldout_events_used_in_calibration"]), 0.0)
+                self.assertEqual(float(row["heldout_cage_residual_used_in_prediction"]), 0.0)
+
+        self.assertEqual(stored["mechanism_state"], recomputed["mechanism_state"])
+        self.assertEqual(stored["mechanism_state"], "anchor_aware_model_rejected")
+        self.assertEqual(len(sota_rows), 4)
+        self.assertEqual(
+            {row["alignment"] for row in sota_rows},
+            {
+                "consistent_event_signal",
+                "consistent_missing_memory",
+                "consistent_nonseparability_warning",
+                "consistent_need_for_richer_escape_path",
+            },
+        )
+        self.assertTrue(all(row["primary_url"].startswith("https://doi.org/") for row in sota_rows))
+        for key in (
+            "provenance_and_competitor_completeness_pass",
+            "all_low_anchor_replicates_improve_over_recoil",
+            "microdynamic_closure_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(stored[key]), float(recomputed[key]))
+        svg = svg_path.read_text()
+        self.assertIn("Anchor-aware semi-Markov held-out gate", svg)
+        self.assertIn("anchor_aware_model_rejected", svg)
+        self.assertNotIn("nan", svg.lower())
+        self.assertNotIn("inf", svg.lower())
+
     def test_softmode_precursor_residual_gate_is_complete(self):
         document_path = ROOT / "docs" / "microscopic-softmode-precursor-residual.md"
         summary_path = (
@@ -284,7 +411,270 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertGreater(
             float(summary["minimum_cross_epsilon_covariance_correlation"]), 0.9999
         )
+    def test_cage_anchor_gate_artifacts_enforce_frozen_crossover(self):
+        data = ROOT / "data"
+        figure = ROOT / "figures" / "renewal_cage_ka_cage_anchor_gate.svg"
+        return_rows_path = data / "renewal_cage_ka_cage_anchor_returns_rows.csv"
+        return_verdict_path = data / "renewal_cage_ka_cage_anchor_returns_verdict.csv"
+        recoil_prefixes = {
+            "low": data / "renewal_cage_ka_replicates_T045_recoil_markov",
+            "high": data / "renewal_cage_ka_replicates_T058_recoil_markov",
+        }
+        gate_path = data / "renewal_cage_ka_cage_anchor_gate.csv"
+        ordered_path = data / "renewal_cage_ka_replicates_T045_empirical_path_verdict.csv"
 
+        with return_rows_path.open() as handle:
+            return_rows = list(csv.DictReader(handle))
+        with return_verdict_path.open() as handle:
+            return_verdict = next(csv.DictReader(handle))
+        recoil = {}
+        for temperature, prefix in recoil_prefixes.items():
+            tables = {}
+            for suffix in ("rows", "quality", "summary", "verdict"):
+                with prefix.with_name(f"{prefix.name}_{suffix}.csv").open() as handle:
+                    tables[suffix] = list(csv.DictReader(handle))
+            recoil[temperature] = tables
+        with gate_path.open() as handle:
+            gate = next(csv.DictReader(handle))
+        with ordered_path.open() as handle:
+            ordered = next(
+                row
+                for row in csv.DictReader(handle)
+                if row["model"] == "contiguous_empirical_path"
+            )
+
+        self.assertEqual(len(return_rows), 24)
+        self.assertEqual(len(recoil["low"]["quality"]), 48)
+        self.assertEqual(len(recoil["high"]["quality"]), 80)
+        self.assertEqual(float(return_verdict["low_temperature_replicate_count"]), 3.0)
+        self.assertEqual(float(return_verdict["high_temperature_replicate_count"]), 5.0)
+        self.assertEqual(float(return_verdict["all_radius_scales_separated"]), 1.0)
+        self.assertEqual(float(return_verdict["primary_radius_null_excess_pass"]), 1.0)
+        self.assertGreaterEqual(
+            float(return_verdict["minimum_primary_low_return_excess_ratio"]),
+            1.35,
+        )
+        self.assertEqual({float(row["radius_scale"]) for row in return_rows}, {0.5, 1.0, 1.5})
+
+        for temperature, expected_count, calibration_time in (
+            ("low", 3.0, 5000.0),
+            ("high", 5.0, 750.0),
+        ):
+            verdict = recoil[temperature]["verdict"][0]
+            quality = recoil[temperature]["quality"]
+            self.assertEqual(float(verdict["independent_replicate_count"]), expected_count)
+            self.assertEqual(float(verdict["calibration_time"]), calibration_time)
+            self.assertEqual(float(verdict["block_size"]), 20.0)
+            self.assertEqual(float(verdict["radial_bin_count"]), 8.0)
+            self.assertEqual(float(verdict["required_realizations_per_replicate"]), 16.0)
+            self.assertEqual(float(verdict["quality_realization_completeness_pass"]), 1.0)
+            self.assertEqual(float(verdict["quality_pass"]), 1.0)
+            self.assertEqual(float(verdict["precision_pass"]), 1.0)
+            self.assertLessEqual(float(verdict["maximum_ensemble_msd_mc_relative_se"]), 0.01)
+            self.assertLessEqual(float(verdict["maximum_ensemble_ngp_mc_se"]), 0.03)
+            self.assertLessEqual(float(verdict["maximum_ensemble_fs_mc_se"]), 0.003)
+            self.assertLessEqual(max(float(row["radial_mean_relative_error"]) for row in quality), 0.02)
+            self.assertLessEqual(max(float(row["radial_standard_deviation_relative_error"]) for row in quality), 0.02)
+            self.assertLessEqual(max(float(row["lag_one_cosine_mean_absolute_error"]) for row in quality), 0.02)
+            self.assertLessEqual(max(float(row["lag_one_cosine_quantile_maximum_absolute_error"]) for row in quality), 0.03)
+            self.assertLessEqual(max(float(row["normalized_lag_one_dot_correlation_absolute_error"]) for row in quality), 0.02)
+            self.assertTrue(all(float(row["radial_bin_count"]) == 8.0 for row in quality))
+            self.assertTrue(all(float(row["replicate_first_aggregation"]) == 1.0 for row in recoil[temperature]["summary"]))
+
+        low = recoil["low"]["verdict"][0]
+        high = recoil["high"]["verdict"][0]
+        self.assertGreater(float(low["maximum_ensemble_ngp_absolute_error"]), 0.30)
+        self.assertGreater(float(low["maximum_ensemble_fs_absolute_error"]), 0.03)
+        self.assertEqual(float(high["curve_transfer_pass"]), 1.0)
+        self.assertLessEqual(float(high["maximum_ensemble_msd_relative_error"]), 0.10)
+        self.assertLessEqual(float(high["maximum_ensemble_ngp_absolute_error"]), 0.30)
+        self.assertLessEqual(float(high["maximum_ensemble_fs_absolute_error"]), 0.03)
+
+        for key, expected in (
+            ("block_size", 20.0),
+            ("radial_bin_count", 8.0),
+            ("recoil_realizations_per_replicate", 16.0),
+            ("primary_radius_scale", 1.0),
+            ("msd_relative_error_tolerance", 0.10),
+            ("ngp_absolute_error_tolerance", 0.30),
+            ("fs_absolute_error_tolerance", 0.03),
+        ):
+            self.assertEqual(float(gate[key]), expected)
+        self.assertEqual(float(gate["ordered_calibration_path_upper_bound_pass"]), 1.0)
+        self.assertEqual(float(gate["cage_anchor_memory_required"]), 1.0)
+        self.assertEqual(gate["mechanism_state"], "cage_anchor_memory_required")
+        recomputed = classify_cage_anchor_gate(
+            [row for row in return_rows if float(row["temperature"]) == 0.45],
+            [row for row in return_rows if float(row["temperature"]) == 0.58],
+            recoil["low"]["quality"],
+            recoil["high"]["quality"],
+            recoil["low"]["verdict"][0],
+            recoil["high"]["verdict"][0],
+            ordered,
+        )
+        self.assertEqual(set(recomputed), set(gate))
+        for key, value in recomputed.items():
+            if isinstance(value, str):
+                self.assertEqual(gate[key], value)
+            else:
+                self.assertEqual(float(gate[key]), value)
+        for key in (
+            "microdynamic_closure_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(gate[key]), 0.0)
+            self.assertTrue(all(float(row[key]) == 0.0 for row in return_rows))
+            for tables in recoil.values():
+                for table in tables.values():
+                    self.assertTrue(all(float(row[key]) == 0.0 for row in table))
+
+        svg = figure.read_text()
+        self.assertIn("Cooling-induced cage-anchor memory gate", svg)
+        self.assertIn("T=0.45", svg)
+        self.assertIn("T=0.58", svg)
+        self.assertIn(
+            'y="528" font-family="Arial, sans-serif" font-size="11" fill="#596268">Dynamical mechanism only; closure, facilitation,</text>',
+            svg,
+        )
+        self.assertIn(
+            'y="543" font-family="Arial, sans-serif" font-size="11" fill="#596268">and thermodynamic claims remain 0.</text>',
+            svg,
+        )
+        self.assertNotIn("nan", svg.lower())
+        self.assertNotIn("inf", svg.lower())
+
+    def test_nonlinear_path_gate_artifacts_preserve_claim_boundaries(self):
+        gate_path = ROOT / "data" / "renewal_cage_ka_nonlinear_path_gate.csv"
+        quality_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_nonlinear_path_quality.csv"
+        )
+        validity_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_path_cumulant_validity.csv"
+        )
+        low_verdict_path = (
+            ROOT
+            / "data"
+            / "renewal_cage_ka_replicates_T045_nonlinear_path_verdict.csv"
+        )
+        high_verdict_paths = [
+            ROOT
+            / "data"
+            / f"renewal_cage_ka_replicates_T058_{block}_nonlinear_path_verdict.csv"
+            for block in ("block20", "block10")
+        ]
+        svg_path = ROOT / "figures" / "renewal_cage_ka_nonlinear_path_gate.svg"
+        with gate_path.open() as handle:
+            gate = next(csv.DictReader(handle))
+        with quality_path.open() as handle:
+            quality = list(csv.DictReader(handle))
+        with validity_path.open() as handle:
+            validity = list(csv.DictReader(handle))
+        with low_verdict_path.open() as handle:
+            low_verdict = next(csv.DictReader(handle))
+        high_verdicts = []
+        for path in high_verdict_paths:
+            with path.open() as handle:
+                high_verdicts.append(next(csv.DictReader(handle)))
+
+        self.assertEqual(float(gate["low_temperature_gate_ready"]), 1.0)
+        self.assertEqual(
+            float(gate["low_temperature_nonlinear_path_memory_required"]),
+            1.0,
+        )
+        self.assertEqual(
+            float(gate["low_temperature_surrogate_failure_replicate_count"]),
+            3.0,
+        )
+        self.assertEqual(
+            float(gate["low_temperature_paired_contiguous_better_replicate_count"]),
+            3.0,
+        )
+        self.assertEqual(float(gate["high_temperature_resolution_sensitivity"]), 1.0)
+        self.assertEqual(float(gate["high_temperature_mechanism_resolved"]), 0.0)
+        self.assertEqual(
+            float(gate["binary_temperature_crossover_claim_allowed"]),
+            0.0,
+        )
+        self.assertEqual(float(gate["unique_microscopic_model_selected"]), 0.0)
+        self.assertEqual(float(gate["low_cumulant_horizon_k2"]), 4096.0)
+        self.assertEqual(float(gate["low_cumulant_horizon_k4"]), 200.0)
+        self.assertEqual(float(gate["low_cumulant_horizon_k7p25"]), 20.0)
+        self.assertEqual(len(quality), 24)
+        self.assertEqual(
+            float(low_verdict["surrogate_realization_completeness_pass"]),
+            1.0,
+        )
+        self.assertEqual(
+            float(low_verdict["required_surrogate_realizations_per_replicate"]),
+            8.0,
+        )
+        self.assertEqual(
+            float(
+                low_verdict[
+                    "one_block_radial_plus_two_point_spectrum_sufficiency_resolved"
+                ]
+            ),
+            1.0,
+        )
+        self.assertEqual(
+            float(low_verdict["one_block_radial_plus_two_point_spectrum_sufficient"]),
+            0.0,
+        )
+        for verdict in high_verdicts:
+            self.assertEqual(
+                float(
+                    verdict[
+                        "one_block_radial_plus_two_point_spectrum_sufficiency_resolved"
+                    ]
+                ),
+                0.0,
+            )
+            self.assertEqual(
+                float(verdict["calibration_nonstationarity_assessment_resolved"]),
+                0.0,
+            )
+        self.assertLess(
+            max(float(row["cross_spectral_matrix_nrmse"]) for row in quality),
+            0.012,
+        )
+        for row in quality:
+            self.assertEqual(float(row["calibration_time"]), 5000.0)
+            self.assertEqual(float(row["independent_replicate_count"]), 3.0)
+            self.assertEqual(float(row["surrogate_realizations_per_replicate"]), 8.0)
+            self.assertEqual(float(row["surrogate_iteration_count"]), 110.0)
+            self.assertEqual(float(row["surrogate_base_seed"]), 211003.0)
+            self.assertEqual(float(row["heldout_path_used_in_prediction"]), 0.0)
+        for row in validity:
+            self.assertEqual(float(row["independent_replicate_count"]), 3.0)
+            self.assertEqual(row["replicate_ids"], "1;2;3")
+            self.assertEqual(float(row["replicate_moments_pooled"]), 1.0)
+            self.assertEqual(float(row["heldout_prediction_claim_allowed"]), 0.0)
+        for key in (
+            "microdynamic_closure_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(gate[key]), 0.0)
+            self.assertTrue(all(float(row[key]) == 0.0 for row in quality))
+            self.assertTrue(all(float(row[key]) == 0.0 for row in validity))
+        for key, value in gate.items():
+            if key in (
+                "high_block20_state",
+                "high_block10_state",
+                "next_minimal_model_candidate",
+            ):
+                continue
+            self.assertTrue(math.isfinite(float(value)), key)
+        svg = svg_path.read_text()
+        self.assertIn("Nonlinear cage-path cumulant gate", svg)
+        self.assertIn("B  Observed-cumulant Fs error", svg)
+        self.assertNotIn("nan", svg.lower())
+        self.assertNotIn("inf", svg.lower())
     def test_ordered_empirical_paths_close_heldout_curves_but_nulls_fail(self):
         low_path = (
             ROOT

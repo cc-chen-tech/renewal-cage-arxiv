@@ -1,0 +1,6 @@
+replicate,contiguous_higher_order_score,radial_higher_order_score,radial_higher_order_failure,paired_contiguous_better,ngp_absolute_error_tolerance,fs_absolute_error_tolerance,heldout_path_used_in_prediction,microdynamic_closure_claim_allowed,spatial_facilitation_claim_allowed,thermodynamic_claim_allowed,temperature,calibration_time,block_size,independent_replicate_count,surrogate_realizations_per_replicate,surrogate_iteration_count,surrogate_base_seed
+1.0,0.5782272146671948,0.5645671383763651,0.0,0.0,0.3,0.03,0.0,0.0,0.0,0.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0
+2.0,2.0658125173698574,1.4413670417379278,1.0,0.0,0.3,0.03,0.0,0.0,0.0,0.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0
+3.0,1.156363059042953,0.6478128022101626,0.0,0.0,0.3,0.03,0.0,0.0,0.0,0.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0
+4.0,0.7933485212658613,0.7870154535361588,0.0,0.0,0.3,0.03,0.0,0.0,0.0,0.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0
+5.0,0.6685978991988122,0.624251498840356,0.0,0.0,0.3,0.03,0.0,0.0,0.0,0.0,0.58,750.0,20.0,5.0,8.0,240.0,211003.0
