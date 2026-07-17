@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
+<rect width="100%" height="100%" fill="#f7f7f4"/>
+<style>text{font-family:Arial,sans-serif;fill:#1e1e1e;font-size:14px;letter-spacing:0}</style>
+<text x="490" y="34" text-anchor="middle" font-size="22">Anchor-aware semi-Markov held-out gate</text>
+<line x1="75" y1="240" x2="905" y2="240" stroke="#b42318" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="910" y="244" fill="#b42318">gate = 1</text>
+<text x="149" y="420" text-anchor="middle">Low anchor</text><rect x="95" y="100.00" width="28" height="280.00" fill="#15616d"/><rect x="135" y="100.00" width="28" height="280.00" fill="#ff7d00"/><rect x="175" y="100.00" width="28" height="280.00" fill="#5f0f40"/><text x="359" y="420" text-anchor="middle">Low clock</text><rect x="305" y="100.00" width="28" height="280.00" fill="#15616d"/><rect x="345" y="100.00" width="28" height="280.00" fill="#ff7d00"/><rect x="385" y="100.00" width="28" height="280.00" fill="#5f0f40"/><text x="569" y="420" text-anchor="middle">High anchor</text><rect x="515" y="100.00" width="28" height="280.00" fill="#15616d"/><rect x="555" y="281.78" width="28" height="98.22" fill="#ff7d00"/><rect x="595" y="100.00" width="28" height="280.00" fill="#5f0f40"/><text x="779" y="420" text-anchor="middle">High clock</text><rect x="725" y="100.00" width="28" height="280.00" fill="#15616d"/><rect x="765" y="267.00" width="28" height="113.00" fill="#ff7d00"/><rect x="805" y="100.00" width="28" height="280.00" fill="#5f0f40"/>
+<rect x="120" y="452" width="16" height="16" fill="#15616d"/><text x="142" y="465">MSD / 0.10</text><rect x="330" y="452" width="16" height="16" fill="#ff7d00"/><text x="352" y="465">NGP / 0.30</text><rect x="540" y="452" width="16" height="16" fill="#5f0f40"/><text x="562" y="465">Fs / 0.03</text>
+<text x="490" y="492" text-anchor="middle" font-weight="bold">anchor_aware_model_rejected</text>
+<text x="490" y="510" text-anchor="middle" font-size="12">Dynamical diagnostic only; no spatial-facilitation or thermodynamic-glass claim.</text>
+</svg>

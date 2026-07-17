@@ -13,9 +13,135 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from build_arxiv_package import build_arxiv_package  # noqa: E402
 from summarize_ka_cage_anchor_gate import classify_cage_anchor_gate  # noqa: E402
+from summarize_ka_anchor_semi_markov_gate import (  # noqa: E402
+    classify_anchor_semi_markov_gate,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        prefixes = {
+            "low": data / "renewal_cage_ka_replicates_T045_anchor_semi_markov",
+            "high": data / "renewal_cage_ka_replicates_T058_anchor_semi_markov",
+        }
+        tables = {}
+        for label, prefix in prefixes.items():
+            tables[label] = {}
+            for suffix in (
+                "transitions",
+                "quality",
+                "realizations",
+                "rows",
+                "summary",
+                "verdict",
+            ):
+                path = prefix.with_name(f"{prefix.name}_{suffix}.csv")
+                self.assertTrue(path.is_file(), path)
+                with path.open() as handle:
+                    tables[label][suffix] = list(csv.DictReader(handle))
+
+        gate_path = data / "renewal_cage_ka_anchor_semi_markov_gate.csv"
+        sota_path = data / "renewal_cage_ka_anchor_semi_markov_sota_audit.csv"
+        svg_path = ROOT / "figures" / "renewal_cage_ka_anchor_semi_markov_gate.svg"
+        self.assertTrue(gate_path.is_file())
+        self.assertTrue(sota_path.is_file())
+        self.assertTrue(svg_path.is_file())
+        with gate_path.open() as handle:
+            stored = next(csv.DictReader(handle))
+        with sota_path.open() as handle:
+            sota_rows = list(csv.DictReader(handle))
+        with (
+            data / "renewal_cage_ka_replicates_T045_recoil_markov_rows.csv"
+        ).open() as handle:
+            low_recoil_rows = list(csv.DictReader(handle))
+        recoil_verdicts = []
+        empirical_verdicts = []
+        for label in ("T045", "T058"):
+            with (
+                data / f"renewal_cage_ka_replicates_{label}_recoil_markov_verdict.csv"
+            ).open() as handle:
+                recoil_verdicts.extend(csv.DictReader(handle))
+            with (
+                data / f"renewal_cage_ka_replicates_{label}_empirical_path_verdict.csv"
+            ).open() as handle:
+                empirical_verdicts.extend(
+                    row
+                    for row in csv.DictReader(handle)
+                    if row["model"] == "contiguous_empirical_path"
+                )
+        recomputed = classify_anchor_semi_markov_gate(
+            low_quality_rows=tables["low"]["quality"],
+            low_summary_rows=tables["low"]["summary"],
+            low_replicate_rows=tables["low"]["rows"],
+            high_quality_rows=tables["high"]["quality"],
+            high_summary_rows=tables["high"]["summary"],
+            high_replicate_rows=tables["high"]["rows"],
+            low_recoil_rows=low_recoil_rows,
+            recoil_verdict_rows=recoil_verdicts,
+            empirical_verdict_rows=empirical_verdicts,
+        )
+
+        self.assertEqual(len(tables["low"]["quality"]), 3 * 16 * 2)
+        self.assertEqual(len(tables["high"]["quality"]), 5 * 16 * 2)
+        for label, replicate_count in (("low", 3), ("high", 5)):
+            quality = tables[label]["quality"]
+            for model in (
+                "anchor_aware_semi_markov",
+                "state_schedule_without_anchor_geometry",
+            ):
+                grid = {
+                    (int(float(row["replicate"])), int(float(row["realization"])))
+                    for row in quality
+                    if row["model"] == model
+                }
+                self.assertEqual(
+                    grid,
+                    {
+                        (replicate, realization)
+                        for replicate in range(1, replicate_count + 1)
+                        for realization in range(16)
+                    },
+                )
+            for suffix in ("quality", "realizations", "rows", "summary", "verdict"):
+                for row in tables[label][suffix]:
+                    self.assertEqual(float(row["microdynamic_closure_claim_allowed"]), 0.0)
+                    self.assertEqual(float(row["spatial_facilitation_claim_allowed"]), 0.0)
+                    self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            for row in tables[label]["quality"]:
+                self.assertEqual(float(row["calibration_events_only"]), 1.0)
+                self.assertEqual(float(row["external_cage_channel_used"]), 1.0)
+                self.assertEqual(float(row["calibration_cage_residual_transfer"]), 1.0)
+                self.assertEqual(float(row["heldout_events_used_in_calibration"]), 0.0)
+                self.assertEqual(float(row["heldout_cage_residual_used_in_prediction"]), 0.0)
+
+        self.assertEqual(stored["mechanism_state"], recomputed["mechanism_state"])
+        self.assertEqual(stored["mechanism_state"], "anchor_aware_model_rejected")
+        self.assertEqual(len(sota_rows), 4)
+        self.assertEqual(
+            {row["alignment"] for row in sota_rows},
+            {
+                "consistent_event_signal",
+                "consistent_missing_memory",
+                "consistent_nonseparability_warning",
+                "consistent_need_for_richer_escape_path",
+            },
+        )
+        self.assertTrue(all(row["primary_url"].startswith("https://doi.org/") for row in sota_rows))
+        for key in (
+            "provenance_and_competitor_completeness_pass",
+            "all_low_anchor_replicates_improve_over_recoil",
+            "microdynamic_closure_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(stored[key]), float(recomputed[key]))
+        svg = svg_path.read_text()
+        self.assertIn("Anchor-aware semi-Markov held-out gate", svg)
+        self.assertIn("anchor_aware_model_rejected", svg)
+        self.assertNotIn("nan", svg.lower())
+        self.assertNotIn("inf", svg.lower())
+
     def test_softmode_precursor_residual_gate_is_complete(self):
         document_path = ROOT / "docs" / "microscopic-softmode-precursor-residual.md"
         summary_path = (
