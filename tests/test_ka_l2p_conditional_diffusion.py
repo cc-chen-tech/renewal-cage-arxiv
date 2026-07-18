@@ -1,6 +1,7 @@
 import importlib.util
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -396,6 +397,57 @@ class L2pConditionalDiffusionTests(unittest.TestCase):
         ):
             self.assertIn(option, completed.stdout)
 
+    def test_analysis_loader_accepts_only_numerically_resolved_deterministic_caches(self):
+        module = load_script(
+            "analyze_ka_l2p_conditional_diffusion.py",
+            "analyze_ka_l2p_conditional_diffusion_loader_test",
+        )
+        clone = {
+            "trajectory_sha256": "trajectory-a",
+            "target_indices": np.array([1, 3]),
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            path = directory / "clone_001_l2p_deterministic_diffusion.npz"
+            common = {
+                "trajectory_sha256": np.asarray("trajectory-a"),
+                "target_indices": np.array([1, 3]),
+                "l2p_conditional_diffusion": np.broadcast_to(
+                    np.eye(3), (5, 2, 3, 3)
+                ).copy(),
+                "completed_frame_count": 5.0,
+                "requested_frame_count": 5.0,
+                "estimator": np.asarray("deterministic_velocity_jacobian"),
+                "a_primary_reference_error": np.full((1, 2), 1e-4),
+                "q_primary_reference_error": np.full((1, 2), 2e-4),
+                "a_coarse_reference_error": np.full((1, 2), 1e-3),
+                "q_coarse_reference_error": np.full((1, 2), 2e-3),
+                "directional_response_error": np.full((1, 4, 2), 3e-4),
+                "q_minimum_eigenvalue": np.ones((1, 2)),
+                "q_trace": np.full((1, 2), 3.0),
+                "deterministic_numerical_gate_pass": 1.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+            np.savez(path, **common)
+
+            loaded = module.load_conditional_diffusion_caches(directory, [clone])
+
+            self.assertEqual(
+                loaded[0]["numerical_estimator"],
+                "deterministic_velocity_jacobian",
+            )
+            self.assertEqual(loaded[0]["numerical_gate_pass"], 1.0)
+            self.assertNotIn("prefix_error", loaded[0])
+            np.savez(
+                path,
+                **{
+                    **common,
+                    "deterministic_numerical_gate_pass": 0.0,
+                },
+            )
+            with self.assertRaisesRegex(ValueError, "numerical gate"):
+                module.load_conditional_diffusion_caches(directory, [clone])
+
     def test_verdict_requires_all_four_folds_and_keeps_broad_claims_closed(self):
         module = load_script(
             "analyze_ka_l2p_conditional_diffusion.py",
@@ -463,6 +515,25 @@ class L2pConditionalDiffusionTests(unittest.TestCase):
             1.0,
         )
         self.assertEqual(failed_verdict["l3p_derivation_authorized"], 1.0)
+
+        deterministic_convergence = [
+            {
+                "fold_index": float(fold),
+                "numerical_estimator": "deterministic_velocity_jacobian",
+                "numerical_gate_pass": 1.0,
+            }
+            for fold in range(1, 5)
+        ]
+        deterministic = module.classify_l2p_conditional_diffusion(
+            rows, deterministic_convergence
+        )
+        self.assertEqual(
+            deterministic["conditional_diffusion_estimator"],
+            "deterministic_velocity_jacobian",
+        )
+        self.assertEqual(deterministic["l2p_diffusion_numerical_gate_pass"], 1.0)
+        self.assertEqual(deterministic["l2p_diffusion_probe_converged"], 0.0)
+        self.assertEqual(deterministic["l2p_conditional_diffusion_supported"], 1.0)
 
 
 if __name__ == "__main__":

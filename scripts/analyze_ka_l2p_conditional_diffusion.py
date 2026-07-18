@@ -85,13 +85,32 @@ def classify_l2p_conditional_diffusion(
         (int(float(row["fold_index"])), str(row["model"])): row
         for row in detail_rows
     }
-    probe_converged = all(
-        float(row["prefix_median_relative_frobenius_error"]) <= 0.10
-        and float(row["prefix_p95_relative_frobenius_error"]) <= 0.25
-        and float(row["step_median_relative_frobenius_error"]) <= 0.10
-        and float(row["step_p95_relative_frobenius_error"]) <= 0.25
+    estimators = {
+        str(row.get("numerical_estimator", "rademacher_32_probe"))
         for row in convergence_rows
-    )
+    }
+    if len(estimators) != 1:
+        raise ValueError("conditional-diffusion estimators must match across folds")
+    estimator = estimators.pop()
+    if estimator == "rademacher_32_probe":
+        probe_converged = all(
+            float(row["prefix_median_relative_frobenius_error"]) <= 0.10
+            and float(row["prefix_p95_relative_frobenius_error"]) <= 0.25
+            and float(row["step_median_relative_frobenius_error"]) <= 0.10
+            and float(row["step_p95_relative_frobenius_error"]) <= 0.25
+            for row in convergence_rows
+        )
+        numerical_gate_pass = probe_converged
+        model_name = "l2p_conditional_diffusion_32_probe_tensor"
+    elif estimator == "deterministic_velocity_jacobian":
+        probe_converged = False
+        numerical_gate_pass = all(
+            float(row["numerical_gate_pass"]) == 1.0
+            for row in convergence_rows
+        )
+        model_name = "l2p_conditional_diffusion_deterministic_velocity_jacobian_tensor"
+    else:
+        raise ValueError("unknown conditional-diffusion numerical estimator")
     nll_improvement = np.asarray(
         [
             float(by_cell[(fold, "constant_full")]["negative_log_likelihood"])
@@ -123,7 +142,7 @@ def classify_l2p_conditional_diffusion(
         float(row["isotropic_floor_variance_fraction"]) <= 0.25 for row in exact_rows
     )
     supported = (
-        probe_converged
+        numerical_gate_pass
         and every_fold_nll_improves
         and float(nll_interval["ci95_low"]) > 0.0
         and every_fold_memory_reduction
@@ -143,7 +162,8 @@ def classify_l2p_conditional_diffusion(
     )
     return {
         "record": "verdict",
-        "model": "l2p_conditional_diffusion_32_probe_tensor",
+        "model": model_name,
+        "conditional_diffusion_estimator": estimator,
         "held_clone_count": 4.0,
         "mean_constant_to_tensor_nll_improvement": nll_interval["mean"],
         "constant_to_tensor_nll_improvement_standard_error": nll_interval[
@@ -160,6 +180,7 @@ def classify_l2p_conditional_diffusion(
         "permuted_tensor_null_rejected": float(permuted_rejected),
         "every_fold_floor_fraction_pass": float(floor_pass),
         "l2p_diffusion_probe_converged": float(probe_converged),
+        "l2p_diffusion_numerical_gate_pass": float(numerical_gate_pass),
         "l2p_conditional_diffusion_supported": float(supported),
         "l2p_conditional_diffusion_informative_but_insufficient": float(informative),
         "l2p_tensor_orientation_required": float(orientation_required),
@@ -178,7 +199,13 @@ def load_conditional_diffusion_caches(
     clones: list[dict[str, np.ndarray | float | str]],
 ) -> list[dict[str, np.ndarray | float | str]]:
     by_hash: dict[str, dict[str, np.ndarray | float | str]] = {}
-    for path in sorted(directory.glob("clone_*_l2p_conditional_diffusion.npz")):
+    probe_paths = sorted(directory.glob("clone_*_l2p_conditional_diffusion.npz"))
+    deterministic_paths = sorted(
+        directory.glob("clone_*_l2p_deterministic_diffusion.npz")
+    )
+    if probe_paths and deterministic_paths:
+        raise ValueError("conditional-diffusion cache directory mixes estimators")
+    for path in probe_paths + deterministic_paths:
         with np.load(path, allow_pickle=False) as cache:
             source_hash = str(np.asarray(cache["trajectory_sha256"]).item())
             if source_hash in by_hash:
@@ -188,26 +215,70 @@ def load_conditional_diffusion_caches(
             requested = int(float(cache["requested_frame_count"]))
             q = np.asarray(cache["l2p_conditional_diffusion"], dtype=float)
             targets = np.asarray(cache["target_indices"], dtype=int)
-            prefix_error = np.asarray(cache["prefix_relative_frobenius_error"], dtype=float)
-            step_error = np.asarray(cache["step_relative_frobenius_error"], dtype=float)
             if (
                 claim != 0.0
                 or completed != requested
                 or q.shape != (completed, len(targets), 3, 3)
-                or prefix_error.shape[0] != completed
                 or np.any(~np.isfinite(q))
-                or np.any(~np.isfinite(prefix_error))
-                or np.any(~np.isfinite(step_error))
             ):
                 raise ValueError(f"incomplete conditional-diffusion cache: {path}")
-            by_hash[source_hash] = {
+            loaded: dict[str, np.ndarray | float | str] = {
                 "conditional_diffusion": q,
-                "prefix_error": prefix_error,
-                "step_error": step_error,
                 "target_indices": targets,
                 "path": str(path.resolve()),
                 "thermodynamic_claim_allowed": 0.0,
             }
+            if path in deterministic_paths:
+                estimator = str(np.asarray(cache["estimator"]).item())
+                numerical_gate = float(cache["deterministic_numerical_gate_pass"])
+                numerical_arrays = {
+                    name: np.asarray(cache[name], dtype=float)
+                    for name in (
+                        "a_primary_reference_error",
+                        "q_primary_reference_error",
+                        "a_coarse_reference_error",
+                        "q_coarse_reference_error",
+                        "directional_response_error",
+                        "q_minimum_eigenvalue",
+                        "q_trace",
+                    )
+                }
+                if (
+                    estimator != "deterministic_velocity_jacobian"
+                    or numerical_gate != 1.0
+                    or any(
+                        np.any(~np.isfinite(values))
+                        for values in numerical_arrays.values()
+                    )
+                ):
+                    raise ValueError(
+                        f"deterministic numerical gate did not pass: {path}"
+                    )
+                loaded.update(numerical_arrays)
+                loaded["numerical_estimator"] = estimator
+                loaded["numerical_gate_pass"] = numerical_gate
+            else:
+                prefix_error = np.asarray(
+                    cache["prefix_relative_frobenius_error"], dtype=float
+                )
+                step_error = np.asarray(
+                    cache["step_relative_frobenius_error"], dtype=float
+                )
+                if (
+                    prefix_error.shape[0] != completed
+                    or np.any(~np.isfinite(prefix_error))
+                    or np.any(~np.isfinite(step_error))
+                ):
+                    raise ValueError(f"incomplete conditional-diffusion cache: {path}")
+                loaded.update(
+                    {
+                        "prefix_error": prefix_error,
+                        "step_error": step_error,
+                        "numerical_estimator": "rademacher_32_probe",
+                        "numerical_gate_pass": 0.0,
+                    }
+                )
+            by_hash[source_hash] = loaded
     matched = []
     for clone in clones:
         source_hash = str(clone["trajectory_sha256"])
@@ -356,20 +427,53 @@ def main() -> None:
                     "thermodynamic_claim_allowed": 0.0,
                 }
             )
-        prefix_error = np.asarray(held_q_cache["prefix_error"])
-        step_error = np.asarray(held_q_cache["step_error"])
-        convergence.append(
-            {
-                "record": "held_fold_convergence",
-                "fold_index": float(fold_index),
-                "prefix_median_relative_frobenius_error": float(np.median(prefix_error[:, -1])),
-                "prefix_p95_relative_frobenius_error": float(np.quantile(prefix_error[:, -1], 0.95)),
-                "step_median_relative_frobenius_error": float(np.median(step_error)),
-                "step_p95_relative_frobenius_error": float(np.quantile(step_error, 0.95)),
-                "trajectory_sha256": str(held["trajectory_sha256"]),
-                "thermodynamic_claim_allowed": 0.0,
-            }
-        )
+        estimator = str(held_q_cache["numerical_estimator"])
+        convergence_row: dict[str, object] = {
+            "record": "held_fold_convergence",
+            "fold_index": float(fold_index),
+            "numerical_estimator": estimator,
+            "numerical_gate_pass": float(held_q_cache["numerical_gate_pass"]),
+            "trajectory_sha256": str(held["trajectory_sha256"]),
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        if estimator == "deterministic_velocity_jacobian":
+            for prefix, key in (
+                ("a_primary_reference", "a_primary_reference_error"),
+                ("q_primary_reference", "q_primary_reference_error"),
+                ("a_coarse_reference", "a_coarse_reference_error"),
+                ("q_coarse_reference", "q_coarse_reference_error"),
+                ("directional", "directional_response_error"),
+            ):
+                values = np.asarray(held_q_cache[key], dtype=float)
+                convergence_row[f"{prefix}_median_relative_error"] = float(
+                    np.median(values)
+                )
+                convergence_row[f"{prefix}_p95_relative_error"] = float(
+                    np.quantile(values, 0.95)
+                )
+            convergence_row["q_minimum_eigenvalue"] = float(
+                np.min(np.asarray(held_q_cache["q_minimum_eigenvalue"]))
+            )
+        else:
+            prefix_error = np.asarray(held_q_cache["prefix_error"])
+            step_error = np.asarray(held_q_cache["step_error"])
+            convergence_row.update(
+                {
+                    "prefix_median_relative_frobenius_error": float(
+                        np.median(prefix_error[:, -1])
+                    ),
+                    "prefix_p95_relative_frobenius_error": float(
+                        np.quantile(prefix_error[:, -1], 0.95)
+                    ),
+                    "step_median_relative_frobenius_error": float(
+                        np.median(step_error)
+                    ),
+                    "step_p95_relative_frobenius_error": float(
+                        np.quantile(step_error, 0.95)
+                    ),
+                }
+            )
+        convergence.append(convergence_row)
 
     summaries: list[dict[str, object]] = []
     metric_names = (

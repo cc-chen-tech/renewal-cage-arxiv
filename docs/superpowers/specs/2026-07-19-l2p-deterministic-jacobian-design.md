@@ -208,6 +208,27 @@ reference/coarse matrices and four independent directional checks. The
 checkpoint cache was 19 KiB and a completed one-frame rerun exited without
 recomputing the frame.
 
+After the compact tensor-lifetime implementation was fixed, the same frozen
+frame was recomputed on the remote calculation node from byte-identical source
+files and the same trajectory hash. The node had 2 vCPUs, 1.8 GiB RAM, and a
+4 GiB safety swap file. `/usr/bin/time -v` reported 860560 KiB maximum resident
+memory and zero job swaps. The independent remote values were
+
+```text
+A primary/reference median = 5.607930017456152e-7
+A primary/reference p95    = 9.174246540148369e-7
+Q primary/reference median = 4.857032863650780e-7
+Q primary/reference p95    = 9.379867217073619e-7
+directional median         = 6.320212942009594e-4
+directional p95            = 2.386923484089341e-3
+minimum eigenvalue(Q)      = 1.0416182894151709e5
+```
+
+All numerical gates again passed. The small differences from the first run are
+consistent with platform-level floating-point variation and remain orders of
+magnitude inside the frozen numerical limits. This is execution and numerical
+provenance only; it does not alter a physical claim flag.
+
 ## Claim boundary
 
 This estimator tests whether state-dependent microscopic diffusion inherited
