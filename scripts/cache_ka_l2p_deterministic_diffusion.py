@@ -181,6 +181,9 @@ def cache_clone(
                 and math.isclose(float(saved["primary_jacobian_step"]), _PRIMARY_STEP)
                 and math.isclose(float(saved["reference_jacobian_step"]), _REFERENCE_STEP)
                 and math.isclose(float(saved["coarse_jacobian_step"]), _COARSE_STEP)
+                and int(saved["sensitivity_frame_count"]) == sensitivity_count
+                and int(saved["target_batch_size"]) == args.target_batch_size
+                and np.array_equal(saved["direction_seeds"], _DIRECTION_SEEDS)
             )
             if not valid:
                 raise ValueError("existing deterministic diffusion cache has mismatched provenance")
@@ -246,6 +249,7 @@ def cache_clone(
             completed_frame_count=float(done),
             requested_frame_count=float(frame_count),
             sensitivity_frame_count=float(sensitivity_count),
+            target_batch_size=float(args.target_batch_size),
             **verdict,
         )
 
