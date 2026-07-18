@@ -218,54 +218,62 @@ def audit_segment_surrogate(
         and int(np.sum(target_lengths)) == block_count
     )
     expected = np.empty_like(values)
-    block_provenance: list[int] = []
-    token_provenance: list[int] = []
+    block_provenance_array = np.empty((particle_count, block_count), dtype=int)
+    token_provenance_array = np.empty((particle_count, segment_count), dtype=int)
     length_match = provenance_shape_pass
     cursor = 0
     if provenance_shape_pass:
-        for target in range(particle_count):
-            cursor = 0
-            for slot in range(segment_count):
-                local_source_particle = int(source_particle[target, slot])
-                local_source_segment = int(source_segment[target, slot])
-                start, stop = slices[local_source_segment]
-                length = stop - start
-                if length != int(target_lengths[slot]):
-                    length_match = False
-                    break
-                expected[target, cursor : cursor + length] = values[
-                    local_source_particle,
-                    start:stop,
-                ]
-                block_provenance.extend(
-                    local_source_particle * block_count + block
-                    for block in range(start, stop)
-                )
-                token_provenance.append(
-                    local_source_particle * segment_count + local_source_segment
-                )
-                cursor += length
-            if cursor != block_count:
+        source_lengths = np.asarray([stop - start for start, stop in slices])
+        source_starts = np.asarray([start for start, _ in slices])
+        for slot in range(segment_count):
+            local_source_particle = source_particle[:, slot].astype(int, copy=False)
+            local_source_segment = source_segment[:, slot].astype(int, copy=False)
+            lengths = source_lengths[local_source_segment]
+            length = int(target_lengths[slot])
+            if np.any(lengths != length):
                 length_match = False
                 break
+            for segment_id in np.unique(local_source_segment):
+                selected = local_source_segment == segment_id
+                start, stop = slices[int(segment_id)]
+                expected[selected, cursor : cursor + length] = values[
+                    local_source_particle[selected],
+                    start:stop,
+                ]
+                block_provenance_array[selected, cursor : cursor + length] = (
+                    local_source_particle[selected, None] * block_count
+                    + np.arange(start, stop)[None, :]
+                )
+            token_provenance_array[:, slot] = (
+                local_source_particle * segment_count + local_source_segment
+            )
+            cursor += length
+        if cursor != block_count:
+            length_match = False
+    token_provenance = (
+        token_provenance_array.reshape(-1) if provenance_shape_pass else np.array([], dtype=int)
+    )
     token_counts = np.bincount(
-        np.asarray(token_provenance, dtype=int),
+        token_provenance,
         minlength=particle_count * segment_count,
     )
     token_minimum = float(np.min(token_counts)) if len(token_counts) else 0.0
     token_maximum = float(np.max(token_counts)) if len(token_counts) else 0.0
     token_multiset = bool(
         length_match
-        and len(token_provenance) == particle_count * segment_count
+        and token_provenance.size == particle_count * segment_count
         and np.all(token_counts == 1)
     )
+    block_provenance = (
+        block_provenance_array.reshape(-1) if provenance_shape_pass else np.array([], dtype=int)
+    )
     block_counts = np.bincount(
-        np.asarray(block_provenance, dtype=int),
+        block_provenance,
         minlength=particle_count * block_count,
     )
     block_multiset = bool(
         length_match
-        and len(block_provenance) == particle_count * block_count
+        and block_provenance.size == particle_count * block_count
         and np.all(block_counts == 1)
     )
     value_match = bool(
@@ -293,20 +301,20 @@ def audit_segment_surrogate(
     internal_pairs = int(np.sum(np.maximum(target_lengths - 1, 0))) * particle_count
     total_pairs = particle_count * max(block_count - 1, 1)
     guaranteed_internal_fraction = float(internal_pairs / total_pairs)
-    accidental_count = 0
     seam_count = particle_count * max(segment_count - 1, 0)
-    if provenance_shape_pass:
-        for target in range(particle_count):
-            for slot in range(segment_count - 1):
-                left_particle = int(source_particle[target, slot])
-                right_particle = int(source_particle[target, slot + 1])
-                left_segment = int(source_segment[target, slot])
-                right_segment = int(source_segment[target, slot + 1])
-                if (
-                    left_particle == right_particle
-                    and slices[left_segment][1] == slices[right_segment][0]
-                ):
-                    accidental_count += 1
+    accidental_count = (
+        int(
+            np.sum(
+                (source_particle[:, :-1] == source_particle[:, 1:])
+                & (
+                    np.asarray([stop for _, stop in slices])[source_segment[:, :-1]]
+                    == source_starts[source_segment[:, 1:]]
+                )
+            )
+        )
+        if provenance_shape_pass and segment_count > 1
+        else 0
+    )
     accidental_fraction = float(accidental_count / seam_count) if seam_count else 0.0
     within_particle_multiset = bool(
         token_multiset
@@ -325,7 +333,7 @@ def audit_segment_surrogate(
     )
     return {
         "source_token_count": float(particle_count * segment_count),
-        "target_token_count": float(len(token_provenance)),
+        "target_token_count": float(token_provenance.size),
         "source_token_reuse_minimum": token_minimum,
         "source_token_reuse_maximum": token_maximum,
         "ordered_token_multiset_preserved": float(token_multiset and value_match),
