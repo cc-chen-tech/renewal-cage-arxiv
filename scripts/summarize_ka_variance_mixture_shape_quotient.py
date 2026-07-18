@@ -17,6 +17,35 @@ OBSERVABLE_WAVE_NUMBERS = {
     "fs_k7p25": 7.25,
 }
 EXPECTED_OBSERVABLES = frozenset({"ngp", *OBSERVABLE_WAVE_NUMBERS})
+FROZEN_SUPPORTED_CELLS = {
+    0.45: frozenset(
+        {
+            (1, 20),
+            (1, 100),
+            (1, 200),
+            (1, 500),
+            (1, 1000),
+            (1, 2000),
+            (2, 100),
+            (2, 200),
+            (2, 500),
+            (2, 1000),
+            (2, 2000),
+            (2, 3000),
+            (3, 20),
+            (3, 100),
+            (3, 200),
+            (3, 500),
+            (3, 1000),
+            (3, 2000),
+        }
+    ),
+    0.58: frozenset(
+        (replicate, lag)
+        for replicate in range(1, 6)
+        for lag in (20, 100, 200, 400)
+    ),
+}
 SOURCE_CLOSED_CLAIMS = (
     "blind_prediction_claim_allowed",
     "microdynamic_closure_claim_allowed",
@@ -341,11 +370,11 @@ def _validate_scored_rows(
         cell_waves: dict[tuple[int, int], set[float]] = {}
         for _, replicate, lag, wave_number in local:
             cell_waves.setdefault((replicate, lag), set()).add(wave_number)
-        if not cell_waves or any(
+        if set(cell_waves) != FROZEN_SUPPORTED_CELLS[temperature] or any(
             waves != set(OBSERVABLE_WAVE_NUMBERS.values())
             for waves in cell_waves.values()
         ):
-            raise ValueError("scored rows do not contain complete multi-k cells")
+            raise ValueError("scored rows do not contain the frozen multi-k grid")
 
 
 def classify_shape_quotient_gate(
