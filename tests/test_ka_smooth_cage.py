@@ -190,6 +190,64 @@ class SmoothCageTests(unittest.TestCase):
                 batched["jacobian_gram"][row], expected_gram, atol=1e-12
             )
 
+    def test_batch_full_jacobian_matches_scalar_blocks_and_projections(self):
+        from ka_smooth_cage import (
+            smooth_force_support_cage,
+            smooth_force_support_cage_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 17.0 - 0.2
+        additional = np.stack(
+            [
+                np.arange(12, dtype=float).reshape(4, 3) / 23.0,
+                np.arange(11, -1, -1, dtype=float).reshape(4, 3) / 19.0,
+            ]
+        )
+        targets = np.array([0, 2])
+
+        batched = smooth_force_support_cage_batch(
+            inputs["positions"],
+            velocities=velocities,
+            additional_vectors=additional,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+            target_batch_size=1,
+            return_jacobian=True,
+        )
+        expected = np.stack(
+            [
+                smooth_force_support_cage(
+                    inputs["positions"],
+                    particle_types=inputs["particle_types"],
+                    box_lengths=inputs["box_lengths"],
+                    target_index=int(target),
+                )["jacobian"]
+                for target in targets
+            ]
+        )
+
+        np.testing.assert_allclose(batched["jacobian"], expected, rtol=1e-13, atol=1e-13)
+        np.testing.assert_allclose(
+            np.einsum("tnab,nb->ta", expected, velocities),
+            batched["relative_velocity"],
+            rtol=1e-13,
+            atol=1e-13,
+        )
+        np.testing.assert_allclose(
+            np.einsum("tnab,knb->kta", expected, additional),
+            batched["additional_relative_velocity"],
+            rtol=1e-13,
+            atol=1e-13,
+        )
+        np.testing.assert_allclose(
+            np.einsum("tnab,tncb->tac", expected, expected),
+            batched["jacobian_gram"],
+            rtol=1e-13,
+            atol=1e-13,
+        )
+
     def test_batched_smooth_cage_is_rigid_motion_covariant_and_positive(self):
         from ka_smooth_cage import smooth_force_support_cage_batch
 

@@ -116,6 +116,7 @@ def smooth_force_support_cage_batch(
     target_batch_size: int = 16,
     additional_vectors: np.ndarray | None = None,
     compute_gram: bool = True,
+    return_jacobian: bool = False,
 ) -> dict[str, np.ndarray | float]:
     """Evaluate exact smooth-cage vector coordinates for fixed targets."""
 
@@ -161,6 +162,8 @@ def smooth_force_support_cage_batch(
         raise ValueError("target_batch_size must be a positive integer")
     if not isinstance(compute_gram, (bool, np.bool_)):
         raise ValueError("compute_gram must be Boolean")
+    if not isinstance(return_jacobian, (bool, np.bool_)):
+        raise ValueError("return_jacobian must be Boolean")
     if additional_vectors is None:
         extra_vectors = np.empty((0, *positions.shape), dtype=float)
     else:
@@ -183,6 +186,11 @@ def smooth_force_support_cage_batch(
     target_jacobian_block = np.empty_like(jacobian_gram)
     total_weight = np.empty(len(targets), dtype=float)
     support_count = np.empty(len(targets), dtype=int)
+    full_jacobian = (
+        np.empty((len(targets), len(positions), 3, 3), dtype=float)
+        if return_jacobian
+        else None
+    )
     identity = np.eye(3)
     for start in range(0, len(targets), int(target_batch_size)):
         stop = min(start + int(target_batch_size), len(targets))
@@ -214,6 +222,13 @@ def smooth_force_support_cage_batch(
             "tna,tnb->tab", centered, radial_gradient
         )
         target_block = identity[None, :, :] + centered_gradient / chunk_weight[:, None, None]
+        if return_jacobian:
+            neighbor_block = -(
+                weight[:, :, None, None] * identity[None, None, :, :]
+                + centered[:, :, :, None] * radial_gradient[:, :, None, :]
+            ) / chunk_weight[:, None, None, None]
+            neighbor_block[local_axis, selected] = target_block
+            full_jacobian[start:stop] = neighbor_block
         vector_fields = np.concatenate([velocities[None, :, :], extra_vectors], axis=0)
         vector_difference = (
             vector_fields[:, selected, None, :] - vector_fields[:, None, :, :]
@@ -268,6 +283,8 @@ def smooth_force_support_cage_batch(
     if compute_gram:
         result["jacobian_gram"] = jacobian_gram
         result["target_jacobian_block"] = target_jacobian_block
+    if return_jacobian:
+        result["jacobian"] = full_jacobian
     return result
 
 
