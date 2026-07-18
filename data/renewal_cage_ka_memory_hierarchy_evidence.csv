@@ -1,0 +1,7 @@
+evidence_stage,preserved_information,heldout_result,evidence_status,mechanism_claim_allowed,interpretation
+pooled_one_step_recoil,one-step recoil conditional,rejected,1.0,0.0,one-step recoil statistics are insufficient
+pooled_anchor_semi_markov,observed anchor state and holding time,rejected,1.0,0.0,two-state anchor geometry is insufficient
+particle_identity_without_order,particle identity and path marginals,rejected,1.0,0.0,identity alone does not replace path order
+ordered_particle_path,particle identity and ordered multiblock path,closes both temperatures,1.0,0.0,nonparametric upper bound selects ordered path memory
+finite_exchange_environment,particle mobility identity across finite blocks,supported,1.0,0.0,finite exchange is supported within tested rate alternatives; the static-environment family remains open
+spatial_covariance_measurement,cross-particle event-count covariance,measurement only,1.0,0.0,spatial facilitation necessity is not identified

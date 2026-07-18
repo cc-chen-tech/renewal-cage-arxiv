@@ -16,9 +16,78 @@ from summarize_ka_cage_anchor_gate import classify_cage_anchor_gate  # noqa: E40
 from summarize_ka_anchor_semi_markov_gate import (  # noqa: E402
     classify_anchor_semi_markov_gate,
 )
+from summarize_ka_memory_hierarchy import (  # noqa: E402
+    main as summarize_memory_hierarchy,
+    recompute_hierarchy,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def test_memory_hierarchy_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        verdict_path = data / "renewal_cage_ka_memory_hierarchy.csv"
+        evidence_path = data / "renewal_cage_ka_memory_hierarchy_evidence.csv"
+        figure_path = ROOT / "figures" / "renewal_cage_ka_memory_hierarchy.svg"
+        for path in (verdict_path, evidence_path, figure_path):
+            self.assertTrue(path.is_file(), path)
+
+        with verdict_path.open() as handle:
+            stored = next(csv.DictReader(handle))
+        with evidence_path.open() as handle:
+            evidence = list(csv.DictReader(handle))
+        recomputed = recompute_hierarchy(data)
+
+        self.assertEqual(
+            stored["mechanism_state"],
+            "ordered_particle_path_required_finite_exchange_supported",
+        )
+        for key, value in recomputed.items():
+            if isinstance(value, str):
+                self.assertEqual(stored[key], value)
+            else:
+                self.assertAlmostEqual(float(stored[key]), float(value))
+        self.assertEqual(len(evidence), 6)
+        self.assertEqual(evidence[-1]["heldout_result"], "measurement only")
+        self.assertEqual(float(evidence[-1]["mechanism_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["microdynamic_closure_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["spatial_facilitation_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["static_environment_family_excluded"]), 0.0)
+        self.assertEqual(float(stored["cross_particle_mechanism_excluded"]), 0.0)
+        self.assertEqual(float(stored["environment_recomputed_from_raw"]), 1.0)
+        self.assertEqual(
+            float(stored["environment_waiting_consensus_recomputed_from_windows"]),
+            1.0,
+        )
+        self.assertEqual(float(stored["waiting_recomputed_from_thresholds"]), 1.0)
+        self.assertEqual(
+            float(stored["stored_environment_waiting_consistency_pass"]), 1.0
+        )
+        self.assertEqual(float(stored["stored_subgate_consistency_pass"]), 1.0)
+        figure = figure_path.read_text()
+        self.assertIn("Information-ablation hierarchy", figure)
+        self.assertIn("measurement only", figure.lower())
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            generated_verdict = temporary / "verdict.csv"
+            generated_evidence = temporary / "evidence.csv"
+            generated_figure = temporary / "figure.svg"
+            summarize_memory_hierarchy(
+                [
+                    "--data-dir",
+                    str(data),
+                    "--output-csv",
+                    str(generated_verdict),
+                    "--output-evidence-csv",
+                    str(generated_evidence),
+                    "--output-svg",
+                    str(generated_figure),
+                ]
+            )
+            self.assertEqual(verdict_path.read_bytes(), generated_verdict.read_bytes())
+            self.assertEqual(evidence_path.read_bytes(), generated_evidence.read_bytes())
+            self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
+
     def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"
         prefixes = {

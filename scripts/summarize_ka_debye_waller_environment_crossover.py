@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -36,21 +37,18 @@ def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--high-curve", type=Path, required=True)
-    parser.add_argument("--low-curve", type=Path, required=True)
-    parser.add_argument("--high-cross-half", type=Path, required=True)
-    parser.add_argument("--low-cross-half", type=Path, required=True)
-    parser.add_argument("--high-waiting-verdict", type=Path, required=True)
-    parser.add_argument("--low-waiting-verdict", type=Path, required=True)
-    parser.add_argument("--output-prefix", type=Path, required=True)
-    args = parser.parse_args()
+def classify_environment_crossover(
+    *,
+    high_curve_rows: Sequence[dict[str, object]],
+    low_curve_rows: Sequence[dict[str, object]],
+    high_cross_half_rows: Sequence[dict[str, object]],
+    low_cross_half_rows: Sequence[dict[str, object]],
+    high_waiting: dict[str, object],
+    low_waiting: dict[str, object],
+) -> tuple[list[dict[str, object]], list[dict[str, object]], dict[str, object]]:
+    """Recompute the finite-exchange support gate from its lowest stored tables."""
 
-    curves = {
-        "high": read_rows(args.high_curve),
-        "low": read_rows(args.low_curve),
-    }
+    curves = {"high": high_curve_rows, "low": low_curve_rows}
     common_blocks = sorted(
         {float(row["block_size"]) for row in curves["high"]}
         & {float(row["block_size"]) for row in curves["low"]}
@@ -63,7 +61,9 @@ def main() -> None:
         for block_size in common_blocks:
             selected = [row for row in rows if float(row["block_size"]) == block_size]
             for replicate in sorted({float(row["replicate"]) for row in selected}):
-                local = [row for row in selected if float(row["replicate"]) == replicate]
+                local = [
+                    row for row in selected if float(row["replicate"]) == replicate
+                ]
                 crossing = correlation_efold_crossing(local)
                 crossing.update(
                     {
@@ -94,18 +94,16 @@ def main() -> None:
         growth_rows.append(comparison)
 
     high_cross = np.array(
-        [float(row["particle_identity_correlation"]) for row in read_rows(args.high_cross_half)]
+        [float(row["particle_identity_correlation"]) for row in high_cross_half_rows]
     )
     low_cross = np.array(
-        [float(row["particle_identity_correlation"]) for row in read_rows(args.low_cross_half)]
+        [float(row["particle_identity_correlation"]) for row in low_cross_half_rows]
     )
     cross_growth = independent_group_ratio(
         low_cross,
         high_cross,
         relative_equivalence_margin=0.2,
     )
-    high_waiting = read_one(args.high_waiting_verdict)
-    low_waiting = read_one(args.low_waiting_verdict)
     high_iid = high_waiting["consensus_verdict"] == "empirical_iid_waiting_law_sufficient"
     low_environment = (
         low_waiting["consensus_verdict"] == "persistent_particle_environment_required"
@@ -135,6 +133,28 @@ def main() -> None:
         "source_alignment": "cooling_decouples_exchange_and_persistence_and_strengthens_dynamic_heterogeneity",
         "thermodynamic_claim_allowed": 0.0,
     }
+    return crossing_rows, growth_rows, verdict
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--high-curve", type=Path, required=True)
+    parser.add_argument("--low-curve", type=Path, required=True)
+    parser.add_argument("--high-cross-half", type=Path, required=True)
+    parser.add_argument("--low-cross-half", type=Path, required=True)
+    parser.add_argument("--high-waiting-verdict", type=Path, required=True)
+    parser.add_argument("--low-waiting-verdict", type=Path, required=True)
+    parser.add_argument("--output-prefix", type=Path, required=True)
+    args = parser.parse_args()
+
+    crossing_rows, growth_rows, verdict = classify_environment_crossover(
+        high_curve_rows=read_rows(args.high_curve),
+        low_curve_rows=read_rows(args.low_curve),
+        high_cross_half_rows=read_rows(args.high_cross_half),
+        low_cross_half_rows=read_rows(args.low_cross_half),
+        high_waiting=read_one(args.high_waiting_verdict),
+        low_waiting=read_one(args.low_waiting_verdict),
+    )
     write_rows(
         args.output_prefix.with_name(args.output_prefix.name + "_crossings.csv"),
         crossing_rows,

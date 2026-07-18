@@ -86,6 +86,10 @@ def classify_empirical_path_crossover(
         "shared_low_temperature_fs_failure": float(shared_fs_failure),
         "shared_low_temperature_higher_order_failure": float(shared_failure),
         "shuffle_precision_pass": float(shuffle_precision),
+        "within_particle_time_shuffle_curve_transfer_pass": float(
+            float(shuffled_low["curve_transfer_pass"]) == 1.0
+        ),
+        "direction_randomized_path_curve_transfer_pass": float(direction_pass),
         "paired_contiguous_better_replicate_count": float(contiguous_better),
         "paired_replicate_count": float(replicate_count),
         "required_replicate_consensus_count": float(required_consensus),
