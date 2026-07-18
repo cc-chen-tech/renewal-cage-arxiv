@@ -130,7 +130,12 @@ documented in
 Validation is reported in three separate layers:
 
 - scientific result: parent gate blocked and full candidate rejected as above;
-- engineering validation: focused tests, full local suite, deterministic
-  artifact recomputation, syntax checks, and arXiv package rebuild;
-- remote CI: reported from the draft PR and never used as evidence for a
-  scientific pass.
+- engineering validation: 21 focused memory-closure tests and the package gate
+  recomputation test pass; the post-rebase complete local suite reports
+  `Ran 1011 tests in 19.302s — OK`; eight summary artifacts rebuild
+  byte-identically; Python syntax and `git diff --check` pass; and
+  `scripts/build_arxiv_package.py` exits zero with
+  `dist/renewal-cage-arxiv-source.zip`;
+- remote CI: pending when this result note was committed; its later state is
+  reported on the draft PR and is never used as evidence for a scientific
+  pass.
