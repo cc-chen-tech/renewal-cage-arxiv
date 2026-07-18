@@ -16,6 +16,11 @@ from build_arxiv_package import (  # noqa: E402
     build_arxiv_package,
     write_ka_shape_mechanism_selection_pdf,
 )
+from analyze_ka_prl_memory_closure import (  # noqa: E402
+    recompute_committed_memory_closure_gate,
+)
+sys.path.insert(0, str(ROOT / "src"))
+from ka_prl_memory_closure import CLOSED_CLAIM_FIELDS  # noqa: E402
 from summarize_ka_cage_anchor_gate import classify_cage_anchor_gate  # noqa: E402
 from summarize_ka_anchor_semi_markov_gate import (  # noqa: E402
     classify_anchor_semi_markov_gate,
@@ -187,6 +192,69 @@ class ArxivPackageTests(unittest.TestCase):
             ),
             0.0,
         )
+
+    def test_prl_memory_closure_is_parent_gated_and_claim_limited(self):
+        data = ROOT / "data"
+        with (data / "renewal_cage_ka_prl_parent_provenance.csv").open() as handle:
+            parent_rows = list(csv.DictReader(handle))
+        with (data / "renewal_cage_ka_prl_memory_closure_gate.csv").open() as handle:
+            stored = next(csv.DictReader(handle))
+        with (data / "renewal_cage_ka_prl_parent_blockers.csv").open() as handle:
+            blockers = list(csv.DictReader(handle))
+        with (data / "renewal_cage_ka_prl_memory_closure_model_verdicts.csv").open() as handle:
+            verdicts = list(csv.DictReader(handle))
+        with (data / "renewal_cage_ka_prl_memory_closure_claim_ledger.csv").open() as handle:
+            claims = list(csv.DictReader(handle))
+
+        recomputed = recompute_committed_memory_closure_gate(data)
+
+        self.assertCsvGateMatchesComputedGate(stored, recomputed)
+        self.assertEqual(
+            len(
+                {
+                    row["parent_id"]
+                    for row in parent_rows
+                    if float(row["temperature"]) == 0.45
+                }
+            ),
+            1,
+        )
+        self.assertEqual(
+            stored["mechanism_state"], "blocked_independent_parent_validation"
+        )
+        self.assertEqual(float(stored["positive_memory_closure_claim_allowed"]), 0.0)
+        self.assertTrue(all(float(stored[key]) == 0.0 for key in CLOSED_CLAIM_FIELDS))
+        self.assertEqual(float(stored["diagnostic_realizations"]), 64.0)
+        self.assertEqual(stored["correlated_parent_diagnostic_state"], "candidate_rejected")
+        self.assertEqual(
+            stored["correlated_parent_diagnostic_failure_localization"],
+            "cross_particle_or_unmodeled_coupling",
+        )
+        blocker_by_temperature = {
+            float(row["temperature"]): row for row in blockers
+        }
+        self.assertEqual(float(blocker_by_temperature[0.45]["missing_parent_count"]), 2.0)
+        self.assertEqual(float(blocker_by_temperature[0.58]["missing_parent_count"]), 4.0)
+        self.assertEqual(float(blocker_by_temperature[0.58]["stationarity_pass"]), 0.0)
+        verdict_by_model = {row["model"]: row for row in verdicts}
+        self.assertEqual(float(verdict_by_model["full_candidate"]["precision_pass"]), 1.0)
+        self.assertEqual(
+            float(verdict_by_model["full_candidate"]["failed_child_restart_count"]),
+            3.0,
+        )
+        self.assertEqual(
+            float(
+                verdict_by_model["contiguous_empirical_upper_control"][
+                    "failed_child_restart_count"
+                ]
+            ),
+            2.0,
+        )
+        self.assertTrue(all(float(row["claim_allowed"]) == 0.0 for row in claims))
+        tampered = dict(stored)
+        tampered["positive_memory_closure_claim_allowed"] = "1"
+        with self.assertRaises(AssertionError):
+            self.assertCsvGateMatchesComputedGate(tampered, recomputed)
 
     def test_memory_hierarchy_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

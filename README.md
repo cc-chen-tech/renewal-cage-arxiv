@@ -88,6 +88,15 @@ NGP remain diagnostic inputs, the three restart labels share one parent sample,
 and all static/finite-exchange, cage-jump-coupling, spatial, microdynamic, and
 thermodynamic claims remain closed. See `docs/ka-shape-mechanism-selection.md`.
 
+The independent-parent PRL memory-closure test is documented in
+[`docs/prl-memory-closure-independent-parent-result.md`](docs/prl-memory-closure-independent-parent-result.md).
+The available `T=0.45` restart labels contribute only one of three required
+source parents, and `T=0.58` contributes one of five while failing the frozen
+stationarity control. The particle-conditioned finite-exchange ordered-path
+candidate also fails the replicate-first correlated-parent diagnostic. The PRL
+claim therefore remains blocked; complete microscopic closure, spatial
+facilitation, and thermodynamic-transition claims remain outside scope.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
