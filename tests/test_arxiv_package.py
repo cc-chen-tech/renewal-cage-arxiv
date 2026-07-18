@@ -1063,12 +1063,10 @@ class ArxivPackageTests(unittest.TestCase):
             pdf = Path(directory) / "selection.pdf"
             write_ka_shape_mechanism_selection_pdf(pdf)
             self.assertGreater(pdf.stat().st_size, 2_000)
-            from pypdf import PdfReader
-
-            rendered_text = "\n".join(
-                page.extract_text() or "" for page in PdfReader(pdf).pages
+            self.assertIn(
+                b"maximum absolute Fs error / 0.03",
+                pdf.read_bytes(),
             )
-            self.assertIn("maximum absolute Fs error / 0.03", rendered_text)
 
     def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

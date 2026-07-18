@@ -9638,7 +9638,7 @@ def write_ka_shape_mechanism_selection_pdf(path: Path) -> None:
         return bottom + plot_height * min(maximum, max(0.0, value)) / maximum
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    c = canvas.Canvas(str(path), pagesize=landscape(letter))
+    c = canvas.Canvas(str(path), pagesize=landscape(letter), pageCompression=0)
     c.setTitle("Shape-class mechanism selection")
     c.setFillColor(colors.HexColor("#17202a"))
     c.setFont("Helvetica-Bold", 16)
