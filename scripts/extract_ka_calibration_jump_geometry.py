@@ -131,6 +131,24 @@ def extract_calibration_jump_geometry(
     return result
 
 
+def load_calibration_type_a_positions(
+    trajectory_path: Path,
+    *,
+    calibration_time: int,
+) -> np.ndarray:
+    if (
+        isinstance(calibration_time, bool)
+        or not isinstance(calibration_time, int)
+        or calibration_time < 2
+    ):
+        raise ValueError("calibration_time must be an integer of at least two")
+    trajectory = load_lammps_custom_trajectory(
+        Path(trajectory_path),
+        maximum_frame_count=calibration_time + 1,
+    )
+    return trajectory["unwrapped_positions"][:, trajectory["particle_types"] == 0]
+
+
 def read_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="") as handle:
         return list(csv.DictReader(handle))
@@ -172,10 +190,10 @@ def main() -> None:
             / str(specification["directory"])
             / "trajectory.lammpstrj"
         )
-        trajectory = load_lammps_custom_trajectory(trajectory_path)
-        positions = trajectory["unwrapped_positions"][
-            :, trajectory["particle_types"] == 0
-        ]
+        positions = load_calibration_type_a_positions(
+            trajectory_path,
+            calibration_time=args.calibration_time,
+        )
         local = extract_calibration_jump_geometry(
             positions,
             calibration_time=args.calibration_time,

@@ -42,6 +42,16 @@ validates the analytic slow-field limit, while an added OU-cage variance has
 insufficient exact inversion support. This is a diagnostic rejection of the
 scalar-mobility closure, not a blind microdynamic or spatial mechanism claim.
 
+An activated cage-jump geometry quotient then replaces the gamma shape by the
+full calibration jump-vector characteristic. The measured broad jump law
+improves the T=0.45 physical cage/count decomposition from `3/21` fixed-length
+rows to `8/21`, but still misses the 80% support gate and has maximum
+`Fs(k=7.25)` error `0.04164 > 0.03`. Thus one-jump geometry alone is
+insufficient: count overdispersion, correlated jumps, or cage-jump coupling
+must enter the next cumulant closure. Heldout MSD and NGP remain diagnostic
+inputs, and all microscopic, spatial, unique-potential, and thermodynamic claim
+flags remain zero.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,

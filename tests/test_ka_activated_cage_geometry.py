@@ -94,6 +94,27 @@ class JumpGeometryExtractionTests(unittest.TestCase):
         self.assertEqual(row["calibration_events_only"], 1.0)
         self.assertEqual(row["heldout_events_used"], 0.0)
 
+    def test_trajectory_loader_stops_after_the_calibration_prefix(self):
+        trajectory = {
+            "unwrapped_positions": np.zeros((6, 3, 3), dtype=float),
+            "particle_types": np.array([0, 1, 0]),
+        }
+        with mock.patch.object(
+            self.analysis,
+            "load_lammps_custom_trajectory",
+            return_value=trajectory,
+        ) as loader:
+            positions = self.analysis.load_calibration_type_a_positions(
+                Path("trajectory.lammpstrj"),
+                calibration_time=5,
+            )
+
+        loader.assert_called_once_with(
+            Path("trajectory.lammpstrj"),
+            maximum_frame_count=6,
+        )
+        self.assertEqual(positions.shape, (6, 2, 3))
+
 
 class GeometryQuotientTests(unittest.TestCase):
     @classmethod

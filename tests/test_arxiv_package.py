@@ -36,6 +36,10 @@ from summarize_ka_gamma_variance_mixture import (  # noqa: E402
     CLOSED_GATE_FIELDS as GAMMA_VARIANCE_CLOSED_GATE_FIELDS,
     main as summarize_gamma_variance_mixture,
 )
+from summarize_ka_activated_cage_geometry import (  # noqa: E402
+    STRONG_ZERO_FLAGS as ACTIVATED_GEOMETRY_ZERO_FLAGS,
+    main as summarize_activated_cage_geometry,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
@@ -540,6 +544,138 @@ class ArxivPackageTests(unittest.TestCase):
         readme = re.sub(r"\s+", " ", (ROOT / "README.md").read_text())
         self.assertIn("gamma variance-mixture Langevin", readme)
         self.assertIn("fail at the T=0.45 cage-scale wave number", readme)
+
+    def test_activated_cage_geometry_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        low_geometry_path = (
+            data / "renewal_cage_ka_replicates_T045_calibration_jump_geometry.csv"
+        )
+        high_geometry_path = (
+            data / "renewal_cage_ka_replicates_T058_calibration_jump_geometry.csv"
+        )
+        rows_path = data / "renewal_cage_ka_activated_cage_geometry_rows.csv"
+        gate_path = data / "renewal_cage_ka_activated_cage_geometry_gate.csv"
+        figure_path = ROOT / "figures" / "renewal_cage_ka_activated_cage_geometry.svg"
+        note_path = ROOT / "docs" / "microscopic-activated-cage-geometry.md"
+        for path in (
+            low_geometry_path,
+            high_geometry_path,
+            rows_path,
+            gate_path,
+            figure_path,
+            note_path,
+        ):
+            self.assertTrue(path.is_file(), path)
+
+        with low_geometry_path.open() as handle:
+            low_geometry = list(csv.DictReader(handle))
+        with high_geometry_path.open() as handle:
+            high_geometry = list(csv.DictReader(handle))
+        with rows_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        with gate_path.open() as handle:
+            gates = list(csv.DictReader(handle))
+        self.assertEqual(len(low_geometry), 3)
+        self.assertEqual(len(high_geometry), 5)
+        self.assertEqual(len(rows), 46)
+        self.assertEqual(len(gates), 2)
+        for row in low_geometry + high_geometry:
+            self.assertEqual(float(row["calibration_events_only"]), 1.0)
+            self.assertEqual(float(row["heldout_events_used"]), 0.0)
+            for field in ACTIVATED_GEOMETRY_ZERO_FLAGS:
+                self.assertEqual(float(row[field]), 0.0)
+
+        low = next(row for row in gates if float(row["temperature"]) == 0.45)
+        high = next(row for row in gates if float(row["temperature"]) == 0.58)
+        self.assertEqual(
+            low["analysis_status"],
+            "compound_poisson_cage_decomposition_unsupported",
+        )
+        self.assertEqual(float(low["empirical_supported_row_count"]), 8.0)
+        self.assertAlmostEqual(
+            float(low["empirical_support_fraction"]),
+            8.0 / 21.0,
+            delta=5e-10,
+        )
+        self.assertEqual(float(low["fixed_length_supported_row_count"]), 3.0)
+        self.assertEqual(float(low["source_stationarity_pass"]), 1.0)
+        self.assertAlmostEqual(
+            float(low["fs_k7p25_empirical_max_absolute_error"]),
+            0.04164052592,
+            delta=5e-10,
+        )
+        self.assertEqual(float(low["curve_transfer_pass"]), 0.0)
+        self.assertEqual(
+            float(low["empirical_activated_jump_geometry_supported_exploratory"]),
+            0.0,
+        )
+        self.assertEqual(
+            high["analysis_status"],
+            "canary_only_nonstationary_source",
+        )
+        self.assertEqual(float(high["empirical_supported_row_count"]), 25.0)
+        self.assertEqual(float(high["source_stationarity_pass"]), 0.0)
+        self.assertEqual(float(high["high_temperature_canary_only"]), 1.0)
+        self.assertAlmostEqual(
+            float(high["fs_k7p25_empirical_max_absolute_error"]),
+            0.04341535083,
+            delta=5e-10,
+        )
+        self.assertEqual(
+            float(high["empirical_activated_jump_geometry_supported_exploratory"]),
+            0.0,
+        )
+        for row in rows:
+            for field in ACTIVATED_GEOMETRY_ZERO_FLAGS:
+                self.assertEqual(float(row[field]), 0.0)
+        for gate in gates:
+            for field in ACTIVATED_GEOMETRY_ZERO_FLAGS:
+                self.assertEqual(float(gate[field]), 0.0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            generated_rows = temporary / "rows.csv"
+            generated_gate = temporary / "gate.csv"
+            generated_figure = temporary / "figure.svg"
+            summarize_activated_cage_geometry(
+                [
+                    "--low-geometry",
+                    str(low_geometry_path),
+                    "--high-geometry",
+                    str(high_geometry_path),
+                    "--gamma-rows",
+                    str(data / "renewal_cage_ka_gamma_variance_mixture_rows.csv"),
+                    "--low-stationarity",
+                    str(data / "renewal_cage_ka_replicates_T045_nonlinear_path_stationarity.csv"),
+                    "--high-stationarity",
+                    str(data / "renewal_cage_ka_replicates_T058_block20_nonlinear_path_stationarity.csv"),
+                    "--provenance",
+                    str(data / "renewal_cage_ka_replicates_T058_T045_provenance.csv"),
+                    "--output-rows",
+                    str(generated_rows),
+                    "--output-gate",
+                    str(generated_gate),
+                    "--output-svg",
+                    str(generated_figure),
+                ]
+            )
+            self.assertEqual(rows_path.read_bytes(), generated_rows.read_bytes())
+            self.assertEqual(gate_path.read_bytes(), generated_gate.read_bytes())
+            self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
+
+        svg = figure_path.read_text()
+        self.assertIn("Activated cage-jump geometry quotient", svg)
+        self.assertIn("absolute Fs error (tolerance = 0.03)", svg)
+        self.assertIn("fixed-length null: 3/21 supported at T=0.45", svg)
+        self.assertIn("support gate failed", svg)
+        self.assertIn("nonstationary canary", svg)
+        self.assertNotIn("compound_poisson_cage_decomposition_unsupported", svg)
+        self.assertNotIn("canary_only_nonstationary_source", svg)
+        note = re.sub(r"\s+", " ", note_path.read_text())
+        self.assertIn("held-out MSD and NGP are diagnostic inputs", note)
+        self.assertIn("activated_cage_geometry_resolved = 0", note)
+        readme = re.sub(r"\s+", " ", (ROOT / "README.md").read_text())
+        self.assertIn("activated cage-jump geometry quotient", readme)
 
     def test_transport_clock_shape_quotient_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"
