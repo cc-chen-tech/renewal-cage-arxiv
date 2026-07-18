@@ -7,6 +7,41 @@ import math
 import numpy as np
 
 
+def deterministic_conditional_diffusion(
+    velocity_jacobian: np.ndarray,
+    *,
+    friction: float,
+    temperature: float,
+) -> dict[str, np.ndarray | float | str]:
+    """Return ``2 gamma T A A^T`` from the full microscopic matrix ``A``."""
+
+    jacobian = np.asarray(velocity_jacobian, dtype=float)
+    if (
+        jacobian.ndim != 4
+        or jacobian.shape[1] != 3
+        or jacobian.shape[-1] != 3
+        or len(jacobian) < 1
+        or jacobian.shape[2] < 1
+        or np.any(~np.isfinite(jacobian))
+    ):
+        raise ValueError(
+            "velocity_jacobian must have finite shape (targets, 3, particles, 3)"
+        )
+    if not math.isfinite(friction) or friction <= 0.0:
+        raise ValueError("friction must be finite and positive")
+    if not math.isfinite(temperature) or temperature <= 0.0:
+        raise ValueError("temperature must be finite and positive")
+    diffusion = 2.0 * friction * temperature * np.einsum(
+        "tanb,tcnb->tac", jacobian, jacobian
+    )
+    diffusion = 0.5 * (diffusion + np.swapaxes(diffusion, -1, -2))
+    return {
+        "conditional_diffusion": diffusion,
+        "estimator": "deterministic_velocity_jacobian",
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def rademacher_velocity_probes(
     *,
     probe_count: int,

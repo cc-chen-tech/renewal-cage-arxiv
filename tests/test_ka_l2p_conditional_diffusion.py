@@ -74,6 +74,31 @@ class L2pConditionalDiffusionTests(unittest.TestCase):
         )
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
 
+    def test_deterministic_conditional_diffusion_is_exact_psd_and_probe_free(self):
+        from ka_l2p_conditional_diffusion import deterministic_conditional_diffusion
+
+        jacobian = np.random.default_rng(20260721).normal(size=(5, 3, 4, 3))
+        result = deterministic_conditional_diffusion(
+            jacobian,
+            friction=0.7,
+            temperature=0.58,
+        )
+        expected = 2.0 * 0.7 * 0.58 * np.einsum(
+            "tanb,tcnb->tac", jacobian, jacobian
+        )
+
+        np.testing.assert_allclose(
+            result["conditional_diffusion"], expected, rtol=2e-15, atol=2e-15
+        )
+        self.assertGreaterEqual(
+            float(np.min(np.linalg.eigvalsh(result["conditional_diffusion"]))),
+            -1e-12,
+        )
+        self.assertNotIn("probe_count", result)
+        self.assertNotIn("primary_probe_count", result)
+        self.assertEqual(result["estimator"], "deterministic_velocity_jacobian")
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
     def test_probe_estimator_converges_to_known_linear_velocity_diffusion(self):
         from ka_l2p_conditional_diffusion import (
             nested_diffusion_estimates,

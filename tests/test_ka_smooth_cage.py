@@ -815,6 +815,83 @@ class SmoothCageTests(unittest.TestCase):
                 velocity_direction=np.zeros((2, 3)),
             )
 
+    def test_deterministic_l2p_velocity_jacobian_matches_directional_derivative(self):
+        from ka_local_cage import (
+            ka_lj_force_and_isotropic_curvature,
+            ka_lj_force_generator_observables,
+        )
+        from ka_smooth_cage import (
+            smooth_cage_l2p_velocity_directional_derivative_batch,
+            smooth_cage_l2p_velocity_jacobian_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 13.0 - 0.3
+        direction = np.random.default_rng(20260721).normal(size=velocities.shape)
+        types = inputs["particle_types"]
+        box = inputs["box_lengths"]
+        targets = np.array([0, 2])
+        friction = 0.7
+
+        for protocol in ("ka_lj_cut", "ka_lj_c3_switch"):
+            with self.subTest(protocol=protocol):
+                forces = ka_lj_force_and_isotropic_curvature(
+                    positions,
+                    particle_types=types,
+                    box_lengths=box,
+                    potential_protocol=protocol,
+                )[0]
+
+                def force_generator(value):
+                    return ka_lj_force_generator_observables(
+                        positions,
+                        velocities=value,
+                        particle_types=types,
+                        box_lengths=box,
+                        target_indices=np.arange(len(positions)),
+                        friction=friction,
+                        temperature=0.58,
+                        potential_protocol=protocol,
+                    )["force_generator"]
+
+                expected = smooth_cage_l2p_velocity_directional_derivative_batch(
+                    positions,
+                    velocities=velocities,
+                    velocity_direction=direction,
+                    forces=forces,
+                    force_generator=force_generator(velocities),
+                    force_generator_direction=force_generator(direction),
+                    particle_types=types,
+                    box_lengths=box,
+                    target_indices=targets,
+                    friction=friction,
+                    directional_step=1e-5,
+                    phase_space_step=3e-6,
+                    velocity_step=2e-5,
+                )["l2p_velocity_directional_derivative"]
+                result = smooth_cage_l2p_velocity_jacobian_batch(
+                    positions,
+                    velocities=velocities,
+                    forces=forces,
+                    particle_types=types,
+                    box_lengths=box,
+                    target_indices=targets,
+                    friction=friction,
+                    jacobian_step=1e-4,
+                    potential_protocol=protocol,
+                )
+                actual = np.einsum(
+                    "tanb,nb->ta", result["l2p_velocity_jacobian"], direction
+                )
+
+                self.assertEqual(
+                    result["l2p_velocity_jacobian"].shape,
+                    (len(targets), 3, len(positions), 3),
+                )
+                np.testing.assert_allclose(actual, expected, rtol=2e-3, atol=2e-3)
+                self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
     def test_smooth_cage_features_are_rotation_invariant(self):
         from ka_smooth_cage import smooth_cage_invariant_features
 

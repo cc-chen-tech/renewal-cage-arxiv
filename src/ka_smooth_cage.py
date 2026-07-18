@@ -7,7 +7,10 @@ from pathlib import Path
 
 import numpy as np
 
-from ka_local_cage import ka_lj_force_and_isotropic_curvature
+from ka_local_cage import (
+    ka_lj_force_and_isotropic_curvature,
+    ka_lj_pair_hessian_geometry,
+)
 from ka_replicates import load_lammps_custom_trajectory
 
 
@@ -344,6 +347,112 @@ def contract_cage_jacobian_force_jacobian(
         np.add.at(by_particle, selected_i, block_by_pair)
         np.add.at(by_particle, selected_j, -block_by_pair)
     return np.transpose(by_particle, (1, 2, 0, 3))
+
+
+def smooth_cage_l2p_velocity_jacobian_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    forces: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    jacobian_step: float,
+    potential_protocol: str = "ka_lj_cut",
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float | str]:
+    """Construct the full deterministic matrix ``grad_V(L^2 p)``."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or forces.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+        or np.any(~np.isfinite(forces))
+    ):
+        raise ValueError("phase-space arrays must be aligned finite (particles, 3) arrays")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(jacobian_step) or jacobian_step <= 0.0:
+        raise ValueError("jacobian_step must be finite and positive")
+
+    coordinate_arguments = {
+        "velocities": np.zeros_like(positions),
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "target_batch_size": target_batch_size,
+        "compute_gram": False,
+        "return_jacobian": True,
+    }
+
+    def cage_jacobian(configuration: np.ndarray) -> np.ndarray:
+        return np.asarray(
+            smooth_force_support_cage_batch(
+                configuration,
+                **coordinate_arguments,
+            )["jacobian"],
+            dtype=float,
+        )
+
+    step = float(jacobian_step)
+    base = cage_jacobian(positions)
+    plus_velocity = cage_jacobian(positions + step * velocities)
+    minus_velocity = cage_jacobian(positions - step * velocities)
+    plus_force = cage_jacobian(positions + step * forces)
+    minus_force = cage_jacobian(positions - step * forces)
+
+    first_velocity = (plus_velocity - minus_velocity) / (2.0 * step)
+    second_velocity = (plus_velocity - 2.0 * base + minus_velocity) / step**2
+    first_force = (plus_force - minus_force) / (2.0 * step)
+    pair_geometry = ka_lj_pair_hessian_geometry(
+        positions,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        potential_protocol=potential_protocol,
+    )
+    force_jacobian = contract_cage_jacobian_force_jacobian(
+        base,
+        particle_i=np.asarray(pair_geometry["particle_i"]),
+        particle_j=np.asarray(pair_geometry["particle_j"]),
+        pair_hessian=np.asarray(pair_geometry["pair_hessian"]),
+    )
+
+    def matrix_layout(value: np.ndarray) -> np.ndarray:
+        return np.transpose(value, (0, 2, 1, 3))
+
+    force_direction_term = 3.0 * matrix_layout(first_force)
+    velocity_direction_term = -6.0 * friction * matrix_layout(first_velocity)
+    friction_term = friction**2 * matrix_layout(base)
+    third_derivative_term = 3.0 * matrix_layout(second_velocity)
+    total = (
+        force_jacobian
+        + force_direction_term
+        + velocity_direction_term
+        + friction_term
+        + third_derivative_term
+    )
+    return {
+        "l2p_velocity_jacobian": total,
+        "force_jacobian_term": force_jacobian,
+        "force_direction_cage_jacobian_term": force_direction_term,
+        "velocity_direction_cage_jacobian_term": velocity_direction_term,
+        "friction_cage_jacobian_term": friction_term,
+        "third_derivative_cage_jacobian_term": third_derivative_term,
+        "jacobian_step": step,
+        "pair_count": float(pair_geometry["pair_count"]),
+        "potential_protocol": potential_protocol,
+        "thermodynamic_claim_allowed": 0.0,
+    }
 
 
 def smooth_cage_joint_noise_covariance_rate(
