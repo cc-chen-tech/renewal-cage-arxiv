@@ -273,6 +273,8 @@ class ParentAggregationTests(unittest.TestCase):
         self.assertAlmostEqual(parents[0]["predicted_msd"], 2.0)
         self.assertAlmostEqual(parents[0]["msd_relative_error"], 0.0)
         self.assertEqual(parents[0]["child_restart_count"], 2)
+        self.assertEqual(parents[0]["all_child_restart_curve_gate_pass"], 0.0)
+        self.assertFalse(closure.curve_pass(parents))
 
     def test_restart_summary_computes_monte_carlo_error_before_parent_pooling(self):
         rows = [
@@ -320,6 +322,7 @@ class MemoryClosureGateTests(unittest.TestCase):
             "parent_id": parent,
             "model": model,
             "lag": 100.0,
+            "target_msd": 1.0,
             "msd_relative_error": msd_error,
             "ngp_absolute_error": ngp_error,
             "absolute_error_fs_k2": 0.0,
@@ -435,6 +438,12 @@ class MemoryClosureGateTests(unittest.TestCase):
         self.assertAlmostEqual(closure.higher_order_score(row), 0.8)
         self.assertTrue(closure.curve_pass([row]))
         row["mc_se_fs_k7p25"] = 0.0031
+        self.assertFalse(closure.curve_pass([row]))
+
+    def test_msd_monte_carlo_limit_is_relative_to_target(self):
+        row = self.parent_row(parent="p", model="m")
+        row["target_msd"] = 0.1
+        row["mc_se_msd"] = 0.002
         self.assertFalse(closure.curve_pass([row]))
 
 

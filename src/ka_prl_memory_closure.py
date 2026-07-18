@@ -452,6 +452,16 @@ def _add_curve_errors(row: dict[str, object]) -> None:
         )
 
 
+def _msd_mc_relative_se(row: Mapping[str, object]) -> float:
+    target_msd = abs(float(row["target_msd"]))
+    if not math.isfinite(target_msd) or target_msd <= 0.0:
+        raise ValueError("target MSD must be positive for relative Monte Carlo SE")
+    value = float(row.get("mc_se_msd", 0.0)) / target_msd
+    if not math.isfinite(value) or value < 0.0:
+        raise ValueError("MSD Monte Carlo SE must be finite and nonnegative")
+    return value
+
+
 def summarize_restarts(
     realization_rows: Sequence[Mapping[str, object]],
 ) -> list[dict[str, object]]:
@@ -482,7 +492,30 @@ def summarize_restarts(
             float(row.get("support_pass", 1.0)) for row in rows
         )
         _add_curve_errors(summary)
+        summary["mc_relative_se_msd"] = _msd_mc_relative_se(summary)
         output.append(summary)
+    for _, rows in _group_rows(output, ("temperature", "restart", "model")):
+        restart_curve_pass = float(curve_pass(rows))
+        restart_higher_order_pass = float(
+            all(higher_order_score(row) <= 1.0 for row in rows)
+        )
+        restart_precision_pass = float(
+            all(
+                _msd_mc_relative_se(row) <= MC_LIMITS["msd"]
+                and float(row["mc_se_ngp"]) <= MC_LIMITS["ngp"]
+                and max(
+                    float(value)
+                    for key, value in row.items()
+                    if str(key).startswith("mc_se_fs_k")
+                )
+                <= MC_LIMITS["fs"]
+                for row in rows
+            )
+        )
+        for row in rows:
+            row["restart_curve_gate_pass"] = restart_curve_pass
+            row["restart_higher_order_gate_pass"] = restart_higher_order_pass
+            row["restart_precision_pass"] = restart_precision_pass
     return output
 
 
@@ -529,7 +562,17 @@ def summarize_parents(
                 math.sqrt(float(np.sum(child_se * child_se))) / len(rows)
             )
         summary["support_pass"] = min(float(row["support_pass"]) for row in rows)
+        summary["all_child_restart_curve_gate_pass"] = min(
+            float(row.get("restart_curve_gate_pass", 1.0)) for row in rows
+        )
+        summary["all_child_restart_higher_order_gate_pass"] = min(
+            float(row.get("restart_higher_order_gate_pass", 1.0)) for row in rows
+        )
+        summary["all_child_restart_precision_pass"] = min(
+            float(row.get("restart_precision_pass", 1.0)) for row in rows
+        )
         _add_curve_errors(summary)
+        summary["mc_relative_se_msd"] = _msd_mc_relative_se(summary)
         output.append(summary)
     return output
 
@@ -559,10 +602,11 @@ def curve_pass(rows: Sequence[Mapping[str, object]]) -> bool:
         return False
     return all(
         float(row.get("support_pass", 1.0)) == 1.0
+        and float(row.get("all_child_restart_curve_gate_pass", 1.0)) == 1.0
         and float(row["msd_relative_error"]) <= CURVE_LIMITS["msd"]
         and float(row["ngp_absolute_error"]) <= CURVE_LIMITS["ngp"]
         and max(_fs_error_values(row)) <= CURVE_LIMITS["fs"]
-        and float(row.get("mc_se_msd", 0.0)) <= MC_LIMITS["msd"]
+        and _msd_mc_relative_se(row) <= MC_LIMITS["msd"]
         and float(row.get("mc_se_ngp", 0.0)) <= MC_LIMITS["ngp"]
         and max(
             float(value)
@@ -584,7 +628,14 @@ def summarize_model_verdicts(
         verdict["lag_count"] = len(rows)
         verdict["curve_gate_pass"] = float(curve_pass(rows))
         verdict["higher_order_gate_pass"] = float(
-            all(higher_order_score(row) <= 1.0 for row in rows)
+            all(
+                higher_order_score(row) <= 1.0
+                and float(
+                    row.get("all_child_restart_higher_order_gate_pass", 1.0)
+                )
+                == 1.0
+                for row in rows
+            )
         )
         verdict["maximum_higher_order_score"] = max(
             higher_order_score(row) for row in rows
@@ -594,7 +645,8 @@ def summarize_model_verdicts(
         )
         verdict["precision_pass"] = float(
             all(
-                float(row.get("mc_se_msd", 0.0)) <= MC_LIMITS["msd"]
+                _msd_mc_relative_se(row) <= MC_LIMITS["msd"]
+                and float(row.get("all_child_restart_precision_pass", 1.0)) == 1.0
                 and float(row.get("mc_se_ngp", 0.0)) <= MC_LIMITS["ngp"]
                 and max(
                     float(value)
