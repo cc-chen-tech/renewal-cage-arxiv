@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
+<rect width="980" height="520" fill="#ffffff"/>
+<text x="60.00" y="42.00" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start" fill="#263238">Activated cage-jump geometry quotient</text>
+<text x="60.00" y="68.00" font-family="Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#46515c">absolute Fs error (tolerance = 0.03)</text>
+<rect x="60" y="100" width="410" height="300" fill="#fbfcfd" stroke="#c7ced5"/>
+<text x="78.00" y="130.00" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#263238">T=0.45 primary</text>
+<line x1="115.00" y1="338.00" x2="445.00" y2="338.00" stroke="#e2e6ea"/>
+<text x="108.00" y="342.00" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="end" fill="#5b6570">0</text>
+<line x1="115.00" y1="225.23" x2="445.00" y2="225.23" stroke="#a43b32" stroke-dasharray="5 4"/>
+<text x="108.00" y="229.23" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="end" fill="#5b6570">0.03</text>
+<line x1="115.00" y1="158.00" x2="445.00" y2="158.00" stroke="#e2e6ea"/>
+<text x="108.00" y="162.00" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="end" fill="#5b6570">0.0479</text>
+<rect x="154.00" y="337.72" width="32" height="0.28" fill="#2f7d68"/>
+<text x="170.00" y="358.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#263238">k=2</text>
+<rect x="264.00" y="325.87" width="32" height="12.13" fill="#2f7d68"/>
+<text x="280.00" y="358.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#263238">k=4</text>
+<rect x="374.00" y="181.48" width="32" height="156.52" fill="#b34a42"/>
+<text x="390.00" y="358.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#263238">k=7.25</text>
+<text x="78.00" y="375.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" fill="#46515c">empirical support: 8/21; support gate failed</text>
+<rect x="510" y="100" width="410" height="300" fill="#fbfcfd" stroke="#c7ced5"/>
+<text x="528.00" y="130.00" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#263238">T=0.58 canary only</text>
+<line x1="565.00" y1="338.00" x2="895.00" y2="338.00" stroke="#e2e6ea"/>
+<text x="558.00" y="342.00" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="end" fill="#5b6570">0</text>
+<line x1="565.00" y1="229.84" x2="895.00" y2="229.84" stroke="#a43b32" stroke-dasharray="5 4"/>
+<text x="558.00" y="233.84" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="end" fill="#5b6570">0.03</text>
+<line x1="565.00" y1="158.00" x2="895.00" y2="158.00" stroke="#e2e6ea"/>
+<text x="558.00" y="162.00" font-family="Arial, sans-serif" font-size="10" font-weight="400" text-anchor="end" fill="#5b6570">0.0499</text>
+<rect x="604.00" y="324.35" width="32" height="13.65" fill="#2f7d68"/>
+<text x="620.00" y="358.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#263238">k=2</text>
+<rect x="714.00" y="290.64" width="32" height="47.36" fill="#2f7d68"/>
+<text x="730.00" y="358.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#263238">k=4</text>
+<rect x="824.00" y="181.48" width="32" height="156.52" fill="#b34a42"/>
+<text x="840.00" y="358.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#263238">k=7.25</text>
+<text x="528.00" y="375.00" font-family="Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" fill="#46515c">empirical support: 25/25; nonstationary canary</text>
+<text x="60.00" y="435.00" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#263238">fixed-length null: 3/21 supported at T=0.45</text>
+<text x="60.00" y="462.00" font-family="Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#46515c">Boundary: held-out MSD and NGP are diagnostic inputs; no blind, unique-potential, spatial, microscopic, or thermodynamic claim.</text>
+</svg>
