@@ -2652,6 +2652,42 @@ effective model into a thermodynamic theory.
   either equal or decoupled persistence and exchange clocks.}
 \end{figure}
 
+\subsection{Common-grid KA shape mechanism selection}
+
+The remaining low-temperature cage-scale residual can be used as a direct
+mechanism discriminator.  On the identical 18-cell $T=0.45$ support grid we
+combine the inferred negative-binomial count PGF $G(z)$ with calibration
+one-jump and consecutive two-jump characteristic functions $\psi_1(k)$ and
+$\psi_2(k)$.  Besides the independent result $G(\psi_1)$, we test a disjoint
+pair closure, a leading Pair-eigenmode closure with
+$\lambda_k=\psi_2(k)/\psi_1(k)$, and the full committed empirical
+$n$-jump path kernel through $n=60$.  All use the same independent Gaussian
+cage factor and the same held-out MSD and NGP diagnostic inputs; none fits a
+macro parameter.
+
+All four factorized event-path closures fail the frozen $0.03$ multi-$k$
+tolerance.  The mildest pair correction reduces the independent high-$k$
+maximum from $0.04109$ to $0.03310$, but increases the $k=4$ maximum to
+$0.04521$; the Pair-eigenmode and empirical-path maxima rise to $0.09721$ and
+$0.12065$.  On the same cells, gamma and inverse-Gaussian positive
+variance-mixture resummations have maxima $0.01398$ and $0.01268$ and both
+pass.  The result therefore selects a transient displacement shape class
+rather than a unique microscopic mechanism.  It does not identify a unique
+mixing family, static disorder, finite exchange, cage--jump coupling, or
+spatial facilitation, and the three restart labels still share one parent
+sample.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/renewal_cage_ka_shape_mechanism_selection.pdf}
+  \caption{Common-grid KA shape mechanism selection.  Points show the maximum
+  absolute $F_s$ error divided by the frozen $0.03$ tolerance at each wave
+  number.  Every tested factorized event-path closure crosses the unit line,
+  whereas two distinct positive variance-mixture resummations remain below it.
+  Held-out MSD and NGP are diagnostic inputs, so this is shape-class selection,
+  not a blind microscopic closure or a thermodynamic glass-transition claim.}
+\end{figure}
+
 \clearpage
 \section{Discussion}
 

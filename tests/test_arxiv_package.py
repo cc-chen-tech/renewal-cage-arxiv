@@ -12,7 +12,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from build_arxiv_package import build_arxiv_package  # noqa: E402
+from build_arxiv_package import (  # noqa: E402
+    build_arxiv_package,
+    write_ka_shape_mechanism_selection_pdf,
+)
 from summarize_ka_cage_anchor_gate import classify_cage_anchor_gate  # noqa: E402
 from summarize_ka_anchor_semi_markov_gate import (  # noqa: E402
     classify_anchor_semi_markov_gate,
@@ -52,6 +55,10 @@ from analyze_transient_periodic_langevin import (  # noqa: E402
     CLAIM_FLAGS as TRANSIENT_LANGEVIN_ZERO_FLAGS,
     classify_ablation as classify_transient_langevin_ablation,
     render_ablation_svg,
+)
+from summarize_ka_shape_mechanism_selection import (  # noqa: E402
+    CLAIM_FLAGS as SHAPE_SELECTION_CLOSED_CLAIMS,
+    analyze_committed_tables as analyze_shape_mechanism_selection,
 )
 
 
@@ -1000,6 +1007,66 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("variance-mixture shape quotient", readme)
         self.assertIn("held-out MSD and NGP are diagnostic inputs", readme)
         self.assertIn("does not select a unique variance-mixture family", readme)
+
+    def test_shape_mechanism_selection_is_recomputed_packaged_and_claim_limited(self):
+        data = ROOT / "data"
+        rows_path = data / "renewal_cage_ka_shape_mechanism_selection_rows.csv"
+        models_path = data / "renewal_cage_ka_shape_mechanism_selection_models.csv"
+        verdict_path = data / "renewal_cage_ka_shape_mechanism_selection_verdict.csv"
+        figure_path = ROOT / "figures" / "renewal_cage_ka_shape_mechanism_selection.svg"
+        note_path = ROOT / "docs" / "ka-shape-mechanism-selection.md"
+        for path in (rows_path, models_path, verdict_path, figure_path, note_path):
+            self.assertTrue(path.is_file(), path)
+
+        computed_rows, computed_models, computed_verdicts = (
+            analyze_shape_mechanism_selection(ROOT)
+        )
+        with rows_path.open() as handle:
+            stored_rows = list(csv.DictReader(handle))
+        with models_path.open() as handle:
+            stored_models = list(csv.DictReader(handle))
+        with verdict_path.open() as handle:
+            stored_verdicts = list(csv.DictReader(handle))
+        self.assertCsvRowsMatchComputedRows(stored_rows, computed_rows)
+        self.assertCsvRowsMatchComputedRows(stored_models, computed_models)
+        self.assertCsvRowsMatchComputedRows(stored_verdicts, computed_verdicts)
+
+        low = next(row for row in stored_verdicts if float(row["temperature"]) == 0.45)
+        self.assertEqual(
+            low["analysis_status"],
+            "variance_mixture_shape_survives_factorized_event_path_closures_fail",
+        )
+        self.assertEqual(float(low["parent_sample_count"]), 1.0)
+        self.assertEqual(
+            float(low["tested_factorized_event_path_closures_excluded_on_common_grid"]),
+            1.0,
+        )
+        self.assertEqual(
+            float(low["positive_variance_mixture_shape_class_survives"]),
+            1.0,
+        )
+        for field in SHAPE_SELECTION_CLOSED_CLAIMS:
+            self.assertEqual(float(low[field]), 0.0, field)
+
+        note = note_path.read_text()
+        self.assertIn("Pair-eigenmode closure", note)
+        self.assertIn("shape class, not a microscopic mechanism", note)
+        readme = (ROOT / "README.md").read_text()
+        self.assertIn("common-grid shape mechanism selection", readme)
+        manuscript = (ROOT / "paper" / "main.tex").read_text()
+        self.assertIn("renewal_cage_ka_shape_mechanism_selection.pdf", manuscript)
+        self.assertIn(
+            "shape class rather than a unique microscopic mechanism",
+            re.sub(r"\s+", " ", manuscript),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            pdf = Path(directory) / "selection.pdf"
+            write_ka_shape_mechanism_selection_pdf(pdf)
+            self.assertGreater(pdf.stat().st_size, 2_000)
+            self.assertIn(
+                b"maximum absolute Fs error / 0.03",
+                pdf.read_bytes(),
+            )
 
     def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"
@@ -7441,6 +7508,18 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertIn("figures/renewal_cage_heterogeneity.pdf", names)
             self.assertIn("figures/renewal_cage_heterogeneity_map.pdf", names)
             self.assertIn("figures/renewal_cage_static_null.pdf", names)
+            self.assertIn(
+                "figures/renewal_cage_ka_shape_mechanism_selection.pdf",
+                names,
+            )
+            self.assertIn(
+                "data/renewal_cage_ka_shape_mechanism_selection_models.csv",
+                names,
+            )
+            self.assertIn(
+                "data/renewal_cage_ka_shape_mechanism_selection_verdict.csv",
+                names,
+            )
             self.assertIn("figures/renewal_cage_alpha_shape.pdf", names)
             self.assertIn("figures/renewal_cage_facilitated_exchange.pdf", names)
             self.assertIn("figures/renewal_cage_glass_audit.pdf", names)

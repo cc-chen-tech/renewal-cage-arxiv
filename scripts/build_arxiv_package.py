@@ -9592,6 +9592,144 @@ def write_obadiya_waiting_shuffle_pdf(path: Path) -> None:
     c.save()
 
 
+def write_ka_shape_mechanism_selection_pdf(path: Path) -> None:
+    with (
+        DATA_DIR / "renewal_cage_ka_shape_mechanism_selection_models.csv"
+    ).open() as handle:
+        rows = [
+            row
+            for row in csv.DictReader(handle)
+            if math.isclose(float(row["temperature"]), 0.45)
+        ]
+    order = (
+        "independent_jump",
+        "disjoint_pair",
+        "pair_eigenmode",
+        "empirical_path",
+        "gamma_variance_mixture",
+        "inverse_gaussian_variance_mixture",
+    )
+    by_model = {row["model"]: row for row in rows}
+    if set(by_model) != set(order):
+        raise ValueError("shape-mechanism PDF requires the complete T=0.45 model grid")
+    labels = {
+        "independent_jump": ("Independent", "jump"),
+        "disjoint_pair": ("Disjoint", "pairs"),
+        "pair_eigenmode": ("Pair", "eigenmode"),
+        "empirical_path": ("Empirical", "path"),
+        "gamma_variance_mixture": ("Gamma", "mixture"),
+        "inverse_gaussian_variance_mixture": ("Inverse-Gaussian", "mixture"),
+    }
+    wave_fields = (
+        ("k=2", "fs_k2_max_absolute_error", colors.HexColor("#147d92")),
+        ("k=4", "fs_k4_max_absolute_error", colors.HexColor("#d97706")),
+        ("k=7.25", "fs_k7p25_max_absolute_error", colors.HexColor("#b83280")),
+    )
+    page_width, page_height = landscape(letter)
+    left = 68.0
+    right = 28.0
+    bottom = 145.0
+    top = 96.0
+    plot_width = page_width - left - right
+    plot_height = page_height - top - bottom
+    maximum = 4.25
+
+    def y_coordinate(value: float) -> float:
+        return bottom + plot_height * min(maximum, max(0.0, value)) / maximum
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=landscape(letter), pageCompression=0)
+    c.setTitle("Shape-class mechanism selection")
+    c.setFillColor(colors.HexColor("#17202a"))
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, page_height - 34, "Shape-class mechanism selection")
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.HexColor("#44515c"))
+    c.drawString(
+        40,
+        page_height - 52,
+        "T=0.45, identical 18 replicate-lag cells; held-out MSD and NGP are diagnostic inputs",
+    )
+
+    spacing = plot_width / len(order)
+    for index, model in enumerate(order):
+        if model not in {"gamma_variance_mixture", "inverse_gaussian_variance_mixture"}:
+            continue
+        x = left + spacing * (index + 0.5)
+        c.setFillColor(colors.HexColor("#edf7f0"))
+        c.rect(x - 0.44 * spacing, bottom, 0.88 * spacing, plot_height, fill=1, stroke=0)
+
+    c.setFont("Helvetica", 7)
+    for tick in range(5):
+        y = y_coordinate(float(tick))
+        c.setStrokeColor(colors.HexColor("#d9dee3"))
+        c.setLineWidth(0.6)
+        c.line(left, y, page_width - right, y)
+        c.setFillColor(colors.HexColor("#56616b"))
+        c.drawRightString(left - 7, y - 2, str(tick))
+    tolerance_y = y_coordinate(1.0)
+    c.setStrokeColor(colors.HexColor("#20262c"))
+    c.setLineWidth(1.2)
+    c.setDash(5, 4)
+    c.line(left, tolerance_y, page_width - right, tolerance_y)
+    c.setDash()
+    c.setFont("Helvetica-Bold", 7)
+    c.setFillColor(colors.HexColor("#20262c"))
+    c.drawRightString(page_width - right - 2, tolerance_y + 5, "frozen tolerance")
+    c.setLineWidth(0.9)
+    c.line(left, bottom, left, bottom + plot_height)
+    c.line(left, bottom, page_width - right, bottom)
+    c.saveState()
+    c.translate(18, bottom + plot_height / 2.0)
+    c.rotate(90)
+    c.setFillColor(colors.HexColor("#26323b"))
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(0, 0, "maximum absolute Fs error / 0.03")
+    c.restoreState()
+
+    for index, model in enumerate(order):
+        x = left + spacing * (index + 0.5)
+        row = by_model[model]
+        for offset, (_, field, color) in zip((-10.0, 0.0, 10.0), wave_fields):
+            normalized = float(row[field]) / 0.03
+            c.setFillColor(color)
+            c.circle(x + offset, y_coordinate(normalized), 4.5, fill=1, stroke=0)
+        first, second = labels[model]
+        c.setFillColor(colors.HexColor("#26323b"))
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawCentredString(x, bottom - 19, first)
+        c.setFont("Helvetica", 7.5)
+        c.drawCentredString(x, bottom - 31, second)
+
+    legend_x = 510.0
+    for index, (label, _, color) in enumerate(wave_fields):
+        x = legend_x + 72.0 * index
+        c.setFillColor(color)
+        c.circle(x, page_height - 33, 3.8, fill=1, stroke=0)
+        c.setFillColor(colors.HexColor("#34414b"))
+        c.setFont("Helvetica", 7.5)
+        c.drawString(x + 7, page_height - 36, label)
+
+    c.setFillColor(colors.HexColor("#26323b"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(40, 54, "Result:")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        78,
+        54,
+        "all tested factorized event-path closures fail; both positive variance-mixture resummations pass.",
+    )
+    c.setFillColor(colors.HexColor("#59656f"))
+    c.setFont("Helvetica", 7.2)
+    c.drawString(
+        40,
+        38,
+        "Diagnostic shape-class selection only; no unique family, static/finite exchange, cage-jump coupling, or microscopic mechanism is identified.",
+    )
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -9938,6 +10076,9 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     heterogeneity_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity.pdf"
     heterogeneity_map_pdf = PAPER_FIGURE_DIR / "renewal_cage_heterogeneity_map.pdf"
     static_null_pdf = PAPER_FIGURE_DIR / "renewal_cage_static_null.pdf"
+    ka_shape_mechanism_selection_pdf = (
+        PAPER_FIGURE_DIR / "renewal_cage_ka_shape_mechanism_selection.pdf"
+    )
     inversion_pdf = PAPER_FIGURE_DIR / "renewal_cage_inversion.pdf"
     write_results_pdf(results_pdf)
     write_stationary_finite_flight_pdf(stationary_finite_flight_pdf)
@@ -10225,6 +10366,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     write_heterogeneity_pdf(heterogeneity_pdf)
     write_heterogeneity_map_pdf(heterogeneity_map_pdf)
     write_static_null_pdf(static_null_pdf)
+    write_ka_shape_mechanism_selection_pdf(ka_shape_mechanism_selection_pdf)
     write_inversion_pdf(inversion_pdf)
 
     zip_path = output_dir / "renewal-cage-arxiv-source.zip"
@@ -10244,6 +10386,16 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
             obadiya_waiting_shuffle_pdf,
             "figures/renewal_cage_obadiya_T045_waiting_shuffle.pdf",
         )
+        archive.write(
+            ka_shape_mechanism_selection_pdf,
+            "figures/renewal_cage_ka_shape_mechanism_selection.pdf",
+        )
+        for filename in (
+            "renewal_cage_ka_shape_mechanism_selection_rows.csv",
+            "renewal_cage_ka_shape_mechanism_selection_models.csv",
+            "renewal_cage_ka_shape_mechanism_selection_verdict.csv",
+        ):
+            archive.write(DATA_DIR / filename, f"data/{filename}")
         archive.write(
             DATA_DIR / "renewal_cage_stationary_finite_flight.csv",
             "data/renewal_cage_stationary_finite_flight.csv",
