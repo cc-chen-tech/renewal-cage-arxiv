@@ -1453,6 +1453,26 @@ def paired_excess_source_verdict_fixture():
     }
 
 
+def paired_excess_provenance_fixture():
+    return [
+        {
+            "temperature": 0.45,
+            "replicate": float(replicate),
+            "source_sha256": "shared-parent-sha256",
+            "source_frame_index": float(frame),
+            "velocity_seed": float(seed),
+            "independence_class": "decorrelated_parent_frames_plus_velocity_seeds",
+            "independently_prepared_parent_samples": False,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        for replicate, frame, seed in (
+            (1, 5000, 45117),
+            (2, 35000, 45157),
+            (3, 65000, 45201),
+        )
+    ]
+
+
 class PairedExcessBaselineTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -1468,6 +1488,7 @@ class PairedExcessBaselineTests(unittest.TestCase):
             ),
             segment_cell_fixture(0.45, within_start=None, cross_start=None),
             [source_verdict or paired_excess_source_verdict_fixture()],
+            paired_excess_provenance_fixture(),
         )
 
     def test_excess_rows_are_replicate_paired_to_the_full_path_baseline(self):
@@ -1480,7 +1501,13 @@ class PairedExcessBaselineTests(unittest.TestCase):
             if row["model"] == "within_particle_segment_shuffle"
             and row["segment_length"] == 50.0
         )
-        self.assertEqual(selected["independent_replicate_count"], 3.0)
+        self.assertEqual(selected["independent_replicate_count"], 0.0)
+        self.assertEqual(selected["replicate_count"], 3.0)
+        self.assertEqual(selected["parent_sample_count"], 1.0)
+        self.assertEqual(
+            selected["ci95_method"],
+            "student_t_replicate_first_correlated_parent_exploratory_df2",
+        )
         self.assertAlmostEqual(selected["replicate_1_paired_excess"], 2.0)
         self.assertAlmostEqual(selected["replicate_2_paired_excess"], 2.0)
         self.assertAlmostEqual(selected["replicate_3_paired_excess"], 2.0)
@@ -1495,6 +1522,8 @@ class PairedExcessBaselineTests(unittest.TestCase):
         self.assertEqual(gate["input_completeness_pass"], 1.0)
         self.assertEqual(gate["full_path_model_agreement_pass"], 1.0)
         self.assertEqual(gate["low_full_path_control_all_replicates_pass"], 0.0)
+        self.assertEqual(gate["replicate_provenance_validation_pass"], 1.0)
+        self.assertEqual(gate["independent_replicate_count"], 0.0)
         self.assertEqual(gate["short_horizon_information_loss_supported_exploratory"], 1.0)
         self.assertEqual(gate["owner_identity_information_supported_exploratory"], 1.0)
         self.assertEqual(gate["finite_memory_state_addition_allowed"], 0.0)

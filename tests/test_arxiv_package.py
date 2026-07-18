@@ -319,6 +319,18 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
             self.assertEqual(float(row["post_run_exploratory"]), 1.0)
             self.assertEqual(float(row["global_source_segment_schedule_preserved"]), 1.0)
+            self.assertEqual(float(row["replicate_provenance_validation_pass"]), 1.0)
+            self.assertEqual(float(row["independent_replicate_count"]), 0.0)
+            self.assertEqual(float(row["replicate_count"]), 3.0)
+            self.assertEqual(float(row["parent_sample_count"]), 1.0)
+            self.assertEqual(
+                float(row["replicate_first_interval_independence_claim_allowed"]),
+                0.0,
+            )
+            self.assertEqual(
+                row["ci95_method"],
+                "student_t_replicate_first_correlated_parent_exploratory_df2",
+            )
 
         with (data / "renewal_cage_ka_replicates_T045_segment_splice_replicate_scores.csv").open() as handle:
             replicate_scores = list(csv.DictReader(handle))
@@ -326,10 +338,13 @@ class ArxivPackageTests(unittest.TestCase):
             cells = list(csv.DictReader(handle))
         with (data / "renewal_cage_ka_segment_splice_gate.csv").open() as handle:
             source_verdict = list(csv.DictReader(handle))
+        with (data / "renewal_cage_ka_replicates_T058_T045_provenance.csv").open() as handle:
+            provenance = list(csv.DictReader(handle))
         recomputed_rows, recomputed_gate = classify_paired_excess_gate(
             replicate_scores,
             cells,
             source_verdict,
+            provenance,
         )
         self.assertEqual(len(recomputed_rows), len(rows))
         self.assertCsvRowsMatchComputedRows(rows, recomputed_rows)
@@ -342,6 +357,11 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(stored["full_path_model_agreement_pass"]), 1.0)
         self.assertEqual(float(stored["low_full_path_control_all_replicates_pass"]), 0.0)
         self.assertEqual(float(stored["low_full_path_control_failed_replicate_count"]), 2.0)
+        self.assertEqual(float(stored["replicate_provenance_validation_pass"]), 1.0)
+        self.assertEqual(float(stored["replicate_count"]), 3.0)
+        self.assertEqual(float(stored["parent_sample_count"]), 1.0)
+        self.assertEqual(float(stored["independent_replicate_count"]), 0.0)
+        self.assertEqual(float(stored["independently_prepared_parent_samples"]), 0.0)
         self.assertEqual(float(stored["identified_prefix_max_segment_length"]), 10.0)
         self.assertEqual(float(stored["identified_prefix_max_tau"]), 200.0)
         self.assertEqual(
@@ -379,6 +399,8 @@ class ArxivPackageTests(unittest.TestCase):
                     str(data / "renewal_cage_ka_replicates_T045_segment_splice_cells.csv"),
                     "--source-verdict",
                     str(data / "renewal_cage_ka_segment_splice_gate.csv"),
+                    "--provenance",
+                    str(data / "renewal_cage_ka_replicates_T058_T045_provenance.csv"),
                     "--output-rows",
                     str(generated_rows),
                     "--output-gate",
@@ -387,19 +409,15 @@ class ArxivPackageTests(unittest.TestCase):
                     str(generated_figure),
                 ]
             )
-            with generated_rows.open() as handle:
-                generated_row_values = list(csv.DictReader(handle))
-            with generated_gate.open() as handle:
-                generated_gate_value = next(csv.DictReader(handle))
-            self.assertCsvRowsMatchComputedRows(rows, generated_row_values)
-            self.assertCsvGateMatchesComputedGate(stored, generated_gate_value)
+            self.assertEqual(rows_path.read_bytes(), generated_rows.read_bytes())
+            self.assertEqual(gate_path.read_bytes(), generated_gate.read_bytes())
             self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
 
         svg = figure_path.read_text()
         self.assertIn("Paired excess over replicate full-path baseline", svg)
         self.assertIn("post-run exploratory", svg)
         self.assertIn("mechanism unresolved", svg)
-        self.assertIn("no sufficiency, microscopic, spatial, or thermodynamic claim", svg)
+        self.assertIn("no independent-sample CI, sufficiency, microscopic, spatial, or thermodynamic claim", svg)
         coordinates = [
             float(value)
             for value in re.findall(r'(?:(?:x|y)[12]?|cx|cy)="([0-9.]+)"', svg)
