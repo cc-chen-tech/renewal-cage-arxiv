@@ -127,8 +127,11 @@ and seed `20260718`.  No design parameter was changed.  The maximum Euler
 position increment is below `0.373 L` in every model, and every state remains
 finite.
 
-The seed fixes trajectories within one numerical runtime, and the quick
-ablation test replays that contract.  Exact event rows are not required to be
+The seed fixes trajectories within one numerical runtime, with independent
+child streams for the initial barrier, tagged-coordinate, elastic-coordinate,
+and barrier-coordinate noises.  The same child streams are reused across all
+four ablations, so switching `q` cannot shift the later `x` or `z` thermal
+increments.  The quick ablation test replays that contract.  Exact event rows are not required to be
 bitwise reproducible across operating systems or NumPy builds: tiny
 platform-level differences in transcendental forces can move a long stochastic
 path across a nearest-well boundary.  Cross-platform package validation instead
@@ -141,18 +144,18 @@ tolerance.
 
 | model | events | count Fano | successive step correlation | persistence/exchange | max NGP |
 |---|---:|---:|---:|---:|---:|
-| `static_periodic` | 66,790 | 0.879901 | -0.004782 | 0.935988 | 0.461009 |
-| `rate_only` | 50,009 | 1.260693 | -0.003019 | 1.139325 | 0.651285 |
-| `elastic_only` | 64,712 | 0.888939 | -0.068824 | 0.949379 | 0.455246 |
-| `full_transient` | 48,372 | 1.247995 | -0.068495 | 1.332826 | 0.643281 |
+| `static_periodic` | 66,575 | 0.867508 | -0.003304 | 0.918941 | 0.463994 |
+| `rate_only` | 49,130 | 1.270067 | -0.004545 | 1.223083 | 0.664862 |
+| `elastic_only` | 64,804 | 0.883977 | -0.070353 | 0.930306 | 0.455961 |
+| `full_transient` | 47,999 | 1.277219 | -0.070209 | 1.222761 | 0.650929 |
 
 Relative to `static_periodic`:
 
 ```text
-rate_only Fano change                 = +0.380792,
-elastic_only step-correlation change = -0.064042,
-full Fano change                      = +0.368094,
-full step-correlation change         = -0.063713.
+rate_only Fano change                 = +0.402559,
+elastic_only step-correlation change = -0.067049,
+full Fano change                      = +0.409712,
+full step-correlation change         = -0.066905.
 ```
 
 All frozen directional margins are `0.02`, so the rate-only, elastic-only, and

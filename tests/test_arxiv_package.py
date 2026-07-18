@@ -40,6 +40,10 @@ from summarize_ka_activated_cage_geometry import (  # noqa: E402
     STRONG_ZERO_FLAGS as ACTIVATED_GEOMETRY_ZERO_FLAGS,
     main as summarize_activated_cage_geometry,
 )
+from summarize_ka_variance_mixture_shape_quotient import (  # noqa: E402
+    OUTPUT_CLOSED_CLAIMS as VARIANCE_MIXTURE_CLOSED_CLAIMS,
+    main as summarize_variance_mixture_shape_quotient,
+)
 from summarize_ka_count_overdispersed_geometry import (  # noqa: E402
     CLAIM_FLAGS as COUNT_OVERDISPERSED_ZERO_FLAGS,
     analyze_committed_tables as analyze_count_overdispersed_geometry,
@@ -48,10 +52,6 @@ from analyze_transient_periodic_langevin import (  # noqa: E402
     CLAIM_FLAGS as TRANSIENT_LANGEVIN_ZERO_FLAGS,
     classify_ablation as classify_transient_langevin_ablation,
     render_ablation_svg,
-)
-from summarize_ka_variance_mixture_shape_quotient import (  # noqa: E402
-    OUTPUT_CLOSED_CLAIMS as VARIANCE_MIXTURE_CLOSED_CLAIMS,
-    main as summarize_variance_mixture_shape_quotient,
 )
 
 

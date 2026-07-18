@@ -150,10 +150,13 @@ def simulate_transient_periodic_langevin(
     if stability_number >= 0.2:
         raise ValueError("Euler stability bound requires dt*kappa/gamma_x < 0.2")
 
-    rng = np.random.default_rng(seed)
+    seed_streams = np.random.SeedSequence(seed).spawn(4)
+    initial_barrier_rng, x_rng, q_rng, z_rng = (
+        np.random.default_rng(stream) for stream in seed_streams
+    )
     x = np.zeros((trajectory_count, dimension), dtype=float)
     q = np.zeros_like(x)
-    z = rng.normal(
+    z = initial_barrier_rng.normal(
         scale=math.sqrt(params.temperature / params.barrier_stiffness),
         size=trajectory_count,
     )
@@ -167,18 +170,18 @@ def simulate_transient_periodic_langevin(
         force_x, force_q, force_z = conservative_forces(x, q, z, params)
         delta_x = (
             force_x * dt / params.gamma_x
-            + x_noise * rng.normal(size=x.shape)
+            + x_noise * x_rng.normal(size=x.shape)
         )
         if params.elastic_stiffness > 0.0:
             delta_q = (
                 force_q * dt / params.gamma_q
-                + q_noise * rng.normal(size=q.shape)
+                + q_noise * q_rng.normal(size=q.shape)
             )
         else:
             delta_q = np.zeros_like(q)
         delta_z = (
             force_z * dt / params.gamma_z
-            + z_noise * rng.normal(size=z.shape)
+            + z_noise * z_rng.normal(size=z.shape)
         )
         x += delta_x
         q += delta_q

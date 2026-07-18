@@ -25,29 +25,29 @@
 <text x="540" y="175.000" text-anchor="end" font-family="Arial, sans-serif" font-size="10" fill="#5b646a">0.00</text>
 <line x1="546" y1="108.000" x2="930" y2="108.000" stroke="#e1e5e7" stroke-width="1"/>
 <text x="540" y="112.000" text-anchor="end" font-family="Arial, sans-serif" font-size="10" fill="#5b646a">0.04</text>
-<rect x="92.0" y="212.177" width="54" height="147.823" fill="#687078"/>
-<text x="119.0" y="205.177" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">0.880</text>
+<rect x="92.0" y="214.259" width="54" height="145.741" fill="#687078"/>
+<text x="119.0" y="207.259" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">0.868</text>
 <text x="119.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">static</text>
-<rect x="572.0" y="171.000" width="54" height="7.531" fill="#687078"/>
-<text x="599.0" y="193.531" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.005</text>
+<rect x="572.0" y="171.000" width="54" height="5.203" fill="#687078"/>
+<text x="599.0" y="191.203" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.003</text>
 <text x="599.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">static</text>
-<rect x="180.0" y="148.204" width="54" height="211.796" fill="#2f6fb0"/>
-<text x="207.0" y="141.204" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">1.261</text>
+<rect x="180.0" y="146.629" width="54" height="213.371" fill="#2f6fb0"/>
+<text x="207.0" y="139.629" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">1.270</text>
 <text x="207.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">rate only</text>
-<rect x="660.0" y="171.000" width="54" height="4.755" fill="#2f6fb0"/>
-<text x="687.0" y="190.755" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.003</text>
+<rect x="660.0" y="171.000" width="54" height="7.159" fill="#2f6fb0"/>
+<text x="687.0" y="193.159" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.005</text>
 <text x="687.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">rate only</text>
-<rect x="268.0" y="210.658" width="54" height="149.342" fill="#2f8a62"/>
-<text x="295.0" y="203.658" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">0.889</text>
+<rect x="268.0" y="211.492" width="54" height="148.508" fill="#2f8a62"/>
+<text x="295.0" y="204.492" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">0.884</text>
 <text x="295.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">elastic only</text>
-<rect x="748.0" y="171.000" width="54" height="108.398" fill="#2f8a62"/>
-<text x="775.0" y="294.398" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.069</text>
+<rect x="748.0" y="171.000" width="54" height="110.806" fill="#2f8a62"/>
+<text x="775.0" y="296.806" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.070</text>
 <text x="775.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">elastic only</text>
-<rect x="356.0" y="150.337" width="54" height="209.663" fill="#c84d43"/>
-<text x="383.0" y="143.337" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">1.248</text>
+<rect x="356.0" y="145.427" width="54" height="214.573" fill="#c84d43"/>
+<text x="383.0" y="138.427" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">1.277</text>
 <text x="383.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">full</text>
-<rect x="836.0" y="171.000" width="54" height="107.879" fill="#c84d43"/>
-<text x="863.0" y="293.879" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.068</text>
+<rect x="836.0" y="171.000" width="54" height="110.579" fill="#c84d43"/>
+<text x="863.0" y="296.579" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">-0.070</text>
 <text x="863.0" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">full</text>
 <rect x="70" y="414" width="860" height="67" fill="#f5f7f8" stroke="#d4dade"/>
 <text x="90" y="438" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#1f2529">rate Fano increase: 1   elastic recoil ordering: 1   full joint signature: 1</text>

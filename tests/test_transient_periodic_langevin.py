@@ -224,6 +224,32 @@ class TransientIntegratorTests(unittest.TestCase):
         endpoint = result["positions"][-1, :, 0] - result["positions"][0, :, 0]
         self.assertGreater(float(np.mean(endpoint**2)), 0.1)
 
+    def test_elastic_ablation_keeps_uncoupled_barrier_noise_paired(self):
+        kwargs = dict(
+            trajectory_count=16,
+            dimension=2,
+            dt=0.001,
+            burnin_steps=20,
+            production_steps=40,
+            record_stride=5,
+            seed=37,
+        )
+        without_elastic = simulate_transient_periodic_langevin(
+            self.params(elastic_stiffness=0.0, barrier_coupling=0.0),
+            **kwargs,
+        )
+        with_elastic = simulate_transient_periodic_langevin(
+            self.params(elastic_stiffness=0.6, barrier_coupling=0.0),
+            **kwargs,
+        )
+
+        self.assertTrue(
+            np.array_equal(
+                without_elastic["barrier_coordinates"],
+                with_elastic["barrier_coordinates"],
+            )
+        )
+
     def test_integrator_rejects_reference_curvature_instability(self):
         with self.assertRaisesRegex(ValueError, "stability"):
             simulate_transient_periodic_langevin(
