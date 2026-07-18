@@ -24,9 +24,36 @@ from summarize_ka_memory_hierarchy import (  # noqa: E402
 from summarize_ka_segment_splice_gate import (  # noqa: E402
     classify_segment_splice_gate,
 )
+from summarize_ka_segment_splice_paired_excess import (  # noqa: E402
+    classify_paired_excess_gate,
+    main as summarize_segment_splice_paired_excess,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def assertSerializedValueMatches(self, stored, key, expected):
+        self.assertIn(key, stored)
+        try:
+            stored_value = float(stored[key])
+            expected_value = float(expected)
+        except (TypeError, ValueError):
+            self.assertEqual(stored[key], str(expected))
+        else:
+            tolerance = max(1e-10, abs(expected_value) * 1e-11)
+            self.assertAlmostEqual(stored_value, expected_value, delta=tolerance)
+
+    def assertCsvRowsMatchComputedRows(self, stored_rows, computed_rows):
+        self.assertEqual(len(stored_rows), len(computed_rows))
+        for stored_row, computed_row in zip(stored_rows, computed_rows):
+            self.assertEqual(set(stored_row), set(computed_row))
+            for key, value in computed_row.items():
+                self.assertSerializedValueMatches(stored_row, key, value)
+
+    def assertCsvGateMatchesComputedGate(self, stored_gate, computed_gate):
+        self.assertEqual(set(stored_gate), set(computed_gate))
+        for key, value in computed_gate.items():
+            self.assertSerializedValueMatches(stored_gate, key, value)
+
     def test_memory_hierarchy_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"
         verdict_path = data / "renewal_cage_ka_memory_hierarchy.csv"
@@ -257,6 +284,131 @@ class ArxivPackageTests(unittest.TestCase):
         note = (ROOT / "docs" / "segment-splice-memory-gate.md").read_text()
         self.assertIn("conditional on the preserved global source-segment schedule", note)
         self.assertIn("does not identify finite single-particle memory", note)
+
+    def test_segment_splice_paired_excess_gate_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        rows_path = data / "renewal_cage_ka_segment_splice_paired_excess_rows.csv"
+        gate_path = data / "renewal_cage_ka_segment_splice_paired_excess_gate.csv"
+        figure_path = ROOT / "figures" / "renewal_cage_ka_segment_splice_paired_excess.svg"
+        note_path = ROOT / "docs" / "segment-splice-paired-excess.md"
+        for path in (rows_path, gate_path, figure_path, note_path):
+            self.assertTrue(path.is_file(), path)
+
+        with rows_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        with gate_path.open() as handle:
+            stored = next(csv.DictReader(handle))
+        self.assertEqual(len(rows), 14)
+        self.assertEqual(
+            {
+                (row["model"], int(float(row["segment_length"])))
+                for row in rows
+            },
+            {
+                (model, length)
+                for model in (
+                    "within_particle_segment_shuffle",
+                    "cross_particle_segment_splice",
+                )
+                for length in (1, 2, 5, 10, 25, 50, 125)
+            },
+        )
+        for row in rows:
+            self.assertEqual(float(row["microdynamic_closure_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["spatial_facilitation_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["post_run_exploratory"]), 1.0)
+            self.assertEqual(float(row["global_source_segment_schedule_preserved"]), 1.0)
+
+        with (data / "renewal_cage_ka_replicates_T045_segment_splice_replicate_scores.csv").open() as handle:
+            replicate_scores = list(csv.DictReader(handle))
+        with (data / "renewal_cage_ka_replicates_T045_segment_splice_cells.csv").open() as handle:
+            cells = list(csv.DictReader(handle))
+        with (data / "renewal_cage_ka_segment_splice_gate.csv").open() as handle:
+            source_verdict = list(csv.DictReader(handle))
+        recomputed_rows, recomputed_gate = classify_paired_excess_gate(
+            replicate_scores,
+            cells,
+            source_verdict,
+        )
+        self.assertEqual(len(recomputed_rows), len(rows))
+        self.assertCsvRowsMatchComputedRows(rows, recomputed_rows)
+        self.assertCsvGateMatchesComputedGate(stored, recomputed_gate)
+
+        self.assertEqual(stored["mechanism_state"], "mechanism_unresolved")
+        self.assertEqual(float(stored["input_completeness_pass"]), 1.0)
+        self.assertEqual(float(stored["paired_input_exactness_pass"]), 1.0)
+        self.assertEqual(float(stored["source_verdict_fail_closed"]), 0.0)
+        self.assertEqual(float(stored["full_path_model_agreement_pass"]), 1.0)
+        self.assertEqual(float(stored["low_full_path_control_all_replicates_pass"]), 0.0)
+        self.assertEqual(float(stored["low_full_path_control_failed_replicate_count"]), 2.0)
+        self.assertEqual(float(stored["identified_prefix_max_segment_length"]), 10.0)
+        self.assertEqual(float(stored["identified_prefix_max_tau"]), 200.0)
+        self.assertEqual(
+            float(stored["short_horizon_information_loss_supported_exploratory"]),
+            1.0,
+        )
+        self.assertEqual(float(stored["owner_identity_paired_ordering_count"]), 21.0)
+        self.assertEqual(float(stored["owner_identity_paired_ordering_total"]), 21.0)
+        self.assertEqual(float(stored["owner_identity_information_supported_exploratory"]), 1.0)
+        self.assertEqual(float(stored["paired_excess_equivalence_claim_allowed"]), 0.0)
+        self.assertEqual(
+            float(stored["independent_replicate_memory_lower_bound_claim_allowed"]),
+            0.0,
+        )
+        self.assertEqual(float(stored["finite_memory_state_addition_allowed"]), 0.0)
+        self.assertEqual(float(stored["owner_identity_sufficiency_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["microdynamic_closure_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["spatial_facilitation_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["thermodynamic_claim_allowed"]), 0.0)
+        self.assertEqual(
+            stored["next_required_action"],
+            "replicate_resolved_full_path_baseline_or_new_trajectory_validation",
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            generated_rows = temporary / "rows.csv"
+            generated_gate = temporary / "gate.csv"
+            generated_figure = temporary / "figure.svg"
+            summarize_segment_splice_paired_excess(
+                [
+                    "--replicate-scores",
+                    str(data / "renewal_cage_ka_replicates_T045_segment_splice_replicate_scores.csv"),
+                    "--cells",
+                    str(data / "renewal_cage_ka_replicates_T045_segment_splice_cells.csv"),
+                    "--source-verdict",
+                    str(data / "renewal_cage_ka_segment_splice_gate.csv"),
+                    "--output-rows",
+                    str(generated_rows),
+                    "--output-gate",
+                    str(generated_gate),
+                    "--output-svg",
+                    str(generated_figure),
+                ]
+            )
+            with generated_rows.open() as handle:
+                generated_row_values = list(csv.DictReader(handle))
+            with generated_gate.open() as handle:
+                generated_gate_value = next(csv.DictReader(handle))
+            self.assertCsvRowsMatchComputedRows(rows, generated_row_values)
+            self.assertCsvGateMatchesComputedGate(stored, generated_gate_value)
+            self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
+
+        svg = figure_path.read_text()
+        self.assertIn("Paired excess over replicate full-path baseline", svg)
+        self.assertIn("post-run exploratory", svg)
+        self.assertIn("mechanism unresolved", svg)
+        self.assertIn("no sufficiency, microscopic, spatial, or thermodynamic claim", svg)
+        coordinates = [
+            float(value)
+            for value in re.findall(r'(?:(?:x|y)[12]?|cx|cy)="([0-9.]+)"', svg)
+        ]
+        self.assertTrue(coordinates)
+        self.assertTrue(all(math.isfinite(value) and value >= 0.0 for value in coordinates))
+        note = note_path.read_text()
+        self.assertIn("full-path replicate baseline itself does not close", note)
+        self.assertIn("finite_memory_state_addition_allowed = 0", note)
 
     def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"
