@@ -147,6 +147,42 @@ fail-closed:
 If any numerical gate fails, held closure classification is not run and no
 physical interpretation is assigned.
 
+### Frozen real-frame canary
+
+The following controls were fixed after the synthetic directional-identity
+test and before evaluating any deterministic tensor on a real trajectory
+frame:
+
+```text
+configuration-step ladder = {1e-4, 3e-5, 1e-5, 3e-6}
+primary step              = 1e-5
+reference step            = 3e-6
+direction seeds           = 20260721, 20260722, 20260723, 20260724
+directional velocity step = 2e-5
+directional position step = 1e-5
+directional phase step    = 3e-6
+```
+
+For the fixed first real frame and all 64 frozen targets:
+
+```text
+A(primary) vs A(reference): median <= 0.02 and p95 <= 0.10
+Q(primary) vs Q(reference): median <= 0.02 and p95 <= 0.10
+```
+
+The per-target relative response error of `A(primary) eta` against the
+existing full `L2p` directional derivative, pooled over the four fixed
+directions, must also satisfy median <= 0.02 and p95 <= 0.10. The median
+`A` and `Q` errors relative to the reference must not increase when moving
+from `3e-5` to `1e-5`. Every primary `Q` must satisfy
+
+```text
+lambda_min(Q) >= -1e-10 max(trace(Q), 1).
+```
+
+These are numerical-only limits. Failure stops the held closure run and does
+not authorize changing a physical claim flag or retuning a tolerance.
+
 ## Claim boundary
 
 This estimator tests whether state-dependent microscopic diffusion inherited
