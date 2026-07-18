@@ -76,6 +76,18 @@ mechanism capability, not identification of `q,z` in KA or blind macro closure;
 all microscopic, spatial, unique-potential, and thermodynamic flags remain
 zero. See `docs/microscopic-transient-periodic-langevin.md`.
 
+A common-grid shape mechanism selection now puts the surviving marginal
+variance-mixture class and calibration-measured event-path corrections under
+the same T=0.45 support mask. Independent jumps fail only at high `k`; the
+mildest disjoint-pair correction lowers that residual but breaks `k=2,4`, and
+pair-eigenmode and full empirical-path kernels fail more strongly. In contrast,
+both gamma and inverse-Gaussian variance-mixture resummations pass all 18 cells
+and all three wave numbers. This selects a transient displacement shape class,
+not a unique variance-mixture family or microscopic mechanism. Heldout MSD and
+NGP remain diagnostic inputs, the three restart labels share one parent sample,
+and all static/finite-exchange, cage-jump-coupling, spatial, microdynamic, and
+thermodynamic claims remain closed. See `docs/ka-shape-mechanism-selection.md`.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
