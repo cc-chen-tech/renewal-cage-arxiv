@@ -460,6 +460,10 @@ class L2pConditionalDiffusionTests(unittest.TestCase):
                 "q_minimum_eigenvalue": np.ones((1, 2)),
                 "q_trace": np.full((1, 2), 3.0),
                 "deterministic_numerical_gate_pass": 1.0,
+                "numerical_state": np.asarray(
+                    "deterministic_jacobian_numerically_resolved"
+                ),
+                "potential_protocol": np.asarray("ka_lj_c3_switch"),
                 "thermodynamic_claim_allowed": 0.0,
             }
             np.savez(path, **common)
@@ -471,12 +475,19 @@ class L2pConditionalDiffusionTests(unittest.TestCase):
                 "deterministic_velocity_jacobian",
             )
             self.assertEqual(loaded[0]["numerical_gate_pass"], 1.0)
+            self.assertEqual(
+                loaded[0]["numerical_state"],
+                "deterministic_jacobian_numerically_resolved",
+            )
+            self.assertEqual(loaded[0]["potential_protocol"], "ka_lj_c3_switch")
             self.assertNotIn("prefix_error", loaded[0])
             np.savez(
                 path,
                 **{
                     **common,
-                    "deterministic_numerical_gate_pass": 0.0,
+                    "numerical_state": np.asarray(
+                        "deterministic_jacobian_numerically_unresolved"
+                    ),
                 },
             )
             with self.assertRaisesRegex(ValueError, "numerical gate"):

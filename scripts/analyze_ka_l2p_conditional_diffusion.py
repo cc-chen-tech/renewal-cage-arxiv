@@ -382,6 +382,10 @@ def load_conditional_diffusion_caches(
             if path in deterministic_paths:
                 estimator = str(np.asarray(cache["estimator"]).item())
                 numerical_gate = float(cache["deterministic_numerical_gate_pass"])
+                numerical_state = str(np.asarray(cache["numerical_state"]).item())
+                potential_protocol = str(
+                    np.asarray(cache["potential_protocol"]).item()
+                )
                 numerical_arrays = {
                     name: np.asarray(cache[name], dtype=float)
                     for name in (
@@ -397,6 +401,8 @@ def load_conditional_diffusion_caches(
                 if (
                     estimator != "deterministic_velocity_jacobian"
                     or numerical_gate != 1.0
+                    or numerical_state
+                    != "deterministic_jacobian_numerically_resolved"
                     or any(
                         np.any(~np.isfinite(values))
                         for values in numerical_arrays.values()
@@ -408,6 +414,8 @@ def load_conditional_diffusion_caches(
                 loaded.update(numerical_arrays)
                 loaded["numerical_estimator"] = estimator
                 loaded["numerical_gate_pass"] = numerical_gate
+                loaded["numerical_state"] = numerical_state
+                loaded["potential_protocol"] = potential_protocol
             else:
                 prefix_error = np.asarray(
                     cache["prefix_relative_frobenius_error"], dtype=float
@@ -441,6 +449,13 @@ def load_conditional_diffusion_caches(
         matched.append(cache)
     if len(by_hash) != len(clones):
         raise ValueError("conditional-diffusion directory contains unmatched clones")
+    protocols = {
+        str(cache["potential_protocol"])
+        for cache in matched
+        if "potential_protocol" in cache
+    }
+    if len(protocols) > 1:
+        raise ValueError("deterministic cache potential protocols do not match")
     return matched
 
 
@@ -589,6 +604,12 @@ def main() -> None:
             "thermodynamic_claim_allowed": 0.0,
         }
         if estimator == "deterministic_velocity_jacobian":
+            convergence_row["numerical_state"] = str(
+                held_q_cache["numerical_state"]
+            )
+            convergence_row["potential_protocol"] = str(
+                held_q_cache["potential_protocol"]
+            )
             for prefix, key in (
                 ("a_primary_reference", "a_primary_reference_error"),
                 ("q_primary_reference", "q_primary_reference_error"),
