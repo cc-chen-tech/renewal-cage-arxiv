@@ -26,6 +26,98 @@ _CLOSED_CLAIMS = {
 }
 
 
+def _error_summary(values: np.ndarray) -> tuple[float, float]:
+    array = np.asarray(values, dtype=float)
+    if array.size < 1 or np.any(~np.isfinite(array)):
+        return math.nan, math.nan
+    return float(np.median(array)), float(np.quantile(array, 0.95))
+
+
+def classify_l3p_numerical_canary(
+    *,
+    prefix_16_32_error: np.ndarray,
+    position_primary_reference_error: np.ndarray,
+    position_coarse_reference_error: np.ndarray,
+    cage_primary_reference_error: np.ndarray,
+    cage_coarse_reference_error: np.ndarray,
+    acceleration_directional_error: np.ndarray,
+) -> dict[str, float | str]:
+    """Apply the frozen fail-closed numerical gates for microscopic ``L^3p``."""
+
+    arrays = {
+        "prefix_16_32": np.asarray(prefix_16_32_error, dtype=float),
+        "position_primary_reference": np.asarray(
+            position_primary_reference_error,
+            dtype=float,
+        ),
+        "position_coarse_reference": np.asarray(
+            position_coarse_reference_error,
+            dtype=float,
+        ),
+        "cage_primary_reference": np.asarray(
+            cage_primary_reference_error,
+            dtype=float,
+        ),
+        "cage_coarse_reference": np.asarray(
+            cage_coarse_reference_error,
+            dtype=float,
+        ),
+        "acceleration_directional": np.asarray(
+            acceleration_directional_error,
+            dtype=float,
+        ),
+    }
+    finite = all(value.size > 0 and np.all(np.isfinite(value)) for value in arrays.values())
+    summaries = {key: _error_summary(value) for key, value in arrays.items()}
+    prefix_gate = finite and summaries["prefix_16_32"][0] <= 0.10 and summaries[
+        "prefix_16_32"
+    ][1] <= 0.25
+    position_gate = finite and summaries["position_primary_reference"][0] <= 0.02 and summaries[
+        "position_primary_reference"
+    ][1] <= 0.10
+    cage_gate = finite and summaries["cage_primary_reference"][0] <= 0.02 and summaries[
+        "cage_primary_reference"
+    ][1] <= 0.10
+    directional_gate = finite and summaries["acceleration_directional"][0] <= 0.02 and summaries[
+        "acceleration_directional"
+    ][1] <= 0.10
+    monotonic_gate = finite and (
+        summaries["position_primary_reference"][0]
+        <= summaries["position_coarse_reference"][0]
+        and summaries["cage_primary_reference"][0]
+        <= summaries["cage_coarse_reference"][0]
+    )
+    passed = all(
+        (
+            finite,
+            prefix_gate,
+            position_gate,
+            cage_gate,
+            directional_gate,
+            monotonic_gate,
+        )
+    )
+    result: dict[str, float | str] = {
+        "numerical_state": (
+            "l3p_generator_numerically_resolved"
+            if passed
+            else "l3p_generator_numerically_unresolved"
+        ),
+        "l3p_numerical_gate_pass": float(passed),
+        "finite_component_gate_pass": float(finite),
+        "trace_prefix_gate_pass": float(prefix_gate),
+        "position_step_gate_pass": float(position_gate),
+        "cage_step_gate_pass": float(cage_gate),
+        "step_monotonicity_gate_pass": float(monotonic_gate),
+        "acceleration_directional_gate_pass": float(directional_gate),
+        **_CLOSED_CLAIMS,
+    }
+    for key, (median, p95) in summaries.items():
+        result[f"{key}_median_relative_error"] = median
+        result[f"{key}_p95_relative_error"] = p95
+    return result
+
+
 def _validated_prefix_counts(
     prefix_counts: tuple[int, ...],
     probe_count: int,

@@ -1,11 +1,16 @@
 import sys
+import subprocess
+import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 class L3pGeneratorTests(unittest.TestCase):
@@ -450,6 +455,315 @@ class L3pGeneratorTests(unittest.TestCase):
             rtol=2e-3,
             atol=2e-3,
         )
+
+    def test_l3p_numerical_classifier_is_fail_closed(self):
+        from ka_l3p_generator import classify_l3p_numerical_canary
+
+        passing = {
+            "prefix_16_32_error": np.full(20, 0.10),
+            "position_primary_reference_error": np.full(20, 0.02),
+            "position_coarse_reference_error": np.full(20, 0.04),
+            "cage_primary_reference_error": np.full(20, 0.02),
+            "cage_coarse_reference_error": np.full(20, 0.04),
+            "acceleration_directional_error": np.full(20, 0.02),
+        }
+        verdict = classify_l3p_numerical_canary(**passing)
+        self.assertEqual(verdict["l3p_numerical_gate_pass"], 1.0)
+        self.assertEqual(
+            verdict["numerical_state"],
+            "l3p_generator_numerically_resolved",
+        )
+        for key in (
+            "trace_prefix_gate_pass",
+            "position_step_gate_pass",
+            "cage_step_gate_pass",
+            "step_monotonicity_gate_pass",
+            "acceleration_directional_gate_pass",
+        ):
+            self.assertEqual(verdict[key], 1.0)
+        for key in (
+            "finite_l3p_gaussian_closure_supported",
+            "microscopic_environment_coordinate_z_allowed",
+            "continuous_gaussian_langevin_bath_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(verdict[key], 0.0)
+
+        failures = (
+            ("prefix_16_32_error", 0.26, "trace_prefix_gate_pass"),
+            (
+                "position_primary_reference_error",
+                0.11,
+                "position_step_gate_pass",
+            ),
+            (
+                "cage_primary_reference_error",
+                0.11,
+                "cage_step_gate_pass",
+            ),
+            (
+                "position_coarse_reference_error",
+                0.01,
+                "step_monotonicity_gate_pass",
+            ),
+            (
+                "acceleration_directional_error",
+                0.11,
+                "acceleration_directional_gate_pass",
+            ),
+        )
+        for field, value, failed_gate in failures:
+            inputs = {key: item.copy() for key, item in passing.items()}
+            inputs[field][:] = value
+            failed = classify_l3p_numerical_canary(**inputs)
+            self.assertEqual(failed["l3p_numerical_gate_pass"], 0.0)
+            self.assertEqual(failed[failed_gate], 0.0)
+            self.assertEqual(
+                failed["numerical_state"],
+                "l3p_generator_numerically_unresolved",
+            )
+
+        nonfinite = {key: item.copy() for key, item in passing.items()}
+        nonfinite["prefix_16_32_error"][0] = np.nan
+        unresolved = classify_l3p_numerical_canary(**nonfinite)
+        self.assertEqual(unresolved["l3p_numerical_gate_pass"], 0.0)
+        self.assertEqual(unresolved["finite_component_gate_pass"], 0.0)
+
+    def test_l3p_cache_cli_freezes_provenance(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "cache_ka_l3p_generator.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for phrase in (
+            "--probe-prefix-counts",
+            "4 8 16 32",
+            "--trace-seed",
+            "20260731",
+            "--primary-position-step",
+            "--reference-position-step",
+            "--coarse-position-step",
+            "--primary-cage-hessian-step",
+            "--reference-cage-hessian-step",
+            "--coarse-cage-hessian-step",
+            "--jacobian-step",
+            "--l2p-directional-step",
+            "--l2p-phase-space-step",
+            "--sensitivity-frame-count",
+            "--checkpoint-interval",
+        ):
+            self.assertIn(phrase, completed.stdout)
+
+    def test_l3p_checkpoint_rejects_mismatched_provenance_and_shapes(self):
+        from cache_ka_l3p_generator import validate_existing_checkpoint
+
+        expected = {
+            "trajectory_sha256": "trajectory-hash",
+            "drift_cache_sha256": "drift-hash",
+            "second_generator_cache_sha256": "second-hash",
+            "target_indices": np.array([2, 5], dtype=int),
+            "potential_protocol": "ka_lj_cut",
+            "estimator": "microscopic_l3p_generator_quotient",
+            "probe_prefix_counts": np.array([4, 8, 16, 32], dtype=int),
+            "trace_seed": 20260731,
+            "primary_position_step": 1e-5,
+            "reference_position_step": 3e-6,
+            "coarse_position_step": 3e-5,
+            "primary_cage_hessian_step": 1e-5,
+            "reference_cage_hessian_step": 3e-6,
+            "coarse_cage_hessian_step": 3e-5,
+            "jacobian_step": 1e-5,
+            "l2p_directional_step": 1e-5,
+            "l2p_phase_space_step": 3e-6,
+            "directional_velocity_step": 2e-5,
+            "friction": 1.0,
+            "temperature": 0.58,
+            "requested_frame_count": 3,
+            "sensitivity_frame_count": 1,
+            "target_batch_size": 16,
+        }
+        shapes = {
+            "l3p": (3, 2, 3),
+            "l3p_prefixes": (3, 4, 2, 3),
+        }
+        saved = {
+            **{key: np.asarray(value) for key, value in expected.items()},
+            "completed_frame_count": np.asarray(2.0),
+            "l3p": np.zeros(shapes["l3p"]),
+            "l3p_prefixes": np.zeros(shapes["l3p_prefixes"]),
+        }
+        self.assertEqual(
+            validate_existing_checkpoint(saved, expected, shapes),
+            2,
+        )
+
+        for key in (
+            "trajectory_sha256",
+            "drift_cache_sha256",
+            "target_indices",
+            "trace_seed",
+            "primary_position_step",
+            "requested_frame_count",
+        ):
+            mismatched = dict(saved)
+            value = np.asarray(saved[key]).copy()
+            if value.dtype.kind in "SU":
+                value = np.asarray("wrong")
+            elif value.ndim:
+                value.flat[0] += 1
+            else:
+                value = value + 1
+            mismatched[key] = value
+            with self.assertRaisesRegex(ValueError, "mismatched provenance"):
+                validate_existing_checkpoint(mismatched, expected, shapes)
+
+        wrong_shape = dict(saved)
+        wrong_shape["l3p"] = np.zeros((2, 2, 3))
+        with self.assertRaisesRegex(ValueError, "mismatched array shape"):
+            validate_existing_checkpoint(wrong_shape, expected, shapes)
+
+        wrong_completion = dict(saved)
+        wrong_completion["completed_frame_count"] = np.asarray(4.0)
+        with self.assertRaisesRegex(ValueError, "completion count"):
+            validate_existing_checkpoint(wrong_completion, expected, shapes)
+
+    def test_l3p_completed_cache_skips_microscopic_recomputation(self):
+        import cache_ka_l3p_generator as cache_module
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trajectory_path = root / "trajectory.lammpstrj"
+            drift_path = root / "drift.npz"
+            second_path = root / "second.npz"
+            output_path = root / "l3p.npz"
+            for path in (trajectory_path, drift_path, second_path):
+                path.write_bytes(b"frozen-test-input")
+
+            args = Namespace(
+                clone_directory=root,
+                drift_cache_directory=root,
+                second_generator_cache_directory=root,
+                output_cache_directory=root,
+                expected_clone_count=1,
+                clone_indices=None,
+                target_count=2,
+                maximum_frame_count=2,
+                probe_prefix_counts=[4, 8, 16, 32],
+                trace_seed=20260731,
+                primary_position_step=1e-5,
+                reference_position_step=3e-6,
+                coarse_position_step=3e-5,
+                primary_cage_hessian_step=1e-5,
+                reference_cage_hessian_step=3e-6,
+                coarse_cage_hessian_step=3e-5,
+                jacobian_step=1e-5,
+                l2p_directional_step=1e-5,
+                l2p_phase_space_step=3e-6,
+                directional_velocity_step=2e-5,
+                sensitivity_frame_count=1,
+                friction=1.0,
+                temperature=0.58,
+                target_batch_size=16,
+                checkpoint_interval=1,
+            )
+            positions = np.zeros((2, 3, 3))
+            trajectory = {
+                "unwrapped_positions": positions,
+                "velocities": positions.copy(),
+                "particle_types": np.array([0, 0, 1], dtype=int),
+                "box_lengths": np.full(3, 20.0),
+            }
+            drift = {"target_indices": np.array([0, 1], dtype=int)}
+            second = {
+                "second_relative_generator": np.zeros((2, 2, 3)),
+                "potential_protocol": np.asarray("ka_lj_cut"),
+            }
+
+            def evaluator(**kwargs):
+                del kwargs
+                target_vectors = np.zeros((2, 3))
+                prefix_vectors = np.zeros((4, 2, 3))
+                return {
+                    "l3p": target_vectors,
+                    "l3p_prefixes": prefix_vectors,
+                    "position_transport_term": target_vectors,
+                    "acceleration_response_term": target_vectors,
+                    "thermal_gradient_prefixes": prefix_vectors,
+                    "thermal_friction_prefixes": prefix_vectors,
+                    "laplacian_prefixes": prefix_vectors,
+                    "laplacian_velocity_derivative_prefixes": prefix_vectors,
+                    "acceleration": np.zeros((3, 3)),
+                    "force": np.zeros((3, 3)),
+                    "force_generator": np.zeros((3, 3)),
+                }
+
+            directional = {
+                "l2p_velocity_directional_derivative": np.zeros((2, 3))
+            }
+            patches = (
+                mock.patch.object(cache_module, "load_drift_cache", return_value=drift),
+                mock.patch.object(cache_module, "load_second_generator_cache", return_value=second),
+                mock.patch.object(cache_module, "validate_cache_alignment"),
+                mock.patch.object(
+                    cache_module,
+                    "load_lammps_custom_trajectory",
+                    return_value=trajectory,
+                ),
+                mock.patch.object(
+                    cache_module,
+                    "smooth_cage_l3p_generator_batch",
+                    side_effect=evaluator,
+                ),
+                mock.patch.object(
+                    cache_module,
+                    "ka_lj_sparse_force_generator_observables",
+                    return_value={"force_generator": np.zeros((3, 3))},
+                ),
+                mock.patch.object(
+                    cache_module,
+                    "smooth_cage_l2p_velocity_directional_derivative_batch",
+                    return_value=directional,
+                ),
+            )
+            with patches[0], patches[1], patches[2], patches[3], patches[4] as l3p_mock, patches[5], patches[6]:
+                first = cache_module.cache_clone(
+                    trajectory_path,
+                    drift_path,
+                    second_path,
+                    output_path,
+                    args=args,
+                )
+            self.assertEqual(first["completed_frame_count"], 2)
+            self.assertEqual(l3p_mock.call_count, 6)
+            with np.load(output_path, allow_pickle=False) as cache:
+                self.assertEqual(int(cache["completed_frame_count"]), 2)
+                self.assertEqual(cache["l3p"].shape, (2, 2, 3))
+                self.assertEqual(float(cache["l3p_numerical_gate_pass"]), 1.0)
+
+            with patches[0], patches[1], patches[2], patches[3], mock.patch.object(
+                cache_module,
+                "smooth_cage_l3p_generator_batch",
+                side_effect=AssertionError("completed cache was recomputed"),
+            ) as resumed_mock:
+                resumed = cache_module.cache_clone(
+                    trajectory_path,
+                    drift_path,
+                    second_path,
+                    output_path,
+                    args=args,
+                )
+            self.assertEqual(resumed["completed_frame_count"], 2)
+            resumed_mock.assert_not_called()
 
 
 if __name__ == "__main__":
