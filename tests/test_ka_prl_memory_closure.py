@@ -1,5 +1,7 @@
 import csv
+import hashlib
 import importlib
+import json
 import sys
 import tempfile
 import unittest
@@ -37,20 +39,53 @@ class ParentProvenanceTests(unittest.TestCase):
                 )
         return rows
 
-    @staticmethod
-    def stationarity(passing):
+    def stationarity(self, passing, *, failed_restart=None):
+        rows = []
+        for provenance in self.provenance_rows():
+            parent_id = closure.parent_identifier(provenance)
+            restart = int(provenance["replicate"])
+            for comparison in ("early_late", "early_heldout", "late_heldout"):
+                local_pass = passing and restart != failed_restart
+                rows.append(
+                    {
+                        "temperature": provenance["temperature"],
+                        "replicate": provenance["replicate"],
+                        "parent_id": parent_id,
+                        "comparison": comparison,
+                        "curve_transfer_pass": str(float(local_pass)),
+                    }
+                )
+        return rows
+
+    def lineage(self, passing):
         return [
-            {"comparison": comparison, "curve_transfer_pass": str(float(passing))}
-            for comparison in ("early_late", "early_heldout", "late_heldout")
+            {
+                "temperature": row["temperature"],
+                "replicate": row["replicate"],
+                "parent_id": closure.parent_identifier(row),
+                "source_doi": row["source_doi"],
+                "source_sha256": row["source_sha256"],
+                "source_frame_index": row["source_frame_index"],
+                "velocity_seed": row["velocity_seed"],
+                "ensemble_manifest_parent_join_pass": "1",
+                "replicate_manifest_parent_join_pass": "1",
+                "trajectory_sha256": "c" * 64,
+                "trajectory_size_bytes": "123",
+                "trajectory_hash_scope": "complete_file",
+                "heldout_parent_join_pass": str(int(passing)),
+                "environment_parent_join_pass": str(int(passing)),
+                "spectral_frozen_metadata_pass": "1",
+                "spectral_parent_join_pass": str(int(passing)),
+                "input_lineage_join_pass": str(int(passing)),
+            }
+            for row in self.provenance_rows()
         ]
 
     def test_parent_audit_counts_shared_restart_parent_once(self):
         ledger, blockers = closure.audit_parent_provenance(
             provenance_rows=self.provenance_rows(),
-            stationarity_by_temperature={
-                0.45: self.stationarity(True),
-                0.58: self.stationarity(False),
-            },
+            stationarity_rows=self.stationarity(True, failed_restart=4),
+            lineage_rows=self.lineage(True),
         )
 
         low_ledger = [row for row in ledger if row["temperature"] == 0.45]
@@ -85,10 +120,8 @@ class ParentProvenanceTests(unittest.TestCase):
     def test_parent_audit_keeps_failed_warm_stationarity_as_canary(self):
         _, blockers = closure.audit_parent_provenance(
             provenance_rows=self.provenance_rows(),
-            stationarity_by_temperature={
-                0.45: self.stationarity(True),
-                0.58: self.stationarity(False),
-            },
+            stationarity_rows=self.stationarity(True, failed_restart=4),
+            lineage_rows=self.lineage(True),
         )
 
         warm = next(row for row in blockers if row["temperature"] == 0.58)
@@ -108,19 +141,52 @@ class ParentProvenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SHA256"):
             closure.audit_parent_provenance(
                 provenance_rows=rows,
-                stationarity_by_temperature={
-                    0.45: self.stationarity(True),
-                    0.58: self.stationarity(False),
-                },
+                stationarity_rows=self.stationarity(True),
+                lineage_rows=self.lineage(True),
             )
 
         with self.assertRaisesRegex(ValueError, "stationarity comparisons"):
             closure.audit_parent_provenance(
                 provenance_rows=self.provenance_rows(),
-                stationarity_by_temperature={
-                    0.45: self.stationarity(True)[:2],
-                    0.58: self.stationarity(False),
-                },
+                stationarity_rows=self.stationarity(True)[:-1],
+                lineage_rows=self.lineage(True),
+            )
+
+    def test_parent_audit_is_restart_specific_and_lineage_fail_closed(self):
+        ledger, blockers = closure.audit_parent_provenance(
+            provenance_rows=self.provenance_rows(),
+            stationarity_rows=self.stationarity(True, failed_restart=2),
+            lineage_rows=self.lineage(False),
+        )
+
+        low = [row for row in ledger if row["temperature"] == 0.45]
+        self.assertEqual([row["stationarity_pass"] for row in low], [1.0, 0.0, 1.0])
+        self.assertTrue(all(row["input_lineage_join_pass"] == 0.0 for row in low))
+        blocker = next(row for row in blockers if row["temperature"] == 0.45)
+        self.assertEqual(blocker["stationarity_pass"], 0.0)
+        self.assertEqual(blocker["input_lineage_join_pass"], 0.0)
+        self.assertEqual(blocker["blocker_state"], "stationarity_lineage_and_independent_parents")
+
+    def test_parent_audit_rejects_temperature_only_stationarity(self):
+        aggregate = [
+            {"temperature": 0.45, "comparison": comparison, "curve_transfer_pass": 1}
+            for comparison in ("early_late", "early_heldout", "late_heldout")
+        ]
+        with self.assertRaisesRegex(ValueError, "restart-specific"):
+            closure.audit_parent_provenance(
+                provenance_rows=self.provenance_rows(),
+                stationarity_rows=aggregate,
+                lineage_rows=self.lineage(True),
+            )
+
+    def test_parent_audit_rejects_mismatched_lineage_frame(self):
+        lineage = self.lineage(True)
+        lineage[0]["source_frame_index"] = "999"
+        with self.assertRaisesRegex(ValueError, "source_frame_index"):
+            closure.audit_parent_provenance(
+                provenance_rows=self.provenance_rows(),
+                stationarity_rows=self.stationarity(True),
+                lineage_rows=lineage,
             )
 
 
@@ -171,6 +237,43 @@ class MemoryKernelTests(unittest.TestCase):
         self.assertEqual(audit["finite_exchange_environment_retained"], 1.0)
         self.assertEqual(audit["ordered_path_memory_retained"], 0.0)
         self.assertGreater(audit["environment_exchange_count"], 0.0)
+
+    def test_finite_and_full_use_identical_exchange_source_schedule(self):
+        blocks = self.labelled_blocks(particles=5, block_count=40)
+        schedule = closure.generate_exchange_schedule(
+            blocks,
+            environment_time=60.0,
+            block_size=20.0,
+            rng=np.random.default_rng(29),
+        )
+        _, finite = closure.generate_ablation_path(
+            blocks,
+            model="finite_exchange_environment",
+            environment_time=60.0,
+            block_size=20.0,
+            rng=np.random.default_rng(31),
+            exchange_schedule=schedule,
+        )
+        _, full = closure.generate_ablation_path(
+            blocks,
+            model="full_candidate",
+            environment_time=60.0,
+            block_size=20.0,
+            rng=np.random.default_rng(37),
+            exchange_schedule=schedule,
+        )
+
+        np.testing.assert_array_equal(finite["source_particle"], full["source_particle"])
+        np.testing.assert_array_equal(finite["exchange_before"], full["exchange_before"])
+        self.assertEqual(
+            finite["exchange_schedule_sha256"], full["exchange_schedule_sha256"]
+        )
+        self.assertEqual(
+            finite["environment_exchange_count"], full["environment_exchange_count"]
+        )
+        self.assertFalse(
+            np.array_equal(finite["source_block"], full["source_block"])
+        )
 
     def test_static_environment_never_changes_source_particle(self):
         _, audit = closure.generate_ablation_path(
@@ -338,6 +441,7 @@ class MemoryClosureGateTests(unittest.TestCase):
             "evidence_role": "primary",
             "missing_parent_count": missing,
             "stationarity_pass": stationary,
+            "input_lineage_join_pass": 1.0,
         }
 
     @staticmethod
@@ -365,34 +469,38 @@ class MemoryClosureGateTests(unittest.TestCase):
         rows = []
         for parent_index in range(3):
             parent = f"parent-{parent_index}"
-            rows.append(
-                self.parent_row(
+            for lag in (20, 100, 200, 500, 1000, 2000, 3000):
+                full = self.parent_row(
                     parent=parent,
                     model="full_candidate",
                     msd_error=0.2 if full_fails and parent_index == 0 else 0.0,
                 )
-            )
-            for model in self.REQUIRED_ABLATIONS:
-                rows.append(
-                    self.parent_row(
+                full["lag"] = lag
+                rows.append(full)
+                for model in self.REQUIRED_ABLATIONS:
+                    ablation = self.parent_row(
                         parent=parent,
                         model=model,
                         ngp_error=0.31
                         if ablations_fail and parent_index < 2
                         else 0.0,
                     )
-                )
+                    ablation["lag"] = lag
+                    rows.append(ablation)
         return rows
 
     def upper_controls(self, *, pass_all=True):
-        return [
-            self.parent_row(
-                parent=f"parent-{index}",
-                model="contiguous_empirical_upper_control",
-                msd_error=0.0 if pass_all else 0.2,
-            )
-            for index in range(3)
-        ]
+        rows = []
+        for index in range(3):
+            for lag in (20, 100, 200, 500, 1000, 2000, 3000):
+                row = self.parent_row(
+                    parent=f"parent-{index}",
+                    model="contiguous_empirical_upper_control",
+                    msd_error=0.0 if pass_all else 0.2,
+                )
+                row["lag"] = lag
+                rows.append(row)
+        return rows
 
     def test_ensemble_average_cannot_rescue_failed_parent(self):
         gate = closure.classify_memory_closure_gate(
@@ -416,6 +524,22 @@ class MemoryClosureGateTests(unittest.TestCase):
             "cross_particle_or_unmodeled_coupling",
         )
         self.assertEqual(diagnostic["positive_memory_closure_claim_allowed"], 0.0)
+
+    def test_warm_diagnostic_is_parameterized_instead_of_using_low_lookup(self):
+        parent_rows = self.parent_rows(full_fails=True)
+        controls = self.upper_controls(pass_all=False)
+        for row in (*parent_rows, *controls):
+            row["temperature"] = 0.58
+        diagnostic = closure.classify_correlated_parent_diagnostic(
+            parent_summaries=parent_rows,
+            upper_control_parents=controls,
+            temperature=0.58,
+        )
+        self.assertEqual(diagnostic["diagnostic_state"], "candidate_rejected")
+        self.assertEqual(
+            diagnostic["diagnostic_failure_localization"],
+            "cross_particle_or_unmodeled_coupling",
+        )
 
     def test_gate_truth_table_is_fail_closed(self):
         cases = (
@@ -470,6 +594,25 @@ class MemoryClosureGateTests(unittest.TestCase):
                         gate["positive_memory_closure_claim_allowed"], 1.0
                     )
 
+    def test_positive_gate_rejects_a_missing_frozen_lag(self):
+        rows = self.parent_rows()
+        rows = [
+            row
+            for row in rows
+            if not (
+                row["parent_id"] == "parent-0"
+                and row["model"] == "full_candidate"
+                and row["lag"] == 3000
+            )
+        ]
+        gate = closure.classify_memory_closure_gate(
+            parent_summaries=rows,
+            blockers=[self.blocker()],
+            upper_control_parents=self.upper_controls(),
+        )
+        self.assertEqual(gate["mechanism_state"], "blocked_incomplete_frozen_grid")
+        self.assertEqual(gate["positive_memory_closure_claim_allowed"], 0.0)
+
     def test_higher_order_score_and_precision_are_frozen(self):
         row = self.parent_row(parent="p", model="m", ngp_error=0.15)
         row["absolute_error_fs_k7p25"] = 0.024
@@ -492,6 +635,11 @@ class MemoryClosureCliTests(unittest.TestCase):
         return importlib.import_module("analyze_ka_prl_memory_closure")
 
     @staticmethod
+    def load_input_audit():
+        sys.path.insert(0, str(ROOT / "scripts"))
+        return importlib.import_module("audit_ka_prl_parent_inputs")
+
+    @staticmethod
     def write_rows(path, rows):
         with path.open("w", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
@@ -502,12 +650,13 @@ class MemoryClosureCliTests(unittest.TestCase):
         base = Path(directory)
         base.mkdir(parents=True, exist_ok=True)
         provenance = base / "provenance.csv"
-        low_stationarity = base / "low_stationarity.csv"
-        high_stationarity = base / "high_stationarity.csv"
-        self.write_rows(provenance, ParentProvenanceTests().provenance_rows())
-        self.write_rows(low_stationarity, ParentProvenanceTests.stationarity(True))
-        self.write_rows(high_stationarity, ParentProvenanceTests.stationarity(False))
-        return provenance, low_stationarity, high_stationarity
+        stationarity = base / "stationarity.csv"
+        lineage = base / "lineage.csv"
+        fixtures = ParentProvenanceTests()
+        self.write_rows(provenance, fixtures.provenance_rows())
+        self.write_rows(stationarity, fixtures.stationarity(True, failed_restart=4))
+        self.write_rows(lineage, fixtures.lineage(True))
+        return provenance, stationarity, lineage
 
     @staticmethod
     def output_arguments(output):
@@ -523,15 +672,15 @@ class MemoryClosureCliTests(unittest.TestCase):
         ]
 
     def run_audit(self, source, output):
-        provenance, low_stationarity, high_stationarity = self.audit_inputs(source)
+        provenance, stationarity, lineage = self.audit_inputs(source)
         arguments = [
             "--audit-only",
             "--provenance",
             str(provenance),
-            "--low-stationarity",
-            str(low_stationarity),
-            "--high-stationarity",
-            str(high_stationarity),
+            "--parent-stationarity",
+            str(stationarity),
+            "--input-lineage",
+            str(lineage),
             *self.output_arguments(output),
         ]
         self.load_cli().main(arguments)
@@ -579,6 +728,182 @@ class MemoryClosureCliTests(unittest.TestCase):
                 {path.name: path.read_bytes() for path in first.iterdir()},
                 {path.name: path.read_bytes() for path in second.iterdir()},
             )
+
+    def test_precision_escalation_is_an_automatic_common_grid_decision(self):
+        cli = self.load_cli()
+        rows = [
+            {"model": model, "restart_precision_pass": 1.0}
+            for model in sorted(closure.ABLATION_MODELS)
+        ]
+        self.assertFalse(cli.precision_escalation_required(rows))
+        rows[2]["restart_precision_pass"] = 0.0
+        self.assertTrue(cli.precision_escalation_required(rows))
+
+    def test_runtime_paths_must_match_audited_lineage_hashes(self):
+        cli = self.load_cli()
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            ensemble = base / "ensemble"
+            ensemble.mkdir()
+            manifest = {
+                "replicates": [
+                    {"replicate": restart, "directory": f"replicate_{restart:02d}"}
+                    for restart in (1, 2, 3)
+                ]
+            }
+            (ensemble / "ensemble_manifest.json").write_text(json.dumps(manifest))
+            for restart in (1, 2, 3):
+                child = ensemble / f"replicate_{restart:02d}"
+                child.mkdir()
+                (child / "manifest.json").write_text(f"manifest-{restart}")
+                (child / "trajectory.lammpstrj").write_text(
+                    f"trajectory-{restart}"
+                )
+            targets = base / "targets.csv"
+            environment = base / "environment.csv"
+            spectral = base / "spectral.csv"
+            for path, content in (
+                (targets, "targets"),
+                (environment, "environment"),
+                (spectral, "spectral"),
+            ):
+                path.write_text(content)
+
+            def digest(path):
+                return hashlib.sha256(path.read_bytes()).hexdigest()
+
+            lineage = [
+                {
+                    "temperature": 0.45,
+                    "replicate": restart,
+                    "ensemble_manifest_sha256": digest(
+                        ensemble / "ensemble_manifest.json"
+                    ),
+                    "replicate_manifest_sha256": digest(
+                        ensemble / f"replicate_{restart:02d}" / "manifest.json"
+                    ),
+                    "trajectory_sha256": digest(
+                        ensemble
+                        / f"replicate_{restart:02d}"
+                        / "trajectory.lammpstrj"
+                    ),
+                    "trajectory_size_bytes": (
+                        ensemble
+                        / f"replicate_{restart:02d}"
+                        / "trajectory.lammpstrj"
+                    ).stat().st_size,
+                    "trajectory_hash_scope": "complete_file",
+                    "heldout_table_sha256": digest(targets),
+                    "environment_table_sha256": digest(environment),
+                    "spectral_table_sha256": digest(spectral),
+                }
+                for restart in (1, 2, 3)
+            ]
+            cli.validate_runtime_lineage_hashes(
+                ensemble_directory=ensemble,
+                heldout_targets=targets,
+                environment_crossings=environment,
+                spectral_rows=spectral,
+                lineage_rows=lineage,
+                temperature=0.45,
+            )
+            targets.write_text("replaced targets")
+            with self.assertRaisesRegex(ValueError, "heldout"):
+                cli.validate_runtime_lineage_hashes(
+                    ensemble_directory=ensemble,
+                    heldout_targets=targets,
+                    environment_crossings=environment,
+                    spectral_rows=spectral,
+                    lineage_rows=lineage,
+                    temperature=0.45,
+                )
+            targets.write_text("targets")
+            (ensemble / "replicate_02" / "trajectory.lammpstrj").write_text(
+                "replacement trajectory"
+            )
+            with self.assertRaisesRegex(ValueError, "trajectory"):
+                cli.validate_runtime_lineage_hashes(
+                    ensemble_directory=ensemble,
+                    heldout_targets=targets,
+                    environment_crossings=environment,
+                    spectral_rows=spectral,
+                    lineage_rows=lineage,
+                    temperature=0.45,
+                )
+
+    def test_warm_control_requires_five_full_candidate_parent_passes(self):
+        cli = self.load_cli()
+        blocker = {
+            "temperature": 0.58,
+            "missing_parent_count": 0,
+            "stationarity_pass": 1,
+            "input_lineage_join_pass": 1,
+        }
+        verdicts = [
+            {
+                "temperature": 0.58,
+                "parent_id": f"parent-{index}",
+                "model": "full_candidate",
+                "curve_gate_pass": 1,
+            }
+            for index in range(5)
+        ]
+        self.assertTrue(cli.warm_control_is_eligible(blocker, verdicts))
+        verdicts[0]["curve_gate_pass"] = 0
+        self.assertFalse(cli.warm_control_is_eligible(blocker, verdicts))
+
+    def test_stationarity_audit_scores_each_restart_before_any_average(self):
+        audit = self.load_input_audit()
+        cli = self.load_cli()
+        generator = np.random.default_rng(73)
+        blocks_by_restart = {
+            restart: generator.normal(size=(5, 250, 3))
+            for restart in (1, 2, 3)
+        }
+        targets = []
+        lags = (20, 100, 200, 500, 1000, 2000, 3000)
+        for restart, blocks in blocks_by_restart.items():
+            half = blocks.shape[1] // 2
+            compatible = tuple(lag for lag in lags if lag // 20 <= half)
+            observed = cli.cumulative_observables_many_lags(
+                blocks[:, :half],
+                block_counts=tuple(lag // 20 for lag in compatible),
+                wave_numbers=np.asarray((2.0, 4.0, 7.25)),
+            )
+            for lag in lags:
+                source = observed[min(lag, compatible[-1]) // 20]
+                targets.append(
+                    {
+                        "replicate": restart,
+                        "temperature": 0.45,
+                        "lag": lag,
+                        "observed_msd": source["msd"]
+                        * (2.0 if restart == 2 else 1.0),
+                        "observed_ngp": source["ngp"],
+                        "observed_fs_k2": source["characteristic_k2"],
+                        "observed_fs_k4": source["characteristic_k4"],
+                        "observed_fs_k7p25": source["characteristic_k7p25"],
+                    }
+                )
+        provenance = [
+            row
+            for row in ParentProvenanceTests().provenance_rows()
+            if float(row["temperature"]) == 0.45
+        ]
+        rows = audit.restart_stationarity_rows(
+            blocks_by_restart=blocks_by_restart,
+            target_rows=targets,
+            provenance_rows=provenance,
+            temperature=0.45,
+        )
+        early_heldout = {
+            int(row["replicate"]): row
+            for row in rows
+            if row["comparison"] == "early_heldout"
+        }
+        self.assertEqual(early_heldout[1]["curve_transfer_pass"], 1)
+        self.assertEqual(early_heldout[2]["curve_transfer_pass"], 0)
+        self.assertEqual(early_heldout[3]["curve_transfer_pass"], 1)
 
     def test_correlated_parent_diagnostic_is_deterministic_and_never_reads_targets_as_inputs(self):
         cli = self.load_cli()
@@ -641,6 +966,27 @@ class MemoryClosureCliTests(unittest.TestCase):
             "spectral_source_rows": spectral,
             "temperature": 0.45,
             "realizations": 16,
+            "lineage_rows": [
+                {
+                    "temperature": 0.45,
+                    "replicate": restart,
+                    "parent_id": "parent-a",
+                    "source_doi": "10.0/test",
+                    "source_sha256": "a" * 64,
+                    "source_frame_index": restart,
+                    "velocity_seed": 100 + restart,
+                    "ensemble_manifest_sha256": "b" * 64,
+                    "replicate_manifest_sha256": "c" * 64,
+                    "trajectory_sha256": "1" * 64,
+                    "trajectory_size_bytes": 123,
+                    "trajectory_hash_scope": "complete_file",
+                    "heldout_table_sha256": "d" * 64,
+                    "environment_table_sha256": "e" * 64,
+                    "spectral_table_sha256": "f" * 64,
+                    "input_lineage_join_pass": 1,
+                }
+                for restart in (1, 2, 3)
+            ],
         }
 
         first = cli.predict_correlated_parent_diagnostic(**arguments, workers=1)
@@ -660,6 +1006,111 @@ class MemoryClosureCliTests(unittest.TestCase):
         self.assertTrue(
             all(row["heldout_observables_used_as_model_inputs"] == 0.0 for row in first)
         )
+        ledger = [
+            {
+                "temperature": 0.45,
+                "replicate": restart,
+                "parent_id": "parent-a",
+                "trajectory_sha256": "1" * 64,
+                "trajectory_size_bytes": 123,
+                "trajectory_hash_scope": "complete_file",
+            }
+            for restart in (1, 2, 3)
+        ]
+        closure.validate_realization_grid(
+            first,
+            parent_ledger=ledger,
+            temperature=0.45,
+            generated_realizations=16,
+        )
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            closure.validate_realization_grid(
+                first[:-1],
+                parent_ledger=ledger,
+                temperature=0.45,
+                generated_realizations=16,
+            )
+        paired = {}
+        for row in first:
+            if row["model"] not in {"finite_exchange_environment", "full_candidate"}:
+                continue
+            key = (row["restart"], row["realization"])
+            paired.setdefault(key, {})[row["model"]] = row["exchange_schedule_sha256"]
+        self.assertTrue(paired)
+        self.assertTrue(
+            all(values["finite_exchange_environment"] == values["full_candidate"] for values in paired.values())
+        )
+        triggering_16 = [dict(row) for row in first]
+        changed = next(
+            row
+            for row in triggering_16
+            if row["model"] == "mean_rate_null"
+            and row["restart"] == 1
+            and row["realization"] == 0
+            and row["lag"] == 20
+        )
+        changed["predicted_msd"] *= 10.0
+        self.assertTrue(
+            cli.initial_grid_precision_trigger(
+                triggering_16,
+                parent_ledger=ledger,
+                temperature=0.45,
+                final_realizations=16,
+            )
+        )
+        extended_64 = []
+        for row in triggering_16:
+            if row["model"] in closure.ABLATION_MODELS:
+                for offset in (0, 16, 32, 48):
+                    extended = dict(row)
+                    extended["realization"] = row["realization"] + offset
+                    extended_64.append(extended)
+            else:
+                extended_64.append(dict(row))
+        self.assertTrue(
+            cli.initial_grid_precision_trigger(
+                extended_64,
+                parent_ledger=ledger,
+                temperature=0.45,
+                final_realizations=64,
+            )
+        )
+        constant_by_cell = {}
+        no_trigger_64 = [dict(row) for row in extended_64]
+        for row in no_trigger_64:
+            if row["model"] not in closure.ABLATION_MODELS:
+                continue
+            key = (row["restart"], row["model"], row["lag"])
+            values = constant_by_cell.setdefault(
+                key,
+                {name: row[f"predicted_{name}"] for name in closure.PREDICTION_OBSERVABLES},
+            )
+            for name, value in values.items():
+                row[f"predicted_{name}"] = value
+        self.assertFalse(
+            cli.initial_grid_precision_trigger(
+                no_trigger_64,
+                parent_ledger=ledger,
+                temperature=0.45,
+                final_realizations=64,
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "not justified"):
+            cli.build_diagnostic_tables(
+                realization_rows=no_trigger_64,
+                parent_ledger=ledger,
+                blockers=[
+                    {
+                        "temperature": 0.45,
+                        "evidence_role": "primary",
+                        "missing_parent_count": 2,
+                        "stationarity_pass": 1,
+                        "input_lineage_join_pass": 1,
+                    }
+                ],
+                temperature=0.45,
+                realizations=64,
+            )
 
 
 if __name__ == "__main__":

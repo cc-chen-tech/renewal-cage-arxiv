@@ -11,11 +11,11 @@
 <text x="1010" y="148" class="fail">FAIL</text>
 <text x="28" y="172">finite_exchange_environment</text>
 <text x="520" y="172">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
-<text x="800" y="172">25.5886</text>
+<text x="800" y="172">25.6055</text>
 <text x="1010" y="172" class="fail">FAIL</text>
 <text x="28" y="196">full_candidate</text>
 <text x="520" y="196">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
-<text x="800" y="196">14.9226</text>
+<text x="800" y="196">14.8946</text>
 <text x="1010" y="196" class="fail">FAIL</text>
 <text x="28" y="220">mean_rate_null</text>
 <text x="520" y="220">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>

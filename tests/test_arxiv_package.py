@@ -18,6 +18,8 @@ from build_arxiv_package import (  # noqa: E402
 )
 from analyze_ka_prl_memory_closure import (  # noqa: E402
     recompute_committed_memory_closure_gate,
+    recompute_committed_memory_closure_tables,
+    write_svg as write_memory_closure_svg,
 )
 sys.path.insert(0, str(ROOT / "src"))
 from ka_prl_memory_closure import CLOSED_CLAIM_FIELDS  # noqa: E402
@@ -206,7 +208,8 @@ class ArxivPackageTests(unittest.TestCase):
         with (data / "renewal_cage_ka_prl_memory_closure_claim_ledger.csv").open() as handle:
             claims = list(csv.DictReader(handle))
 
-        recomputed = recompute_committed_memory_closure_gate(data)
+        recomputed_tables = recompute_committed_memory_closure_tables(data)
+        recomputed = recomputed_tables["gate"]
 
         self.assertCsvGateMatchesComputedGate(stored, recomputed)
         self.assertEqual(
@@ -235,7 +238,10 @@ class ArxivPackageTests(unittest.TestCase):
         }
         self.assertEqual(float(blocker_by_temperature[0.45]["missing_parent_count"]), 2.0)
         self.assertEqual(float(blocker_by_temperature[0.58]["missing_parent_count"]), 4.0)
+        self.assertEqual(float(blocker_by_temperature[0.45]["stationarity_pass"]), 0.0)
         self.assertEqual(float(blocker_by_temperature[0.58]["stationarity_pass"]), 0.0)
+        self.assertEqual(float(blocker_by_temperature[0.45]["input_lineage_join_pass"]), 0.0)
+        self.assertEqual(float(blocker_by_temperature[0.58]["input_lineage_join_pass"]), 0.0)
         verdict_by_model = {row["model"]: row for row in verdicts}
         self.assertEqual(float(verdict_by_model["full_candidate"]["precision_pass"]), 1.0)
         self.assertEqual(
@@ -255,6 +261,30 @@ class ArxivPackageTests(unittest.TestCase):
         tampered["positive_memory_closure_claim_allowed"] = "1"
         with self.assertRaises(AssertionError):
             self.assertCsvGateMatchesComputedGate(tampered, recomputed)
+
+        table_paths = {
+            "parent_ledger": "renewal_cage_ka_prl_parent_provenance.csv",
+            "blockers": "renewal_cage_ka_prl_parent_blockers.csv",
+            "restart_summaries": "renewal_cage_ka_prl_memory_closure_restart_summary.csv",
+            "parent_summaries": "renewal_cage_ka_prl_memory_closure_parent_summary.csv",
+            "model_verdicts": "renewal_cage_ka_prl_memory_closure_model_verdicts.csv",
+            "claim_ledger": "renewal_cage_ka_prl_memory_closure_claim_ledger.csv",
+        }
+        for key, filename in table_paths.items():
+            with (data / filename).open() as handle:
+                stored_rows = list(csv.DictReader(handle))
+            self.assertCsvRowsMatchComputedRows(stored_rows, recomputed_tables[key])
+        with tempfile.TemporaryDirectory() as directory:
+            generated_svg = Path(directory) / "memory.svg"
+            write_memory_closure_svg(
+                generated_svg,
+                recomputed_tables["model_verdicts"],
+                recomputed_tables["gate"],
+            )
+            self.assertEqual(
+                (ROOT / "figures" / "renewal_cage_ka_prl_memory_closure.svg").read_bytes(),
+                generated_svg.read_bytes(),
+            )
 
     def test_memory_hierarchy_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

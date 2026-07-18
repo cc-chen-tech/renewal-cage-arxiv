@@ -21,6 +21,38 @@
 - Keep microscopic-closure, spatial-facilitation, and thermodynamic-glass-transition flags zero for every outcome.
 - Do not edit or write beneath /Users/luicy/AI/renewal-cage-arxiv; that raw trajectory directory is read-only input.
 
+## Implementation-audit correction plan
+
+This section supersedes the early interface sketches below without changing the
+frozen claim, thresholds, lags, observables, or calibration budget.
+
+- [x] Recompute `early_late`, `early_heldout`, and `late_heldout` separately for
+  every restart and bind every row to DOI/SHA256/frame/velocity provenance.
+- [x] Audit ensemble and replicate manifests against provenance and record
+  cryptographic hashes plus explicit failed joins for auxiliary tables that do
+  not embed parent identity.
+- [x] Precompute one exchange/source schedule per
+  parent/restart/realization and reuse it exactly for the finite-exchange and
+  full ordered-path models.
+- [x] Validate the exact restart/model/realization/frozen-lag grid before any
+  aggregation; reject missing or duplicate cells.
+- [x] Make 16-to-64 precision escalation automatic and reject a stored
+  16-realization grid when it should have escalated.
+- [x] Re-audit source provenance, parent stationarity, and lineage during
+  package recomputation; rebuild and compare every downstream CSV and SVG.
+- [x] Run fresh focused and full verification after these corrections, rebuild
+  the arXiv package, and request final code review. Push remains the publication
+  step after the verified diff is committed.
+
+The lowest-level audit command is:
+
+    /tmp/renewal-cage-prl-memory-closure.ocGhcz/venv312/bin/python scripts/audit_ka_prl_parent_inputs.py --provenance data/renewal_cage_ka_replicates_T058_T045_provenance.csv --low-ensemble-directory /Users/luicy/AI/renewal-cage-arxiv/tmp/ka_replicates/T045 --low-heldout-targets data/renewal_cage_ka_replicates_T045_event_oracle_factorization_rows.csv --low-spectral-rows data/renewal_cage_ka_replicates_T045_nonlinear_path_rows.csv --high-ensemble-directory /Users/luicy/AI/renewal-cage-arxiv/tmp/ka_replicates/T058 --high-heldout-targets data/renewal_cage_ka_replicates_T058_event_oracle_factorization_rows.csv --high-spectral-rows data/renewal_cage_ka_replicates_T058_block20_nonlinear_path_rows.csv --environment-crossings data/renewal_cage_ka_debye_waller_environment_crossover_crossings.csv --output-stationarity data/renewal_cage_ka_prl_parent_stationarity.csv --output-lineage data/renewal_cage_ka_prl_input_lineage.csv
+
+Full mode consumes those two audited tables through `--parent-stationarity` and
+`--input-lineage`. It always starts at 16 realizations and performs any required
+64-realization extension itself; there is no operator-selectable realization
+count.
+
 ---
 
 ### Task 1: Parent provenance ledger and blocker gate
@@ -403,17 +435,21 @@ Expected: manifest validation, held-out exclusion, exact schemas, parent groupin
 
 Run:
 
-    /tmp/renewal-cage-prl-memory-closure.ocGhcz/venv312/bin/python scripts/analyze_ka_prl_memory_closure.py --audit-only --provenance data/renewal_cage_ka_replicates_T058_T045_provenance.csv --low-stationarity data/renewal_cage_ka_replicates_T045_nonlinear_path_stationarity.csv --high-stationarity data/renewal_cage_ka_replicates_T058_block20_nonlinear_path_stationarity.csv --output-parent-ledger data/renewal_cage_ka_prl_parent_provenance.csv --output-blockers data/renewal_cage_ka_prl_parent_blockers.csv --output-gate data/renewal_cage_ka_prl_memory_closure_gate.csv --output-claim-ledger data/renewal_cage_ka_prl_memory_closure_claim_ledger.csv
+    /tmp/renewal-cage-prl-memory-closure.ocGhcz/venv312/bin/python scripts/analyze_ka_prl_memory_closure.py --audit-only --provenance data/renewal_cage_ka_replicates_T058_T045_provenance.csv --parent-stationarity data/renewal_cage_ka_prl_parent_stationarity.csv --input-lineage data/renewal_cage_ka_prl_input_lineage.csv --output-parent-ledger data/renewal_cage_ka_prl_parent_provenance.csv --output-blockers data/renewal_cage_ka_prl_parent_blockers.csv --output-gate data/renewal_cage_ka_prl_memory_closure_gate.csv --output-claim-ledger data/renewal_cage_ka_prl_memory_closure_claim_ledger.csv
 
-Expected: T=0.45 one available/three required parents; T=0.58 one available/five required parents and failed stationarity; positive claim zero.
+Expected: T=0.45 one available/three required parents and T=0.58 one/five;
+both parents fail restart-first stationarity and input lineage; positive claim
+zero.
 
 - [ ] **Step 7: Run the T=0.45 correlated-parent diagnostic**
 
 Run:
 
-    /tmp/renewal-cage-prl-memory-closure.ocGhcz/venv312/bin/python scripts/analyze_ka_prl_memory_closure.py --provenance data/renewal_cage_ka_replicates_T058_T045_provenance.csv --low-stationarity data/renewal_cage_ka_replicates_T045_nonlinear_path_stationarity.csv --high-stationarity data/renewal_cage_ka_replicates_T058_block20_nonlinear_path_stationarity.csv --run-temperature 0.45 --ensemble-directory /Users/luicy/AI/renewal-cage-arxiv/tmp/ka_replicates/T045 --heldout-targets data/renewal_cage_ka_replicates_T045_event_oracle_factorization_rows.csv --environment-crossings data/renewal_cage_ka_debye_waller_environment_crossover_crossings.csv --spectral-rows data/renewal_cage_ka_replicates_T045_nonlinear_path_rows.csv --realizations 16 --workers 3 --output-parent-ledger data/renewal_cage_ka_prl_parent_provenance.csv --output-blockers data/renewal_cage_ka_prl_parent_blockers.csv --output-restart-rows data/renewal_cage_ka_prl_memory_closure_restart_rows.csv --output-restart-summary data/renewal_cage_ka_prl_memory_closure_restart_summary.csv --output-parent-summary data/renewal_cage_ka_prl_memory_closure_parent_summary.csv --output-model-verdicts data/renewal_cage_ka_prl_memory_closure_model_verdicts.csv --output-gate data/renewal_cage_ka_prl_memory_closure_gate.csv --output-claim-ledger data/renewal_cage_ka_prl_memory_closure_claim_ledger.csv --output-svg figures/renewal_cage_ka_prl_memory_closure.svg
+    /tmp/renewal-cage-prl-memory-closure.ocGhcz/venv312/bin/python scripts/analyze_ka_prl_memory_closure.py --provenance data/renewal_cage_ka_replicates_T058_T045_provenance.csv --parent-stationarity data/renewal_cage_ka_prl_parent_stationarity.csv --input-lineage data/renewal_cage_ka_prl_input_lineage.csv --run-temperature 0.45 --ensemble-directory /Users/luicy/AI/renewal-cage-arxiv/tmp/ka_replicates/T045 --heldout-targets data/renewal_cage_ka_replicates_T045_event_oracle_factorization_rows.csv --environment-crossings data/renewal_cage_ka_debye_waller_environment_crossover_crossings.csv --spectral-rows data/renewal_cage_ka_replicates_T045_nonlinear_path_rows.csv --workers 3 --output-parent-ledger data/renewal_cage_ka_prl_parent_provenance.csv --output-blockers data/renewal_cage_ka_prl_parent_blockers.csv --output-restart-rows data/renewal_cage_ka_prl_memory_closure_restart_rows.csv --output-restart-summary data/renewal_cage_ka_prl_memory_closure_restart_summary.csv --output-parent-summary data/renewal_cage_ka_prl_memory_closure_parent_summary.csv --output-model-verdicts data/renewal_cage_ka_prl_memory_closure_model_verdicts.csv --output-gate data/renewal_cage_ka_prl_memory_closure_gate.csv --output-claim-ledger data/renewal_cage_ka_prl_memory_closure_claim_ledger.csv --output-svg figures/renewal_cage_ka_prl_memory_closure.svg
 
-If any precision field fails, rerun the identical command with --realizations 64. The gate remains blocked regardless of curves.
+The CLI records any 16-realization precision trigger and automatically extends
+all generated stochastic cells to 64. The gate remains blocked regardless of
+curves.
 
 - [ ] **Step 8: Commit CLI and artifacts**
 

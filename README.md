@@ -91,9 +91,11 @@ thermodynamic claims remain closed. See `docs/ka-shape-mechanism-selection.md`.
 The independent-parent PRL memory-closure test is documented in
 [`docs/prl-memory-closure-independent-parent-result.md`](docs/prl-memory-closure-independent-parent-result.md).
 The available `T=0.45` restart labels contribute only one of three required
-source parents, and `T=0.58` contributes one of five while failing the frozen
-stationarity control. The particle-conditioned finite-exchange ordered-path
-candidate also fails the replicate-first correlated-parent diagnostic. The PRL
+source parents, and `T=0.58` contributes one of five. Restart-first reanalysis
+finds that neither source parent passes stationarity (no `T=0.45` child passes
+all three comparisons; only `T=0.58` child 4 does), and the current auxiliary
+tables lack embedded parent lineage. The paired-schedule particle-conditioned
+finite-exchange ordered-path candidate also fails every `T=0.45` child. The PRL
 claim therefore remains blocked; complete microscopic closure, spatial
 facilitation, and thermodynamic-transition claims remain outside scope.
 

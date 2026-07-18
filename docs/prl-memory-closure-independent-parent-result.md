@@ -27,15 +27,19 @@ five `T=0.58` labels likewise descend from one source parent. Different source
 frames and velocity seeds do not turn those children into independently
 prepared parents.
 
-| Temperature | Role | Required parents | Available parents | Missing parents | Stationarity |
-| --- | --- | ---: | ---: | ---: | --- |
-| `0.45` | primary low-temperature evidence | 3 | 1 | 2 | pass |
-| `0.58` | control/canary only | 5 | 1 | 4 | fail (`early_late` and `early_heldout`) |
+| Temperature | Role | Required parents | Available parents | Missing parents | Restart-first stationarity | Auxiliary-input lineage |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| `0.45` | primary low-temperature evidence | 3 | 1 | 2 | fail; 0/3 child restarts pass all comparisons | fail; derived tables lack embedded parent keys |
+| `0.58` | control/canary only | 5 | 1 | 4 | fail; only child restart 4 passes all comparisons | fail; derived tables lack embedded parent keys |
 
 The machine gate is therefore
 `blocked_independent_parent_validation`. Shared-parent resampling cannot clear
-it. The exact acquisition blockers are recorded in
-`data/renewal_cage_ka_prl_parent_blockers.csv`.
+it. The old temperature-averaged stationarity rows are retained only as
+historical evidence; they cannot qualify a parent. The exact acquisition,
+stationarity, and lineage blockers are recorded in
+`data/renewal_cage_ka_prl_parent_blockers.csv`, with the restart-level audit in
+`data/renewal_cage_ka_prl_parent_stationarity.csv` and cryptographic input audit
+in `data/renewal_cage_ka_prl_input_lineage.csv`.
 
 ## Evidence frozen before the positive model
 
@@ -64,7 +68,9 @@ identity with the pre-existing block-size-20 environment e-folding lifetime;
 while that identity persists it emits contiguous calibration blocks. Source
 endpoints force a recorded exchange rather than wrapping. Heldout MSD, NGP, and
 multi-`k` scattering are joined only after each calibration-only prediction is
-complete.
+complete. For every restart and realization, the finite-exchange/no-order and
+full ordered models now consume the exact same precomputed source-particle and
+exchange schedule; their only difference is within-source block order.
 
 The nested family is:
 
@@ -79,8 +85,10 @@ The contiguous empirical calibration path is a nonselectable upper control.
 Pass/fail is computed for every child restart before parent aggregation, so a
 parent or ensemble average cannot conceal a child failure.
 
-The final correlated-parent diagnostic uses the frozen nested realization grid
-`0..63`; the exact model scores and precision flags are in
+The automatic nested procedure first evaluated `0..15`, detected a precision
+failure, and extended every generated stochastic model to `0..63`. The frozen
+spectral surrogate retains its eight realizations `0..7`, and the contiguous
+upper control is deterministic. The exact model scores and precision flags are in
 `data/renewal_cage_ka_prl_memory_closure_model_verdicts.csv`:
 
 | Model | Failed child restarts | Worst child higher-order score | Precision pass |
@@ -89,14 +97,14 @@ The final correlated-parent diagnostic uses the frozen nested realization grid
 | one-step jump law | 3/3 | 25.640 | no |
 | two-point path spectrum | 3/3 | 5.289 | yes |
 | static particle environment | 3/3 | 25.309 | no |
-| finite-exchange environment, no order | 3/3 | 25.589 | no |
-| full finite-exchange ordered-path candidate | 3/3 | 14.923 | yes |
+| finite-exchange environment, no order | 3/3 | 25.606 | no |
+| full finite-exchange ordered-path candidate | 3/3 | 14.895 | yes |
 | contiguous empirical upper control | 2/3 | 3.324 | yes |
 
 The score is `max(NGP error / 0.30, maximum Fs error / 0.03)`. The full
-candidate's maximum child errors are MSD `1.698`, NGP `1.785`, and Fs `0.448`,
-whereas its maximum Monte Carlo errors are relative MSD `0.00387`, NGP
-`0.00366`, and Fs `0.000614`. Its rejection is therefore a curve failure, not a
+candidate's maximum child errors are MSD `1.698`, NGP `1.781`, and Fs `0.447`,
+whereas its maximum Monte Carlo errors are relative MSD `0.00415`, NGP
+`0.00320`, and Fs `0.000617`. Its rejection is therefore a curve failure, not a
 Monte Carlo precision artifact.
 
 The positive candidate fails the frozen low-temperature curve gate, as do all
@@ -108,10 +116,13 @@ vocabulary. That label does **not** establish spatial facilitation.
 
 ## Claim decision and boundary
 
-The candidate positive-memory claim remains closed for two independent reasons:
+The candidate positive-memory claim remains closed for four independent reasons:
 
 1. only one of three required `T=0.45` parents exists; and
-2. the full candidate fails the replicate-first correlated-parent diagnostic.
+2. the available `T=0.45` parent fails restart-first stationarity;
+3. the current heldout, environment, and spectral tables cannot be
+   cryptographically joined to parent identity; and
+4. the full candidate fails the replicate-first correlated-parent diagnostic.
 
 The result does not establish complete microscopic closure, spatial
 facilitation, or a thermodynamic glass transition. Every corresponding claim
@@ -120,22 +131,30 @@ flag remains zero in
 
 ## Reproduction
 
-The audit-only mode writes the parent ledger and fail-closed gate without
-touching trajectory files. Full mode reads an explicit ensemble manifest,
-calibration prefixes, heldout target table, environment-crossing table, and the
-recomputable spectral-null artifact. The command and all output paths are
-documented in
+`scripts/audit_ka_prl_parent_inputs.py` rebuilds restart-specific stationarity
+and lineage from both raw ensembles, their manifests, and explicit auxiliary
+tables. Audit-only mode then writes the parent ledger and fail-closed gate
+without touching trajectory files. Full mode reads an explicit ensemble
+manifest, calibration prefixes, heldout target table, environment-crossing
+table, and spectral-null artifact; its 16-to-64 escalation is automatic.
+Derived-only mode re-audits provenance/stationarity/lineage and rebuilds every
+summary, verdict, gate, claim row, and SVG from the frozen realization rows. The
+full CLI re-hashes the actual runtime manifests, auxiliary files, and complete
+trajectory files against the lineage audit before reading trajectory blocks. A
+stored 64-realization grid is accepted only if its own `0..15` prefix reproduces
+the frozen precision trigger.
+The commands and all output paths are documented in
 [`superpowers/plans/2026-07-18-prl-memory-closure-independent-parent.md`](superpowers/plans/2026-07-18-prl-memory-closure-independent-parent.md).
 
 Validation is reported in three separate layers:
 
 - scientific result: parent gate blocked and full candidate rejected as above;
-- engineering validation: 21 focused memory-closure tests and the package gate
-  recomputation test pass; the post-rebase complete local suite reports
-  `Ran 1011 tests in 19.302s — OK`; eight summary artifacts rebuild
-  byte-identically; Python syntax and `git diff --check` pass; and
-  `scripts/build_arxiv_package.py` exits zero with
-  `dist/renewal-cage-arxiv-source.zip`;
+- engineering validation: 31 focused memory-closure tests and the dedicated
+  package recomputation test pass; the complete local suite reports
+  `Ran 1056 tests in 80.481s — OK`; the two raw-audit artifacts and eight
+  downstream artifacts rebuild byte-identically; runtime input hashes, Python
+  syntax, and `git diff --check` pass; and `scripts/build_arxiv_package.py`
+  exits zero with `dist/renewal-cage-arxiv-source.zip`;
 - remote CI: pending when this result note was committed; its later state is
   reported on the draft PR and is never used as evidence for a scientific
   pass.

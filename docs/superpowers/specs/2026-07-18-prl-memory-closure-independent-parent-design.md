@@ -18,6 +18,17 @@ This is a preregistration. No result may change the wording, parent rule,
 observables, lag grid, calibration budget, tolerances, Monte Carlo rule, or
 ablation logic below.
 
+### Fail-closed implementation clarification
+
+The post-implementation safety audit did not alter any scientific threshold or
+claim. It made four requirements already implicit in "parent first" and
+"nested ablation" executable invariants: stationarity is keyed by
+parent/restart rather than averaged by temperature; every auxiliary input must
+carry verifiable parent lineage; finite/full models share one exchange/source
+schedule; and every frozen lag/model/realization cell must be present. A source
+that cannot satisfy those checks remains a diagnostic only and cannot open the
+claim.
+
 ## Scope and immutable claim boundaries
 
 The target is an event/block-path dynamical reconstruction claim for the
@@ -100,8 +111,18 @@ an equal held-out window, block size 20 trajectory samples, and lags
 T=0.58 is only a control/canary. It uses calibration time 750, an equal held-out
 window, block size 20, and lags `20,100,200,400,600`. It is eligible only when
 all frozen `early_late`, `early_heldout`, and `late_heldout` stationarity rows
-pass. The committed T=0.58 source fails the first two comparisons, so it is
-ineligible and must remain a canary in this run.
+pass separately for every child of the parent. The same restart-specific rule
+applies to primary T=0.45 evidence. Recalculation shows that no T=0.45 child
+passes all three comparisons and only T=0.58 child 4 does; both source parents
+are therefore stationarity-ineligible. Temperature-averaged historical rows
+cannot qualify either parent.
+
+The ensemble and replicate manifests must match DOI, SHA256, source frame, and
+velocity seed in the parent ledger. Heldout targets, environment lifetimes, and
+spectral rows must also embed those parent keys (or an equivalent verified
+cryptographic identity). The current derived tables do not, so their lineage
+audit is a blocker even though they remain usable for a labeled
+correlated-parent diagnostic.
 
 Every model uses Type-A calibration block displacements only. Held-out paths,
 events, MSD, NGP, and multi-k Fs may not enter any model parameter, environment
@@ -124,11 +145,13 @@ maximum absolute NGP Monte Carlo SE = 0.03
 maximum absolute Fs Monte Carlo SE = 0.003
 ```
 
-The realization schedule is nested: evaluate deterministic realization indices
-`0..15`; if any model/temperature cell fails precision, extend every evaluated
-cell together to indices `0..63`. The base seed is `20260718`, inherited from the
-segment-splice gate. The existing spectral ablation retains its frozen base seed
-`211003` and iteration count.
+The realization schedule is nested and automatic: evaluate deterministic
+realization indices `0..15`; if any generated model/restart cell fails
+precision, extend every generated stochastic cell together to indices
+`0..63`. A stored 16-realization artifact that should have escalated is invalid.
+The base seed is `20260718`, inherited from the segment-splice gate. The existing
+spectral ablation retains its frozen eight realizations, base seed `211003`, and
+iteration count; the contiguous upper control is deterministic.
 
 ## Positive model and nested ablations
 
@@ -147,8 +170,9 @@ p_exchange = 1 - exp(-block_size / tau_environment).
 At exchange, a different source particle is chosen uniformly. Its starting
 calibration block is chosen uniformly. Without exchange, the environment state
 persists. Every target particle starts in its own calibration identity. Source
-choices and block choices use deterministic model/parent/restart/realization
-seeds.
+choices use one deterministic parent/restart/realization schedule shared exactly
+by `finite_exchange_environment` and `full_candidate`. Model-specific block
+choices may differ only where the order ablation requires them to differ.
 
 The six frozen ablations are:
 
@@ -226,6 +250,10 @@ The gate emits exactly one primary state:
   independence provenance is missing;
 - `blocked_stationarity_control` when a temperature is requested as evidence but
   its frozen stationarity comparisons fail;
+- `blocked_input_lineage` when parent-qualified auxiliary inputs cannot be
+  verified end to end;
+- `blocked_incomplete_frozen_grid` when any required lag, model, realization,
+  target, or observable cell is absent;
 - `candidate_rejected` when provenance and stationarity are eligible but the full
   candidate fails any parent curve or precision gate;
 - `ablation_pattern_unresolved` when the full candidate passes but the required
@@ -252,6 +280,8 @@ The implementation must produce:
 
 - `data/renewal_cage_ka_prl_parent_provenance.csv`;
 - `data/renewal_cage_ka_prl_parent_blockers.csv`;
+- `data/renewal_cage_ka_prl_parent_stationarity.csv`;
+- `data/renewal_cage_ka_prl_input_lineage.csv`;
 - restart/realization rows, restart summaries, parent summaries, model verdicts,
   and one final gate CSV under the prefix
   `data/renewal_cage_ka_prl_memory_closure`;
