@@ -22,6 +22,9 @@ A post-run paired-excess diagnostic is documented in
 full-path score, it finds a short-horizon excess-loss prefix through
 `tau_L=200`, but the full-path replicate baseline still fails, so the mechanism
 state remains unresolved and no finite-memory microscopic coordinate is added.
+The three restart labels share one parent trajectory, so their t95 summaries
+are exploratory correlated-parent diagnostics, not independent-sample
+confidence intervals.
 
 The model combines:
 

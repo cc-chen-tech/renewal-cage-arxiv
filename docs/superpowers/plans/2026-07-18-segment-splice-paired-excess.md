@@ -8,6 +8,11 @@
 
 **Tech Stack:** Python 3.12 standard library, CSV, deterministic SVG, `unittest`.
 
+**Review revision:** The implemented interface now also requires the committed
+T=0.45 provenance rows. This post-run hardening validates the correlated-parent
+restart structure and recomputes source full-path summary fields; it does not
+change the frozen score grid, tolerances, or statistic.
+
 ## Global Constraints
 
 - Treat this as post-run exploratory analysis, not a preregistered mechanism gate.
@@ -27,13 +32,13 @@
 - Modify: `tests/test_ka_segment_splice.py`
 
 **Interfaces:**
-- Produce `compute_paired_excess_rows(score_rows, *, block_size=20) -> list[dict[str, object]]`.
+- Produce `compute_paired_excess_rows(score_rows, provenance_rows, *, block_size=20) -> list[dict[str, object]]`.
 - Return 14 finite-length rows with three baselines, three excesses, mean, SE, t95 bounds, and degradation flag.
 
 - [ ] **Step 1: Write a failing formula test**
 
 ```python
-result = analysis.compute_paired_excess_rows(paired_excess_score_fixture(), block_size=20)
+result = analysis.compute_paired_excess_rows(paired_excess_score_fixture(), provenance_fixture(), block_size=20)
 row = next(item for item in result if item["model"] == "within_particle_segment_shuffle" and item["segment_length"] == 1.0)
 self.assertEqual(row["replicate_1_excess"], 2.0)
 self.assertAlmostEqual(row["mean_paired_excess"], 3.0)
@@ -73,7 +78,7 @@ git commit -m "compute replicate centered segment excess"
 - Modify: `tests/test_ka_segment_splice.py`
 
 **Interfaces:**
-- Produce `classify_paired_excess_gate(score_rows, cell_rows, source_gate) -> dict[str, object]`.
+- Produce `classify_paired_excess_gate(score_rows, cell_rows, source_gate, provenance_rows) -> dict[str, object]`.
 - Recompute all statistics instead of trusting stored exploratory fields.
 
 - [ ] **Step 1: Write classifier truth-table RED tests**
@@ -117,7 +122,7 @@ git commit -m "classify paired segment excess fail closed"
 - Create: `figures/renewal_cage_ka_segment_splice_paired_excess.svg`
 
 **Interfaces:**
-- CLI: `--scores`, `--cells`, `--source-gate`, `--output-rows`, `--output-gate`, `--output-svg`.
+- CLI: `--scores`, `--cells`, `--source-gate`, `--provenance`, `--output-rows`, `--output-gate`, `--output-svg`.
 
 - [ ] **Step 1: Write CLI/SVG RED tests**
 
@@ -139,7 +144,7 @@ selected memory horizon.
 - [ ] **Step 4: Generate real artifacts**
 
 ```bash
-/tmp/renewal-cage-py312-segment-splice/bin/python scripts/summarize_ka_segment_splice_paired_excess.py --scores data/renewal_cage_ka_replicates_T045_segment_splice_replicate_scores.csv --cells data/renewal_cage_ka_replicates_T045_segment_splice_cells.csv --source-gate data/renewal_cage_ka_segment_splice_gate.csv --output-rows data/renewal_cage_ka_segment_splice_paired_excess_rows.csv --output-gate data/renewal_cage_ka_segment_splice_paired_excess_gate.csv --output-svg figures/renewal_cage_ka_segment_splice_paired_excess.svg
+/tmp/renewal-cage-py312-segment-splice/bin/python scripts/summarize_ka_segment_splice_paired_excess.py --scores data/renewal_cage_ka_replicates_T045_segment_splice_replicate_scores.csv --cells data/renewal_cage_ka_replicates_T045_segment_splice_cells.csv --source-gate data/renewal_cage_ka_segment_splice_gate.csv --provenance data/renewal_cage_ka_replicates_T058_T045_provenance.csv --output-rows data/renewal_cage_ka_segment_splice_paired_excess_rows.csv --output-gate data/renewal_cage_ka_segment_splice_paired_excess_gate.csv --output-svg figures/renewal_cage_ka_segment_splice_paired_excess.svg
 ```
 
 - [ ] **Step 5: Render, inspect, verify, and commit**

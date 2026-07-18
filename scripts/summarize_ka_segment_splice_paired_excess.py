@@ -17,7 +17,8 @@ MODELS = (
 LENGTHS = (1, 2, 5, 10, 25, 50, 125, 250)
 REPLICATES = (1, 2, 3)
 T95_DF2 = 4.302652729911275
-CSV_FLOAT_SIGNIFICANT_DIGITS = 12
+CSV_FLOAT_SIGNIFICANT_DIGITS = 15
+INDEPENDENCE_CLASS = "decorrelated_parent_frames_plus_velocity_seeds"
 SOURCE_CLAIM_FIELDS = (
     "microdynamic_closure_claim_allowed",
     "spatial_facilitation_claim_allowed",
@@ -33,10 +34,15 @@ CLOSED_CLAIM_FIELDS = (
     "independent_replicate_memory_lower_bound_claim_allowed",
     "finite_memory_state_addition_allowed",
     "owner_identity_sufficiency_claim_allowed",
+    "replicate_first_interval_independence_claim_allowed",
     "microdynamic_closure_claim_allowed",
     "spatial_facilitation_claim_allowed",
     "thermodynamic_claim_allowed",
 )
+
+
+class SourceVerdictMismatch(ValueError):
+    """Raised when a stored source verdict disagrees with score recomputation."""
 
 
 def _finite(row: dict[str, object], field: str) -> float:
@@ -54,6 +60,18 @@ def _exact_int(row: dict[str, object], field: str) -> int:
     if not value.is_integer():
         raise ValueError(f"field must be an exact integer: {field}")
     return int(value)
+
+
+def _boolean(row: dict[str, object], field: str) -> bool:
+    try:
+        value = row[field]
+    except KeyError as error:
+        raise ValueError(f"missing or invalid field: {field}") from error
+    if value in (False, 0, 0.0, "False", "false", "0", "0.0"):
+        return False
+    if value in (True, 1, 1.0, "True", "true", "1", "1.0"):
+        return True
+    raise ValueError(f"missing or invalid field: {field}")
 
 
 def canonical_csv_value(value: object) -> object:
@@ -143,6 +161,72 @@ def _validate_source_verdict(rows: Sequence[dict[str, object]]) -> dict[str, obj
     return verdict
 
 
+def _validate_provenance(rows: Sequence[dict[str, object]]) -> dict[str, object]:
+    selected = [row for row in rows if _finite(row, "temperature") == 0.45]
+    keys = [_exact_int(row, "replicate") for row in selected]
+    if len(keys) != len(REPLICATES) or len(set(keys)) != len(keys):
+        raise ValueError("provenance does not contain exactly three T=0.45 restarts")
+    if set(keys) != set(REPLICATES):
+        raise ValueError("provenance replicate labels do not match the frozen grid")
+    source_hashes = {str(row.get("source_sha256", "")) for row in selected}
+    if len(source_hashes) != 1 or not next(iter(source_hashes)):
+        raise ValueError("T=0.45 restarts must share one identified parent sample")
+    frames = [_exact_int(row, "source_frame_index") for row in selected]
+    seeds = [_exact_int(row, "velocity_seed") for row in selected]
+    if len(set(frames)) != len(REPLICATES) or len(set(seeds)) != len(REPLICATES):
+        raise ValueError("restart frames and velocity seeds must be distinct")
+    if any(str(row.get("independence_class")) != INDEPENDENCE_CLASS for row in selected):
+        raise ValueError("restart independence class does not match provenance")
+    if any(_boolean(row, "independently_prepared_parent_samples") for row in selected):
+        raise ValueError("paired excess requires the recorded correlated-parent provenance")
+    if any(_boolean(row, "thermodynamic_claim_allowed") for row in selected):
+        raise ValueError("provenance thermodynamic claim boundary must remain closed")
+    return {
+        "replicate_provenance_validation_pass": 1.0,
+        "replicate_count": float(len(REPLICATES)),
+        "parent_sample_count": 1.0,
+        "independent_replicate_count": 0.0,
+        "independently_prepared_parent_samples": 0.0,
+        "independence_class": INDEPENDENCE_CLASS,
+    }
+
+
+def _full_path_baselines(
+    scores: dict[tuple[str, int, int], float],
+) -> tuple[dict[int, float], float]:
+    baselines: dict[int, float] = {}
+    differences: list[float] = []
+    for replicate in REPLICATES:
+        within = scores[(MODELS[0], LENGTHS[-1], replicate)]
+        cross = scores[(MODELS[1], LENGTHS[-1], replicate)]
+        difference = abs(within - cross)
+        differences.append(difference)
+        if not math.isclose(within, cross, rel_tol=0.0, abs_tol=1e-12):
+            raise ValueError("within and cross full-path controls disagree")
+        baselines[replicate] = 0.5 * (within + cross)
+    return baselines, max(differences)
+
+
+def _full_path_replicate_summary(
+    baselines: dict[int, float],
+) -> tuple[float, float]:
+    failed_count = sum(baselines[replicate] > 1.0 for replicate in REPLICATES)
+    return float(failed_count == 0), float(failed_count)
+
+
+def _validate_source_full_path_summary(
+    source: dict[str, object],
+    all_replicates_pass: float,
+    failed_replicate_count: float,
+) -> None:
+    stored_pass = _finite(source, "low_full_path_control_all_replicates_pass")
+    stored_failed = _finite(source, "low_full_path_control_failed_replicate_count")
+    if stored_pass != all_replicates_pass or stored_failed != failed_replicate_count:
+        raise SourceVerdictMismatch(
+            "source full-path replicate verdict disagrees with score recomputation"
+        )
+
+
 def _contiguous_prefix(lengths: Sequence[int]) -> bool:
     selected = tuple(sorted(lengths))
     return bool(selected) and selected == LENGTHS[: len(selected)]
@@ -152,22 +236,23 @@ def _classify_paired_excess_gate_strict(
     replicate_scores: Sequence[dict[str, object]],
     cells: Sequence[dict[str, object]],
     source_verdict: Sequence[dict[str, object]],
+    provenance: Sequence[dict[str, object]],
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     """Return finite-length paired contrasts and a fail-closed exploratory gate."""
 
     scores = _score_lookup(replicate_scores)
     _validate_cells(cells)
     source = _validate_source_verdict(source_verdict)
-
-    baselines: dict[int, float] = {}
-    full_path_model_differences: list[float] = []
-    for replicate in REPLICATES:
-        within = scores[(MODELS[0], LENGTHS[-1], replicate)]
-        cross = scores[(MODELS[1], LENGTHS[-1], replicate)]
-        full_path_model_differences.append(abs(within - cross))
-        if not math.isclose(within, cross, rel_tol=0.0, abs_tol=1e-12):
-            raise ValueError("within and cross full-path controls disagree")
-        baselines[replicate] = 0.5 * (within + cross)
+    provenance_summary = _validate_provenance(provenance)
+    baselines, full_path_max_difference = _full_path_baselines(scores)
+    full_path_all_pass, full_path_failed_count = _full_path_replicate_summary(
+        baselines
+    )
+    _validate_source_full_path_summary(
+        source,
+        full_path_all_pass,
+        full_path_failed_count,
+    )
 
     rows: list[dict[str, object]] = []
     identified: dict[str, list[int]] = {model: [] for model in MODELS}
@@ -208,12 +293,15 @@ def _classify_paired_excess_gate_strict(
                     "paired_excess_t95_ci_low": ci_low,
                     "paired_excess_t95_ci_high": ci_high,
                     "paired_degradation_identified": degradation,
-                    "independent_replicate_count": 3.0,
+                    "independent_replicate_count": 0.0,
                     "replicate_count": 3.0,
-                    "full_path_baseline_max_model_difference": max(
-                        full_path_model_differences
-                    ),
-                    "ci95_method": "student_t_paired_independent_restarts_df2",
+                    "parent_sample_count": 1.0,
+                    "independently_prepared_parent_samples": 0.0,
+                    "independence_class": INDEPENDENCE_CLASS,
+                    "replicate_provenance_validation_pass": 1.0,
+                    "replicate_first_interval_independence_claim_allowed": 0.0,
+                    "full_path_baseline_max_model_difference": full_path_max_difference,
+                    "ci95_method": "student_t_replicate_first_correlated_parent_exploratory_df2",
                     "post_run_exploratory": 1.0,
                     "global_source_segment_schedule_preserved": 1.0,
                     "paired_excess_equivalence_claim_allowed": 0.0,
@@ -248,21 +336,16 @@ def _classify_paired_excess_gate_strict(
     gate: dict[str, object] = {
         "mechanism_state": "mechanism_unresolved",
         "analysis_status": "post_run_exploratory",
-        "substantive_interpretation_condition": "conditional_on_preserved_global_source_segment_schedule",
+        "substantive_interpretation_condition": "conditional_on_preserved_global_source_segment_schedule_and_correlated_parent_restart_labels",
         "input_completeness_pass": 1.0,
         "paired_input_exactness_pass": 1.0,
         "source_verdict_fail_closed": 0.0,
         "full_path_model_agreement_pass": 1.0,
-        "full_path_baseline_max_model_difference": max(full_path_model_differences),
-        "low_full_path_control_all_replicates_pass": _finite(
-            source, "low_full_path_control_all_replicates_pass"
-        ),
-        "full_path_replicate_baseline_pass": _finite(
-            source, "low_full_path_control_all_replicates_pass"
-        ),
-        "low_full_path_control_failed_replicate_count": _finite(
-            source, "low_full_path_control_failed_replicate_count"
-        ),
+        "full_path_baseline_max_model_difference": full_path_max_difference,
+        "low_full_path_control_all_replicates_pass": full_path_all_pass,
+        "full_path_replicate_baseline_pass": full_path_all_pass,
+        "low_full_path_control_failed_replicate_count": full_path_failed_count,
+        **provenance_summary,
         "within_identified_prefix_max_segment_length": float(
             max(identified[MODELS[0]]) if _contiguous_prefix(identified[MODELS[0]]) else 0
         ),
@@ -301,7 +384,7 @@ def _failed_gate(
     gate: dict[str, object] = {
         "mechanism_state": "mechanism_unresolved",
         "analysis_status": "post_run_exploratory",
-        "substantive_interpretation_condition": "conditional_on_preserved_global_source_segment_schedule",
+        "substantive_interpretation_condition": "conditional_on_preserved_global_source_segment_schedule_and_correlated_parent_restart_labels",
         "input_completeness_pass": float(input_completeness_pass),
         "paired_input_exactness_pass": 0.0,
         "source_verdict_fail_closed": float(source_verdict_fail_closed),
@@ -310,6 +393,12 @@ def _failed_gate(
         "low_full_path_control_all_replicates_pass": 0.0,
         "full_path_replicate_baseline_pass": 0.0,
         "low_full_path_control_failed_replicate_count": 0.0,
+        "replicate_provenance_validation_pass": 0.0,
+        "replicate_count": 0.0,
+        "parent_sample_count": 0.0,
+        "independent_replicate_count": 0.0,
+        "independently_prepared_parent_samples": 0.0,
+        "independence_class": "unresolved",
         "within_identified_prefix_max_segment_length": 0.0,
         "cross_identified_prefix_max_segment_length": 0.0,
         "identified_prefix_max_segment_length": 0.0,
@@ -340,6 +429,7 @@ def classify_paired_excess_gate(
     replicate_scores: Sequence[dict[str, object]],
     cells: Sequence[dict[str, object]],
     source_verdict: Sequence[dict[str, object]],
+    provenance: Sequence[dict[str, object]],
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     """Fail closed when paired support or the unresolved source verdict is invalid."""
 
@@ -352,6 +442,13 @@ def classify_paired_excess_gate(
             source_verdict_fail_closed=True,
             input_completeness_pass=False,
         )
+    try:
+        _validate_provenance(provenance)
+    except (KeyError, TypeError, ValueError):
+        return [], _failed_gate(
+            source_verdict_fail_closed=False,
+            input_completeness_pass=False,
+        )
     input_complete = False
     try:
         _score_lookup(replicate_scores)
@@ -361,6 +458,12 @@ def classify_paired_excess_gate(
             replicate_scores,
             cells,
             source_verdict,
+            provenance,
+        )
+    except SourceVerdictMismatch:
+        return [], _failed_gate(
+            source_verdict_fail_closed=True,
+            input_completeness_pass=input_complete,
         )
     except (KeyError, TypeError, ValueError):
         return [], _failed_gate(
@@ -371,6 +474,7 @@ def classify_paired_excess_gate(
 
 def compute_paired_excess_rows(
     replicate_scores: Sequence[dict[str, object]],
+    provenance: Sequence[dict[str, object]],
     *,
     block_size: int = 20,
 ) -> list[dict[str, object]]:
@@ -390,18 +494,26 @@ def compute_paired_excess_rows(
         for model in MODELS
         for length in LENGTHS
     ]
+    scores = _score_lookup(replicate_scores)
+    baselines, _ = _full_path_baselines(scores)
+    all_pass, failed_count = _full_path_replicate_summary(baselines)
     source = [
         {
             "mechanism_state": "mechanism_unresolved",
             "low_mechanism_identifiable_against_full_path_control": 0.0,
-            "low_full_path_control_all_replicates_pass": 0.0,
-            "low_full_path_control_failed_replicate_count": 3.0,
+            "low_full_path_control_all_replicates_pass": all_pass,
+            "low_full_path_control_failed_replicate_count": failed_count,
             "global_source_segment_schedule_preserved": 1.0,
             **{field: 0.0 for field in SOURCE_CLAIM_FIELDS},
             **{field: 0.0 for field in SOURCE_VERDICT_CLOSED_FIELDS},
         }
     ]
-    rows, _ = _classify_paired_excess_gate_strict(replicate_scores, cells, source)
+    rows, _ = _classify_paired_excess_gate_strict(
+        replicate_scores,
+        cells,
+        source,
+        provenance,
+    )
     return rows
 
 
@@ -512,12 +624,12 @@ def write_paired_excess_svg(
 <style>text{{font-family:Arial,sans-serif;fill:#202020;font-size:14px;letter-spacing:0}}</style>
 <text x="560" y="35" text-anchor="middle" font-size="23" font-weight="bold">Segment-splice paired-excess baseline</text>
 <text x="560" y="58" text-anchor="middle" font-size="13">Paired excess over replicate full-path baseline</text>
-<text x="28" y="308" text-anchor="middle" font-size="12" transform="rotate(-90 28 308)">higher-order score excess (tolerance units; mean +/- t95)</text>
+<text x="28" y="308" text-anchor="middle" font-size="12" transform="rotate(-90 28 308)">higher-order score excess (tolerance units; descriptive t95)</text>
 {''.join(elements)}
-<circle cx="90" cy="590" r="5" fill="#176b87"/><text x="104" y="595">CI above zero: identified short-horizon degradation</text>
-<circle cx="510" cy="590" r="4" fill="#ffffff" stroke="#176b87" stroke-width="2"/><text x="524" y="595">CI crosses zero: unresolved</text>
+<circle cx="90" cy="590" r="5" fill="#176b87"/><text x="104" y="595">t95 interval above zero: identified short-horizon degradation</text>
+<circle cx="510" cy="590" r="4" fill="#ffffff" stroke="#176b87" stroke-width="2"/><text x="524" y="595">t95 interval crosses zero: unresolved</text>
 <text x="560" y="622" text-anchor="middle" font-size="13" font-weight="bold">post-run exploratory; mechanism_unresolved (mechanism unresolved)</text>
-<text x="560" y="642" text-anchor="middle" font-size="11">Conditional on the preserved global source-segment schedule; no sufficiency, microscopic, spatial, or thermodynamic claim.</text>
+<text x="560" y="642" text-anchor="middle" font-size="11">Correlated-parent restart labels; no independent-sample CI, sufficiency, microscopic, spatial, or thermodynamic claim.</text>
 </svg>'''
     if "nan" in svg.lower() or "inf" in svg.lower():
         raise ValueError("paired-excess SVG contains nonfinite coordinates")
@@ -532,6 +644,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--replicate-scores", "--scores", dest="replicate_scores", type=Path, required=True)
     parser.add_argument("--cells", type=Path, required=True)
     parser.add_argument("--source-verdict", "--source-gate", dest="source_verdict", type=Path, required=True)
+    parser.add_argument("--provenance", type=Path, required=True)
     parser.add_argument("--output-rows", type=Path, required=True)
     parser.add_argument("--output-gate", type=Path, required=True)
     parser.add_argument("--output-svg", type=Path, required=True)
@@ -544,6 +657,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         _read_rows(args.replicate_scores),
         _read_rows(args.cells),
         _read_rows(args.source_verdict),
+        _read_rows(args.provenance),
     )
     _write_rows(args.output_rows, rows)
     _write_rows(args.output_gate, [gate])

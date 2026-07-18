@@ -97,6 +97,26 @@ def source_verdict():
     ]
 
 
+def provenance_rows():
+    return [
+        {
+            "temperature": 0.45,
+            "replicate": float(replicate),
+            "source_sha256": "shared-parent-sha256",
+            "source_frame_index": float(frame),
+            "velocity_seed": float(seed),
+            "independence_class": "decorrelated_parent_frames_plus_velocity_seeds",
+            "independently_prepared_parent_samples": False,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        for replicate, frame, seed in (
+            (1, 5000, 45117),
+            (2, 35000, 45157),
+            (3, 65000, 45201),
+        )
+    ]
+
+
 class PairedExcessGateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -104,7 +124,7 @@ class PairedExcessGateTests(unittest.TestCase):
 
     def test_centers_each_replicate_and_identifies_only_short_prefix(self):
         rows, gate = self.summary.classify_paired_excess_gate(
-            score_rows(), cell_rows(), source_verdict()
+            score_rows(), cell_rows(), source_verdict(), provenance_rows()
         )
         self.assertEqual(len(rows), 14)
         self.assertEqual(
@@ -131,8 +151,24 @@ class PairedExcessGateTests(unittest.TestCase):
         self.assertEqual(gate["identified_prefix_max_tau"], 200.0)
         self.assertEqual(gate["short_horizon_information_loss_supported_exploratory"], 1.0)
         self.assertEqual(gate["owner_identity_information_supported_exploratory"], 1.0)
+        self.assertEqual(gate["independently_prepared_parent_samples"], 0.0)
+        self.assertEqual(gate["independent_replicate_count"], 0.0)
+        self.assertEqual(gate["replicate_count"], 3.0)
+        self.assertEqual(gate["replicate_provenance_validation_pass"], 1.0)
+        self.assertEqual(
+            gate["independence_class"],
+            "decorrelated_parent_frames_plus_velocity_seeds",
+        )
+        self.assertEqual(within_one["independent_replicate_count"], 0.0)
+        self.assertEqual(within_one["replicate_count"], 3.0)
+        self.assertEqual(
+            within_one["ci95_method"],
+            "student_t_replicate_first_correlated_parent_exploratory_df2",
+        )
 
-        computed = self.summary.compute_paired_excess_rows(score_rows())
+        computed = self.summary.compute_paired_excess_rows(
+            score_rows(), provenance_rows()
+        )
         self.assertEqual(computed, rows)
 
     def test_rejects_incomplete_inputs_full_path_disagreement_and_open_claims(self):
@@ -156,12 +192,12 @@ class PairedExcessGateTests(unittest.TestCase):
         for scores in malformed_scores:
             with self.subTest():
                 with self.assertRaises(ValueError):
-                    self.summary.compute_paired_excess_rows(scores)
+                    self.summary.compute_paired_excess_rows(scores, provenance_rows())
 
         open_claim = cell_rows()
         open_claim[0] = {**open_claim[0], "microdynamic_closure_claim_allowed": 1.0}
         rows, gate = self.summary.classify_paired_excess_gate(
-            score_rows(), open_claim, source_verdict()
+            score_rows(), open_claim, source_verdict(), provenance_rows()
         )
         self.assertEqual(rows, [])
         self.assertEqual(gate["paired_input_exactness_pass"], 0.0)
@@ -169,7 +205,7 @@ class PairedExcessGateTests(unittest.TestCase):
         resolved = source_verdict()
         resolved[0] = {**resolved[0], "mechanism_state": "resolved"}
         rows, gate = self.summary.classify_paired_excess_gate(
-            score_rows(), cell_rows(), resolved
+            score_rows(), cell_rows(), resolved, provenance_rows()
         )
         self.assertEqual(rows, [])
         self.assertEqual(gate["source_verdict_fail_closed"], 1.0)
@@ -180,14 +216,49 @@ class PairedExcessGateTests(unittest.TestCase):
             "owner_identity_sufficiency_claim_allowed": 1.0,
         }
         rows, gate = self.summary.classify_paired_excess_gate(
-            score_rows(), cell_rows(), source_claim
+            score_rows(), cell_rows(), source_claim, provenance_rows()
         )
         self.assertEqual(rows, [])
         self.assertEqual(gate["source_verdict_fail_closed"], 1.0)
 
+        inconsistent = source_verdict()
+        inconsistent[0] = {
+            **inconsistent[0],
+            "low_full_path_control_all_replicates_pass": 1.0,
+            "low_full_path_control_failed_replicate_count": 0.0,
+        }
+        rows, gate = self.summary.classify_paired_excess_gate(
+            score_rows(), cell_rows(), inconsistent, provenance_rows()
+        )
+        self.assertEqual(rows, [])
+        self.assertEqual(gate["source_verdict_fail_closed"], 1.0)
+
+    def test_rejects_missing_or_false_independence_provenance(self):
+        malformed = [provenance_rows()[:-1]]
+        independent = provenance_rows()
+        independent[0] = {
+            **independent[0],
+            "independently_prepared_parent_samples": True,
+        }
+        malformed.append(independent)
+        mixed_parent = provenance_rows()
+        mixed_parent[0] = {**mixed_parent[0], "source_sha256": "other-parent"}
+        malformed.append(mixed_parent)
+        open_claim = provenance_rows()
+        open_claim[0] = {**open_claim[0], "thermodynamic_claim_allowed": True}
+        malformed.append(open_claim)
+        for provenance in malformed:
+            with self.subTest():
+                rows, gate = self.summary.classify_paired_excess_gate(
+                    score_rows(), cell_rows(), source_verdict(), provenance
+                )
+                self.assertEqual(rows, [])
+                self.assertEqual(gate["replicate_provenance_validation_pass"], 0.0)
+                self.assertEqual(gate["independent_replicate_count"], 0.0)
+
     def test_gate_keeps_all_strong_claims_closed(self):
         _, gate = self.summary.classify_paired_excess_gate(
-            score_rows(), cell_rows(), source_verdict()
+            score_rows(), cell_rows(), source_verdict(), provenance_rows()
         )
         self.assertEqual(gate["mechanism_state"], "mechanism_unresolved")
         self.assertEqual(gate["next_required_action"], "replicate_resolved_full_path_baseline_or_new_trajectory_validation")
@@ -195,6 +266,11 @@ class PairedExcessGateTests(unittest.TestCase):
             self.assertEqual(gate[field], 0.0, field)
 
     def test_csv_float_serialization_ignores_platform_last_bit_drift(self):
+        self.assertEqual(self.summary.CSV_FLOAT_SIGNIFICANT_DIGITS, 15)
+        self.assertEqual(
+            self.summary.canonical_csv_value(2.0953229763876298),
+            "2.09532297638763",
+        )
         self.assertEqual(
             self.summary.canonical_csv_value(16.999163731272752),
             self.summary.canonical_csv_value(16.999163731272755),
@@ -210,7 +286,7 @@ class PairedExcessGateTests(unittest.TestCase):
 
     def test_svg_is_deterministic_and_states_exploratory_boundary(self):
         rows, gate = self.summary.classify_paired_excess_gate(
-            score_rows(), cell_rows(), source_verdict()
+            score_rows(), cell_rows(), source_verdict(), provenance_rows()
         )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "paired.svg"

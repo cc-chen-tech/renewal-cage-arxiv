@@ -1,5 +1,16 @@
 # Segment-Splice Paired-Excess Baseline Design
 
+## Review revision note
+
+The original post-run design was committed in `f4779fa` and clarified in
+`df73983`. Review hardening after PR #11 adds the committed provenance table as
+a required input, records that the three restart labels share one parent
+trajectory, and requires the full-path pass/failure fields to be recomputed
+from the score table before they are compared with the source verdict. This
+revision does not change trajectory inputs, score values, grids, block size,
+full-path agreement tolerance, curve tolerances, or the exploratory t statistic.
+It narrows the interpretation of the already computed interval.
+
 ## Status and scope
 
 This is a post-run exploratory diagnostic designed after the frozen
@@ -18,7 +29,8 @@ The source tables are:
 
 - `data/renewal_cage_ka_replicates_T045_segment_splice_replicate_scores.csv`;
 - `data/renewal_cage_ka_replicates_T045_segment_splice_cells.csv`; and
-- `data/renewal_cage_ka_segment_splice_gate.csv`.
+- `data/renewal_cage_ka_segment_splice_gate.csv`;
+- `data/renewal_cage_ka_replicates_T058_T045_provenance.csv`.
 
 The required grid is exactly three replicates, two models, and lengths
 `{1,2,5,10,25,50,125,250}`. The full-path length is `B=250`; finite lengths are
@@ -49,7 +61,7 @@ more than a factor of three and ratio centering would over-weight the smallest
 baseline.
 
 For each `(m,L)`, report all three excesses, their arithmetic mean, sample
-standard error, and a two-sided Student-t 95% confidence interval with
+standard error, and a two-sided Student-t 95% descriptive interval with
 `df=2` and `t_0.975=4.302652729911275`:
 
 ```text
@@ -57,10 +69,11 @@ SE = sample_std(e_1,e_2,e_3) / sqrt(3)
 CI95 = mean(e) +/- 4.302652729911275 SE
 ```
 
-Set `paired_degradation_identified=1` only when `CI95_low>0`. A confidence
-interval that includes zero is `unresolved`; it is not evidence of equivalence
-or noninferiority. No equivalence margin is introduced after observing the
-data.
+Because the labels share one parent trajectory, this is an exploratory
+correlated-parent summary, not an independent-sample confidence interval. Set
+`paired_degradation_identified=1` only when `CI95_low>0`. An interval that
+includes zero is `unresolved`; it is not evidence of equivalence or
+noninferiority. No equivalence margin is introduced after observing the data.
 
 ## Owner-identity contrast
 
@@ -82,7 +95,7 @@ The output must separate four facts:
 
 1. exact paired input and full-path model agreement;
 2. whether short-horizon degradation is identified relative to baseline;
-3. whether the full-path baseline closes in every independent replicate; and
+3. whether the full-path baseline closes for every correlated-parent restart label; and
 4. whether any microscopic state addition is allowed.
 
 The first two may be positive while the latter two remain negative. The
@@ -93,6 +106,7 @@ paired_excess_equivalence_claim_allowed
 independent_replicate_memory_lower_bound_claim_allowed
 finite_memory_state_addition_allowed
 owner_identity_sufficiency_claim_allowed
+replicate_first_interval_independence_claim_allowed
 microdynamic_closure_claim_allowed
 spatial_facilitation_claim_allowed
 thermodynamic_claim_allowed
