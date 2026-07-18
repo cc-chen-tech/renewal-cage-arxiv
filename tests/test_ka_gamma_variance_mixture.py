@@ -87,6 +87,17 @@ class GammaVarianceFormulaTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.summary.gamma_variance_fs(**arguments)
 
+    def test_csv_serialization_discards_platform_last_bit_drift(self):
+        self.assertEqual(self.summary.CSV_FLOAT_SIGNIFICANT_DIGITS, 12)
+        self.assertEqual(
+            self.summary.canonical_csv_value(0.314802545826245),
+            self.summary.canonical_csv_value(0.314802545826246),
+        )
+        self.assertNotEqual(
+            self.summary.canonical_csv_value(1.0),
+            self.summary.canonical_csv_value(1.0001),
+        )
+
 
 class GammaVarianceRealDataTests(unittest.TestCase):
     @classmethod

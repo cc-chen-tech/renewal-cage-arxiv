@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import math
 from collections.abc import Sequence
 from pathlib import Path
@@ -21,7 +22,6 @@ from summarize_ka_transport_clock_shape_quotient import (
     _svg_text,
     manifests_from_provenance,
     read_rows,
-    write_rows,
 )
 
 
@@ -31,6 +31,7 @@ WAVE_NUMBERS = {
     "fs_k7p25": (7.25, "observed_fs_k7p25"),
 }
 FS_TOLERANCE = 0.03
+CSV_FLOAT_SIGNIFICANT_DIGITS = 12
 SIMULATION_MSD_RELATIVE_TOLERANCE = 0.015
 SIMULATION_NGP_ABSOLUTE_TOLERANCE = 0.035
 SIMULATION_FS_ABSOLUTE_TOLERANCE = 0.012
@@ -43,6 +44,34 @@ CLOSED_GATE_FIELDS = (
     "microdynamic_closure_claim_allowed",
     "thermodynamic_claim_allowed",
 )
+
+
+def canonical_csv_value(value: object) -> object:
+    """Serialize floats below known cross-platform transcendental drift."""
+
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("cannot serialize a nonfinite variance-mixture value")
+        return format(value, f".{CSV_FLOAT_SIGNIFICANT_DIGITS}g")
+    return value
+
+
+def write_rows(path: Path, rows: Sequence[dict[str, object]]) -> None:
+    """Write a rectangular table with diagnostic-local canonical precision."""
+
+    if not rows:
+        raise ValueError("cannot write an empty variance-mixture table")
+    fields = list(rows[0])
+    if any(list(row) != fields for row in rows):
+        raise ValueError("variance-mixture output rows must share one schema")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(
+            {field: canonical_csv_value(value) for field, value in row.items()}
+            for row in rows
+        )
 
 
 def _positive_finite(value: object, name: str) -> float:
