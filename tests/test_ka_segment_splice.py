@@ -1,7 +1,11 @@
 import sys
 import importlib.util
+import csv
+import json
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -692,6 +696,369 @@ class SegmentCellClassifierTests(unittest.TestCase):
                 expected_replicates={0.45: (1, 2, 3)},
                 expected_realizations=2,
             )
+
+
+def synthetic_two_temperature_protocol():
+    rng = np.random.default_rng(20260718)
+    blocks_by_temperature = {
+        0.45: {
+            replicate: rng.normal(size=(5, 250, 3))
+            for replicate in (1, 2, 3)
+        },
+        0.58: {
+            replicate: rng.normal(size=(5, 37, 3))
+            for replicate in (1, 2, 3, 4, 5)
+        },
+    }
+    heldout_by_temperature = {}
+    waves = np.array([2.0, 4.0, 7.25])
+    for temperature, replicates in blocks_by_temperature.items():
+        rows = []
+        for replicate, blocks in replicates.items():
+            observed = cumulative_observables_many_lags(
+                blocks,
+                block_counts=(1, 2),
+                wave_numbers=waves,
+            )
+            for block_count in (1, 2):
+                row = {
+                    "replicate": float(replicate),
+                    "temperature": temperature,
+                    "lag": float(20 * block_count),
+                    "observed_msd": observed[block_count]["msd"],
+                    "observed_ngp": observed[block_count]["ngp"],
+                }
+                for wave in waves:
+                    characteristic = f"characteristic_k{wave:g}".replace(".", "p")
+                    fs_key = f"observed_fs_k{wave:g}".replace(".", "p")
+                    row[fs_key] = observed[block_count][characteristic]
+                rows.append(row)
+        heldout_by_temperature[temperature] = rows
+    stationarity = [
+        {
+            "temperature": temperature,
+            "comparison": comparison,
+            "curve_transfer_pass": 1.0,
+        }
+        for temperature in (0.45, 0.58)
+        for comparison in ("early_late", "early_heldout", "late_heldout")
+    ]
+    return blocks_by_temperature, heldout_by_temperature, stationarity
+
+
+class SegmentRunnerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.analysis = load_script_module(
+            "analyze_ka_segment_splice_gate.py",
+            "analyze_ka_segment_splice_gate_runner",
+        )
+
+    def test_frozen_protocol_and_seed_grid_are_strict_and_deterministic(self):
+        low = self.analysis.frozen_protocol(0.45)
+        high = self.analysis.frozen_protocol(0.58)
+        self.assertEqual(low["calibration_time"], 5000)
+        self.assertEqual(low["block_count"], 250)
+        self.assertEqual(low["segment_lengths"], (1, 2, 5, 10, 25, 50, 125, 250))
+        self.assertEqual(low["replicates"], (1, 2, 3))
+        self.assertEqual(high["calibration_time"], 750)
+        self.assertEqual(high["block_count"], 37)
+        self.assertEqual(high["segment_lengths"], (1, 2, 4, 8, 16, 32, 37))
+        self.assertEqual(high["replicates"], (1, 2, 3, 4, 5))
+        with self.assertRaises(ValueError):
+            self.analysis.frozen_protocol(0.50)
+
+        seeds = {
+            self.analysis.segment_realization_seed(
+                20260718,
+                temperature=temperature,
+                replicate=replicate,
+                segment_length=length,
+                realization=realization,
+            )
+            for temperature in (0.45, 0.58)
+            for replicate in (1, 2)
+            for length in (1, 2)
+            for realization in range(4)
+        }
+        self.assertEqual(len(seeds), 2 * 2 * 2 * 4)
+        self.assertEqual(
+            self.analysis.segment_realization_seed(
+                20260718,
+                temperature=0.45,
+                replicate=1,
+                segment_length=2,
+                realization=3,
+            ),
+            self.analysis.segment_realization_seed(
+                20260718,
+                temperature=0.45,
+                replicate=1,
+                segment_length=2,
+                realization=3,
+            ),
+        )
+        for bad in (
+            {"base_seed": -1},
+            {"replicate": 0},
+            {"segment_length": 0},
+            {"realization": -1},
+        ):
+            arguments = {
+                "base_seed": 1,
+                "temperature": 0.45,
+                "replicate": 1,
+                "segment_length": 1,
+                "realization": 0,
+            }
+            arguments.update(bad)
+            with self.assertRaises(ValueError):
+                self.analysis.segment_realization_seed(**arguments)
+
+    def test_replicate_analysis_is_nested_and_keeps_paired_segment_order(self):
+        blocks_by_temperature, heldout, _ = synthetic_two_temperature_protocol()
+        blocks = blocks_by_temperature[0.45][1]
+        local_heldout = [row for row in heldout[0.45] if row["replicate"] == 1.0]
+        first = self.analysis.analyze_segment_replicate(
+            blocks,
+            local_heldout,
+            temperature=0.45,
+            replicate=1,
+            segment_lengths=(1, 2),
+            realization_count=2,
+            base_seed=11,
+            block_size=20,
+        )
+        extended = self.analysis.analyze_segment_replicate(
+            blocks,
+            local_heldout,
+            temperature=0.45,
+            replicate=1,
+            segment_lengths=(1, 2),
+            realization_count=3,
+            base_seed=11,
+            block_size=20,
+        )
+
+        first_quality = first["quality_rows"]
+        nested_quality = [
+            row for row in extended["quality_rows"] if row["realization"] < 2.0
+        ]
+        self.assertEqual(first_quality, nested_quality)
+        self.assertTrue(all(row["paired_segment_order_match"] == 1.0 for row in first_quality))
+        self.assertTrue(all(row["heldout_path_used_in_prediction"] == 0.0 for row in first_quality))
+        self.assertEqual(len(first["prediction_rows"]), 2 * 2 * 2)
+        self.assertEqual(len(first["replicate_scores"]), 2 * 2)
+
+    def test_two_temperature_protocol_extends_every_cell_together(self):
+        blocks, heldout, stationarity = synthetic_two_temperature_protocol()
+        result = self.analysis.run_two_temperature_from_blocks(
+            blocks,
+            heldout,
+            stationarity,
+            initial_realizations=2,
+            extended_realizations=4,
+            base_seed=20260718,
+            block_size=20,
+        )
+        rerun = self.analysis.run_two_temperature_from_blocks(
+            blocks,
+            heldout,
+            stationarity,
+            initial_realizations=2,
+            extended_realizations=4,
+            base_seed=20260718,
+            block_size=20,
+        )
+
+        self.assertEqual(result, rerun)
+        self.assertEqual(result["realization_count"], 4)
+        pairs_by_cell = {}
+        for row in result["quality_rows"]:
+            key = (row["temperature"], row["model"], row["segment_length"], row["replicate"])
+            pairs_by_cell.setdefault(key, set()).add(int(row["realization"]))
+        self.assertTrue(pairs_by_cell)
+        self.assertTrue(all(realizations == set(range(4)) for realizations in pairs_by_cell.values()))
+        self.assertEqual(
+            {row["required_realization_count"] for row in result["cell_rows"]},
+            {4.0},
+        )
+
+    def test_cli_controls_reject_nonfrozen_real_protocol(self):
+        self.analysis.validate_real_protocol_controls(
+            block_size=20,
+            initial_realizations=16,
+            extended_realizations=64,
+        )
+        for controls in (
+            (10, 16, 64),
+            (20, 8, 64),
+            (20, 16, 32),
+            (20, 64, 16),
+        ):
+            with self.assertRaises(ValueError):
+                self.analysis.validate_real_protocol_controls(
+                    block_size=controls[0],
+                    initial_realizations=controls[1],
+                    extended_realizations=controls[2],
+                )
+
+    def test_manifest_validation_and_type_a_block_extraction_are_strict(self):
+        manifest = {
+            "temperature": 0.45,
+            "replicate_count": 3,
+            "replicates": [
+                {"replicate": replicate, "directory": f"replicate_{replicate:02d}"}
+                for replicate in (1, 2, 3)
+            ],
+            "thermodynamic_claim_allowed": False,
+        }
+        validated = self.analysis.validate_ensemble_manifest(manifest, temperature=0.45)
+        self.assertEqual(validated, ((1, "replicate_01"), (2, "replicate_02"), (3, "replicate_03")))
+        for key, value in (
+            ("temperature", 0.58),
+            ("replicate_count", 2),
+            ("thermodynamic_claim_allowed", True),
+        ):
+            changed = json.loads(json.dumps(manifest))
+            changed[key] = value
+            with self.assertRaises(ValueError):
+                self.analysis.validate_ensemble_manifest(changed, temperature=0.45)
+
+        positions = np.zeros((41, 4, 3), dtype=float)
+        for frame in range(41):
+            positions[frame, :, 0] = frame * np.array([1.0, 10.0, 2.0, 20.0])
+        trajectory = {
+            "unwrapped_positions": positions,
+            "particle_types": np.array([0, 1, 0, 1]),
+        }
+        blocks = self.analysis.calibration_blocks_from_trajectory(
+            trajectory,
+            calibration_time=40,
+            block_size=20,
+        )
+        self.assertEqual(blocks.shape, (2, 2, 3))
+        np.testing.assert_array_equal(blocks[:, :, 0], [[20.0, 20.0], [40.0, 40.0]])
+        with self.assertRaises(ValueError):
+            self.analysis.calibration_blocks_from_trajectory(
+                {**trajectory, "unwrapped_positions": positions[:40]},
+                calibration_time=40,
+                block_size=20,
+            )
+
+    def test_protocol_writer_emits_exact_deterministic_two_temperature_files(self):
+        blocks, heldout, stationarity = synthetic_two_temperature_protocol()
+        result = self.analysis.run_two_temperature_from_blocks(
+            blocks,
+            heldout,
+            stationarity,
+            initial_realizations=2,
+            extended_realizations=2,
+            base_seed=7,
+            block_size=20,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self.analysis.write_protocol_outputs(root, result)
+            expected = {
+                root / f"renewal_cage_ka_replicates_T{code}_segment_splice_{suffix}.csv"
+                for code in ("045", "058")
+                for suffix in (
+                    "quality",
+                    "rows",
+                    "summary",
+                    "cells",
+                    "replicate_scores",
+                )
+            }
+            self.assertEqual(set(paths), expected)
+            self.assertTrue(all(path.is_file() for path in expected))
+            snapshots = {path.name: path.read_bytes() for path in expected}
+            self.analysis.write_protocol_outputs(root, result)
+            self.assertEqual(
+                snapshots,
+                {path.name: path.read_bytes() for path in expected},
+            )
+            for path in expected:
+                with path.open() as handle:
+                    rows = list(csv.DictReader(handle))
+                self.assertTrue(rows)
+                self.assertEqual(
+                    {float(row["temperature"]) for row in rows},
+                    {0.45 if "T045" in path.name else 0.58},
+                )
+
+    def test_frozen_block_loader_reads_only_the_calibration_prefix(self):
+        manifest = {
+            "temperature": 0.58,
+            "replicate_count": 5,
+            "replicates": [
+                {"replicate": replicate, "directory": f"replicate_{replicate:02d}"}
+                for replicate in (1, 2, 3, 4, 5)
+            ],
+            "thermodynamic_claim_allowed": False,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "ensemble_manifest.json").write_text(json.dumps(manifest))
+            for replicate in (1, 2, 3, 4, 5):
+                replicate_root = root / f"replicate_{replicate:02d}"
+                replicate_root.mkdir()
+                (replicate_root / "trajectory.lammpstrj").write_text("fixture\n")
+
+            positions = np.zeros((751, 3, 3), dtype=float)
+            positions[:, :, 0] = np.arange(751)[:, None]
+            trajectory = {
+                "unwrapped_positions": positions,
+                "particle_types": np.array([0, 1, 0]),
+            }
+            with mock.patch.object(
+                self.analysis,
+                "load_lammps_custom_trajectory",
+                return_value=trajectory,
+            ) as loader:
+                blocks = self.analysis.load_frozen_blocks(
+                    root,
+                    temperature=0.58,
+                    block_size=20,
+                )
+
+            self.assertEqual(set(blocks), {1, 2, 3, 4, 5})
+            self.assertTrue(all(value.shape == (2, 37, 3) for value in blocks.values()))
+            self.assertEqual(loader.call_count, 5)
+            for replicate, call in enumerate(loader.call_args_list, start=1):
+                self.assertEqual(
+                    call.args[0],
+                    root / f"replicate_{replicate:02d}" / "trajectory.lammpstrj",
+                )
+                self.assertEqual(call.kwargs, {"maximum_frame_count": 751})
+
+    def test_cli_parser_requires_both_temperatures_and_all_controls(self):
+        parser = self.analysis.build_parser()
+        paths = [Path(f"input_{index}") for index in range(6)]
+        args = parser.parse_args(
+            [
+                "--low-ensemble-directory",
+                str(paths[0]),
+                "--high-ensemble-directory",
+                str(paths[1]),
+                "--low-heldout-factorization",
+                str(paths[2]),
+                "--high-heldout-factorization",
+                str(paths[3]),
+                "--low-stationarity",
+                str(paths[4]),
+                "--high-stationarity",
+                str(paths[5]),
+                "--output-directory",
+                "output",
+            ]
+        )
+        self.assertEqual(args.block_size, 20)
+        self.assertEqual(args.initial_realizations, 16)
+        self.assertEqual(args.extended_realizations, 64)
+        self.assertEqual(args.base_seed, 20260718)
+        self.assertEqual(args.output_directory, Path("output"))
 
 
 if __name__ == "__main__":
