@@ -175,7 +175,7 @@ def validate_launch_record(
             raise ValueError(f"launch resource snapshot has invalid {key}")
     if resources.get("execution_mode") != "parallel_two_parent_jobs":
         raise ValueError("both independently prepared parents must remain launched")
-    if int(resources.get("nice_value", -1)) != 15:
+    if int(resources.get("nice_value", -1)) != 0:
         raise ValueError("resource snapshot must record the actual launch priority")
 
     frozen_parents = {parent["parent_id"]: parent for parent in spec["parents"]}

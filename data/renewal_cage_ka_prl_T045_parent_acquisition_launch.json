@@ -9,10 +9,11 @@
   "deployed_commit": "dda89cc2c4de57307001e772706275dd09790124",
   "jobs": [
     {
-      "cpu_seconds_delta_over_5s": 2.54,
+      "cpu_seconds_delta_over_15s": 8.4,
       "error_match_count": 0,
       "lammps_log_bytes_at_snapshot": 0,
       "lammps_log_path": "/root/prl-memory-closure-acquisition/runs/p02/log.lammps",
+      "nice_value": 0,
       "parent_id": "ka-t045-independent-p02-20260719",
       "pid": 50273,
       "process_state": "running",
@@ -23,10 +24,11 @@
       "screen_log_path": "/root/prl-memory-closure-acquisition/runs/p02/screen.log"
     },
     {
-      "cpu_seconds_delta_over_5s": 2.37,
+      "cpu_seconds_delta_over_15s": 11.75,
       "error_match_count": 0,
       "lammps_log_bytes_at_snapshot": 0,
       "lammps_log_path": "/root/prl-memory-closure-acquisition/runs/p03/log.lammps",
+      "nice_value": 0,
       "parent_id": "ka-t045-independent-p03-20260719",
       "pid": 50274,
       "process_state": "running",
@@ -40,26 +42,31 @@
   "lammps_binary_sha256": "fbb4f8993b9b14be5a41afffcf1efc42a6ae01f6d0beba5cb0ff7caedd3fe962",
   "launch_state": "running_verified",
   "remote_launch_status_path": "/root/prl-memory-closure-acquisition/launch_status.json",
-  "remote_launch_status_sha256": "6b32c2541904ed87b13cb0499b4e5e94bc06e3d4ccf033f8bc1452b8cd781927",
+  "remote_launch_status_sha256": "384af21bdb80197cb4b0c57e095ca7241a458595fa1a9f53f03b4ec6ce0805a6",
   "remote_repository_path": "/root/prl-memory-closure-acquisition/repo",
   "resource_snapshot": {
-    "disk_available_bytes": 22687698944,
+    "disk_available_bytes": 22687682560,
     "execution_mode": "parallel_two_parent_jobs",
-    "load_average_1m": 3.34,
+    "load_average_1m": 3.44,
     "logical_cpu_count": 2,
-    "memory_available_bytes": 1473327104,
+    "memory_available_bytes": 1456336896,
     "memory_total_bytes": 1961869312,
-    "nice_adjustment": "retained_because_preexisting_compute_pid_49179_was_active",
-    "nice_value": 15,
+    "nice_adjustment": "reniced_p02_p03_from_15_to_0_after_verifying_pid_49179_is_a_same_project_preexisting_task_and_no_external_user_is_present",
+    "nice_value": 0,
     "other_active_compute": {
-      "command": "scripts/cache_ka_l2p_deterministic_diffusion.py",
+      "classification": "same_renewal_cage_project_preexisting_compute",
+      "command": "python3.11 scripts/cache_ka_l2p_deterministic_diffusion.py --output-cache-directory /root/renewal-cage-compute-data/output/full",
+      "cwd": "/root/renewal-cage-arxiv-compute",
+      "output_log": "/root/renewal-cage-compute-data/output/full-run.log",
       "pid": 49179,
-      "resident_set_bytes": 225996800
+      "resident_set_bytes": 238743552,
+      "started_at_local": "2026-07-19T03:39:03+08:00",
+      "user": "root"
     },
     "parallelism_decision": "keep_two_lammps_jobs_parallel_each_uses_about_24MB_RSS_and_memory_available_exceeds_1GiB",
     "swap_total_bytes": 4294963200
   },
   "schema_version": 1,
   "started_at_utc": "2026-07-18T19:55:11Z",
-  "verified_at_utc": "2026-07-18T19:58:44Z"
+  "verified_at_utc": "2026-07-18T20:00:53Z"
 }
