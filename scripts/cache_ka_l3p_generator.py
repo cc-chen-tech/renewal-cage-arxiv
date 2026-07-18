@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import math
 import sys
 from pathlib import Path
@@ -14,13 +15,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from analyze_ka_projected_ito_innovations import load_drift_cache  # noqa: E402
-from cache_ka_l2p_conditional_diffusion import (  # noqa: E402
-    atomic_savez,
-    file_sha256,
-    load_second_generator_cache,
-    validate_cache_alignment,
-)
 from ka_l2p_conditional_diffusion import rademacher_velocity_probes  # noqa: E402
 from ka_l3p_generator import (  # noqa: E402
     classify_l3p_numerical_canary,
@@ -40,6 +34,89 @@ L2P_DIRECTIONAL_STEP = 1e-5
 L2P_PHASE_SPACE_STEP = 3e-6
 TRACE_SEED = 20260731
 ESTIMATOR = "microscopic_l3p_generator_quotient"
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def atomic_savez(path: Path, **arrays: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp.npz")
+    np.savez_compressed(temporary, **arrays)
+    temporary.replace(path)
+
+
+def load_second_generator_cache(path: Path) -> dict[str, np.ndarray]:
+    required = (
+        "second_relative_generator",
+        "target_indices",
+        "trajectory_sha256",
+        "potential_protocol",
+        "trace_probe_count",
+        "thermodynamic_claim_allowed",
+    )
+    with np.load(path, allow_pickle=False) as cache:
+        if any(key not in cache for key in required):
+            raise ValueError(f"incomplete second-generator cache: {path}")
+        return {key: np.asarray(cache[key]) for key in required}
+
+
+def load_drift_cache(path: Path) -> dict[str, np.ndarray]:
+    """Load only the frozen fields needed to align the L3p target set."""
+
+    required = (
+        "relative_position",
+        "relative_velocity",
+        "center_velocity",
+        "relative_drift",
+        "center_drift",
+        "target_indices",
+        "trajectory_sha256",
+        "thermodynamic_claim_allowed",
+    )
+    with np.load(path, allow_pickle=False) as cache:
+        if any(key not in cache for key in required):
+            raise ValueError(f"incomplete decomposed-drift cache: {path}")
+        result = {key: np.asarray(cache[key]) for key in required}
+    shape = result["relative_velocity"].shape
+    if (
+        len(shape) != 3
+        or shape[-1] != 3
+        or any(result[key].shape != shape for key in required[:5])
+        or float(result["thermodynamic_claim_allowed"]) != 0.0
+    ):
+        raise ValueError(f"invalid decomposed-drift cache: {path}")
+    return result
+
+
+def validate_cache_alignment(
+    *,
+    trajectory_sha256: str,
+    drift: dict[str, np.ndarray],
+    second: dict[str, np.ndarray],
+    target_count: int,
+) -> None:
+    if (
+        str(drift["trajectory_sha256"]) != trajectory_sha256
+        or str(second["trajectory_sha256"]) != trajectory_sha256
+    ):
+        raise ValueError("trajectory SHA256 does not match microscopic caches")
+    drift_targets = np.asarray(drift["target_indices"], dtype=int)
+    second_targets = np.asarray(second["target_indices"], dtype=int)
+    if (
+        len(drift_targets) != target_count
+        or not np.array_equal(drift_targets, second_targets)
+    ):
+        raise ValueError("target indices do not match the L3p protocol")
+    if str(second["potential_protocol"]) not in {"ka_lj_cut", "ka_lj_c3_switch"}:
+        raise ValueError("potential protocol is unsupported")
+    if float(second["thermodynamic_claim_allowed"]) != 0.0:
+        raise ValueError("claim boundary is open in the second-generator cache")
 
 
 def _provenance_equal(actual: object, expected: object) -> bool:
