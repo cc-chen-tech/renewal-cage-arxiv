@@ -248,6 +248,66 @@ class SmoothCageTests(unittest.TestCase):
             atol=1e-13,
         )
 
+    def test_cage_force_jacobian_contraction_matches_directional_force_response(self):
+        from ka_local_cage import (
+            ka_lj_pair_hessian_geometry,
+            ka_lj_sparse_force_generator_multi,
+        )
+        from ka_smooth_cage import (
+            contract_cage_jacobian_force_jacobian,
+            smooth_force_support_cage_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        particle_types = inputs["particle_types"]
+        box = inputs["box_lengths"]
+        targets = np.array([0, 2])
+        direction = np.random.default_rng(20260719).normal(size=positions.shape)
+        cage_jacobian = smooth_force_support_cage_batch(
+            positions,
+            velocities=np.zeros_like(positions),
+            particle_types=particle_types,
+            box_lengths=box,
+            target_indices=targets,
+            return_jacobian=True,
+        )["jacobian"]
+
+        for protocol in ("ka_lj_cut", "ka_lj_c3_switch"):
+            with self.subTest(protocol=protocol):
+                geometry = ka_lj_pair_hessian_geometry(
+                    positions,
+                    particle_types=particle_types,
+                    box_lengths=box,
+                    potential_protocol=protocol,
+                )
+                matrix = contract_cage_jacobian_force_jacobian(
+                    cage_jacobian,
+                    particle_i=geometry["particle_i"],
+                    particle_j=geometry["particle_j"],
+                    pair_hessian=geometry["pair_hessian"],
+                )
+                force_response = ka_lj_sparse_force_generator_multi(
+                    positions,
+                    velocity_fields=direction[None, :, :],
+                    particle_types=particle_types,
+                    box_lengths=box,
+                    target_indices=np.arange(len(positions)),
+                    potential_protocol=protocol,
+                )["force_generator"][0]
+                expected = np.einsum("tnab,nb->ta", cage_jacobian, force_response)
+
+                self.assertEqual(matrix.shape, (len(targets), 3, len(positions), 3))
+                np.testing.assert_allclose(
+                    np.einsum("tanb,nb->ta", matrix, direction),
+                    expected,
+                    rtol=2e-12,
+                    atol=2e-12,
+                )
+                np.testing.assert_allclose(
+                    np.sum(matrix, axis=2), np.zeros((len(targets), 3, 3)), atol=2e-12
+                )
+
     def test_batched_smooth_cage_is_rigid_motion_covariant_and_positive(self):
         from ka_smooth_cage import smooth_force_support_cage_batch
 

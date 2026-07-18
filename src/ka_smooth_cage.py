@@ -288,6 +288,64 @@ def smooth_force_support_cage_batch(
     return result
 
 
+def contract_cage_jacobian_force_jacobian(
+    cage_jacobian: np.ndarray,
+    *,
+    particle_i: np.ndarray,
+    particle_j: np.ndarray,
+    pair_hessian: np.ndarray,
+) -> np.ndarray:
+    """Return the full matrix product ``J DF`` from unordered KA pairs."""
+
+    jacobian = np.asarray(cage_jacobian, dtype=float)
+    first_raw = np.asarray(particle_i)
+    second_raw = np.asarray(particle_j)
+    hessian = np.asarray(pair_hessian, dtype=float)
+    if (
+        jacobian.ndim != 4
+        or jacobian.shape[2:] != (3, 3)
+        or len(jacobian) < 1
+        or np.any(~np.isfinite(jacobian))
+    ):
+        raise ValueError("cage_jacobian must have finite shape (targets, particles, 3, 3)")
+    pair_count = len(first_raw) if first_raw.ndim == 1 else -1
+    if (
+        first_raw.ndim != 1
+        or second_raw.shape != first_raw.shape
+        or np.any(first_raw != first_raw.astype(int))
+        or np.any(second_raw != second_raw.astype(int))
+        or hessian.shape != (pair_count, 3, 3)
+        or np.any(~np.isfinite(hessian))
+    ):
+        raise ValueError("pair indices and Hessians must be finite aligned arrays")
+    first = first_raw.astype(int)
+    second = second_raw.astype(int)
+    if (
+        np.any(first < 0)
+        or np.any(second >= jacobian.shape[1])
+        or np.any(first >= second)
+    ):
+        raise ValueError("particle_i and particle_j must be valid ordered pair indices")
+
+    by_particle = np.zeros(
+        (jacobian.shape[1], jacobian.shape[0], 3, 3), dtype=float
+    )
+    pair_batch_size = 2048
+    for start in range(0, pair_count, pair_batch_size):
+        stop = min(start + pair_batch_size, pair_count)
+        selected_i = first[start:stop]
+        selected_j = second[start:stop]
+        block = np.einsum(
+            "tpac,pcb->tpab",
+            jacobian[:, selected_j] - jacobian[:, selected_i],
+            hessian[start:stop],
+        )
+        block_by_pair = np.transpose(block, (1, 0, 2, 3))
+        np.add.at(by_particle, selected_i, block_by_pair)
+        np.add.at(by_particle, selected_j, -block_by_pair)
+    return np.transpose(by_particle, (1, 2, 0, 3))
+
+
 def smooth_cage_joint_noise_covariance_rate(
     jacobian_gram: np.ndarray,
     target_jacobian_block: np.ndarray,
