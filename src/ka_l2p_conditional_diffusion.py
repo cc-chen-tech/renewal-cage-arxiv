@@ -42,6 +42,93 @@ def deterministic_conditional_diffusion(
     }
 
 
+def classify_deterministic_numerical_canary(
+    *,
+    a_primary_reference_error: np.ndarray,
+    q_primary_reference_error: np.ndarray,
+    directional_response_error: np.ndarray,
+    a_coarse_reference_error: np.ndarray,
+    q_coarse_reference_error: np.ndarray,
+    q_minimum_eigenvalue: np.ndarray,
+    q_trace: np.ndarray,
+) -> dict[str, float | str]:
+    """Apply the frozen numerical-only gate before held closure scoring."""
+
+    arrays = {
+        "a_primary_reference_error": np.asarray(a_primary_reference_error, dtype=float),
+        "q_primary_reference_error": np.asarray(q_primary_reference_error, dtype=float),
+        "directional_response_error": np.asarray(directional_response_error, dtype=float),
+        "a_coarse_reference_error": np.asarray(a_coarse_reference_error, dtype=float),
+        "q_coarse_reference_error": np.asarray(q_coarse_reference_error, dtype=float),
+        "q_minimum_eigenvalue": np.asarray(q_minimum_eigenvalue, dtype=float),
+        "q_trace": np.asarray(q_trace, dtype=float),
+    }
+    if any(
+        value.ndim != 1 or not len(value) or np.any(~np.isfinite(value))
+        for value in arrays.values()
+    ):
+        raise ValueError("deterministic canary inputs must be finite nonempty vectors")
+    if any(
+        np.any(arrays[name] < 0.0)
+        for name in (
+            "a_primary_reference_error",
+            "q_primary_reference_error",
+            "directional_response_error",
+            "a_coarse_reference_error",
+            "q_coarse_reference_error",
+        )
+    ):
+        raise ValueError("deterministic canary errors must be nonnegative")
+    if arrays["q_minimum_eigenvalue"].shape != arrays["q_trace"].shape:
+        raise ValueError("Q eigenvalue and trace vectors must align")
+
+    def distribution(name: str) -> tuple[float, float]:
+        values = arrays[name]
+        return float(np.median(values)), float(np.quantile(values, 0.95))
+
+    a_median, a_p95 = distribution("a_primary_reference_error")
+    q_median, q_p95 = distribution("q_primary_reference_error")
+    directional_median, directional_p95 = distribution("directional_response_error")
+    coarse_a_median, _ = distribution("a_coarse_reference_error")
+    coarse_q_median, _ = distribution("q_coarse_reference_error")
+    a_pass = a_median <= 0.02 and a_p95 <= 0.10
+    q_pass = q_median <= 0.02 and q_p95 <= 0.10
+    directional_pass = directional_median <= 0.02 and directional_p95 <= 0.10
+    monotonic_pass = a_median <= coarse_a_median and q_median <= coarse_q_median
+    psd_tolerance = 1e-10 * np.maximum(arrays["q_trace"], 1.0)
+    psd_pass = bool(
+        np.all(arrays["q_minimum_eigenvalue"] >= -psd_tolerance)
+    )
+    passed = a_pass and q_pass and directional_pass and monotonic_pass and psd_pass
+    return {
+        "numerical_state": (
+            "deterministic_jacobian_numerically_resolved"
+            if passed
+            else "deterministic_jacobian_numerically_unresolved"
+        ),
+        "deterministic_numerical_gate_pass": float(passed),
+        "a_step_gate_pass": float(a_pass),
+        "q_step_gate_pass": float(q_pass),
+        "directional_identity_gate_pass": float(directional_pass),
+        "step_monotonicity_gate_pass": float(monotonic_pass),
+        "positive_semidefinite_gate_pass": float(psd_pass),
+        "a_primary_reference_median_relative_error": a_median,
+        "a_primary_reference_p95_relative_error": a_p95,
+        "q_primary_reference_median_relative_error": q_median,
+        "q_primary_reference_p95_relative_error": q_p95,
+        "directional_median_relative_error": directional_median,
+        "directional_p95_relative_error": directional_p95,
+        "a_coarse_reference_median_relative_error": coarse_a_median,
+        "q_coarse_reference_median_relative_error": coarse_q_median,
+        "microscopic_environment_coordinate_z_allowed": 0.0,
+        "continuous_gaussian_langevin_bath_allowed": 0.0,
+        "autonomous_single_particle_gle_allowed": 0.0,
+        "complete_event_clock_closure_allowed": 0.0,
+        "kramers_escape_claim_allowed": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def rademacher_velocity_probes(
     *,
     probe_count: int,

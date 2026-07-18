@@ -183,6 +183,31 @@ lambda_min(Q) >= -1e-10 max(trace(Q), 1).
 These are numerical-only limits. Failure stops the held closure run and does
 not authorize changing a physical claim flag or retuning a tolerance.
 
+### Post-run real-frame outcome
+
+The frozen canary was then run on clone 1, timestep 0, all 64 fixed targets,
+and trajectory SHA256
+`a77d5177fa9d632ef97a680d4f953885d10ed6e175ae76487b24861160dcce18`.
+No held closure score was evaluated. The mechanically cached outcome was
+
+```text
+A primary/reference median = 5.498628244528567e-7
+A primary/reference p95    = 9.403464208072587e-7
+Q primary/reference median = 5.156498949931173e-7
+Q primary/reference p95    = 9.91161939117552e-7
+directional median         = 6.393326966820003e-4
+directional p95            = 2.402920962324348e-3
+directional maximum        = 5.912976339950533e-3
+minimum eigenvalue(Q)      = 1.0416182709402591e5
+```
+
+Both median step errors decreased from `3e-5` to `1e-5`. All frozen
+numerical gates passed. A primary frame required about seven seconds in the
+real-frame timing run; the first sensitivity frame additionally paid for the
+reference/coarse matrices and four independent directional checks. The
+checkpoint cache was 19 KiB and a completed one-frame rerun exited without
+recomputing the frame.
+
 ## Claim boundary
 
 This estimator tests whether state-dependent microscopic diffusion inherited

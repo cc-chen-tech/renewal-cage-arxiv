@@ -179,6 +179,74 @@ class L2pConditionalDiffusionTests(unittest.TestCase):
         ):
             self.assertIn(option, completed.stdout)
 
+    def test_deterministic_cache_cli_exposes_steps_provenance_and_checkpoint_controls(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "cache_ka_l2p_deterministic_diffusion.py"),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for option in (
+            "--clone-directory",
+            "--drift-cache-directory",
+            "--second-generator-cache-directory",
+            "--output-cache-directory",
+            "--expected-clone-count",
+            "--primary-jacobian-step",
+            "--reference-jacobian-step",
+            "--coarse-jacobian-step",
+            "--sensitivity-frame-count",
+            "--maximum-frame-count",
+            "--checkpoint-interval",
+        ):
+            self.assertIn(option, completed.stdout)
+        self.assertNotIn("--probe", completed.stdout)
+
+    def test_deterministic_numerical_canary_is_mechanical_and_fail_closed(self):
+        from ka_l2p_conditional_diffusion import classify_deterministic_numerical_canary
+
+        pass_result = classify_deterministic_numerical_canary(
+            a_primary_reference_error=np.array([0.001, 0.002, 0.003, 0.004]),
+            q_primary_reference_error=np.array([0.002, 0.003, 0.004, 0.005]),
+            directional_response_error=np.array([0.003, 0.004, 0.005, 0.006]),
+            a_coarse_reference_error=np.array([0.01, 0.02, 0.03, 0.04]),
+            q_coarse_reference_error=np.array([0.02, 0.03, 0.04, 0.05]),
+            q_minimum_eigenvalue=np.array([0.1, 0.2, 0.3, 0.4]),
+            q_trace=np.array([1.0, 2.0, 3.0, 4.0]),
+        )
+        self.assertEqual(pass_result["deterministic_numerical_gate_pass"], 1.0)
+        self.assertEqual(pass_result["a_step_gate_pass"], 1.0)
+        self.assertEqual(pass_result["q_step_gate_pass"], 1.0)
+        self.assertEqual(pass_result["directional_identity_gate_pass"], 1.0)
+        self.assertEqual(pass_result["step_monotonicity_gate_pass"], 1.0)
+        self.assertEqual(pass_result["positive_semidefinite_gate_pass"], 1.0)
+
+        failed = classify_deterministic_numerical_canary(
+            a_primary_reference_error=np.array([0.001, 0.002, 0.003, 0.004]),
+            q_primary_reference_error=np.array([0.002, 0.003, 0.004, 0.005]),
+            directional_response_error=np.array([0.01, 0.02, 0.20, 0.30]),
+            a_coarse_reference_error=np.array([0.01, 0.02, 0.03, 0.04]),
+            q_coarse_reference_error=np.array([0.02, 0.03, 0.04, 0.05]),
+            q_minimum_eigenvalue=np.array([0.1, 0.2, 0.3, 0.4]),
+            q_trace=np.array([1.0, 2.0, 3.0, 4.0]),
+        )
+        self.assertEqual(failed["deterministic_numerical_gate_pass"], 0.0)
+        self.assertEqual(failed["directional_identity_gate_pass"], 0.0)
+        for flag in (
+            "microscopic_environment_coordinate_z_allowed",
+            "continuous_gaussian_langevin_bath_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(pass_result[flag], 0.0)
+            self.assertEqual(failed[flag], 0.0)
+
     def test_cache_alignment_rejects_hash_target_and_protocol_mismatch(self):
         module = load_script(
             "cache_ka_l2p_conditional_diffusion.py",
