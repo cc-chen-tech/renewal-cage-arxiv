@@ -245,7 +245,11 @@ def _manifest_matches(row: Mapping[str, object], manifest: Mapping[str, object])
 
 
 def _rows_embed_parent(
-    rows: Sequence[Mapping[str, object]], provenance: Mapping[str, object]
+    rows: Sequence[Mapping[str, object]],
+    provenance: Mapping[str, object],
+    *,
+    trajectory_sha256: str,
+    trajectory_size_bytes: int,
 ) -> bool:
     required = {
         "parent_id",
@@ -253,6 +257,9 @@ def _rows_embed_parent(
         "source_sha256",
         "source_frame_index",
         "velocity_seed",
+        "trajectory_sha256",
+        "trajectory_size_bytes",
+        "trajectory_hash_scope",
     }
     if not rows or any(not required.issubset(row) for row in rows):
         return False
@@ -264,8 +271,13 @@ def _rows_embed_parent(
             or str(row["source_sha256"]) != str(provenance["source_sha256"])
             or int(float(row["source_frame_index"])) != int(float(provenance["source_frame_index"]))
             or int(float(row["velocity_seed"])) != int(float(provenance["velocity_seed"]))
+            or str(row["trajectory_sha256"]) != trajectory_sha256
+            or int(float(row["trajectory_size_bytes"])) != trajectory_size_bytes
+            or str(row["trajectory_hash_scope"]) != "complete_file"
         ):
-            raise ValueError("embedded table lineage disagrees with parent provenance")
+            raise ValueError(
+                "embedded table parent or trajectory lineage disagrees with provenance"
+            )
     return True
 
 
@@ -322,6 +334,7 @@ def input_lineage_rows(
             raise ValueError(f"cannot stat trajectory input: {trajectory_path}") from error
         if trajectory_size <= 0:
             raise ValueError("trajectory input must be nonempty")
+        trajectory_sha = file_sha256(trajectory_path)
         local_heldout = [
             row
             for row in heldout_rows
@@ -356,9 +369,19 @@ def input_lineage_rows(
             and float(row.get("macro_fit_parameter_count", 1)) == 0.0
             for row in local_spectral
         )
-        heldout_join = _rows_embed_parent(local_heldout, source)
-        environment_join = _rows_embed_parent(local_environment, source)
-        spectral_join = _rows_embed_parent(local_spectral, source)
+        embedded_lineage_arguments = {
+            "trajectory_sha256": trajectory_sha,
+            "trajectory_size_bytes": trajectory_size,
+        }
+        heldout_join = _rows_embed_parent(
+            local_heldout, source, **embedded_lineage_arguments
+        )
+        environment_join = _rows_embed_parent(
+            local_environment, source, **embedded_lineage_arguments
+        )
+        spectral_join = _rows_embed_parent(
+            local_spectral, source, **embedded_lineage_arguments
+        )
         aggregate = all(
             (
                 ensemble_join,
@@ -382,7 +405,7 @@ def input_lineage_rows(
                 "ensemble_manifest_parent_join_pass": int(ensemble_join),
                 "replicate_manifest_sha256": file_sha256(replicate_manifest_path),
                 "replicate_manifest_parent_join_pass": int(replicate_join),
-                "trajectory_sha256": file_sha256(trajectory_path),
+                "trajectory_sha256": trajectory_sha,
                 "trajectory_size_bytes": trajectory_size,
                 "trajectory_hash_scope": "complete_file",
                 "heldout_table_sha256": heldout_sha,

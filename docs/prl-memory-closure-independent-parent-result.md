@@ -116,13 +116,17 @@ vocabulary. That label does **not** establish spatial facilitation.
 
 ## Claim decision and boundary
 
-The candidate positive-memory claim remains closed for four independent reasons:
+The candidate positive-memory claim remains closed for three independent reasons:
 
 1. only one of three required `T=0.45` parents exists; and
 2. the available `T=0.45` parent fails restart-first stationarity;
-3. the current heldout, environment, and spectral tables cannot be
-   cryptographically joined to parent identity; and
-4. the full candidate fails the replicate-first correlated-parent diagnostic.
+3. the full candidate fails the replicate-first correlated-parent diagnostic.
+
+The earlier auxiliary-input blocker is now resolved as an engineering result:
+every heldout, environment, and spectral row embeds its exact parent ID, source
+hash, complete-trajectory hash, byte size, and hash scope, and all eight
+restart-specific joins pass. This does not turn correlated restarts into
+independent parents and therefore does not open the scientific claim.
 
 The result does not establish complete microscopic closure, spatial
 facilitation, or a thermodynamic glass transition. Every corresponding claim
@@ -131,6 +135,9 @@ flag remains zero in
 
 ## Reproduction
 
+`scripts/bind_ka_prl_input_lineage.py` verifies ensemble and child manifests,
+hashes each complete trajectory, and deterministically binds that identity into
+all heldout, environment, and spectral rows. Then
 `scripts/audit_ka_prl_parent_inputs.py` rebuilds restart-specific stationarity
 and lineage from both raw ensembles, their manifests, and explicit auxiliary
 tables. Audit-only mode then writes the parent ledger and fail-closed gate
@@ -149,12 +156,13 @@ The commands and all output paths are documented in
 Validation is reported in three separate layers:
 
 - scientific result: parent gate blocked and full candidate rejected as above;
-- engineering validation: 31 focused memory-closure tests and the dedicated
-  package recomputation test pass; the complete local suite reports
-  `Ran 1056 tests in 80.481s — OK`; the two raw-audit artifacts and eight
-  downstream artifacts rebuild byte-identically; runtime input hashes, Python
-  syntax, and `git diff --check` pass; and `scripts/build_arxiv_package.py`
-  exits zero with `dist/renewal-cage-arxiv-source.zip`;
+- engineering validation: 42 focused acquisition, lineage, memory-closure, and
+  package-recomputation tests pass; the complete local Python 3.12 suite reports
+  `Ran 1066 tests in 80.886s — OK`; six lineage-bound input artifacts, the two
+  raw-audit artifacts, and eight downstream artifacts rebuild
+  byte-identically; runtime input hashes, Python syntax, and `git diff --check`
+  pass; and `scripts/build_arxiv_package.py` exits zero with
+  `dist/renewal-cage-arxiv-source.zip`;
 - remote CI: pending when this result note was committed; its later state is
   reported on the draft PR and is never used as evidence for a scientific
   pass.

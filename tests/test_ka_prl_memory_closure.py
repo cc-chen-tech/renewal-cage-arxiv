@@ -729,6 +729,36 @@ class MemoryClosureCliTests(unittest.TestCase):
                 {path.name: path.read_bytes() for path in second.iterdir()},
             )
 
+    def test_auxiliary_lineage_requires_exact_complete_trajectory_hash(self):
+        audit = self.load_input_audit()
+        source = ParentProvenanceTests().provenance_rows()[0]
+        row = {
+            "parent_id": closure.parent_identifier(source),
+            "source_doi": source["source_doi"],
+            "source_sha256": source["source_sha256"],
+            "source_frame_index": source["source_frame_index"],
+            "velocity_seed": source["velocity_seed"],
+            "trajectory_sha256": "c" * 64,
+            "trajectory_size_bytes": "123",
+            "trajectory_hash_scope": "complete_file",
+        }
+        self.assertTrue(
+            audit._rows_embed_parent(
+                [row],
+                source,
+                trajectory_sha256="c" * 64,
+                trajectory_size_bytes=123,
+            )
+        )
+        row["trajectory_sha256"] = "d" * 64
+        with self.assertRaisesRegex(ValueError, "trajectory"):
+            audit._rows_embed_parent(
+                [row],
+                source,
+                trajectory_sha256="c" * 64,
+                trajectory_size_bytes=123,
+            )
+
     def test_precision_escalation_is_an_automatic_common_grid_decision(self):
         cli = self.load_cli()
         rows = [

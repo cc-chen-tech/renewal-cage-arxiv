@@ -240,8 +240,8 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(float(blocker_by_temperature[0.58]["missing_parent_count"]), 4.0)
         self.assertEqual(float(blocker_by_temperature[0.45]["stationarity_pass"]), 0.0)
         self.assertEqual(float(blocker_by_temperature[0.58]["stationarity_pass"]), 0.0)
-        self.assertEqual(float(blocker_by_temperature[0.45]["input_lineage_join_pass"]), 0.0)
-        self.assertEqual(float(blocker_by_temperature[0.58]["input_lineage_join_pass"]), 0.0)
+        self.assertEqual(float(blocker_by_temperature[0.45]["input_lineage_join_pass"]), 1.0)
+        self.assertEqual(float(blocker_by_temperature[0.58]["input_lineage_join_pass"]), 1.0)
         verdict_by_model = {row["model"]: row for row in verdicts}
         self.assertEqual(float(verdict_by_model["full_candidate"]["precision_pass"]), 1.0)
         self.assertEqual(

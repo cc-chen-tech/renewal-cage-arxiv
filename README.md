@@ -93,11 +93,13 @@ The independent-parent PRL memory-closure test is documented in
 The available `T=0.45` restart labels contribute only one of three required
 source parents, and `T=0.58` contributes one of five. Restart-first reanalysis
 finds that neither source parent passes stationarity (no `T=0.45` child passes
-all three comparisons; only `T=0.58` child 4 does), and the current auxiliary
-tables lack embedded parent lineage. The paired-schedule particle-conditioned
-finite-exchange ordered-path candidate also fails every `T=0.45` child. The PRL
-claim therefore remains blocked; complete microscopic closure, spatial
-facilitation, and thermodynamic-transition claims remain outside scope.
+all three comparisons; only `T=0.58` child 4 does). Heldout, environment, and
+spectral rows now pass exact parent/source/complete-trajectory hash joins, but
+that engineering repair does not turn correlated restarts into independent
+parents. The paired-schedule particle-conditioned finite-exchange ordered-path
+candidate also fails every `T=0.45` child. The PRL claim therefore remains
+blocked; complete microscopic closure, spatial facilitation, and
+thermodynamic-transition claims remain outside scope.
 
 The model combines:
 
