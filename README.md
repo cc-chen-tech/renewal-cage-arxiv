@@ -42,6 +42,17 @@ validates the analytic slow-field limit, while an added OU-cage variance has
 insufficient exact inversion support. This is a diagnostic rejection of the
 scalar-mobility closure, not a blind microdynamic or spatial mechanism claim.
 
+A fixed-MSD variance-mixture shape quotient then asks whether the remaining
+multi-`k` residual is determined by the NGP residual. The ordinary fourth-order
+cumulant truncation fails at high `k` (maximum normalized error `5.667` at
+`T=0.45`), while both parameter-free gamma and inverse-Gaussian resummations
+pass every supported `k=2,4,7.25` row (worst errors `0.466` and `0.423` in
+tolerance units). Here, held-out MSD and NGP are diagnostic inputs, not blind
+predictions. The result supports an exploratory transient marginal
+variance-mixture closure but does not select a unique variance-mixture family,
+static disorder, finite exchange, or a microscopic mechanism. `T=0.58` remains
+a stationarity-unresolved canary.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
