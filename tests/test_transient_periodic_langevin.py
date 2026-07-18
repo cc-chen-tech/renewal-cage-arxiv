@@ -334,6 +334,21 @@ class TransientAblationTests(unittest.TestCase):
         for key in self.analysis.CLAIM_FLAGS:
             self.assertEqual(float(first_gate[key]), 0.0)
 
+    def test_ablation_gate_is_a_deterministic_function_of_rows(self):
+        rows, gate = self.analysis.run_ablation(seed=20260718, quick=True)
+
+        rebuilt = self.analysis.classify_ablation(rows)
+
+        self.assertEqual(rebuilt, gate)
+        self.assertEqual(
+            rebuilt["stochastic_artifact_validation"],
+            "stored_rows_gate_and_figure_self_consistency",
+        )
+        self.assertEqual(
+            float(rebuilt["cross_platform_exact_trajectory_reproduction_required"]),
+            0.0,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

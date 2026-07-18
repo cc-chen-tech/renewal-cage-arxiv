@@ -127,6 +127,16 @@ and seed `20260718`.  No design parameter was changed.  The maximum Euler
 position increment is below `0.373 L` in every model, and every state remains
 finite.
 
+The seed fixes trajectories within one numerical runtime, and the quick
+ablation test replays that contract.  Exact event rows are not required to be
+bitwise reproducible across operating systems or NumPy builds: tiny
+platform-level differences in transcendental forces can move a long stochastic
+path across a nearest-well boundary.  Cross-platform package validation instead
+recomputes every gate from the committed production rows, verifies the frozen
+parameters and zero claim flags, and regenerates the figure exactly from those
+rows.  This is an artifact-audit boundary, not an additional physical
+tolerance.
+
 ## Frozen ablation result
 
 | model | events | count Fano | successive step correlation | persistence/exchange | max NGP |

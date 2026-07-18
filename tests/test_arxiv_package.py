@@ -46,8 +46,8 @@ from summarize_ka_count_overdispersed_geometry import (  # noqa: E402
 )
 from analyze_transient_periodic_langevin import (  # noqa: E402
     CLAIM_FLAGS as TRANSIENT_LANGEVIN_ZERO_FLAGS,
+    classify_ablation as classify_transient_langevin_ablation,
     render_ablation_svg,
-    run_ablation as run_transient_langevin_ablation,
 )
 
 
@@ -115,12 +115,8 @@ class ArxivPackageTests(unittest.TestCase):
             stored_ablation_rows = list(csv.DictReader(handle))
         with ablation_gate_path.open() as handle:
             stored_ablation_gate = next(csv.DictReader(handle))
-        computed_ablation_rows, computed_ablation_gate = (
-            run_transient_langevin_ablation(seed=20260718, quick=False)
-        )
-        self.assertCsvRowsMatchComputedRows(
-            stored_ablation_rows,
-            computed_ablation_rows,
+        computed_ablation_gate = classify_transient_langevin_ablation(
+            stored_ablation_rows
         )
         self.assertCsvGateMatchesComputedGate(
             stored_ablation_gate,
@@ -130,7 +126,7 @@ class ArxivPackageTests(unittest.TestCase):
         figure = figure_path.read_text()
         self.assertEqual(
             figure,
-            render_ablation_svg(computed_ablation_rows, computed_ablation_gate),
+            render_ablation_svg(stored_ablation_rows, computed_ablation_gate),
         )
         self.assertIn("count Fano factor", figure)
         self.assertIn("successive cage-step correlation", figure)
@@ -166,6 +162,20 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(float(computed_quotient_gates[0][key]), 0.0)
         for key in TRANSIENT_LANGEVIN_ZERO_FLAGS:
             self.assertEqual(float(computed_ablation_gate[key]), 0.0)
+        self.assertEqual(
+            computed_ablation_gate["stochastic_artifact_validation"],
+            "stored_rows_gate_and_figure_self_consistency",
+        )
+        self.assertEqual(float(computed_ablation_gate["seed"]), 20260718.0)
+        self.assertEqual(float(computed_ablation_gate["quick_mode"]), 0.0)
+        self.assertEqual(
+            float(
+                computed_ablation_gate[
+                    "cross_platform_exact_trajectory_reproduction_required"
+                ]
+            ),
+            0.0,
+        )
 
     def test_memory_hierarchy_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

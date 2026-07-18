@@ -50,6 +50,156 @@ def _finite_or_zero(value: float) -> float:
     return float(value) if math.isfinite(float(value)) else 0.0
 
 
+def _finite_field(row: dict[str, object], key: str) -> float:
+    try:
+        value = float(row[key])
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"ablation row has invalid {key}") from error
+    if not math.isfinite(value):
+        raise ValueError(f"ablation row has nonfinite {key}")
+    return value
+
+
+def classify_ablation(
+    rows: list[dict[str, object]],
+) -> dict[str, float | str]:
+    """Classify frozen ablation rows without replaying stochastic trajectories."""
+
+    expected_models = (
+        ("static_periodic", 0.0, 0.0),
+        ("rate_only", 0.0, 1.5),
+        ("elastic_only", 1.0, 0.0),
+        ("full_transient", 1.0, 1.5),
+    )
+    if len(rows) != len(expected_models):
+        raise ValueError("ablation requires exactly four frozen model rows")
+    seeds = set()
+    quick_modes = set()
+    for row, (model, elastic_stiffness, barrier_coupling) in zip(
+        rows, expected_models
+    ):
+        if str(row.get("model")) != model:
+            raise ValueError("ablation rows do not use the frozen model order")
+        seeds.add(_finite_field(row, "seed"))
+        quick_mode = _finite_field(row, "quick_mode")
+        if quick_mode not in (0.0, 1.0):
+            raise ValueError("quick_mode must be zero or one")
+        quick_modes.add(quick_mode)
+        simulation_fields = (
+            {
+                "trajectory_count": 96.0,
+                "burnin_steps": 2000.0,
+                "production_steps": 8000.0,
+            }
+            if quick_mode == 1.0
+            else {
+                "trajectory_count": 384.0,
+                "burnin_steps": 10000.0,
+                "production_steps": 40000.0,
+            }
+        )
+        frozen_fields = {
+            "dimension": 3.0,
+            "temperature": 1.0,
+            "period": 1.0,
+            "base_barrier": 3.0,
+            "elastic_stiffness": elastic_stiffness,
+            "barrier_coupling": barrier_coupling,
+            "barrier_stiffness": 1.0,
+            "gamma_x": 1.0,
+            "gamma_q": 20.0,
+            "gamma_z": 20.0,
+            "dt": 0.002,
+            "record_dt": 0.02,
+            "dwell_frames": 5.0,
+            "count_window": 2.0,
+            "parameter_adjustment_from_design": 0.0,
+            "synthetic_capability_only": 1.0,
+            **simulation_fields,
+        }
+        for key, expected in frozen_fields.items():
+            if _finite_field(row, key) != expected:
+                raise ValueError(f"ablation row violates frozen {key}")
+        for key in (
+            "event_count",
+            "count_fano_factor",
+            "successive_vector_correlation",
+            "maximum_euler_displacement",
+        ):
+            _finite_field(row, key)
+        if _finite_field(row, "event_count") <= 0.0:
+            raise ValueError("ablation row has no extracted events")
+        if _finite_field(row, "all_finite") != 1.0:
+            raise ValueError("ablation row contains a nonfinite trajectory")
+        if _finite_field(row, "trajectory_continuity_pass") != 1.0:
+            raise ValueError("ablation row fails the continuity audit")
+        for flag in CLAIM_FLAGS:
+            if _finite_field(row, flag) != 0.0:
+                raise ValueError(f"ablation row promotes forbidden claim {flag}")
+    if len(seeds) != 1 or len(quick_modes) != 1:
+        raise ValueError("ablation rows must share one seed and simulation mode")
+
+    by_model = {str(row["model"]): row for row in rows}
+    static = by_model["static_periodic"]
+    rate = by_model["rate_only"]
+    elastic = by_model["elastic_only"]
+    full = by_model["full_transient"]
+    fano_margin = 0.02
+    correlation_margin = 0.02
+    rate_pass = _finite_field(rate, "count_fano_factor") > _finite_field(
+        static, "count_fano_factor"
+    ) + fano_margin
+    elastic_pass = _finite_field(
+        elastic, "successive_vector_correlation"
+    ) < _finite_field(static, "successive_vector_correlation") - correlation_margin
+    full_pass = (
+        _finite_field(full, "count_fano_factor")
+        > _finite_field(static, "count_fano_factor") + fano_margin
+        and _finite_field(full, "successive_vector_correlation")
+        < _finite_field(static, "successive_vector_correlation")
+        - correlation_margin
+    )
+    gate: dict[str, float | str] = {
+        "analysis_status": (
+            "synthetic_joint_rate_recoil_capability"
+            if rate_pass and elastic_pass and full_pass
+            else "synthetic_ablation_unresolved"
+        ),
+        "seed": next(iter(seeds)),
+        "quick_mode": next(iter(quick_modes)),
+        "model_count": 4.0,
+        "all_models_finite": 1.0,
+        "all_models_continuous": 1.0,
+        "minimum_event_count": min(_finite_field(row, "event_count") for row in rows),
+        "fano_comparison_margin": fano_margin,
+        "correlation_comparison_margin": correlation_margin,
+        "rate_only_minus_static_fano": _finite_field(rate, "count_fano_factor")
+        - _finite_field(static, "count_fano_factor"),
+        "elastic_minus_static_step_correlation": _finite_field(
+            elastic, "successive_vector_correlation"
+        )
+        - _finite_field(static, "successive_vector_correlation"),
+        "full_minus_static_fano": _finite_field(full, "count_fano_factor")
+        - _finite_field(static, "count_fano_factor"),
+        "full_minus_static_step_correlation": _finite_field(
+            full, "successive_vector_correlation"
+        )
+        - _finite_field(static, "successive_vector_correlation"),
+        "rate_disorder_count_fano_increase": float(rate_pass),
+        "elastic_memory_more_negative_step_correlation": float(elastic_pass),
+        "full_model_joint_signature_pass": float(full_pass),
+        "synthetic_capability_only": 1.0,
+        "stochastic_artifact_validation": (
+            "stored_rows_gate_and_figure_self_consistency"
+        ),
+        "cross_platform_exact_trajectory_reproduction_required": 0.0,
+        "next_required_action": "infer_q_z_proxies_from_ka_calibration",
+    }
+    for flag in CLAIM_FLAGS:
+        gate[flag] = 0.0
+    return gate
+
+
 def run_ablation(
     *,
     seed: int,
@@ -178,62 +328,7 @@ def run_ablation(
             row[flag] = 0.0
         rows.append(row)
 
-    by_model = {str(row["model"]): row for row in rows}
-    static = by_model["static_periodic"]
-    rate = by_model["rate_only"]
-    elastic = by_model["elastic_only"]
-    full = by_model["full_transient"]
-    fano_margin = 0.02
-    correlation_margin = 0.02
-    rate_pass = float(rate["count_fano_factor"]) > float(
-        static["count_fano_factor"]
-    ) + fano_margin
-    elastic_pass = float(elastic["successive_vector_correlation"]) < float(
-        static["successive_vector_correlation"]
-    ) - correlation_margin
-    full_pass = (
-        float(full["count_fano_factor"])
-        > float(static["count_fano_factor"]) + fano_margin
-        and float(full["successive_vector_correlation"])
-        < float(static["successive_vector_correlation"]) - correlation_margin
-    )
-    gate: dict[str, float | str] = {
-        "analysis_status": (
-            "synthetic_joint_rate_recoil_capability"
-            if rate_pass and elastic_pass and full_pass
-            else "synthetic_ablation_unresolved"
-        ),
-        "seed": float(seed),
-        "quick_mode": float(quick),
-        "model_count": 4.0,
-        "all_models_finite": float(all(float(row["all_finite"]) == 1.0 for row in rows)),
-        "all_models_continuous": float(
-            all(float(row["trajectory_continuity_pass"]) == 1.0 for row in rows)
-        ),
-        "minimum_event_count": min(float(row["event_count"]) for row in rows),
-        "fano_comparison_margin": fano_margin,
-        "correlation_comparison_margin": correlation_margin,
-        "rate_only_minus_static_fano": float(rate["count_fano_factor"])
-        - float(static["count_fano_factor"]),
-        "elastic_minus_static_step_correlation": float(
-            elastic["successive_vector_correlation"]
-        )
-        - float(static["successive_vector_correlation"]),
-        "full_minus_static_fano": float(full["count_fano_factor"])
-        - float(static["count_fano_factor"]),
-        "full_minus_static_step_correlation": float(
-            full["successive_vector_correlation"]
-        )
-        - float(static["successive_vector_correlation"]),
-        "rate_disorder_count_fano_increase": float(rate_pass),
-        "elastic_memory_more_negative_step_correlation": float(elastic_pass),
-        "full_model_joint_signature_pass": float(full_pass),
-        "synthetic_capability_only": 1.0,
-        "next_required_action": "infer_q_z_proxies_from_ka_calibration",
-    }
-    for flag in CLAIM_FLAGS:
-        gate[flag] = 0.0
-    return rows, gate
+    return rows, classify_ablation(rows)
 
 
 def render_ablation_svg(
