@@ -180,7 +180,7 @@ git commit -m "contract cage and KA force Jacobians"
 - Modify: `tests/test_ka_l2p_conditional_diffusion.py`
 
 **Interfaces:**
-- Produces: `smooth_cage_l2p_velocity_jacobian_batch(..., jacobian_step, potential_protocol, target_batch_size=16)` returning `l2p_velocity_jacobian`, derivative components, and fixed claim flag.
+- Produces: `smooth_cage_l2p_velocity_jacobian_batch(..., jacobian_step, potential_protocol, target_batch_size=16)` returning `l2p_velocity_jacobian` and the fixed claim flag by default; `return_components=True` retains the five diagnostic derivative components at higher memory cost.
 - Produces: `deterministic_conditional_diffusion(velocity_jacobian, *, friction, temperature)` returning symmetric `conditional_diffusion`.
 
 - [ ] **Step 1: Write the failing `A_c @ eta` identity test**

@@ -892,6 +892,53 @@ class SmoothCageTests(unittest.TestCase):
                 np.testing.assert_allclose(actual, expected, rtol=2e-3, atol=2e-3)
                 self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
 
+    def test_deterministic_l2p_jacobian_releases_components_unless_requested(self):
+        from ka_local_cage import ka_lj_force_and_isotropic_curvature
+        from ka_smooth_cage import smooth_cage_l2p_velocity_jacobian_batch
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        common = {
+            "velocities": np.arange(12, dtype=float).reshape(4, 3) / 13.0 - 0.3,
+            "forces": ka_lj_force_and_isotropic_curvature(
+                positions,
+                particle_types=inputs["particle_types"],
+                box_lengths=inputs["box_lengths"],
+                potential_protocol="ka_lj_c3_switch",
+            )[0],
+            "particle_types": inputs["particle_types"],
+            "box_lengths": inputs["box_lengths"],
+            "target_indices": np.array([0, 2]),
+            "friction": 0.7,
+            "jacobian_step": 1e-4,
+            "potential_protocol": "ka_lj_c3_switch",
+        }
+
+        compact = smooth_cage_l2p_velocity_jacobian_batch(positions, **common)
+        self.assertNotIn("force_jacobian_term", compact)
+        detailed = smooth_cage_l2p_velocity_jacobian_batch(
+            positions, **common, return_components=True
+        )
+        components = (
+            "force_jacobian_term",
+            "force_direction_cage_jacobian_term",
+            "velocity_direction_cage_jacobian_term",
+            "friction_cage_jacobian_term",
+            "third_derivative_cage_jacobian_term",
+        )
+        np.testing.assert_allclose(
+            sum(np.asarray(detailed[name]) for name in components),
+            detailed["l2p_velocity_jacobian"],
+            rtol=2e-15,
+            atol=2e-15,
+        )
+        np.testing.assert_allclose(
+            compact["l2p_velocity_jacobian"],
+            detailed["l2p_velocity_jacobian"],
+            rtol=2e-15,
+            atol=2e-15,
+        )
+
     def test_smooth_cage_features_are_rotation_invariant(self):
         from ka_smooth_cage import smooth_cage_invariant_features
 

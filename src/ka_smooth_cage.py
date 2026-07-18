@@ -361,6 +361,7 @@ def smooth_cage_l2p_velocity_jacobian_batch(
     jacobian_step: float,
     potential_protocol: str = "ka_lj_cut",
     target_batch_size: int = 16,
+    return_components: bool = False,
 ) -> dict[str, np.ndarray | float | str]:
     """Construct the full deterministic matrix ``grad_V(L^2 p)``."""
 
@@ -384,6 +385,8 @@ def smooth_cage_l2p_velocity_jacobian_batch(
         raise ValueError("friction must be finite and nonnegative")
     if not math.isfinite(jacobian_step) or jacobian_step <= 0.0:
         raise ValueError("jacobian_step must be finite and positive")
+    if not isinstance(return_components, (bool, np.bool_)):
+        raise ValueError("return_components must be boolean")
 
     coordinate_arguments = {
         "velocities": np.zeros_like(positions),
@@ -406,21 +409,13 @@ def smooth_cage_l2p_velocity_jacobian_batch(
 
     step = float(jacobian_step)
     base = cage_jacobian(positions)
-    plus_velocity = cage_jacobian(positions + step * velocities)
-    minus_velocity = cage_jacobian(positions - step * velocities)
-    plus_force = cage_jacobian(positions + step * forces)
-    minus_force = cage_jacobian(positions - step * forces)
-
-    first_velocity = (plus_velocity - minus_velocity) / (2.0 * step)
-    second_velocity = (plus_velocity - 2.0 * base + minus_velocity) / step**2
-    first_force = (plus_force - minus_force) / (2.0 * step)
     pair_geometry = ka_lj_pair_hessian_geometry(
         positions,
         particle_types=particle_types,
         box_lengths=box_lengths,
         potential_protocol=potential_protocol,
     )
-    force_jacobian = contract_cage_jacobian_force_jacobian(
+    total = contract_cage_jacobian_force_jacobian(
         base,
         particle_i=np.asarray(pair_geometry["particle_i"]),
         particle_j=np.asarray(pair_geometry["particle_j"]),
@@ -430,29 +425,65 @@ def smooth_cage_l2p_velocity_jacobian_batch(
     def matrix_layout(value: np.ndarray) -> np.ndarray:
         return np.transpose(value, (0, 2, 1, 3))
 
-    force_direction_term = 3.0 * matrix_layout(first_force)
-    velocity_direction_term = -6.0 * friction * matrix_layout(first_velocity)
-    friction_term = friction**2 * matrix_layout(base)
-    third_derivative_term = 3.0 * matrix_layout(second_velocity)
-    total = (
-        force_jacobian
-        + force_direction_term
-        + velocity_direction_term
-        + friction_term
-        + third_derivative_term
-    )
-    return {
+    components: dict[str, np.ndarray] = {}
+    if return_components:
+        components["force_jacobian_term"] = total
+        total = total.copy()
+
+    plus_force = cage_jacobian(positions + step * forces)
+    minus_force = cage_jacobian(positions - step * forces)
+    plus_force -= minus_force
+    del minus_force
+    plus_force *= 3.0 / (2.0 * step)
+    force_direction_term = matrix_layout(plus_force)
+    total += force_direction_term
+    if return_components:
+        components["force_direction_cage_jacobian_term"] = force_direction_term
+    else:
+        del force_direction_term, plus_force
+
+    plus_velocity = cage_jacobian(positions + step * velocities)
+    minus_velocity = cage_jacobian(positions - step * velocities)
+    minus_velocity *= -1.0
+    minus_velocity += plus_velocity
+    minus_velocity /= 2.0 * step
+    plus_velocity -= base
+    plus_velocity -= step * minus_velocity
+    plus_velocity *= 2.0 / step**2
+
+    minus_velocity *= -6.0 * friction
+    velocity_direction_term = matrix_layout(minus_velocity)
+    total += velocity_direction_term
+    if return_components:
+        components["velocity_direction_cage_jacobian_term"] = (
+            velocity_direction_term
+        )
+    else:
+        del velocity_direction_term, minus_velocity
+
+    plus_velocity *= 3.0
+    third_derivative_term = matrix_layout(plus_velocity)
+    if return_components:
+        components["third_derivative_cage_jacobian_term"] = third_derivative_term
+
+    base *= friction**2
+    friction_term = matrix_layout(base)
+    total += friction_term
+    if return_components:
+        components["friction_cage_jacobian_term"] = friction_term
+    total += third_derivative_term
+    if not return_components:
+        del third_derivative_term, plus_velocity
+
+    result: dict[str, np.ndarray | float | str] = {
         "l2p_velocity_jacobian": total,
-        "force_jacobian_term": force_jacobian,
-        "force_direction_cage_jacobian_term": force_direction_term,
-        "velocity_direction_cage_jacobian_term": velocity_direction_term,
-        "friction_cage_jacobian_term": friction_term,
-        "third_derivative_cage_jacobian_term": third_derivative_term,
         "jacobian_step": step,
         "pair_count": float(pair_geometry["pair_count"]),
         "potential_protocol": potential_protocol,
         "thermodynamic_claim_allowed": 0.0,
     }
+    result.update(components)
+    return result
 
 
 def smooth_cage_joint_noise_covariance_rate(
