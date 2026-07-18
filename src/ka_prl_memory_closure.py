@@ -58,6 +58,13 @@ REQUIRED_MECHANISM_ABLATIONS = (
     "static_particle_environment",
     "finite_exchange_environment",
 )
+CLOSED_CLAIM_FIELDS = (
+    "microdynamic_closure_claim_allowed",
+    "complete_microscopic_closure_claim_allowed",
+    "spatial_facilitation_claim_allowed",
+    "thermodynamic_claim_allowed",
+    "thermodynamic_glass_transition_claim_allowed",
+)
 
 
 def _as_float(row: Mapping[str, object], key: str) -> float:
@@ -76,6 +83,21 @@ def _as_int(row: Mapping[str, object], key: str) -> int:
     if value != integer:
         raise ValueError(f"provenance field must be an integer: {key}")
     return integer
+
+
+def _as_bool(row: Mapping[str, object], key: str) -> bool:
+    try:
+        value = row[key]
+    except KeyError as error:
+        raise ValueError(f"missing provenance field: {key}") from error
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {"true", "1", "1.0"}:
+        return True
+    if normalized in {"false", "0", "0.0"}:
+        return False
+    raise ValueError(f"missing or invalid provenance field: {key}")
 
 
 def parent_identifier(row: Mapping[str, object]) -> str:
@@ -166,6 +188,9 @@ def audit_parent_provenance(
                     "temperature": temperature,
                     "replicate": replicate,
                     "parent_id": parent_id,
+                    "calibration_parent_id": parent_id,
+                    "heldout_parent_id": parent_id,
+                    "calibration_heldout_same_parent": 1.0,
                     "source_doi": str(row["source_doi"]),
                     "source_sha256": str(row["source_sha256"]),
                     "source_frame_index": _as_int(row, "source_frame_index"),
@@ -182,14 +207,19 @@ def audit_parent_provenance(
                     "recorded_independence_class": str(
                         row.get("independence_class", "")
                     ),
+                    "recorded_independently_prepared_parent_samples": float(
+                        _as_bool(row, "independently_prepared_parent_samples")
+                    ),
                     "audited_independence_class": "correlated_restarts_of_one_parent_trajectory",
                     "restart_is_independent_sample": 0.0,
                     "parent_unit_contribution": int(
                         replicate == first_restart_by_parent[parent_id]
                     ),
                     "microdynamic_closure_claim_allowed": 0.0,
+                    "complete_microscopic_closure_claim_allowed": 0.0,
                     "spatial_facilitation_claim_allowed": 0.0,
                     "thermodynamic_claim_allowed": 0.0,
+                    "thermodynamic_glass_transition_claim_allowed": 0.0,
                 }
             )
         blocker_state = _parent_blocker_state(
@@ -212,7 +242,9 @@ def audit_parent_provenance(
                 "required_observables": FROZEN_OBSERVABLES,
                 "shared_parent_resampling_can_satisfy": 0.0,
                 "next_required_action": (
-                    f"acquire_{missing_parent_count}_independent_parent_trajectories"
+                    f"acquire_{missing_parent_count}_independent_parent_trajectories_and_requalify_stationarity"
+                    if missing_parent_count and not stationarity_pass
+                    else f"acquire_{missing_parent_count}_independent_parent_trajectories"
                     if missing_parent_count
                     else (
                         "replace_or_requalify_stationarity_control"
@@ -221,8 +253,10 @@ def audit_parent_provenance(
                     )
                 ),
                 "microdynamic_closure_claim_allowed": 0.0,
+                "complete_microscopic_closure_claim_allowed": 0.0,
                 "spatial_facilitation_claim_allowed": 0.0,
                 "thermodynamic_claim_allowed": 0.0,
+                "thermodynamic_glass_transition_claim_allowed": 0.0,
             }
         )
     return ledger, blockers
@@ -496,6 +530,9 @@ def summarize_restarts(
         output.append(summary)
     for _, rows in _group_rows(output, ("temperature", "restart", "model")):
         restart_curve_pass = float(curve_pass(rows))
+        restart_maximum_higher_order_score = max(
+            higher_order_score(row) for row in rows
+        )
         restart_higher_order_pass = float(
             all(higher_order_score(row) <= 1.0 for row in rows)
         )
@@ -516,6 +553,9 @@ def summarize_restarts(
             row["restart_curve_gate_pass"] = restart_curve_pass
             row["restart_higher_order_gate_pass"] = restart_higher_order_pass
             row["restart_precision_pass"] = restart_precision_pass
+            row["restart_maximum_higher_order_score"] = (
+                restart_maximum_higher_order_score
+            )
     return output
 
 
@@ -570,6 +610,13 @@ def summarize_parents(
         )
         summary["all_child_restart_precision_pass"] = min(
             float(row.get("restart_precision_pass", 1.0)) for row in rows
+        )
+        summary["failed_child_restart_count"] = sum(
+            float(row.get("restart_curve_gate_pass", 1.0)) == 0.0 for row in rows
+        )
+        summary["maximum_child_restart_higher_order_score"] = max(
+            float(row.get("restart_maximum_higher_order_score", 0.0))
+            for row in rows
         )
         _add_curve_errors(summary)
         summary["mc_relative_se_msd"] = _msd_mc_relative_se(summary)
@@ -639,6 +686,13 @@ def summarize_model_verdicts(
         )
         verdict["maximum_higher_order_score"] = max(
             higher_order_score(row) for row in rows
+        )
+        verdict["maximum_child_restart_higher_order_score"] = max(
+            float(row.get("maximum_child_restart_higher_order_score", 0.0))
+            for row in rows
+        )
+        verdict["failed_child_restart_count"] = max(
+            int(float(row.get("failed_child_restart_count", 0.0))) for row in rows
         )
         verdict["support_pass"] = min(
             float(row.get("support_pass", 1.0)) for row in rows
@@ -733,6 +787,37 @@ def _localize_candidate_failure(
     ):
         return "ordered_path_kernel"
     return "multiple_unresolved"
+
+
+def classify_correlated_parent_diagnostic(
+    *,
+    parent_summaries: Sequence[Mapping[str, object]],
+    upper_control_parents: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Describe model behavior without treating correlated restarts as evidence."""
+
+    verdicts = summarize_model_verdicts(parent_summaries)
+    upper_verdicts = summarize_model_verdicts(upper_control_parents)
+    full = _verdict_lookup(verdicts, "full_candidate")
+    upper = _verdict_lookup(upper_verdicts, "contiguous_empirical_upper_control")
+    result = {
+        "diagnostic_state": "unavailable",
+        "diagnostic_failure_localization": "not_applicable",
+        "correlated_parent_diagnostic_only": 1.0,
+        "positive_memory_closure_claim_allowed": 0.0,
+    }
+    if not full:
+        return result
+    if any(float(row["curve_gate_pass"]) == 0.0 for row in full.values()) or any(
+        float(row["curve_gate_pass"]) == 0.0 for row in upper.values()
+    ) or set(upper) != set(full):
+        result["diagnostic_state"] = "candidate_rejected"
+        result["diagnostic_failure_localization"] = _localize_candidate_failure(
+            verdicts=verdicts, full=full, upper=upper
+        )
+        return result
+    result["diagnostic_state"] = "candidate_passed_correlated_parent_diagnostic"
+    return result
 
 
 def classify_memory_closure_gate(

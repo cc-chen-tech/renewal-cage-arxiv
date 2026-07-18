@@ -9,6 +9,7 @@ import hashlib
 import html
 import math
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from ka_prl_memory_closure import (  # noqa: E402
     FROZEN_PROTOCOLS,
     audit_parent_provenance,
     build_claim_ledger,
+    classify_correlated_parent_diagnostic,
     classify_memory_closure_gate,
     generate_ablation_path,
     summarize_model_verdicts,
@@ -309,6 +311,59 @@ def _spectral_rows(
     )
 
 
+def _predict_restart_rows(
+    *,
+    restart: int,
+    blocks: np.ndarray,
+    targets: Mapping[tuple[int, int], Mapping[str, float]],
+    environment_time: float,
+    temperature: float,
+    realizations: int,
+) -> list[dict[str, object]]:
+    rows = _prediction_rows_for_path(
+        blocks,
+        temperature=temperature,
+        restart=restart,
+        model=UPPER_CONTROL,
+        realization=0,
+        targets=targets,
+        information={
+            "one_step_jump_law_retained": 1.0,
+            "particle_identity_retained": 1.0,
+            "static_particle_environment_retained": 1.0,
+            "ordered_path_memory_retained": 1.0,
+        },
+    )
+    for model in sorted(ABLATION_MODELS):
+        for realization in range(realizations):
+            generated, audit = generate_ablation_path(
+                blocks,
+                model=model,
+                environment_time=environment_time,
+                block_size=BLOCK_SIZE,
+                rng=np.random.default_rng(
+                    _model_seed(
+                        temperature=temperature,
+                        restart=restart,
+                        model=model,
+                        realization=realization,
+                    )
+                ),
+            )
+            rows.extend(
+                _prediction_rows_for_path(
+                    generated,
+                    temperature=temperature,
+                    restart=restart,
+                    model=model,
+                    realization=realization,
+                    targets=targets,
+                    information=audit,
+                )
+            )
+    return rows
+
+
 def predict_correlated_parent_diagnostic(
     *,
     blocks_by_restart: Mapping[int, np.ndarray],
@@ -317,62 +372,42 @@ def predict_correlated_parent_diagnostic(
     spectral_source_rows: Sequence[Mapping[str, object]],
     temperature: float,
     realizations: int,
+    workers: int = 1,
 ) -> list[dict[str, object]]:
     """Run the frozen model family as a correlated-parent diagnostic only."""
 
     if realizations not in {16, 64}:
         raise ValueError("realizations must be one of the frozen values 16 or 64")
+    if isinstance(workers, bool) or not isinstance(workers, int) or not 1 <= workers <= 3:
+        raise ValueError("workers must be an integer from one to three")
     targets = _heldout_targets(target_rows, temperature=temperature)
     environment_times = _environment_times(crossing_rows, temperature=temperature)
     expected_restarts = {1, 2, 3} if temperature == 0.45 else {1, 2, 3, 4, 5}
     if set(blocks_by_restart) != expected_restarts:
         raise ValueError("calibration blocks miss a frozen restart")
     rows: list[dict[str, object]] = []
-    for restart in sorted(blocks_by_restart):
-        blocks = np.asarray(blocks_by_restart[restart], dtype=float)
-        rows.extend(
-            _prediction_rows_for_path(
-                blocks,
-                temperature=temperature,
-                restart=restart,
-                model=UPPER_CONTROL,
-                realization=0,
-                targets=targets,
-                information={
-                    "one_step_jump_law_retained": 1.0,
-                    "particle_identity_retained": 1.0,
-                    "static_particle_environment_retained": 1.0,
-                    "ordered_path_memory_retained": 1.0,
-                },
-            )
-        )
-        for model in sorted(ABLATION_MODELS):
-            for realization in range(realizations):
-                generated, audit = generate_ablation_path(
-                    blocks,
-                    model=model,
-                    environment_time=environment_times[restart],
-                    block_size=BLOCK_SIZE,
-                    rng=np.random.default_rng(
-                        _model_seed(
-                            temperature=temperature,
-                            restart=restart,
-                            model=model,
-                            realization=realization,
-                        )
-                    ),
-                )
-                rows.extend(
-                    _prediction_rows_for_path(
-                        generated,
-                        temperature=temperature,
-                        restart=restart,
-                        model=model,
-                        realization=realization,
-                        targets=targets,
-                        information=audit,
-                    )
-                )
+    restart_arguments = [
+        {
+            "restart": restart,
+            "blocks": np.asarray(blocks_by_restart[restart], dtype=float),
+            "targets": targets,
+            "environment_time": environment_times[restart],
+            "temperature": temperature,
+            "realizations": realizations,
+        }
+        for restart in sorted(blocks_by_restart)
+    ]
+    if workers == 1:
+        for arguments in restart_arguments:
+            rows.extend(_predict_restart_rows(**arguments))
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(_predict_restart_rows, **arguments)
+                for arguments in restart_arguments
+            ]
+            for future in futures:
+                rows.extend(future.result())
     rows.extend(
         _spectral_rows(
             spectral_source_rows,
@@ -409,6 +444,103 @@ def _annotate_verdicts(
     ]
 
 
+def build_diagnostic_tables(
+    *,
+    realization_rows: Sequence[Mapping[str, object]],
+    parent_ledger: Sequence[Mapping[str, object]],
+    blockers: Sequence[Mapping[str, object]],
+    temperature: float,
+    realizations: int,
+) -> dict[str, object]:
+    restart_summaries = summarize_restarts(realization_rows)
+    parent_summaries = summarize_parents(restart_summaries, parent_ledger)
+    upper_controls = [
+        row for row in parent_summaries if str(row["model"]) == UPPER_CONTROL
+    ]
+    model_parent_rows = [
+        row for row in parent_summaries if str(row["model"]) != UPPER_CONTROL
+    ]
+    gate = classify_memory_closure_gate(
+        parent_summaries=model_parent_rows,
+        blockers=blockers,
+        upper_control_parents=upper_controls,
+    )
+    diagnostic = classify_correlated_parent_diagnostic(
+        parent_summaries=model_parent_rows,
+        upper_control_parents=upper_controls,
+    )
+    verdicts = summarize_model_verdicts(parent_summaries)
+    low_full = [
+        row
+        for row in verdicts
+        if float(row["temperature"]) == 0.45 and str(row["model"]) == "full_candidate"
+    ]
+    gate.update(
+        {
+            "run_temperature": temperature,
+            "diagnostic_realizations": realizations,
+            "correlated_parent_diagnostic_full_candidate_pass": float(
+                bool(low_full)
+                and all(float(row["curve_gate_pass"]) == 1.0 for row in low_full)
+            ),
+            "correlated_parent_diagnostic_only": 1.0,
+            "heldout_observables_used_as_model_inputs": 0.0,
+            "gate_or_claim_tuned_after_results": 0.0,
+            "correlated_parent_diagnostic_state": diagnostic["diagnostic_state"],
+            "correlated_parent_diagnostic_failure_localization": diagnostic[
+                "diagnostic_failure_localization"
+            ],
+        }
+    )
+    return {
+        "restart_summaries": restart_summaries,
+        "parent_summaries": parent_summaries,
+        "model_verdicts": _annotate_verdicts(
+            verdicts, gate_state=str(gate["mechanism_state"])
+        ),
+        "gate": gate,
+        "claim_ledger": build_claim_ledger(gate),
+    }
+
+
+def recompute_committed_memory_closure_gate(data_directory: Path) -> dict[str, object]:
+    """Recompute the committed gate from realization rows, never its stored flag."""
+
+    data = Path(data_directory)
+    blockers = read_rows(data / "renewal_cage_ka_prl_parent_blockers.csv")
+    parent_ledger = read_rows(data / "renewal_cage_ka_prl_parent_provenance.csv")
+    realization_rows = read_rows(
+        data / "renewal_cage_ka_prl_memory_closure_restart_rows.csv"
+    )
+    temperatures = {float(row["temperature"]) for row in realization_rows}
+    if len(temperatures) != 1:
+        raise ValueError("committed diagnostic must contain exactly one temperature")
+    temperature = temperatures.pop()
+    full_realizations_by_restart: dict[int, set[int]] = {}
+    for row in realization_rows:
+        if str(row["model"]) != "full_candidate":
+            continue
+        full_realizations_by_restart.setdefault(
+            int(float(row["restart"])), set()
+        ).add(int(float(row["realization"])))
+    realization_counts = {len(values) for values in full_realizations_by_restart.values()}
+    if len(realization_counts) != 1 or not realization_counts:
+        raise ValueError("full candidate realization grid is incomplete by restart")
+    realizations = realization_counts.pop()
+    if realizations not in {16, 64} or any(
+        labels != set(range(realizations))
+        for labels in full_realizations_by_restart.values()
+    ):
+        raise ValueError("full candidate realization labels violate the frozen grid")
+    return build_diagnostic_tables(
+        realization_rows=realization_rows,
+        parent_ledger=parent_ledger,
+        blockers=blockers,
+        temperature=temperature,
+        realizations=realizations,
+    )["gate"]
+
+
 def write_svg(path: Path, verdicts: Sequence[Mapping[str, object]], gate: Mapping[str, object]) -> None:
     ordered = sorted(
         verdicts,
@@ -423,12 +555,12 @@ def write_svg(path: Path, verdicts: Sequence[Mapping[str, object]], gate: Mappin
         '<text x="28" y="38" class="title">PRL memory closure — parent-first gate</text>',
         f'<text x="28" y="66" class="sub">gate: {html.escape(str(gate["mechanism_state"]))}</text>',
         '<text x="28" y="90" class="sub">Rows below are correlated-parent diagnostics; restart averages cannot open the claim.</text>',
-        '<text x="28" y="122">model</text><text x="520" y="122">parent</text><text x="800" y="122">higher-order max</text><text x="1010" y="122">curve</text>',
+        '<text x="28" y="122">model</text><text x="520" y="122">parent</text><text x="800" y="122">worst child score</text><text x="1010" y="122">curve</text>',
     ]
     for index, row in enumerate(ordered):
         y = 148 + 24 * index
         passed = float(row["curve_gate_pass"]) == 1.0
-        score = float(row["maximum_higher_order_score"])
+        score = float(row["maximum_child_restart_higher_order_score"])
         lines.extend(
             [
                 f'<text x="28" y="{y}">{html.escape(str(row["model"]))}</text>',
@@ -457,6 +589,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--spectral-rows", type=Path)
     parser.add_argument("--realizations", type=int, choices=(16, 64), default=16)
     parser.add_argument("--base-seed", type=int, default=BASE_SEED)
+    parser.add_argument("--workers", type=int, choices=(1, 2, 3), default=1)
     parser.add_argument("--output-parent-ledger", type=Path, required=True)
     parser.add_argument("--output-blockers", type=Path, required=True)
     parser.add_argument("--output-restart-rows", type=Path)
@@ -533,49 +666,22 @@ def main(argv: Sequence[str] | None = None) -> None:
         spectral_source_rows=read_rows(args.spectral_rows),
         temperature=temperature,
         realizations=args.realizations,
+        workers=args.workers,
     )
-    restart_summaries = summarize_restarts(realization_rows)
-    parent_summaries = summarize_parents(restart_summaries, parent_ledger)
-    upper_controls = [
-        row for row in parent_summaries if str(row["model"]) == UPPER_CONTROL
-    ]
-    model_parent_rows = [
-        row for row in parent_summaries if str(row["model"]) != UPPER_CONTROL
-    ]
-    gate = classify_memory_closure_gate(
-        parent_summaries=model_parent_rows,
+    tables = build_diagnostic_tables(
+        realization_rows=realization_rows,
+        parent_ledger=parent_ledger,
         blockers=blockers,
-        upper_control_parents=upper_controls,
-    )
-    verdicts = summarize_model_verdicts(parent_summaries)
-    low_full = [
-        row
-        for row in verdicts
-        if float(row["temperature"]) == 0.45 and str(row["model"]) == "full_candidate"
-    ]
-    gate.update(
-        {
-            "run_temperature": temperature,
-            "diagnostic_realizations": args.realizations,
-            "correlated_parent_diagnostic_full_candidate_pass": float(
-                bool(low_full)
-                and all(float(row["curve_gate_pass"]) == 1.0 for row in low_full)
-            ),
-            "correlated_parent_diagnostic_only": 1.0,
-            "heldout_observables_used_as_model_inputs": 0.0,
-            "gate_or_claim_tuned_after_results": 0.0,
-        }
-    )
-    annotated_verdicts = _annotate_verdicts(
-        verdicts, gate_state=str(gate["mechanism_state"])
+        temperature=temperature,
+        realizations=args.realizations,
     )
     write_rows(args.output_restart_rows, realization_rows)
-    write_rows(args.output_restart_summary, restart_summaries)
-    write_rows(args.output_parent_summary, parent_summaries)
-    write_rows(args.output_model_verdicts, annotated_verdicts)
-    write_rows(args.output_gate, [gate])
-    write_rows(args.output_claim_ledger, build_claim_ledger(gate))
-    write_svg(args.output_svg, annotated_verdicts, gate)
+    write_rows(args.output_restart_summary, tables["restart_summaries"])
+    write_rows(args.output_parent_summary, tables["parent_summaries"])
+    write_rows(args.output_model_verdicts, tables["model_verdicts"])
+    write_rows(args.output_gate, [tables["gate"]])
+    write_rows(args.output_claim_ledger, tables["claim_ledger"])
+    write_svg(args.output_svg, tables["model_verdicts"], tables["gate"])
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 import csv
-import importlib.util
+import importlib
 import sys
 import tempfile
 import unittest
@@ -61,6 +61,26 @@ class ParentProvenanceTests(unittest.TestCase):
         self.assertEqual(low_blocker["blocker_state"], "missing_independent_parents")
         self.assertEqual(sum(row["parent_unit_contribution"] for row in low_ledger), 1)
         self.assertTrue(all(row["restart_is_independent_sample"] == 0.0 for row in low_ledger))
+        self.assertTrue(
+            all(
+                row["calibration_parent_id"] == row["heldout_parent_id"] == row["parent_id"]
+                for row in low_ledger
+            )
+        )
+        self.assertTrue(
+            all(row["calibration_heldout_same_parent"] == 1.0 for row in low_ledger)
+        )
+        self.assertTrue(
+            all(
+                row["recorded_independently_prepared_parent_samples"] == 0.0
+                for row in low_ledger
+            )
+        )
+        for row in low_ledger:
+            self.assertEqual(row["complete_microscopic_closure_claim_allowed"], 0.0)
+            self.assertEqual(
+                row["thermodynamic_glass_transition_claim_allowed"], 0.0
+            )
 
     def test_parent_audit_keeps_failed_warm_stationarity_as_canary(self):
         _, blockers = closure.audit_parent_provenance(
@@ -77,6 +97,10 @@ class ParentProvenanceTests(unittest.TestCase):
         self.assertEqual(warm["available_parent_count"], 1)
         self.assertEqual(warm["missing_parent_count"], 4)
         self.assertEqual(warm["stationarity_pass"], 0.0)
+        self.assertEqual(
+            warm["next_required_action"],
+            "acquire_4_independent_parent_trajectories_and_requalify_stationarity",
+        )
 
     def test_parent_audit_rejects_malformed_parent_hash_and_missing_comparison(self):
         rows = self.provenance_rows()
@@ -274,6 +298,7 @@ class ParentAggregationTests(unittest.TestCase):
         self.assertAlmostEqual(parents[0]["msd_relative_error"], 0.0)
         self.assertEqual(parents[0]["child_restart_count"], 2)
         self.assertEqual(parents[0]["all_child_restart_curve_gate_pass"], 0.0)
+        self.assertEqual(parents[0]["failed_child_restart_count"], 2)
         self.assertFalse(closure.curve_pass(parents))
 
     def test_restart_summary_computes_monte_carlo_error_before_parent_pooling(self):
@@ -379,6 +404,19 @@ class MemoryClosureGateTests(unittest.TestCase):
         self.assertEqual(gate["mechanism_state"], "candidate_rejected")
         self.assertEqual(gate["positive_memory_closure_claim_allowed"], 0.0)
 
+    def test_correlated_parent_diagnostic_localizes_failed_upper_control_without_claim(self):
+        diagnostic = closure.classify_correlated_parent_diagnostic(
+            parent_summaries=self.parent_rows(full_fails=True),
+            upper_control_parents=self.upper_controls(pass_all=False),
+        )
+
+        self.assertEqual(diagnostic["diagnostic_state"], "candidate_rejected")
+        self.assertEqual(
+            diagnostic["diagnostic_failure_localization"],
+            "cross_particle_or_unmodeled_coupling",
+        )
+        self.assertEqual(diagnostic["positive_memory_closure_claim_allowed"], 0.0)
+
     def test_gate_truth_table_is_fail_closed(self):
         cases = (
             (
@@ -450,12 +488,8 @@ class MemoryClosureGateTests(unittest.TestCase):
 class MemoryClosureCliTests(unittest.TestCase):
     @staticmethod
     def load_cli():
-        path = ROOT / "scripts" / "analyze_ka_prl_memory_closure.py"
-        spec = importlib.util.spec_from_file_location("analyze_ka_prl_memory_closure", path)
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)
-        return module
+        sys.path.insert(0, str(ROOT / "scripts"))
+        return importlib.import_module("analyze_ka_prl_memory_closure")
 
     @staticmethod
     def write_rows(path, rows):
@@ -609,8 +643,8 @@ class MemoryClosureCliTests(unittest.TestCase):
             "realizations": 16,
         }
 
-        first = cli.predict_correlated_parent_diagnostic(**arguments)
-        second = cli.predict_correlated_parent_diagnostic(**arguments)
+        first = cli.predict_correlated_parent_diagnostic(**arguments, workers=1)
+        second = cli.predict_correlated_parent_diagnostic(**arguments, workers=2)
 
         self.assertEqual(first, second)
         self.assertEqual({row["model"] for row in first}, {
