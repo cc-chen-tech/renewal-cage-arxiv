@@ -36,6 +36,10 @@ from summarize_ka_gamma_variance_mixture import (  # noqa: E402
     CLOSED_GATE_FIELDS as GAMMA_VARIANCE_CLOSED_GATE_FIELDS,
     main as summarize_gamma_variance_mixture,
 )
+from summarize_ka_variance_mixture_shape_quotient import (  # noqa: E402
+    OUTPUT_CLOSED_CLAIMS as VARIANCE_MIXTURE_CLOSED_CLAIMS,
+    main as summarize_variance_mixture_shape_quotient,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
@@ -640,6 +644,115 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertIn("transport-clock / shape quotient", readme)
         self.assertIn("diagnostic input, not a blind prediction", readme)
         self.assertIn("T=0.58 remains a canary", readme)
+
+    def test_variance_mixture_shape_quotient_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        rows_path = data / "renewal_cage_ka_variance_mixture_shape_quotient_rows.csv"
+        gate_path = data / "renewal_cage_ka_variance_mixture_shape_quotient_gate.csv"
+        figure_path = ROOT / "figures" / "renewal_cage_ka_variance_mixture_shape_quotient.svg"
+        for path in (rows_path, gate_path, figure_path):
+            self.assertTrue(path.is_file(), path)
+
+        with rows_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        with gate_path.open() as handle:
+            gates = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 114)
+        self.assertEqual(len(gates), 2)
+        self.assertEqual({float(row["temperature"]) for row in gates}, {0.45, 0.58})
+        low = next(row for row in gates if float(row["temperature"]) == 0.45)
+        high = next(row for row in gates if float(row["temperature"]) == 0.58)
+        self.assertEqual(
+            low["analysis_status"],
+            "variance_mixture_shape_closure_exploratory",
+        )
+        self.assertAlmostEqual(
+            float(low["maximum_baseline_normalized_error"]),
+            1.13359180983653,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(low["maximum_fourth_normalized_error"]),
+            5.66701641386661,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(low["maximum_gamma_normalized_error"]),
+            0.465837665728119,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(low["maximum_inverse_gaussian_normalized_error"]),
+            0.422604946010197,
+            places=12,
+        )
+        self.assertEqual(float(low["family_robust_resummation_pass"]), 1.0)
+        self.assertEqual(
+            float(
+                low[
+                    "marginal_variance_mixture_shape_closure_supported_exploratory"
+                ]
+            ),
+            1.0,
+        )
+        self.assertEqual(float(low["variance_mixture_family_selected"]), 0.0)
+        self.assertEqual(high["analysis_status"], "high_temperature_canary_only")
+        self.assertEqual(float(high["source_stationarity_pass"]), 0.0)
+        self.assertEqual(float(high["high_temperature_canary_only"]), 1.0)
+        for gate in gates:
+            self.assertEqual(float(gate["replicate_provenance_validation_pass"]), 1.0)
+            self.assertEqual(float(gate["parent_sample_count"]), 1.0)
+            self.assertEqual(float(gate["independent_replicate_count"]), 0.0)
+            self.assertEqual(float(gate["heldout_msd_used_as_diagnostic_input"]), 1.0)
+            self.assertEqual(float(gate["heldout_ngp_used_as_diagnostic_input"]), 1.0)
+            self.assertEqual(float(gate["macro_fit_parameter_count"]), 0.0)
+            for field in VARIANCE_MIXTURE_CLOSED_CLAIMS:
+                self.assertEqual(float(gate[field]), 0.0, (gate["temperature"], field))
+        for row in rows:
+            self.assertEqual(float(row["heldout_msd_used_as_diagnostic_input"]), 1.0)
+            self.assertEqual(float(row["heldout_ngp_used_as_diagnostic_input"]), 1.0)
+            self.assertEqual(float(row["macro_fit_parameter_count"]), 0.0)
+            for field in VARIANCE_MIXTURE_CLOSED_CLAIMS:
+                self.assertEqual(float(row[field]), 0.0, (row["temperature"], field))
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            generated_rows = temporary / "rows.csv"
+            generated_gate = temporary / "gate.csv"
+            generated_figure = temporary / "figure.svg"
+            summarize_variance_mixture_shape_quotient(
+                [
+                    "--quotient-rows",
+                    str(data / "renewal_cage_ka_transport_clock_shape_quotient_rows.csv"),
+                    "--source-gate",
+                    str(data / "renewal_cage_ka_transport_clock_shape_quotient_gate.csv"),
+                    "--output-rows",
+                    str(generated_rows),
+                    "--output-gate",
+                    str(generated_gate),
+                    "--output-svg",
+                    str(generated_figure),
+                ]
+            )
+            self.assertEqual(rows_path.read_bytes(), generated_rows.read_bytes())
+            self.assertEqual(gate_path.read_bytes(), generated_gate.read_bytes())
+            self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
+
+        svg = figure_path.read_text()
+        self.assertIn("Variance-mixture shape quotient", svg)
+        self.assertIn("held-out MSD and NGP are diagnostic inputs", svg)
+        self.assertIn("family unresolved", svg)
+        self.assertIn("T=0.58 canary only", svg)
+        coordinates = [
+            float(value)
+            for value in re.findall(r'(?:(?:x|y)[12]?|cx|cy)="([0-9.]+)"', svg)
+        ]
+        self.assertTrue(coordinates)
+        self.assertTrue(all(math.isfinite(value) and value >= 0.0 for value in coordinates))
+        readme = re.sub(r"\s+", " ", (ROOT / "README.md").read_text())
+        self.assertIn("variance-mixture shape quotient", readme)
+        self.assertIn("held-out MSD and NGP are diagnostic inputs", readme)
+        self.assertIn("does not select a unique variance-mixture family", readme)
 
     def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"
