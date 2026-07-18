@@ -132,6 +132,9 @@ class PairedExcessGateTests(unittest.TestCase):
         self.assertEqual(gate["short_horizon_information_loss_supported_exploratory"], 1.0)
         self.assertEqual(gate["owner_identity_information_supported_exploratory"], 1.0)
 
+        computed = self.summary.compute_paired_excess_rows(score_rows())
+        self.assertEqual(computed, rows)
+
     def test_rejects_incomplete_inputs_full_path_disagreement_and_open_claims(self):
         malformed_scores = []
         malformed_scores.append(score_rows()[:-1])
@@ -190,6 +193,20 @@ class PairedExcessGateTests(unittest.TestCase):
         self.assertEqual(gate["next_required_action"], "replicate_resolved_full_path_baseline_or_new_trajectory_validation")
         for field in self.summary.CLOSED_CLAIM_FIELDS:
             self.assertEqual(gate[field], 0.0, field)
+
+    def test_csv_float_serialization_ignores_platform_last_bit_drift(self):
+        self.assertEqual(
+            self.summary.canonical_csv_value(16.999163731272752),
+            self.summary.canonical_csv_value(16.999163731272755),
+        )
+        self.assertEqual(
+            self.summary.canonical_csv_value(0.2777328943399178),
+            self.summary.canonical_csv_value(0.27773289433991805),
+        )
+        self.assertNotEqual(
+            self.summary.canonical_csv_value(1.0),
+            self.summary.canonical_csv_value(1.0001),
+        )
 
     def test_svg_is_deterministic_and_states_exploratory_boundary(self):
         rows, gate = self.summary.classify_paired_excess_gate(

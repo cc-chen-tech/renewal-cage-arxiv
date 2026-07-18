@@ -17,6 +17,7 @@ MODELS = (
 LENGTHS = (1, 2, 5, 10, 25, 50, 125, 250)
 REPLICATES = (1, 2, 3)
 T95_DF2 = 4.302652729911275
+CSV_FLOAT_SIGNIFICANT_DIGITS = 12
 SOURCE_CLAIM_FIELDS = (
     "microdynamic_closure_claim_allowed",
     "spatial_facilitation_claim_allowed",
@@ -53,6 +54,16 @@ def _exact_int(row: dict[str, object], field: str) -> int:
     if not value.is_integer():
         raise ValueError(f"field must be an exact integer: {field}")
     return int(value)
+
+
+def canonical_csv_value(value: object) -> object:
+    """Serialize floats stably across platform-level last-bit drift."""
+
+    if not isinstance(value, float):
+        return value
+    if not math.isfinite(value):
+        raise ValueError("CSV output values must be finite")
+    return format(value, f".{CSV_FLOAT_SIGNIFICANT_DIGITS}g")
 
 
 def _mean_interval(values: Sequence[float]) -> tuple[float, float, float, float]:
@@ -387,6 +398,7 @@ def compute_paired_excess_rows(
             "low_full_path_control_failed_replicate_count": 3.0,
             "global_source_segment_schedule_preserved": 1.0,
             **{field: 0.0 for field in SOURCE_CLAIM_FIELDS},
+            **{field: 0.0 for field in SOURCE_VERDICT_CLOSED_FIELDS},
         }
     ]
     rows, _ = _classify_paired_excess_gate_strict(replicate_scores, cells, source)
@@ -408,7 +420,13 @@ def _write_rows(path: Path, rows: Sequence[dict[str, object]]) -> None:
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(
+            {
+                field: canonical_csv_value(value)
+                for field, value in row.items()
+            }
+            for row in rows
+        )
 
 
 def write_paired_excess_svg(

@@ -31,6 +31,29 @@ from summarize_ka_segment_splice_paired_excess import (  # noqa: E402
 
 
 class ArxivPackageTests(unittest.TestCase):
+    def assertSerializedValueMatches(self, stored, key, expected):
+        self.assertIn(key, stored)
+        try:
+            stored_value = float(stored[key])
+            expected_value = float(expected)
+        except (TypeError, ValueError):
+            self.assertEqual(stored[key], str(expected))
+        else:
+            tolerance = max(1e-10, abs(expected_value) * 1e-11)
+            self.assertAlmostEqual(stored_value, expected_value, delta=tolerance)
+
+    def assertCsvRowsMatchComputedRows(self, stored_rows, computed_rows):
+        self.assertEqual(len(stored_rows), len(computed_rows))
+        for stored_row, computed_row in zip(stored_rows, computed_rows):
+            self.assertEqual(set(stored_row), set(computed_row))
+            for key, value in computed_row.items():
+                self.assertSerializedValueMatches(stored_row, key, value)
+
+    def assertCsvGateMatchesComputedGate(self, stored_gate, computed_gate):
+        self.assertEqual(set(stored_gate), set(computed_gate))
+        for key, value in computed_gate.items():
+            self.assertSerializedValueMatches(stored_gate, key, value)
+
     def test_memory_hierarchy_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"
         verdict_path = data / "renewal_cage_ka_memory_hierarchy.csv"
@@ -309,11 +332,8 @@ class ArxivPackageTests(unittest.TestCase):
             source_verdict,
         )
         self.assertEqual(len(recomputed_rows), len(rows))
-        for stored_row, recomputed_row in zip(rows, recomputed_rows):
-            for key, value in recomputed_row.items():
-                self.assertEqual(stored_row[key], str(value))
-        for key, value in recomputed_gate.items():
-            self.assertEqual(stored[key], str(value))
+        self.assertCsvRowsMatchComputedRows(rows, recomputed_rows)
+        self.assertCsvGateMatchesComputedGate(stored, recomputed_gate)
 
         self.assertEqual(stored["mechanism_state"], "mechanism_unresolved")
         self.assertEqual(float(stored["input_completeness_pass"]), 1.0)
@@ -367,8 +387,12 @@ class ArxivPackageTests(unittest.TestCase):
                     str(generated_figure),
                 ]
             )
-            self.assertEqual(rows_path.read_bytes(), generated_rows.read_bytes())
-            self.assertEqual(gate_path.read_bytes(), generated_gate.read_bytes())
+            with generated_rows.open() as handle:
+                generated_row_values = list(csv.DictReader(handle))
+            with generated_gate.open() as handle:
+                generated_gate_value = next(csv.DictReader(handle))
+            self.assertCsvRowsMatchComputedRows(rows, generated_row_values)
+            self.assertCsvGateMatchesComputedGate(stored, generated_gate_value)
             self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
 
         svg = figure_path.read_text()
