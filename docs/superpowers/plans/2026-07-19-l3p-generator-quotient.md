@@ -112,7 +112,7 @@ git commit -m "derive microscopic L3p quotient components"
 - Modify: `tests/test_ka_l3p_generator.py`
 
 **Interfaces:**
-- Consumes: one full KA phase-space frame, force protocol, fixed targets, trace probes, `position_step`, `cage_hessian_step`, and `jacobian_step`.
+- Consumes: one full KA phase-space frame, force protocol, fixed targets, trace probes, `position_step`, `cage_hessian_step`, `jacobian_step`, and the inherited `l2p_directional_step=1e-5`, `l2p_phase_space_step=3e-6`.
 - Produces: `smooth_cage_l3p_generator_batch(...) -> dict` with final `l3p`, all prefix/component arrays, pair count, steps, and zero claim flags.
 
 - [ ] **Step 1: Write the failing harmonic identity test**

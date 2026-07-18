@@ -126,6 +126,8 @@ The primary numerical controls are frozen as
 position step ladder       = {3e-6, 1e-5, 3e-5}
 cage-Hessian step ladder   = {3e-6, 1e-5, 3e-5}
 primary step               = 1e-5
+inherited L2p directional step = 1e-5
+inherited L2p phase-space step = 3e-6
 trace prefixes             = {4,8,16,32}
 trace seed                 = 20260731
 real-frame direction seed  = 20260801
@@ -134,6 +136,9 @@ real-frame direction seed  = 20260801
 These controls may be revised only from synthetic identity failures before a
 held score is read. A revision must be recorded as a new design revision and
 must not alter any physical tolerance.
+
+The two inherited `L2p` steps reproduce the committed second-generator cache
+protocol and are not part of the outer `L3p` sensitivity ladder.
 
 ## Numerical gates
 

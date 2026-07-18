@@ -6,7 +6,12 @@ import math
 
 import numpy as np
 
-from ka_smooth_cage import smooth_force_support_cage_batch
+from ka_local_cage import ka_lj_sparse_force_generator_observables
+from ka_smooth_cage import (
+    smooth_cage_l2p_velocity_jacobian_batch,
+    smooth_cage_second_generator_batch,
+    smooth_force_support_cage_batch,
+)
 
 
 _CLOSED_CLAIMS = {
@@ -173,5 +178,205 @@ def assemble_l3p_generator(
         "laplacian_velocity_derivative_prefixes": laplacian_gradient,
         "friction": float(friction),
         "temperature": float(temperature),
+        **_CLOSED_CLAIMS,
+    }
+
+
+def smooth_cage_l3p_generator_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    temperature: float,
+    trace_probes: np.ndarray,
+    prefix_counts: tuple[int, ...] = (4, 8, 16, 32),
+    position_step: float,
+    cage_hessian_step: float,
+    jacobian_step: float,
+    l2p_directional_step: float,
+    l2p_phase_space_step: float,
+    potential_protocol: str = "ka_lj_cut",
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float | str]:
+    """Evaluate ``L^3p`` from one full microscopic KA phase-space frame."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    probes = np.asarray(trace_probes, dtype=float)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+    ):
+        raise ValueError("positions and velocities must be aligned finite arrays")
+    if particle_types.shape != (len(positions),):
+        raise ValueError("particle_types must align with the phase-space frame")
+    if box_lengths.shape != (3,) or np.any(~np.isfinite(box_lengths)):
+        raise ValueError("box_lengths must be a finite three-vector")
+    if (
+        probes.ndim != 3
+        or probes.shape[1:] != positions.shape
+        or len(probes) < 1
+        or np.any(~np.isfinite(probes))
+    ):
+        raise ValueError("trace_probes must be finite full configuration vectors")
+    prefixes = _validated_prefix_counts(prefix_counts, len(probes))
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and nonnegative")
+    steps = (
+        position_step,
+        cage_hessian_step,
+        jacobian_step,
+        l2p_directional_step,
+        l2p_phase_space_step,
+    )
+    if any(not math.isfinite(step) or step <= 0.0 for step in steps):
+        raise ValueError("all L3p numerical steps must be finite and positive")
+    if potential_protocol not in {"ka_lj_cut", "ka_lj_c3_switch"}:
+        raise ValueError("unsupported KA pair-potential protocol")
+
+    all_particles = np.arange(len(positions), dtype=int)
+
+    def force_state(
+        configuration: np.ndarray,
+        current_velocities: np.ndarray,
+    ) -> dict[str, np.ndarray | float]:
+        return ka_lj_sparse_force_generator_observables(
+            configuration,
+            velocities=current_velocities,
+            particle_types=particle_types,
+            box_lengths=box_lengths,
+            target_indices=all_particles,
+            potential_protocol=potential_protocol,
+        )
+
+    def zero_temperature_l2p(
+        configuration: np.ndarray,
+        current_velocities: np.ndarray,
+    ) -> np.ndarray:
+        microscopic = force_state(configuration, current_velocities)
+        return np.asarray(
+            smooth_cage_second_generator_batch(
+                configuration,
+                velocities=current_velocities,
+                forces=np.asarray(microscopic["force"]),
+                force_generator=np.asarray(microscopic["force_generator"]),
+                particle_types=particle_types,
+                box_lengths=box_lengths,
+                target_indices=targets,
+                friction=friction,
+                temperature=0.0,
+                directional_step=l2p_directional_step,
+                phase_space_step=l2p_phase_space_step,
+                trace_probes=None,
+                target_batch_size=target_batch_size,
+            )["second_relative_generator"],
+            dtype=float,
+        )
+
+    outer_step = float(position_step)
+    position_transport = (
+        zero_temperature_l2p(
+            positions + outer_step * velocities,
+            velocities,
+        )
+        - zero_temperature_l2p(
+            positions - outer_step * velocities,
+            velocities,
+        )
+    ) / (2.0 * outer_step)
+
+    base_force_state = force_state(positions, velocities)
+    forces = np.asarray(base_force_state["force"], dtype=float)
+    acceleration = forces - float(friction) * velocities
+    jacobian_result = smooth_cage_l2p_velocity_jacobian_batch(
+        positions,
+        velocities=velocities,
+        forces=forces,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        target_indices=targets,
+        friction=friction,
+        jacobian_step=jacobian_step,
+        potential_protocol=potential_protocol,
+        target_batch_size=target_batch_size,
+    )
+    l2p_velocity_jacobian = np.asarray(
+        jacobian_result["l2p_velocity_jacobian"],
+        dtype=float,
+    )
+
+    if temperature == 0.0:
+        prefix_shape = (len(prefixes), len(targets), 3)
+        laplacian = np.zeros(prefix_shape)
+        laplacian_gradient = np.zeros(prefix_shape)
+    else:
+        laplacian_arguments = {
+            "particle_types": particle_types,
+            "box_lengths": box_lengths,
+            "target_indices": targets,
+            "trace_probes": probes,
+            "directional_step": cage_hessian_step,
+            "prefix_counts": prefixes,
+            "target_batch_size": target_batch_size,
+        }
+        laplacian = np.asarray(
+            smooth_cage_laplacian_prefixes(
+                positions,
+                **laplacian_arguments,
+            )["laplacian_prefixes"],
+            dtype=float,
+        )
+        plus_laplacian = np.asarray(
+            smooth_cage_laplacian_prefixes(
+                positions + outer_step * velocities,
+                **laplacian_arguments,
+            )["laplacian_prefixes"],
+            dtype=float,
+        )
+        minus_laplacian = np.asarray(
+            smooth_cage_laplacian_prefixes(
+                positions - outer_step * velocities,
+                **laplacian_arguments,
+            )["laplacian_prefixes"],
+            dtype=float,
+        )
+        laplacian_gradient = (
+            plus_laplacian - minus_laplacian
+        ) / (2.0 * outer_step)
+
+    assembled = assemble_l3p_generator(
+        position_transport_term=position_transport,
+        l2p_velocity_jacobian=l2p_velocity_jacobian,
+        acceleration=acceleration,
+        laplacian_prefixes=laplacian,
+        laplacian_velocity_derivative_prefixes=laplacian_gradient,
+        friction=friction,
+        temperature=temperature,
+    )
+    return {
+        **assembled,
+        "l2p_velocity_jacobian": l2p_velocity_jacobian,
+        "acceleration": acceleration,
+        "force": forces,
+        "force_generator": np.asarray(base_force_state["force_generator"]),
+        "prefix_counts": np.asarray(prefixes, dtype=int),
+        "position_step": float(position_step),
+        "cage_hessian_step": float(cage_hessian_step),
+        "jacobian_step": float(jacobian_step),
+        "l2p_directional_step": float(l2p_directional_step),
+        "l2p_phase_space_step": float(l2p_phase_space_step),
+        "pair_count": float(jacobian_result["pair_count"]),
+        "potential_protocol": potential_protocol,
         **_CLOSED_CLAIMS,
     }
