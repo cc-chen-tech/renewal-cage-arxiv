@@ -1,5 +1,16 @@
 # Segment-Splice Memory Gate Design
 
+> **Revision note.** The original approved design was committed as `dff26e2`.
+> Later edits only make two claim-boundary corrections explicit: (a) both nulls
+> retain one global source-segment schedule, and (b) the primary low-temperature
+> decision is reported separately from high-temperature crossover support.
+> These corrections do not change trajectory inputs, segment-length grids,
+> seeds, the nested 16-to-64 realization protocol, precision limits, or curve
+> tolerances. Baseline-identifiability diagnostics and the exploratory paired
+> owner-identity effect were observed after the run and are reported only in the
+> result CSV and result note; they are not retroactively added as preregistered
+> decision rules.
+
 ## Purpose
 
 Determine whether the remaining low-temperature closure gap is controlled by a
@@ -153,6 +164,11 @@ multiset exactly. The cross-particle model must have zero same-source assignment
 fraction and zero adjacent same-source segment fraction for every nontrivial
 `L`.
 
+Both frozen nulls use the same source-segment ordinal schedule for every target
+particle. Record `global_source_segment_schedule_preserved=1` mechanically.
+Any substantive interpretation is conditional on this preserved global
+schedule and is not an unconditional single-particle memory claim.
+
 Report the guaranteed internal-adjacency fraction and verify that it equals the
 analytic fraction of pairs internal to unchanged segment tokens. Report any
 original adjacency recreated at a randomized seam separately as an accidental
@@ -219,7 +235,7 @@ crossover control.
 
 | Frozen outcome | Verdict | Interpretation |
 | --- | --- | --- |
-| Both finite lengths resolve and `L_cross* = L_within*` | `finite_single_particle_path_memory_sufficient` | Local ordered path pieces close the tested observables; persistent ownership is not additionally required for tolerance-level closure. |
+| Both finite lengths resolve and `L_cross* = L_within*` | `finite_single_particle_path_memory_sufficient_conditional_on_global_schedule` | Conditional on the preserved global source-segment schedule, local ordered path pieces close the tested observables; persistent ownership is not additionally required for tolerance-level closure. |
 | `L_within*` resolves and `L_cross*` is unresolved or larger | `persistent_environment_identity_required_beyond_local_path` | Keeping segments with one particle carries information beyond a local path horizon. |
 | Both finite lengths are unresolved | `longer_or_richer_path_state_required` | The tested finite segment horizons do not close; a longer path state, nonstationarity, or omitted collective variable remains. |
 | `L_cross*` resolves while `L_within*` is unresolved, or `L_cross* < L_within*` | `null_family_pathology_unresolved` | The nominally more destructive null performs better, so the intended information ordering is not identified. |
@@ -238,6 +254,12 @@ No result from this table enables a spatial-facilitation claim. In particular,
 `persistent_environment_identity_required_beyond_local_path` groups static or
 slow particle disorder, evolving local environment, and spatially cooperative
 facilitation until a later observable separates them.
+
+The stored output separates `low_temperature_mechanism_state` from the global
+preregistered `mechanism_state`. A failed T=0.58 support gate sets
+`high_temperature_control_resolved=0` and blocks cooling-memory growth, but it
+does not erase a complete temperature-specific T=0.45 verdict. A failed T=0.45
+support or precision gate still makes the low-temperature state unresolved.
 
 ## Outputs
 

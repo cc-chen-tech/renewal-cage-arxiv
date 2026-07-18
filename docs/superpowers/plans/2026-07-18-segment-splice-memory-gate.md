@@ -248,7 +248,7 @@ Cover an isolated pass followed by failure, pass only at `L=B`, valid monotone t
 
 - [ ] **Step 2: Write failing decision-table tests**
 
-Cover exactly: `finite_single_particle_path_memory_sufficient`, `persistent_environment_identity_required_beyond_local_path`, `longer_or_richer_path_state_required`, `null_family_pathology_unresolved`, and `mechanism_unresolved`. Require all three low-temperature replicate scores to pass; require strict within-better ordering for the persistent-environment verdict; recompute the cooling crossover label.
+Cover exactly: `finite_single_particle_path_memory_sufficient_conditional_on_global_schedule`, `persistent_environment_identity_required_beyond_local_path`, `longer_or_richer_path_state_required`, `null_family_pathology_unresolved`, and `mechanism_unresolved`. Require all three low-temperature replicate scores to pass; require strict within-better ordering for the persistent-environment verdict; recompute the cooling crossover label. Preserve a complete `low_temperature_mechanism_state` when only the high-temperature crossover support fails, while keeping the global preregistered mechanism state fail-closed.
 
 - [ ] **Step 3: Implement selector and deterministic SVG**
 

@@ -6,6 +6,7 @@ import unittest
 import zipfile
 import csv
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,9 @@ from summarize_ka_anchor_semi_markov_gate import (  # noqa: E402
 from summarize_ka_memory_hierarchy import (  # noqa: E402
     main as summarize_memory_hierarchy,
     recompute_hierarchy,
+)
+from summarize_ka_segment_splice_gate import (  # noqa: E402
+    classify_segment_splice_gate,
 )
 
 
@@ -87,6 +91,169 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(verdict_path.read_bytes(), generated_verdict.read_bytes())
             self.assertEqual(evidence_path.read_bytes(), generated_evidence.read_bytes())
             self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
+
+    def test_segment_splice_memory_gate_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        tables = {}
+        for code, temperature, lengths, replicates in (
+            ("045", 0.45, (1, 2, 5, 10, 25, 50, 125, 250), (1, 2, 3)),
+            ("058", 0.58, (1, 2, 4, 8, 16, 32, 37), (1, 2, 3, 4, 5)),
+        ):
+            tables[temperature] = {}
+            for suffix in ("quality", "rows", "summary", "cells", "replicate_scores"):
+                path = data / f"renewal_cage_ka_replicates_T{code}_segment_splice_{suffix}.csv"
+                self.assertTrue(path.is_file(), path)
+                with path.open() as handle:
+                    tables[temperature][suffix] = list(csv.DictReader(handle))
+                self.assertTrue(tables[temperature][suffix])
+            cells = tables[temperature]["cells"]
+            self.assertEqual(
+                {
+                    (row["model"], int(float(row["segment_length"])))
+                    for row in cells
+                },
+                {
+                    (model, length)
+                    for model in (
+                        "within_particle_segment_shuffle",
+                        "cross_particle_segment_splice",
+                    )
+                    for length in lengths
+                },
+            )
+            self.assertEqual(
+                {float(row["required_realization_count"]) for row in cells},
+                {64.0},
+            )
+            quality = tables[temperature]["quality"]
+            self.assertEqual(
+                {
+                    (int(float(row["replicate"])), int(float(row["realization"])))
+                    for row in quality
+                    if row["model"] == "within_particle_segment_shuffle"
+                    and int(float(row["segment_length"])) == lengths[0]
+                },
+                {(replicate, realization) for replicate in replicates for realization in range(64)},
+            )
+            for suffix, rows in tables[temperature].items():
+                for row in rows:
+                    self.assertEqual(float(row["microdynamic_closure_claim_allowed"]), 0.0)
+                    self.assertEqual(float(row["spatial_facilitation_claim_allowed"]), 0.0)
+                    self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+            self.assertTrue(
+                all(
+                    float(row["global_source_segment_schedule_preserved"]) == 1.0
+                    for row in quality + cells
+                )
+            )
+
+        low_cells = tables[0.45]["cells"]
+        high_cells = tables[0.58]["cells"]
+        low_precision_failures = {
+            (row["model"], int(float(row["segment_length"])))
+            for row in low_cells
+            if float(row["precision_pass"]) == 0.0
+        }
+        self.assertEqual(
+            low_precision_failures,
+            {
+                ("within_particle_segment_shuffle", 1),
+                ("within_particle_segment_shuffle", 2),
+            },
+        )
+        self.assertEqual(
+            {
+                (row["model"], int(float(row["segment_length"])))
+                for row in low_cells
+                if float(row["curve_transfer_pass"]) == 1.0
+            },
+            {
+                ("within_particle_segment_shuffle", 250),
+                ("cross_particle_segment_splice", 250),
+            },
+        )
+        self.assertTrue(all(float(row["stationarity_control_pass"]) == 0.0 for row in high_cells))
+
+        recomputed = classify_segment_splice_gate(
+            low_cells,
+            high_cells,
+            tables[0.45]["replicate_scores"],
+            tables[0.58]["replicate_scores"],
+        )
+        gate_path = data / "renewal_cage_ka_segment_splice_gate.csv"
+        with gate_path.open() as handle:
+            stored = next(csv.DictReader(handle))
+        for key, value in recomputed.items():
+            self.assertEqual(stored[key], str(value))
+        self.assertEqual(stored["mechanism_state"], "mechanism_unresolved")
+        self.assertEqual(stored["low_temperature_mechanism_state"], "mechanism_unresolved")
+        self.assertEqual(float(stored["low_temperature_gate_resolved"]), 0.0)
+        self.assertEqual(float(stored["high_temperature_control_resolved"]), 0.0)
+        self.assertEqual(float(stored["low_within_memory_length_resolved"]), 0.0)
+        self.assertEqual(float(stored["low_cross_memory_length_resolved"]), 0.0)
+        self.assertEqual(float(stored["cell_grid_and_row_completeness_pass"]), 1.0)
+        self.assertEqual(float(stored["global_source_segment_schedule_preserved"]), 1.0)
+        self.assertEqual(float(stored["low_largest_nonfull_length"]), 125.0)
+        self.assertEqual(float(stored["low_largest_nonfull_tau"]), 2500.0)
+        self.assertEqual(float(stored["low_largest_nonfull_within_precision_pass"]), 1.0)
+        self.assertEqual(float(stored["low_largest_nonfull_cross_precision_pass"]), 1.0)
+        self.assertEqual(float(stored["low_largest_nonfull_within_curve_pass"]), 0.0)
+        self.assertEqual(float(stored["low_largest_nonfull_cross_curve_pass"]), 0.0)
+        self.assertEqual(
+            float(stored["low_largest_nonfull_both_models_ensemble_curve_rejected"]),
+            1.0,
+        )
+        self.assertEqual(float(stored["low_full_path_control_ensemble_pass"]), 1.0)
+        self.assertEqual(float(stored["low_full_path_control_all_replicates_pass"]), 0.0)
+        self.assertEqual(float(stored["low_full_path_control_failed_replicate_count"]), 2.0)
+        self.assertEqual(
+            float(stored["low_mechanism_identifiable_against_full_path_control"]),
+            0.0,
+        )
+        self.assertEqual(float(stored["ensemble_cancellation_detected"]), 1.0)
+        self.assertEqual(
+            float(stored["independent_replicate_memory_lower_bound_claim_allowed"]),
+            0.0,
+        )
+        self.assertEqual(float(stored["low_owner_identity_paired_ordering_count"]), 21.0)
+        self.assertEqual(float(stored["low_owner_identity_paired_ordering_total"]), 21.0)
+        self.assertAlmostEqual(
+            float(stored["low_owner_identity_replicate_first_mean_score_difference"]),
+            2.0718621990041886,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(stored["low_owner_identity_replicate_first_standard_error"]),
+            0.27773289433991805,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(stored["low_owner_identity_replicate_first_t95_ci_low"]),
+            0.8768740029863806,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(stored["low_owner_identity_replicate_first_t95_ci_high"]),
+            3.2668503950219963,
+            places=12,
+        )
+        self.assertEqual(float(stored["owner_identity_information_supported_exploratory"]), 1.0)
+        self.assertEqual(float(stored["owner_identity_sufficiency_claim_allowed"]), 0.0)
+        self.assertEqual(float(stored["static_vs_finite_exchange_resolved"]), 0.0)
+        self.assertEqual(
+            stored["substantive_interpretation_condition"],
+            "conditional_on_preserved_global_source_segment_schedule",
+        )
+
+        svg = (ROOT / "figures" / "renewal_cage_ka_segment_splice_gate.svg").read_text()
+        self.assertIn("full-path control", svg)
+        self.assertIn("no microscopic, spatial-facilitation, or thermodynamic claim", svg)
+        coordinates = [float(value) for value in re.findall(r'(?:(?:x|y)[12]?|cx|cy)="([0-9.]+)"', svg)]
+        self.assertTrue(coordinates)
+        self.assertTrue(all(math.isfinite(value) and value >= 0.0 for value in coordinates))
+        note = (ROOT / "docs" / "segment-splice-memory-gate.md").read_text()
+        self.assertIn("conditional on the preserved global source-segment schedule", note)
+        self.assertIn("does not identify finite single-particle memory", note)
 
     def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

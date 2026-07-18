@@ -131,6 +131,27 @@ def _score_lookup(
     }
 
 
+def _cell_lookup(
+    rows: Sequence[dict[str, object]],
+    *,
+    temperature: float,
+) -> dict[tuple[str, int], dict[str, object]]:
+    grid = FROZEN_GRIDS[temperature]
+    selected = [
+        row for row in rows if math.isclose(_finite(row, "temperature"), temperature)
+    ]
+    expected = {(model, length) for model in MODELS for length in grid}
+    keys = [
+        (str(row.get("model")), int(_finite(row, "segment_length")))
+        for row in selected
+    ]
+    if len(keys) != len(expected) or len(set(keys)) != len(keys) or set(keys) != expected:
+        raise ValueError("cell rows do not contain the frozen model-length grid")
+    if any(_finite(row, field) != 0.0 for row in selected for field in CLAIM_FIELDS):
+        raise ValueError("cell-row claim boundaries are not closed")
+    return {key: row for key, row in zip(keys, selected, strict=True)}
+
+
 def classify_segment_splice_gate(
     low_cells: Sequence[dict[str, object]],
     high_cells: Sequence[dict[str, object]],
@@ -141,7 +162,11 @@ def classify_segment_splice_gate(
 
     result: dict[str, object] = {
         "mechanism_state": "mechanism_unresolved",
+        "low_temperature_mechanism_state": "mechanism_unresolved",
+        "low_temperature_gate_resolved": 0.0,
+        "high_temperature_control_resolved": 0.0,
         "gate_input_completeness_pass": 0.0,
+        "cell_grid_and_row_completeness_pass": 0.0,
         "global_source_segment_schedule_preserved": 0.0,
         "substantive_interpretation_condition": (
             "conditional_on_preserved_global_source_segment_schedule"
@@ -158,91 +183,223 @@ def classify_segment_splice_gate(
         "persistent_within_strictly_better_all_replicates": 0.0,
         "within_cooling_memory_growth": 0.0,
         "cross_cooling_memory_growth": 0.0,
+        "low_largest_nonfull_length": 0.0,
+        "low_largest_nonfull_tau": 0.0,
+        "low_largest_nonfull_within_precision_pass": 0.0,
+        "low_largest_nonfull_cross_precision_pass": 0.0,
+        "low_largest_nonfull_within_curve_pass": 0.0,
+        "low_largest_nonfull_cross_curve_pass": 0.0,
+        "low_largest_nonfull_both_models_ensemble_curve_rejected": 0.0,
+        "low_full_path_control_ensemble_pass": 0.0,
+        "low_full_path_control_all_replicates_pass": 0.0,
+        "low_full_path_control_failed_replicate_count": 0.0,
+        "low_mechanism_identifiable_against_full_path_control": 0.0,
+        "ensemble_cancellation_detected": 0.0,
+        "independent_replicate_memory_lower_bound_claim_allowed": 0.0,
+        "low_owner_identity_paired_ordering_count": 0.0,
+        "low_owner_identity_paired_ordering_total": 0.0,
+        "low_owner_identity_replicate_first_mean_score_difference": 0.0,
+        "low_owner_identity_replicate_first_standard_error": 0.0,
+        "low_owner_identity_replicate_first_t95_ci_low": 0.0,
+        "low_owner_identity_replicate_first_t95_ci_high": 0.0,
+        "owner_identity_information_supported_exploratory": 0.0,
+        "owner_identity_sufficiency_claim_allowed": 0.0,
+        "static_vs_finite_exchange_resolved": 0.0,
         "microdynamic_closure_claim_allowed": 0.0,
         "spatial_facilitation_claim_allowed": 0.0,
         "thermodynamic_claim_allowed": 0.0,
     }
     try:
-        cells = {0.45: low_cells, 0.58: high_cells}
-        scores = {
-            0.45: _score_lookup(low_replicate_scores, temperature=0.45),
-            0.58: _score_lookup(high_replicate_scores, temperature=0.58),
-        }
-        lengths: dict[tuple[float, str], int | None] = {}
-        for temperature in (0.45, 0.58):
-            grid = FROZEN_GRIDS[temperature]
-            for model in MODELS:
-                lengths[(temperature, model)] = select_monotone_memory_length(
-                    cells[temperature],
-                    model=model,
-                    temperature=temperature,
-                    block_count=grid[-1],
-                    required_grid=grid,
-                )
+        low_scores = _score_lookup(low_replicate_scores, temperature=0.45)
+        _score_lookup(high_replicate_scores, temperature=0.58)
+        low_cell_lookup = _cell_lookup(low_cells, temperature=0.45)
+        high_cell_lookup = _cell_lookup(high_cells, temperature=0.58)
     except (ValueError, KeyError, TypeError):
         return result
 
-    result["gate_input_completeness_pass"] = 1.0
-    result["global_source_segment_schedule_preserved"] = 1.0
-    for temperature, label in ((0.45, "low"), (0.58, "high")):
-        for model, short in (
-            ("within_particle_segment_shuffle", "within"),
-            ("cross_particle_segment_splice", "cross"),
-        ):
-            length = lengths[(temperature, model)]
-            result[f"{label}_{short}_memory_length_resolved"] = float(length is not None)
-            result[f"{label}_{short}_memory_length"] = float(length or 0)
+    result["cell_grid_and_row_completeness_pass"] = 1.0
+    result["global_source_segment_schedule_preserved"] = float(
+        all(
+            _finite(row, "global_source_segment_schedule_preserved") == 1.0
+            for row in tuple(low_cell_lookup.values()) + tuple(high_cell_lookup.values())
+        )
+    )
+    largest_nonfull = FROZEN_GRIDS[0.45][-2]
+    result["low_largest_nonfull_length"] = float(largest_nonfull)
+    result["low_largest_nonfull_tau"] = float(20 * largest_nonfull)
+    largest_rows = {
+        model: low_cell_lookup[(model, largest_nonfull)] for model in MODELS
+    }
+    for model, short in (
+        ("within_particle_segment_shuffle", "within"),
+        ("cross_particle_segment_splice", "cross"),
+    ):
+        result[f"low_largest_nonfull_{short}_precision_pass"] = _finite(
+            largest_rows[model],
+            "precision_pass",
+        )
+        result[f"low_largest_nonfull_{short}_curve_pass"] = _finite(
+            largest_rows[model],
+            "curve_transfer_pass",
+        )
+    result["low_largest_nonfull_both_models_ensemble_curve_rejected"] = float(
+        all(_finite(row, "curve_transfer_pass") == 0.0 for row in largest_rows.values())
+    )
+    full_length = FROZEN_GRIDS[0.45][-1]
+    full_ensemble_pass = all(
+        _finite(low_cell_lookup[(model, full_length)], "cell_pass") == 1.0
+        for model in MODELS
+    )
+    failed_full_replicates = {
+        replicate
+        for replicate in FROZEN_REPLICATES[0.45]
+        if any(
+            low_scores[(model, full_length, replicate)] > 1.0 for model in MODELS
+        )
+    }
+    all_full_replicates_pass = not failed_full_replicates
+    result["low_full_path_control_ensemble_pass"] = float(full_ensemble_pass)
+    result["low_full_path_control_all_replicates_pass"] = float(
+        all_full_replicates_pass
+    )
+    result["low_full_path_control_failed_replicate_count"] = float(
+        len(failed_full_replicates)
+    )
+    result["low_mechanism_identifiable_against_full_path_control"] = float(
+        full_ensemble_pass and all_full_replicates_pass
+    )
+    result["ensemble_cancellation_detected"] = float(
+        full_ensemble_pass and not all_full_replicates_pass
+    )
+    finite_lengths = FROZEN_GRIDS[0.45][:-1]
+    paired_differences = {
+        replicate: [
+            low_scores[("cross_particle_segment_splice", length, replicate)]
+            - low_scores[("within_particle_segment_shuffle", length, replicate)]
+            for length in finite_lengths
+        ]
+        for replicate in FROZEN_REPLICATES[0.45]
+    }
+    ordering_count = sum(
+        difference > 0.0
+        for differences in paired_differences.values()
+        for difference in differences
+    )
+    ordering_total = sum(len(values) for values in paired_differences.values())
+    replicate_means = [
+        sum(paired_differences[replicate]) / len(finite_lengths)
+        for replicate in FROZEN_REPLICATES[0.45]
+    ]
+    paired_mean = sum(replicate_means) / len(replicate_means)
+    paired_se = math.sqrt(
+        sum((value - paired_mean) ** 2 for value in replicate_means)
+        / (len(replicate_means) - 1)
+        / len(replicate_means)
+    )
+    t95_df2 = 4.302652729911275
+    ci_low = paired_mean - t95_df2 * paired_se
+    ci_high = paired_mean + t95_df2 * paired_se
+    result["low_owner_identity_paired_ordering_count"] = float(ordering_count)
+    result["low_owner_identity_paired_ordering_total"] = float(ordering_total)
+    result["low_owner_identity_replicate_first_mean_score_difference"] = paired_mean
+    result["low_owner_identity_replicate_first_standard_error"] = paired_se
+    result["low_owner_identity_replicate_first_t95_ci_low"] = ci_low
+    result["low_owner_identity_replicate_first_t95_ci_high"] = ci_high
+    result["owner_identity_information_supported_exploratory"] = float(
+        ordering_count == ordering_total and ci_low > 0.0
+    )
 
-    low_within = lengths[(0.45, "within_particle_segment_shuffle")]
-    low_cross = lengths[(0.45, "cross_particle_segment_splice")]
-    high_within = lengths[(0.58, "within_particle_segment_shuffle")]
-    high_cross = lengths[(0.58, "cross_particle_segment_splice")]
+    try:
+        low_lengths = {
+            model: select_monotone_memory_length(
+                low_cells,
+                model=model,
+                temperature=0.45,
+                block_count=FROZEN_GRIDS[0.45][-1],
+                required_grid=FROZEN_GRIDS[0.45],
+            )
+            for model in MODELS
+        }
+    except (ValueError, KeyError, TypeError):
+        return result
+
+    result["low_temperature_gate_resolved"] = 1.0
+    low_within = low_lengths["within_particle_segment_shuffle"]
+    low_cross = low_lengths["cross_particle_segment_splice"]
+    for short, length in (("within", low_within), ("cross", low_cross)):
+        result[f"low_{short}_memory_length_resolved"] = float(length is not None)
+        result[f"low_{short}_memory_length"] = float(length or 0)
+
+    if low_within is None and low_cross is None:
+        low_state = "longer_or_richer_path_state_required"
+    elif low_cross is not None and (low_within is None or low_cross < low_within):
+        low_state = "null_family_pathology_unresolved"
+    else:
+        selected = []
+        if low_within is not None:
+            selected.append(("within_particle_segment_shuffle", low_within))
+        if low_cross is not None:
+            selected.append(("cross_particle_segment_splice", low_cross))
+        selected_scores_pass = all(
+            low_scores[(model, length, replicate)] <= 1.0
+            for model, length in selected
+            for replicate in FROZEN_REPLICATES[0.45]
+        )
+        result["selected_low_replicate_scores_pass"] = float(selected_scores_pass)
+        if not selected_scores_pass:
+            low_state = "mechanism_unresolved"
+        elif low_within == low_cross:
+            low_state = (
+                "finite_single_particle_path_memory_sufficient_conditional_on_global_schedule"
+            )
+        else:
+            strict_order = all(
+                low_scores[("within_particle_segment_shuffle", low_within, replicate)]
+                < low_scores[("cross_particle_segment_splice", low_within, replicate)]
+                for replicate in FROZEN_REPLICATES[0.45]
+            )
+            result["persistent_within_strictly_better_all_replicates"] = float(
+                strict_order
+            )
+            low_state = (
+                "persistent_environment_identity_required_beyond_local_path"
+                if strict_order
+                else "mechanism_unresolved"
+            )
+    result["low_temperature_mechanism_state"] = low_state
+    if result["low_mechanism_identifiable_against_full_path_control"] == 0.0:
+        result["low_temperature_mechanism_state"] = "mechanism_unresolved"
+        low_state = "mechanism_unresolved"
+
+    try:
+        _score_lookup(high_replicate_scores, temperature=0.58)
+        high_lengths = {
+            model: select_monotone_memory_length(
+                high_cells,
+                model=model,
+                temperature=0.58,
+                block_count=FROZEN_GRIDS[0.58][-1],
+                required_grid=FROZEN_GRIDS[0.58],
+            )
+            for model in MODELS
+        }
+    except (ValueError, KeyError, TypeError):
+        return result
+
+    result["high_temperature_control_resolved"] = 1.0
+    result["gate_input_completeness_pass"] = 1.0
+    high_within = high_lengths["within_particle_segment_shuffle"]
+    high_cross = high_lengths["cross_particle_segment_splice"]
+    for short, length in (("within", high_within), ("cross", high_cross)):
+        result[f"high_{short}_memory_length_resolved"] = float(length is not None)
+        result[f"high_{short}_memory_length"] = float(length or 0)
     result["within_cooling_memory_growth"] = float(
         low_within is not None and high_within is not None and low_within > high_within
     )
     result["cross_cooling_memory_growth"] = float(
         low_cross is not None and high_cross is not None and low_cross > high_cross
     )
-
-    if low_within is None and low_cross is None:
-        result["mechanism_state"] = "longer_or_richer_path_state_required"
-        return result
-    if low_cross is not None and (low_within is None or low_cross < low_within):
-        result["mechanism_state"] = "null_family_pathology_unresolved"
-        return result
-
-    selected = []
-    if low_within is not None:
-        selected.append(("within_particle_segment_shuffle", low_within))
-    if low_cross is not None:
-        selected.append(("cross_particle_segment_splice", low_cross))
-    low_scores = scores[0.45]
-    selected_scores_pass = all(
-        low_scores[(model, length, replicate)] <= 1.0
-        for model, length in selected
-        for replicate in FROZEN_REPLICATES[0.45]
-    )
-    result["selected_low_replicate_scores_pass"] = float(selected_scores_pass)
-    if not selected_scores_pass:
-        return result
-
-    if low_within == low_cross:
-        result["mechanism_state"] = (
-            "finite_single_particle_path_memory_sufficient_conditional_on_global_schedule"
-        )
-        return result
-
-    if low_within is not None and (low_cross is None or low_cross > low_within):
-        strict_order = all(
-            low_scores[("within_particle_segment_shuffle", low_within, replicate)]
-            < low_scores[("cross_particle_segment_splice", low_within, replicate)]
-            for replicate in FROZEN_REPLICATES[0.45]
-        )
-        result["persistent_within_strictly_better_all_replicates"] = float(strict_order)
-        if strict_order:
-            result["mechanism_state"] = (
-                "persistent_environment_identity_required_beyond_local_path"
-            )
+    result["mechanism_state"] = low_state
     return result
 
 
@@ -343,10 +500,17 @@ def write_gate_svg(
                     f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3.2" fill="{colors[model]}"/>'
                     for x, y in points
                 )
-        for length in lengths:
+        for index, length in enumerate(lengths):
             x = x_position(length)
+            anchor = "middle"
+            if index == len(lengths) - 2 and x_position(lengths[-1]) - x < 35.0:
+                x -= 4.0
+                anchor = "end"
+            elif index == len(lengths) - 1 and x - x_position(lengths[-2]) < 35.0:
+                x += 4.0
+                anchor = "start"
             elements.append(
-                f'<text x="{x:.2f}" y="{panel_top + panel_height + 23:.1f}" text-anchor="middle" font-size="11">{20 * length:g}</text>'
+                f'<text x="{x:.2f}" y="{panel_top + panel_height + 23:.1f}" text-anchor="{anchor}" font-size="11">{20 * length:g}</text>'
             )
         elements.append(
             f'<text x="{left + panel_width / 2:.1f}" y="{panel_top + panel_height + 52:.1f}" text-anchor="middle">retained horizon tau_L</text>'
@@ -371,7 +535,7 @@ def write_gate_svg(
         )
     mechanism_state = str(verdict.get("mechanism_state", "mechanism_unresolved"))
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
-<rect width="100%" height="100%" fill="#f5f5f1"/>
+<rect x="0" y="0" width="{width}" height="{height}" fill="#f5f5f1"/>
 <style>text{{font-family:Arial,sans-serif;fill:#202020;font-size:14px;letter-spacing:0}}</style>
 <text x="590" y="36" text-anchor="middle" font-size="24" font-weight="bold">Segment-splice path-memory gate</text>
 {''.join(elements)}

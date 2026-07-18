@@ -1105,7 +1105,9 @@ def segment_cell_fixture(
     rows = []
     for model, start in starts.items():
         for length in grid:
-            curve = start is not None and length >= start and length < grid[-1]
+            curve = length == grid[-1] or (
+                start is not None and length >= start and length < grid[-1]
+            )
             row = {
                 "temperature": temperature,
                 "model": model,
@@ -1289,6 +1291,68 @@ class SegmentGateDecisionTests(unittest.TestCase):
         self.assertEqual(score_failure["mechanism_state"], "mechanism_unresolved")
         tied_persistent = self.classify(25, 50, within_score=0.7, cross_score=0.7)
         self.assertEqual(tied_persistent["mechanism_state"], "mechanism_unresolved")
+
+    def test_high_support_failure_preserves_the_low_temperature_specific_verdict(self):
+        low = segment_cell_fixture(0.45, within_start=25, cross_start=50)
+        high = segment_cell_fixture(
+            0.58,
+            within_start=8,
+            cross_start=8,
+            failed_support=(
+                "within_particle_segment_shuffle",
+                8,
+                "stationarity_control_pass",
+            ),
+        )
+        verdict = self.summary.classify_segment_splice_gate(
+            low,
+            high,
+            segment_score_fixture(0.45),
+            segment_score_fixture(0.58),
+        )
+        self.assertEqual(verdict["mechanism_state"], "mechanism_unresolved")
+        self.assertEqual(
+            verdict["low_temperature_mechanism_state"],
+            "persistent_environment_identity_required_beyond_local_path",
+        )
+        self.assertEqual(verdict["low_temperature_gate_resolved"], 1.0)
+        self.assertEqual(verdict["high_temperature_control_resolved"], 0.0)
+        self.assertEqual(verdict["within_cooling_memory_growth"], 0.0)
+        self.assertEqual(verdict["cross_cooling_memory_growth"], 0.0)
+        self.assertEqual(verdict["cell_grid_and_row_completeness_pass"], 1.0)
+        self.assertEqual(verdict["global_source_segment_schedule_preserved"], 1.0)
+
+    def test_full_path_ensemble_cancellation_blocks_mechanism_identifiability(self):
+        low = segment_cell_fixture(0.45, within_start=None, cross_start=None)
+        for row in low:
+            if row["segment_length"] == 250.0:
+                row["curve_transfer_pass"] = 1.0
+                row["cell_pass"] = 1.0
+        low_scores = segment_score_fixture(0.45)
+        for row in low_scores:
+            if row["segment_length"] == 250.0:
+                row["higher_order_score"] = 0.8 if row["replicate"] == 1.0 else 2.0
+        verdict = self.summary.classify_segment_splice_gate(
+            low,
+            segment_cell_fixture(0.58, within_start=8, cross_start=8),
+            low_scores,
+            segment_score_fixture(0.58),
+        )
+        self.assertEqual(verdict["low_full_path_control_ensemble_pass"], 1.0)
+        self.assertEqual(verdict["low_full_path_control_all_replicates_pass"], 0.0)
+        self.assertEqual(verdict["low_full_path_control_failed_replicate_count"], 2.0)
+        self.assertEqual(verdict["low_mechanism_identifiable_against_full_path_control"], 0.0)
+        self.assertEqual(verdict["ensemble_cancellation_detected"], 1.0)
+        self.assertEqual(verdict["independent_replicate_memory_lower_bound_claim_allowed"], 0.0)
+        self.assertEqual(verdict["low_owner_identity_paired_ordering_count"], 21.0)
+        self.assertEqual(verdict["low_owner_identity_paired_ordering_total"], 21.0)
+        self.assertAlmostEqual(
+            verdict["low_owner_identity_replicate_first_mean_score_difference"],
+            0.3,
+        )
+        self.assertEqual(verdict["owner_identity_information_supported_exploratory"], 1.0)
+        self.assertEqual(verdict["owner_identity_sufficiency_claim_allowed"], 0.0)
+        self.assertEqual(verdict["static_vs_finite_exchange_resolved"], 0.0)
 
     def test_svg_is_deterministic_finite_and_marks_the_claim_boundary(self):
         low = segment_cell_fixture(0.45, within_start=25, cross_start=50)

@@ -7,6 +7,16 @@ renewal cage model for dynamical glass signatures. It is an effective
 microdynamic diagnostic theory with an explicit external thermodynamic entropy closure,
 not a first-principles derivation of the thermodynamic glass transition.
 
+The real two-temperature segment-splice memory gate is documented in
+`docs/segment-splice-memory-gate.md`. Its frozen 64-realization run is
+fail-closed: the low-temperature precision gate fails at two short
+within-particle horizons, only the excluded full-path controls pass all
+low-temperature curve limits, and the warm stationarity control is unresolved.
+Thus both finite memory lengths and the global mechanism verdict remain
+unresolved. Both nulls preserve a shared global source-segment schedule, so any
+later positive interpretation must remain conditional on that retained
+cross-particle time structure.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
