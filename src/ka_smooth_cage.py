@@ -557,6 +557,103 @@ def smooth_cage_second_generator_batch(
     }
 
 
+def smooth_cage_l2p_velocity_directional_derivative_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    velocity_direction: np.ndarray,
+    forces: np.ndarray,
+    force_generator: np.ndarray,
+    force_generator_direction: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    directional_step: float,
+    phase_space_step: float,
+    velocity_step: float,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float]:
+    """Return the velocity-directional derivative of ``L^2 p``.
+
+    The Ito trace contribution to ``L^2 p`` depends on configuration but not
+    velocity.  Evaluating the matched velocity perturbations at zero
+    temperature therefore removes an otherwise unnecessary inner trace-probe
+    calculation without changing this derivative.
+    """
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    direction = np.asarray(velocity_direction, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    force_generator = np.asarray(force_generator, dtype=float)
+    force_generator_direction = np.asarray(force_generator_direction, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or forces.shape != positions.shape
+        or force_generator.shape != positions.shape
+        or force_generator_direction.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+        or np.any(~np.isfinite(forces))
+        or np.any(~np.isfinite(force_generator))
+        or np.any(~np.isfinite(force_generator_direction))
+    ):
+        raise ValueError("phase-space arrays must be aligned finite (particles, 3) arrays")
+    if direction.shape != velocities.shape or np.any(~np.isfinite(direction)):
+        raise ValueError("velocity_direction must be finite and align with velocities")
+    if not math.isfinite(velocity_step) or velocity_step <= 0.0:
+        raise ValueError("velocity_step must be finite and positive")
+    if (
+        targets.ndim != 1
+        or len(targets) < 1
+        or np.any(targets < 0)
+        or np.any(targets >= len(positions))
+    ):
+        raise ValueError("target_indices must select one or more particles")
+    if not np.any(direction):
+        return {
+            "l2p_velocity_directional_derivative": np.zeros((len(targets), 3)),
+            "velocity_step": float(velocity_step),
+            "thermodynamic_claim_allowed": 0.0,
+        }
+
+    common = {
+        "positions": positions,
+        "forces": forces,
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "friction": friction,
+        "temperature": 0.0,
+        "directional_step": directional_step,
+        "phase_space_step": phase_space_step,
+        "trace_probes": None,
+        "target_batch_size": target_batch_size,
+    }
+    plus = smooth_cage_second_generator_batch(
+        **common,
+        velocities=velocities + velocity_step * direction,
+        force_generator=force_generator
+        + velocity_step * force_generator_direction,
+    )["second_relative_generator"]
+    minus = smooth_cage_second_generator_batch(
+        **common,
+        velocities=velocities - velocity_step * direction,
+        force_generator=force_generator
+        - velocity_step * force_generator_direction,
+    )["second_relative_generator"]
+    derivative = (np.asarray(plus) - np.asarray(minus)) / (2.0 * velocity_step)
+    return {
+        "l2p_velocity_directional_derivative": derivative,
+        "velocity_step": float(velocity_step),
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def smooth_cage_projected_observables(
     positions: np.ndarray,
     *,

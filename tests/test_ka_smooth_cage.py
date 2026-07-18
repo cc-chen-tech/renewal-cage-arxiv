@@ -574,6 +574,129 @@ class SmoothCageTests(unittest.TestCase):
             atol=2e-3,
         )
 
+    def test_l2p_velocity_directional_derivative_matches_full_temperature_difference(self):
+        from ka_local_cage import (
+            ka_lj_force_and_isotropic_curvature,
+            ka_lj_force_generator_observables,
+        )
+        from ka_smooth_cage import (
+            smooth_cage_l2p_velocity_directional_derivative_batch,
+            smooth_cage_second_generator_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 13.0 - 0.3
+        direction = np.random.default_rng(20260719).normal(size=velocities.shape)
+        types = inputs["particle_types"]
+        box = inputs["box_lengths"]
+        targets = np.array([0, 2])
+        friction = 0.7
+        temperature = 0.58
+        forces = ka_lj_force_and_isotropic_curvature(
+            positions,
+            particle_types=types,
+            box_lengths=box,
+            potential_protocol="ka_lj_c3_switch",
+        )[0]
+
+        def force_generator(value):
+            return ka_lj_force_generator_observables(
+                positions,
+                velocities=value,
+                particle_types=types,
+                box_lengths=box,
+                target_indices=np.arange(len(positions)),
+                friction=friction,
+                temperature=temperature,
+                potential_protocol="ka_lj_c3_switch",
+            )["force_generator"]
+
+        base_force_generator = force_generator(velocities)
+        force_generator_direction = force_generator(direction)
+        probes = np.random.default_rng(20260718).choice(
+            (-1.0, 1.0), size=(8, *velocities.shape)
+        )
+        step = 2e-5
+        direct = []
+        for sign in (1.0, -1.0):
+            direct.append(
+                smooth_cage_second_generator_batch(
+                    positions,
+                    velocities=velocities + sign * step * direction,
+                    forces=forces,
+                    force_generator=base_force_generator
+                    + sign * step * force_generator_direction,
+                    particle_types=types,
+                    box_lengths=box,
+                    target_indices=targets,
+                    friction=friction,
+                    temperature=temperature,
+                    directional_step=1e-5,
+                    phase_space_step=3e-6,
+                    trace_probes=probes,
+                )["second_relative_generator"]
+            )
+        expected = (direct[0] - direct[1]) / (2.0 * step)
+
+        result = smooth_cage_l2p_velocity_directional_derivative_batch(
+            positions,
+            velocities=velocities,
+            velocity_direction=direction,
+            forces=forces,
+            force_generator=base_force_generator,
+            force_generator_direction=force_generator_direction,
+            particle_types=types,
+            box_lengths=box,
+            target_indices=targets,
+            friction=friction,
+            directional_step=1e-5,
+            phase_space_step=3e-6,
+            velocity_step=step,
+        )
+
+        np.testing.assert_allclose(
+            result["l2p_velocity_directional_derivative"],
+            expected,
+            rtol=2e-7,
+            atol=2e-7,
+        )
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
+    def test_l2p_velocity_directional_derivative_rejects_bad_direction_and_zeroes(self):
+        from ka_smooth_cage import (
+            smooth_cage_l2p_velocity_directional_derivative_batch,
+        )
+
+        inputs = self.microscopic_configuration()
+        shape = inputs["positions"].shape
+        common = {
+            "positions": inputs["positions"],
+            "velocities": np.zeros(shape),
+            "forces": np.zeros(shape),
+            "force_generator": np.zeros(shape),
+            "force_generator_direction": np.zeros(shape),
+            "particle_types": inputs["particle_types"],
+            "box_lengths": inputs["box_lengths"],
+            "target_indices": np.array([0]),
+            "friction": 0.7,
+            "directional_step": 1e-5,
+            "phase_space_step": 3e-6,
+            "velocity_step": 1e-5,
+        }
+        result = smooth_cage_l2p_velocity_directional_derivative_batch(
+            **common,
+            velocity_direction=np.zeros(shape),
+        )
+        np.testing.assert_array_equal(
+            result["l2p_velocity_directional_derivative"], np.zeros((1, 3))
+        )
+        with self.assertRaisesRegex(ValueError, "velocity_direction"):
+            smooth_cage_l2p_velocity_directional_derivative_batch(
+                **common,
+                velocity_direction=np.zeros((2, 3)),
+            )
+
     def test_smooth_cage_features_are_rotation_invariant(self):
         from ka_smooth_cage import smooth_cage_invariant_features
 
