@@ -88,7 +88,7 @@ def frozen_spec() -> dict[str, object]:
 class ParentAcquisitionTests(unittest.TestCase):
     def test_committed_manifest_freezes_rendered_inputs_and_code_revision(self):
         path = ROOT / "data" / "renewal_cage_ka_prl_T045_parent_acquisition_manifest.json"
-        spec = validate_acquisition_spec(json.loads(path.read_text()))
+        spec = validate_prelaunch_spec(json.loads(path.read_text()))
         self.assertEqual(spec["implementation_commit"], "be61b11e19c4031b24c1813a979cd691b340922e")
         self.assertEqual(len(spec["parents"]), 2)
         with tempfile.TemporaryDirectory() as directory:

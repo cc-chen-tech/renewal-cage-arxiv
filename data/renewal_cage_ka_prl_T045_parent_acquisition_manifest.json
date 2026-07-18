@@ -18,11 +18,12 @@
   },
   "implementation_commit": "be61b11e19c4031b24c1813a979cd691b340922e",
   "lammps": {
-    "binary_sha256": "build_pending",
-    "build_protocol": "scripts/build_lammps_lepton.py_serial_BUILD_MPI_OFF",
-    "version": "22 Jul 2025 - Update 4"
+    "binary_path": "/usr/bin/lmp",
+    "binary_sha256": "fbb4f8993b9b14be5a41afffcf1efc42a6ae01f6d0beba5cb0ff7caedd3fe962",
+    "build_protocol": "Alibaba_Linux_EPEL_RPM_lammps-20190807-2.el8.x86_64",
+    "version": "7 Aug 2019"
   },
-  "manifest_state": "build_pending",
+  "manifest_state": "frozen_prelaunch",
   "observable_contract": {
     "calibration_inputs": [
       "particle_conditioned_block_paths",
