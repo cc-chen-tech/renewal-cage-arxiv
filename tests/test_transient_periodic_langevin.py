@@ -13,8 +13,11 @@ if str(SRC) not in sys.path:
 from transient_periodic_langevin import (  # noqa: E402
     TransientPeriodicParams,
     conservative_forces,
+    displacement_observables,
+    event_clock_statistics,
     potential_energy,
     simulate_transient_periodic_langevin,
+    stable_cage_events,
 )
 
 
@@ -220,6 +223,70 @@ class TransientIntegratorTests(unittest.TestCase):
                 record_stride=1,
                 seed=1,
             )
+
+
+class TransientEventTests(unittest.TestCase):
+    def test_nonrecrossing_dwell_rejects_transient_index_change(self):
+        positions = np.array([0.0, 1.0, 0.0, 1.0, 1.0, 1.0])[:, None, None]
+
+        events = stable_cage_events(
+            positions,
+            period=1.0,
+            dwell_frames=3,
+            frame_dt=0.5,
+        )
+
+        self.assertEqual(len(events["frame"]), 1)
+        self.assertEqual(int(events["frame"][0]), 3)
+        self.assertAlmostEqual(float(events["time"][0]), 1.5)
+        self.assertEqual(int(events["signed_cage_step"][0]), 1)
+        np.testing.assert_allclose(events["vector_step"][0], [1.0])
+
+    def test_displacement_observables_match_direct_moments(self):
+        positions = np.zeros((3, 2, 3), dtype=float)
+        positions[1, 0] = [1.0, 0.0, 0.0]
+        positions[1, 1] = [0.0, 2.0, 0.0]
+        positions[2] = 2.0 * positions[1]
+
+        rows = displacement_observables(
+            positions,
+            lag_frames=[1],
+            wave_numbers=[2.0],
+        )
+
+        displacements = positions[1:] - positions[:-1]
+        squared = np.sum(displacements**2, axis=2)
+        msd = float(np.mean(squared))
+        fourth = float(np.mean(squared**2))
+        ngp = 3.0 * fourth / (5.0 * msd**2) - 1.0
+        self.assertAlmostEqual(rows[0]["msd"], msd)
+        self.assertAlmostEqual(rows[0]["ngp"], ngp)
+        self.assertAlmostEqual(rows[0]["fs_k2"], np.mean(np.cos(2.0 * displacements)))
+
+    def test_empty_event_clock_has_explicit_unsupported_waiting_fields(self):
+        positions = np.zeros((11, 2, 3), dtype=float)
+        events = stable_cage_events(
+            positions,
+            period=1.0,
+            dwell_frames=2,
+            frame_dt=0.1,
+        )
+
+        result = event_clock_statistics(
+            events,
+            trajectory_count=2,
+            dimension=3,
+            duration=1.0,
+            count_window=0.5,
+        )
+
+        self.assertEqual(result["event_count"], 0.0)
+        self.assertEqual(result["mean_window_count"], 0.0)
+        self.assertEqual(result["count_fano_factor"], 0.0)
+        self.assertEqual(result["persistence_supported"], 0.0)
+        self.assertEqual(result["exchange_supported"], 0.0)
+        self.assertTrue(np.isnan(result["mean_persistence_time"]))
+        self.assertTrue(np.isnan(result["mean_exchange_time"]))
 
 
 if __name__ == "__main__":
