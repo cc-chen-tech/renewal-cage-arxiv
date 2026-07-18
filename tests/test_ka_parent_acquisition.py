@@ -12,6 +12,8 @@ from src.ka_parent_acquisition import (
     validate_prelaunch_spec,
 )
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -84,6 +86,23 @@ def frozen_spec() -> dict[str, object]:
 
 
 class ParentAcquisitionTests(unittest.TestCase):
+    def test_committed_manifest_freezes_rendered_inputs_and_code_revision(self):
+        path = ROOT / "data" / "renewal_cage_ka_prl_T045_parent_acquisition_manifest.json"
+        spec = validate_acquisition_spec(json.loads(path.read_text()))
+        self.assertEqual(spec["implementation_commit"], "be61b11e19c4031b24c1813a979cd691b340922e")
+        self.assertEqual(len(spec["parents"]), 2)
+        with tempfile.TemporaryDirectory() as directory:
+            rendered = prepare_parent_acquisition(
+                path,
+                Path(directory) / "rendered",
+                repository_commit=spec["implementation_commit"],
+            )
+        frozen = {parent["parent_id"]: parent for parent in spec["parents"]}
+        for parent in rendered:
+            expected = frozen[parent["parent_id"]]
+            self.assertEqual(parent["initial_data_sha256"], expected["initial_data_sha256"])
+            self.assertEqual(parent["lammps_input_sha256"], expected["lammps_input_sha256"])
+
     def test_prepare_writes_two_distinct_hashed_independent_parent_inputs(self):
         spec = frozen_spec()
         with tempfile.TemporaryDirectory() as directory:

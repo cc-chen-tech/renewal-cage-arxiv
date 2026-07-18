@@ -1,0 +1,93 @@
+{
+  "claim_flags": {
+    "complete_microscopic_closure_claim_allowed": 0,
+    "positive_memory_closure_claim_allowed": 0,
+    "spatial_facilitation_claim_allowed": 0,
+    "thermodynamic_glass_transition_claim_allowed": 0
+  },
+  "completion_checks": {
+    "atom_count_every_frame": 1000,
+    "expected_production_frame_count": 10001,
+    "final_restart_required": true,
+    "first_production_time_tau": 0.0,
+    "last_production_time_tau": 10000.0,
+    "lammps_exit_code": 0,
+    "parent_start_pairwise_absolute_fs_k7p25_maximum": 0.1,
+    "stationarity_required_per_parent": true,
+    "trajectory_complete_file_sha256_required": true
+  },
+  "implementation_commit": "be61b11e19c4031b24c1813a979cd691b340922e",
+  "lammps": {
+    "binary_sha256": "build_pending",
+    "build_protocol": "scripts/build_lammps_lepton.py_serial_BUILD_MPI_OFF",
+    "version": "22 Jul 2025 - Update 4"
+  },
+  "manifest_state": "build_pending",
+  "observable_contract": {
+    "calibration_inputs": [
+      "particle_conditioned_block_paths",
+      "environment_identity_lifetime"
+    ],
+    "heldout_targets_only": [
+      "MSD",
+      "NGP_3d",
+      "Fs_k2",
+      "Fs_k4",
+      "Fs_k7p25"
+    ],
+    "heldout_values_used_as_model_inputs": false
+  },
+  "parents": [
+    {
+      "initial_data_sha256": "287eae8778ca3423af0246ff3b50752ed8225ad3a7da91794024e9604db94fc4",
+      "lammps_input_sha256": "69249d5061e1df925ba82f23953d6f3eedafa3cb968b85c7382a0e5f0e202984",
+      "parent_id": "ka-t045-independent-p02-20260719",
+      "remote_output_directory": "/root/prl-memory-closure-acquisition/runs/p02",
+      "type_assignment_seed": 4502001,
+      "velocity_seed": 4502002
+    },
+    {
+      "initial_data_sha256": "1dc5bada11f53a05324bbc3150bc1c509ee670adc042de7dc7e9d6c8ea6080d0",
+      "lammps_input_sha256": "81c9ad7e33efa702b8bd4bb414ff5f57f094bf820bab33269b4c3f02a2f8f4f4",
+      "parent_id": "ka-t045-independent-p03-20260719",
+      "remote_output_directory": "/root/prl-memory-closure-acquisition/runs/p03",
+      "type_assignment_seed": 4503001,
+      "velocity_seed": 4503002
+    }
+  ],
+  "potential": {
+    "pair_coefficients": [
+      "1 1 1.0 1.0 2.5",
+      "1 2 1.5 0.8 2.0",
+      "2 2 0.5 0.88 2.2"
+    ],
+    "pair_modify": "shift yes",
+    "pair_style": "lj/cut 2.5"
+  },
+  "protocol": {
+    "calibration_time_tau": 5000.0,
+    "cool_time_tau": 4000.0,
+    "dump_interval_tau": 1.0,
+    "heldout_time_tau": 5000.0,
+    "melt_temperature": 1.0,
+    "melt_time_tau": 1000.0,
+    "production_time_tau": 10000.0,
+    "restart_interval_tau": 100.0,
+    "target_hold_time_tau": 5000.0,
+    "thermostat_damping_tau": 10.0,
+    "timestep_tau": 0.001
+  },
+  "schema_version": 1,
+  "system": {
+    "density": 1.2,
+    "lattice_shape": [
+      10,
+      10,
+      10
+    ],
+    "particle_count": 1000,
+    "type_a_count": 800,
+    "type_b_count": 200
+  },
+  "temperature": 0.45
+}
