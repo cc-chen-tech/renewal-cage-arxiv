@@ -226,6 +226,27 @@ class VarianceMixtureGateTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.summary.classify_shape_quotient_gate(rows, source_gate)
 
+    def test_gate_rejects_a_missing_supported_cell(self):
+        rows = self.summary.compute_shape_quotient_rows(self.source_rows)
+        omitted = rows[0]
+        truncated = [
+            row
+            for row in rows
+            if (
+                row["temperature"],
+                row["replicate"],
+                row["lag"],
+            )
+            != (
+                omitted["temperature"],
+                omitted["replicate"],
+                omitted["lag"],
+            )
+        ]
+
+        with self.assertRaises(ValueError):
+            self.summary.classify_shape_quotient_gate(truncated, self.source_gate)
+
     def test_cli_outputs_are_byte_deterministic_and_claim_limited(self):
         data = ROOT / "data"
         with tempfile.TemporaryDirectory() as directory:
