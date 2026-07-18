@@ -1,3 +1,4 @@
+import importlib.util
 import sys
 import unittest
 from pathlib import Path
@@ -7,8 +8,10 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+SCRIPTS = ROOT / "scripts"
+for directory in (SRC, SCRIPTS):
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
 
 from transient_periodic_langevin import (  # noqa: E402
     TransientPeriodicParams,
@@ -19,6 +22,16 @@ from transient_periodic_langevin import (  # noqa: E402
     simulate_transient_periodic_langevin,
     stable_cage_events,
 )
+
+
+def load_script(filename: str, module_name: str):
+    path = SCRIPTS / filename
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class TransientPotentialTests(unittest.TestCase):
@@ -287,6 +300,39 @@ class TransientEventTests(unittest.TestCase):
         self.assertEqual(result["exchange_supported"], 0.0)
         self.assertTrue(np.isnan(result["mean_persistence_time"]))
         self.assertTrue(np.isnan(result["mean_exchange_time"]))
+
+
+class TransientAblationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.analysis = load_script(
+            "analyze_transient_periodic_langevin.py",
+            "analyze_transient_periodic_langevin",
+        )
+
+    def test_quick_ablation_is_reproducible_and_separates_mechanisms(self):
+        first_rows, first_gate = self.analysis.run_ablation(seed=20260718, quick=True)
+        second_rows, second_gate = self.analysis.run_ablation(seed=20260718, quick=True)
+
+        self.assertEqual(first_rows, second_rows)
+        self.assertEqual(first_gate, second_gate)
+        self.assertEqual(
+            [row["model"] for row in first_rows],
+            ["static_periodic", "rate_only", "elastic_only", "full_transient"],
+        )
+        for row in first_rows:
+            self.assertEqual(float(row["all_finite"]), 1.0)
+            self.assertEqual(float(row["trajectory_continuity_pass"]), 1.0)
+            self.assertGreater(float(row["event_count"]), 0.0)
+        self.assertEqual(float(first_gate["rate_disorder_count_fano_increase"]), 1.0)
+        self.assertEqual(
+            float(first_gate["elastic_memory_more_negative_step_correlation"]),
+            1.0,
+        )
+        self.assertEqual(float(first_gate["full_model_joint_signature_pass"]), 1.0)
+        self.assertEqual(float(first_gate["synthetic_capability_only"]), 1.0)
+        for key in self.analysis.CLAIM_FLAGS:
+            self.assertEqual(float(first_gate[key]), 0.0)
 
 
 if __name__ == "__main__":
