@@ -28,6 +28,10 @@ from summarize_ka_segment_splice_paired_excess import (  # noqa: E402
     classify_paired_excess_gate,
     main as summarize_segment_splice_paired_excess,
 )
+from summarize_ka_transport_clock_shape_quotient import (  # noqa: E402
+    CLOSED_GATE_FIELDS as TRANSPORT_CLOCK_CLOSED_GATE_FIELDS,
+    main as summarize_transport_clock_shape_quotient,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
@@ -427,6 +431,106 @@ class ArxivPackageTests(unittest.TestCase):
         note = note_path.read_text()
         self.assertIn("full-path replicate baseline itself does not close", note)
         self.assertIn("finite_memory_state_addition_allowed = 0", note)
+
+    def test_transport_clock_shape_quotient_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        rows_path = data / "renewal_cage_ka_transport_clock_shape_quotient_rows.csv"
+        gate_path = data / "renewal_cage_ka_transport_clock_shape_quotient_gate.csv"
+        figure_path = ROOT / "figures" / "renewal_cage_ka_transport_clock_shape_quotient.svg"
+        for path in (rows_path, gate_path, figure_path):
+            self.assertTrue(path.is_file(), path)
+
+        with rows_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        with gate_path.open() as handle:
+            gates = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 184)
+        self.assertEqual(len(gates), 2)
+        self.assertEqual({float(row["temperature"]) for row in gates}, {0.45, 0.58})
+        for row in rows:
+            self.assertEqual(float(row["heldout_msd_used_as_diagnostic_input"]), 1.0)
+            self.assertEqual(float(row["blind_prediction_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["microdynamic_closure_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["spatial_facilitation_claim_allowed"]), 0.0)
+            self.assertEqual(float(row["thermodynamic_claim_allowed"]), 0.0)
+
+        low = next(row for row in gates if float(row["temperature"]) == 0.45)
+        high = next(row for row in gates if float(row["temperature"]) == 0.58)
+        self.assertEqual(low["analysis_status"], "clock_shape_separation_exploratory")
+        self.assertEqual(float(low["clock_shape_separation_supported_exploratory"]), 1.0)
+        self.assertAlmostEqual(
+            float(low["fs_k4_max_normalized_msd_matched_error"]),
+            0.508749096734,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(low["fs_k7p25_max_normalized_msd_matched_error"]),
+            1.13359180984,
+            places=11,
+        )
+        self.assertEqual(high["analysis_status"], "high_temperature_canary_only")
+        self.assertEqual(float(high["high_temperature_canary_only"]), 1.0)
+        self.assertEqual(float(high["high_temperature_control_resolved"]), 0.0)
+        for gate in gates:
+            self.assertEqual(float(gate["replicate_provenance_validation_pass"]), 1.0)
+            self.assertEqual(float(gate["parent_sample_count"]), 1.0)
+            self.assertEqual(float(gate["independent_replicate_count"]), 0.0)
+            self.assertEqual(float(gate["independently_prepared_parent_samples"]), 0.0)
+            self.assertEqual(
+                gate["independence_class"],
+                "decorrelated_parent_frames_plus_velocity_seeds",
+            )
+            self.assertEqual(
+                float(gate["confirmatory_independent_parent_replication_required"]),
+                1.0,
+            )
+            for field in TRANSPORT_CLOCK_CLOSED_GATE_FIELDS:
+                self.assertEqual(float(gate[field]), 0.0, (gate["temperature"], field))
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            generated_rows = temporary / "rows.csv"
+            generated_gate = temporary / "gate.csv"
+            generated_figure = temporary / "figure.svg"
+            summarize_transport_clock_shape_quotient(
+                [
+                    "--low-rows",
+                    str(data / "renewal_cage_ka_replicates_T045_segment_splice_rows.csv"),
+                    "--high-rows",
+                    str(data / "renewal_cage_ka_replicates_T058_segment_splice_rows.csv"),
+                    "--low-stationarity",
+                    str(data / "renewal_cage_ka_replicates_T045_nonlinear_path_stationarity.csv"),
+                    "--high-stationarity",
+                    str(data / "renewal_cage_ka_replicates_T058_block20_nonlinear_path_stationarity.csv"),
+                    "--provenance",
+                    str(data / "renewal_cage_ka_replicates_T058_T045_provenance.csv"),
+                    "--output-rows",
+                    str(generated_rows),
+                    "--output-gate",
+                    str(generated_gate),
+                    "--output-svg",
+                    str(generated_figure),
+                ]
+            )
+            self.assertEqual(rows_path.read_bytes(), generated_rows.read_bytes())
+            self.assertEqual(gate_path.read_bytes(), generated_gate.read_bytes())
+            self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
+
+        svg = figure_path.read_text()
+        self.assertIn("maximum normalized error (tolerance units)", svg)
+        self.assertIn("heldout MSD is a diagnostic input, not a blind prediction", svg)
+        self.assertIn("T=0.58 canary only", svg)
+        self.assertIn("clock-only closure rejected", svg)
+        coordinates = [
+            float(value)
+            for value in re.findall(r'(?:(?:x|y)[12]?|cx|cy)="([0-9.]+)"', svg)
+        ]
+        self.assertTrue(coordinates)
+        self.assertTrue(all(math.isfinite(value) and value >= 0.0 for value in coordinates))
+        readme = re.sub(r"\s+", " ", (ROOT / "README.md").read_text())
+        self.assertIn("transport-clock / shape quotient", readme)
+        self.assertIn("diagnostic input, not a blind prediction", readme)
+        self.assertIn("T=0.58 remains a canary", readme)
 
     def test_anchor_semi_markov_gate_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

@@ -19,15 +19,23 @@ MSD enters the quotient, this is a diagnostic and never a blind prediction.
 ## Frozen inputs
 
 Consume the committed T045 and T058 segment-splice row tables, their
-stationarity tables, and the local ensemble manifests. Select the within-model
+stationarity tables, and
+`data/renewal_cage_ka_replicates_T058_T045_provenance.csv`. Reconstruct the
+minimal manifest contract from that committed provenance table so CI does not
+depend on untracked trajectory directories. Select the within-model
 full-path controls (`L=250` at T045 and `L=37` at T058), after verifying that
 the cross-model full-path observables agree within `1e-12`. Require the exact
 replicate and lag grids, finite values, no duplicate cells, zero heldout leakage
 and macro-fit counts, and closed source claim flags.
 
-Both manifests must remain explicit that
-`independently_prepared_parent_samples=false`. T058 is a canary because its
-ensemble stationarity gate fails; it cannot establish a cooling trend.
+Both reconstructed manifest contracts must remain explicit that
+`independently_prepared_parent_samples=false`. Provenance validation requires
+exactly three T045 and five T058 restart labels, one nonempty parent hash per
+temperature, and distinct source frames and velocity seeds. The gate therefore
+reports one parent sample and zero independent replicates at each temperature.
+T058 is a canary because its ensemble stationarity gate fails; it cannot
+establish a cooling trend. CSV floats use 15 significant digits so recomputation
+is deterministic without erasing the frozen tolerance-scale values.
 
 ## Quotient
 
@@ -85,4 +93,3 @@ event-clock prediction of MSD before applying this shape quotient.
 - `data/renewal_cage_ka_transport_clock_shape_quotient_gate.csv`
 - `figures/renewal_cage_ka_transport_clock_shape_quotient.svg`
 - one arXiv artifact recomputation test and a concise README result entry
-
