@@ -100,5 +100,139 @@ class ParentProvenanceTests(unittest.TestCase):
             )
 
 
+class MemoryKernelTests(unittest.TestCase):
+    @staticmethod
+    def labelled_blocks(particles=4, block_count=12):
+        blocks = np.zeros((particles, block_count, 3), dtype=float)
+        for particle in range(particles):
+            for block in range(block_count):
+                blocks[particle, block] = (
+                    1000.0 * particle + block,
+                    10.0 * particle + block,
+                    particle - block,
+                )
+        return blocks
+
+    def test_full_candidate_uses_contiguous_blocks_until_exchange(self):
+        _, audit = closure.generate_ablation_path(
+            self.labelled_blocks(),
+            model="full_candidate",
+            environment_time=1.0e12,
+            block_size=20.0,
+            rng=np.random.default_rng(7),
+        )
+
+        sources = audit["source_particle"]
+        source_blocks = audit["source_block"]
+        for particle in range(sources.shape[0]):
+            for index in range(1, sources.shape[1]):
+                if sources[particle, index] == sources[particle, index - 1]:
+                    self.assertEqual(
+                        source_blocks[particle, index],
+                        source_blocks[particle, index - 1] + 1,
+                    )
+        self.assertEqual(audit["ordered_path_memory_retained"], 1.0)
+        self.assertEqual(audit["finite_exchange_environment_retained"], 1.0)
+        self.assertEqual(audit["source_wrap_count"], 0.0)
+
+    def test_finite_exchange_ablation_retains_identity_but_destroys_order(self):
+        _, audit = closure.generate_ablation_path(
+            self.labelled_blocks(block_count=40),
+            model="finite_exchange_environment",
+            environment_time=20.0,
+            block_size=20.0,
+            rng=np.random.default_rng(11),
+        )
+
+        self.assertEqual(audit["finite_exchange_environment_retained"], 1.0)
+        self.assertEqual(audit["ordered_path_memory_retained"], 0.0)
+        self.assertGreater(audit["environment_exchange_count"], 0.0)
+
+    def test_static_environment_never_changes_source_particle(self):
+        _, audit = closure.generate_ablation_path(
+            self.labelled_blocks(),
+            model="static_particle_environment",
+            environment_time=40.0,
+            block_size=20.0,
+            rng=np.random.default_rng(13),
+        )
+
+        expected = np.broadcast_to(
+            np.arange(4, dtype=int)[:, None], audit["source_particle"].shape
+        )
+        np.testing.assert_array_equal(audit["source_particle"], expected)
+        self.assertEqual(audit["environment_exchange_count"], 0.0)
+        self.assertEqual(audit["static_particle_environment_retained"], 1.0)
+        self.assertEqual(audit["ordered_path_memory_retained"], 0.0)
+
+    def test_terminal_source_block_forces_recorded_exchange_without_wrap(self):
+        _, audit = closure.generate_ablation_path(
+            self.labelled_blocks(particles=3, block_count=8),
+            model="full_candidate",
+            environment_time=1.0e12,
+            block_size=20.0,
+            rng=np.random.default_rng(5),
+        )
+
+        self.assertEqual(audit["source_wrap_count"], 0.0)
+        self.assertGreater(audit["forced_terminal_exchange_count"], 0.0)
+
+    def test_full_candidate_has_no_shared_global_source_schedule(self):
+        _, audit = closure.generate_ablation_path(
+            self.labelled_blocks(particles=8, block_count=20),
+            model="full_candidate",
+            environment_time=60.0,
+            block_size=20.0,
+            rng=np.random.default_rng(19),
+        )
+
+        self.assertEqual(audit["global_source_segment_schedule_preserved"], 0.0)
+        self.assertTrue(
+            any(
+                not np.array_equal(
+                    audit["source_particle"][0],
+                    audit["source_particle"][particle],
+                )
+                for particle in range(1, 8)
+            )
+        )
+
+    def test_mean_rate_and_one_step_ablation_information_flags_are_exact(self):
+        blocks = self.labelled_blocks()
+        for model, one_step in (("mean_rate_null", 0.0), ("one_step_jump_law", 1.0)):
+            with self.subTest(model=model):
+                generated, audit = closure.generate_ablation_path(
+                    blocks,
+                    model=model,
+                    environment_time=40.0,
+                    block_size=20.0,
+                    rng=np.random.default_rng(23),
+                )
+                self.assertEqual(generated.shape, blocks.shape)
+                self.assertTrue(np.all(np.isfinite(generated)))
+                self.assertEqual(audit["one_step_jump_law_retained"], one_step)
+                self.assertEqual(audit["particle_identity_retained"], 0.0)
+                self.assertEqual(audit["ordered_path_memory_retained"], 0.0)
+
+    def test_invalid_kernel_controls_fail_closed(self):
+        blocks = self.labelled_blocks()
+        with self.assertRaisesRegex(ValueError, "unknown"):
+            closure.generate_ablation_path(
+                blocks,
+                model="posthoc_model",
+                environment_time=40.0,
+                block_size=20.0,
+                rng=np.random.default_rng(1),
+            )
+        with self.assertRaisesRegex(ValueError, "positive"):
+            closure.generate_ablation_path(
+                blocks,
+                model="full_candidate",
+                environment_time=0.0,
+                block_size=20.0,
+                rng=np.random.default_rng(1),
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
