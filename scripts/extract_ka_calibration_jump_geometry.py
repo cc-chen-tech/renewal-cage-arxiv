@@ -154,6 +154,35 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def calibration_time_from_threshold_rows(
+    rows: list[dict[str, str]],
+    *,
+    requested: int | None = None,
+) -> int:
+    if not rows:
+        raise ValueError("threshold table must be nonempty")
+    times: set[int] = set()
+    for row in rows:
+        try:
+            value = float(row["calibration_time"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("threshold calibration_time is missing or invalid") from error
+        if not math.isfinite(value) or not value.is_integer() or value < 2:
+            raise ValueError("threshold calibration_time must be an integer of at least two")
+        times.add(int(value))
+    if len(times) != 1:
+        raise ValueError("threshold rows must share one calibration_time")
+    calibration_time = next(iter(times))
+    if requested is not None:
+        if (
+            isinstance(requested, bool)
+            or not isinstance(requested, int)
+            or requested != calibration_time
+        ):
+            raise ValueError("requested calibration_time disagrees with threshold table")
+    return calibration_time
+
+
 def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
     if not rows:
         raise ValueError("cannot write an empty geometry table")
@@ -164,21 +193,26 @@ def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("ensemble_directory", type=Path)
     parser.add_argument("--threshold-table", type=Path, required=True)
-    parser.add_argument("--calibration-time", type=int, default=5000)
+    parser.add_argument("--calibration-time", type=int)
     parser.add_argument("--fluctuation-half-window", type=int, default=5)
     parser.add_argument("--wave-numbers", type=float, nargs="+", default=(2.0, 4.0, 7.25))
     parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     manifest_path = args.ensemble_directory / "ensemble_manifest.json"
     manifest = json.loads(manifest_path.read_text())
+    threshold_rows = read_rows(args.threshold_table)
+    calibration_time = calibration_time_from_threshold_rows(
+        threshold_rows,
+        requested=args.calibration_time,
+    )
     thresholds = {
         int(float(row["replicate"])): float(row["debye_waller_factor"])
-        for row in read_rows(args.threshold_table)
+        for row in threshold_rows
     }
     rows: list[dict[str, object]] = []
     for specification in manifest["replicates"]:
@@ -192,11 +226,11 @@ def main() -> None:
         )
         positions = load_calibration_type_a_positions(
             trajectory_path,
-            calibration_time=args.calibration_time,
+            calibration_time=calibration_time,
         )
         local = extract_calibration_jump_geometry(
             positions,
-            calibration_time=args.calibration_time,
+            calibration_time=calibration_time,
             debye_waller_factor=thresholds[replicate],
             half_window=args.fluctuation_half_window,
             wave_numbers=np.asarray(args.wave_numbers, dtype=float),

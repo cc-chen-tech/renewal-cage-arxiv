@@ -115,6 +115,33 @@ class JumpGeometryExtractionTests(unittest.TestCase):
         )
         self.assertEqual(positions.shape, (6, 2, 3))
 
+    def test_threshold_table_is_authoritative_for_calibration_time(self):
+        rows = [
+            {"replicate": "1", "calibration_time": "750.0"},
+            {"replicate": "2", "calibration_time": "750.0"},
+        ]
+
+        self.assertEqual(
+            self.analysis.calibration_time_from_threshold_rows(rows),
+            750,
+        )
+        self.assertEqual(
+            self.analysis.calibration_time_from_threshold_rows(
+                rows,
+                requested=750,
+            ),
+            750,
+        )
+        with self.assertRaises(ValueError):
+            self.analysis.calibration_time_from_threshold_rows(
+                rows,
+                requested=5000,
+            )
+        with self.assertRaises(ValueError):
+            self.analysis.calibration_time_from_threshold_rows(
+                [*rows, {"replicate": "3", "calibration_time": "5000.0"}]
+            )
+
 
 class GeometryQuotientTests(unittest.TestCase):
     @classmethod
