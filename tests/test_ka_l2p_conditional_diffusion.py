@@ -394,8 +394,42 @@ class L2pConditionalDiffusionTests(unittest.TestCase):
             "--maximum-lag",
             "--frame-time",
             "--output-prefix",
+            "--figure-path",
         ):
             self.assertIn(option, completed.stdout)
+
+    def test_analysis_svg_labels_unclipped_nll_and_memory_axes(self):
+        module = load_script(
+            "analyze_ka_l2p_conditional_diffusion.py",
+            "analyze_ka_l2p_conditional_diffusion_svg_test",
+        )
+        rows = []
+        for fold in range(1, 5):
+            for model, nll, memory in (
+                ("constant_full", 2.0, 0.12),
+                ("trace_only", 1.8, 0.07),
+                ("exact_tensor", 1.5, 0.04),
+                ("permuted_tensor", 2.1, 0.11),
+            ):
+                rows.append(
+                    {
+                        "fold_index": float(fold),
+                        "model": model,
+                        "negative_log_likelihood": nll + 0.01 * fold,
+                        "maximum_absolute_squared_whitened_correlation": memory,
+                    }
+                )
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "diagnostic.svg"
+            module.write_diagnostic_svg(path, rows)
+            svg = path.read_text()
+
+        self.assertIn("negative log-likelihood improvement", svg)
+        self.assertIn("maximum absolute squared whitened correlation", svg)
+        self.assertIn("tolerance = 0.05", svg)
+        self.assertIn("unclipped axes", svg)
+        for model in ("constant_full", "trace_only", "exact_tensor", "permuted_tensor"):
+            self.assertIn(model, svg)
 
     def test_analysis_loader_accepts_only_numerically_resolved_deterministic_caches(self):
         module = load_script(

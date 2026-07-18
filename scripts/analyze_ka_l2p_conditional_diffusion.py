@@ -60,6 +60,157 @@ def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
             writer.writerow({key: canonical_value(value) for key, value in row.items()})
 
 
+def write_diagnostic_svg(path: Path, detail_rows: list[dict[str, object]]) -> None:
+    """Plot the frozen held-fold NLL and squared-memory diagnostics."""
+
+    plot_models = (
+        "constant_full",
+        "trace_only",
+        "exact_tensor",
+        "permuted_tensor",
+    )
+    expected = {(fold, model) for fold in range(1, 5) for model in plot_models}
+    by_cell = {
+        (int(float(row["fold_index"])), str(row["model"])): row
+        for row in detail_rows
+        if str(row["model"]) in plot_models
+    }
+    if set(by_cell) != expected:
+        raise ValueError("four-fold diagnostic SVG grid is not complete")
+
+    nll_improvement = {
+        (fold, model): float(by_cell[(fold, "constant_full")]["negative_log_likelihood"])
+        - float(by_cell[(fold, model)]["negative_log_likelihood"])
+        for fold in range(1, 5)
+        for model in plot_models
+    }
+    squared_memory = {
+        cell: float(row["maximum_absolute_squared_whitened_correlation"])
+        for cell, row in by_cell.items()
+    }
+    if any(
+        not math.isfinite(value)
+        for value in (*nll_improvement.values(), *squared_memory.values())
+    ):
+        raise ValueError("diagnostic SVG values must be finite")
+
+    def padded_bounds(values: list[float], reference: float) -> tuple[float, float]:
+        low = min(*values, reference)
+        high = max(*values, reference)
+        span = high - low
+        if span == 0.0:
+            span = max(abs(high), 1.0)
+        return low - 0.08 * span, high + 0.08 * span
+
+    width = 1200
+    height = 650
+    panel_top = 125.0
+    panel_bottom = 535.0
+    panel_width = 470.0
+    left_x = 75.0
+    right_x = 650.0
+    colors = {
+        "constant_full": "#50555c",
+        "trace_only": "#16817a",
+        "exact_tensor": "#1d5ca8",
+        "permuted_tensor": "#c54b3c",
+    }
+    nll_bounds = padded_bounds(list(nll_improvement.values()), 0.0)
+    memory_bounds = padded_bounds(list(squared_memory.values()), 0.05)
+
+    def x_position(panel_x: float, fold: int) -> float:
+        return panel_x + 55.0 + (fold - 1) * (panel_width - 110.0) / 3.0
+
+    def y_position(value: float, bounds: tuple[float, float]) -> float:
+        low, high = bounds
+        return panel_bottom - (value - low) * (panel_bottom - panel_top) / (high - low)
+
+    svg = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        '<rect width="100%" height="100%" fill="#ffffff"/>',
+        '<text x="75" y="38" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#20242a">Deterministic microscopic L2p conditional-diffusion gate</text>',
+        '<text x="75" y="65" font-family="Arial, sans-serif" font-size="13" fill="#50555c">Four held clones; unchanged covariance models and tolerances; unclipped axes</text>',
+    ]
+    for index, model in enumerate(plot_models):
+        legend_x = 80 + 270 * index
+        svg.extend(
+            [
+                f'<line x1="{legend_x}" y1="91" x2="{legend_x + 28}" y2="91" stroke="{colors[model]}" stroke-width="3"/>',
+                f'<circle cx="{legend_x + 14}" cy="91" r="4" fill="{colors[model]}"/>',
+                f'<text x="{legend_x + 36}" y="96" font-family="Arial, sans-serif" font-size="13" fill="#30353b">{model}</text>',
+            ]
+        )
+
+    panels = (
+        (
+            left_x,
+            nll_bounds,
+            nll_improvement,
+            "negative log-likelihood improvement",
+            "constant_full NLL - model NLL",
+            0.0,
+            "zero improvement",
+        ),
+        (
+            right_x,
+            memory_bounds,
+            squared_memory,
+            "maximum absolute squared whitened correlation",
+            "held residual; lower is better",
+            0.05,
+            "tolerance = 0.05",
+        ),
+    )
+    for panel_x, bounds, values, title, subtitle, reference, reference_label in panels:
+        svg.append(
+            f'<rect x="{panel_x}" y="{panel_top}" width="{panel_width}" height="{panel_bottom - panel_top}" fill="#fbfcfd" stroke="#c9cdd2"/>'
+        )
+        for tick in range(5):
+            fraction = tick / 4.0
+            value = bounds[0] + fraction * (bounds[1] - bounds[0])
+            y = y_position(value, bounds)
+            svg.extend(
+                [
+                    f'<line x1="{panel_x}" y1="{y:.3f}" x2="{panel_x + panel_width}" y2="{y:.3f}" stroke="#e3e6e9"/>',
+                    f'<text x="{panel_x - 9}" y="{y + 4:.3f}" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">{value:.3g}</text>',
+                ]
+            )
+        reference_y = y_position(reference, bounds)
+        svg.extend(
+            [
+                f'<line x1="{panel_x}" y1="{reference_y:.3f}" x2="{panel_x + panel_width}" y2="{reference_y:.3f}" stroke="#15191e" stroke-width="1.4" stroke-dasharray="7 5"/>',
+                f'<text x="{panel_x + panel_width - 6}" y="{reference_y - 7:.3f}" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#15191e">{reference_label}</text>',
+                f'<text x="{panel_x}" y="585" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#24282e">{title}</text>',
+                f'<text x="{panel_x}" y="607" font-family="Arial, sans-serif" font-size="12" fill="#555b62">{subtitle}</text>',
+            ]
+        )
+        for fold in range(1, 5):
+            x = x_position(panel_x, fold)
+            svg.extend(
+                [
+                    f'<line x1="{x:.3f}" y1="{panel_bottom}" x2="{x:.3f}" y2="{panel_bottom + 6}" stroke="#555b62"/>',
+                    f'<text x="{x:.3f}" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold {fold}</text>',
+                ]
+            )
+        for model in plot_models:
+            points = " ".join(
+                f'{x_position(panel_x, fold):.3f},{y_position(values[(fold, model)], bounds):.3f}'
+                for fold in range(1, 5)
+            )
+            svg.append(
+                f'<polyline points="{points}" fill="none" stroke="{colors[model]}" stroke-width="2.4"/>'
+            )
+            for fold in range(1, 5):
+                x = x_position(panel_x, fold)
+                y = y_position(values[(fold, model)], bounds)
+                svg.append(
+                    f'<circle cx="{x:.3f}" cy="{y:.3f}" r="4.2" fill="{colors[model]}"/>'
+                )
+    svg.append("</svg>")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(svg) + "\n")
+
+
 def _model_passes_absolute_gate(row: dict[str, object]) -> bool:
     return (
         float(row["maximum_absolute_whitened_correlation"]) <= 0.05
@@ -319,6 +470,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--permutation-seed", type=int, default=20260721)
     parser.add_argument("--gaussian-reference-seed", type=int, default=20260722)
     parser.add_argument("--output-prefix", type=Path, required=True)
+    parser.add_argument("--figure-path", type=Path)
     return parser.parse_args()
 
 
@@ -506,6 +658,8 @@ def main() -> None:
     write_rows(output_path(args.output_prefix, "_details.csv"), details)
     write_rows(output_path(args.output_prefix, "_convergence.csv"), convergence)
     write_rows(output_path(args.output_prefix, "_summary.csv"), summaries)
+    if args.figure_path is not None:
+        write_diagnostic_svg(args.figure_path, details)
 
 
 if __name__ == "__main__":
