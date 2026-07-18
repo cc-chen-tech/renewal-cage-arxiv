@@ -14,6 +14,7 @@ from transient_periodic_langevin import (  # noqa: E402
     TransientPeriodicParams,
     conservative_forces,
     potential_energy,
+    simulate_transient_periodic_langevin,
 )
 
 
@@ -117,6 +118,108 @@ class TransientPotentialTests(unittest.TestCase):
             with self.subTest(key=key):
                 with self.assertRaises(ValueError):
                     TransientPeriodicParams(**values)
+
+
+class TransientIntegratorTests(unittest.TestCase):
+    @staticmethod
+    def params(**updates):
+        values = dict(
+            temperature=0.7,
+            period=1.0,
+            base_barrier=2.5,
+            elastic_stiffness=0.6,
+            barrier_stiffness=1.0,
+            barrier_coupling=0.4,
+            gamma_x=1.0,
+            gamma_q=4.0,
+            gamma_z=3.0,
+        )
+        values.update(updates)
+        return TransientPeriodicParams(**values)
+
+    def test_simulator_is_seed_deterministic(self):
+        kwargs = dict(
+            trajectory_count=12,
+            dimension=2,
+            dt=0.001,
+            burnin_steps=30,
+            production_steps=50,
+            record_stride=5,
+        )
+        first = simulate_transient_periodic_langevin(
+            self.params(), seed=17, **kwargs
+        )
+        second = simulate_transient_periodic_langevin(
+            self.params(), seed=17, **kwargs
+        )
+        third = simulate_transient_periodic_langevin(
+            self.params(), seed=18, **kwargs
+        )
+
+        for key in ("positions", "environment_positions", "barrier_coordinates"):
+            self.assertTrue(np.array_equal(first[key], second[key]))
+        self.assertFalse(np.array_equal(first["positions"], third["positions"]))
+        self.assertEqual(first["all_finite"], 1.0)
+        self.assertAlmostEqual(first["record_dt"], 0.005)
+
+    def test_high_barrier_wrapped_variance_matches_local_equipartition(self):
+        params = self.params(
+            temperature=0.5,
+            base_barrier=6.0,
+            elastic_stiffness=0.0,
+            barrier_coupling=0.0,
+        )
+        result = simulate_transient_periodic_langevin(
+            params,
+            trajectory_count=800,
+            dimension=1,
+            dt=0.0005,
+            burnin_steps=3000,
+            production_steps=2000,
+            record_stride=20,
+            seed=29,
+        )
+        positions = result["positions"]
+        wrapped = positions - np.floor(positions / params.period + 0.5) * params.period
+        observed = float(np.var(wrapped))
+        expected = params.temperature / (
+            2.0 * np.pi**2 * params.base_barrier / params.period**2
+        )
+        self.assertAlmostEqual(observed / expected, 1.0, delta=0.15)
+
+    def test_elastic_environment_does_not_pin_common_translation(self):
+        params = self.params(
+            temperature=1.0,
+            base_barrier=0.8,
+            elastic_stiffness=0.5,
+            barrier_coupling=0.0,
+            gamma_q=2.0,
+        )
+        result = simulate_transient_periodic_langevin(
+            params,
+            trajectory_count=256,
+            dimension=1,
+            dt=0.002,
+            burnin_steps=1000,
+            production_steps=4000,
+            record_stride=100,
+            seed=31,
+        )
+        endpoint = result["positions"][-1, :, 0] - result["positions"][0, :, 0]
+        self.assertGreater(float(np.mean(endpoint**2)), 0.1)
+
+    def test_integrator_rejects_reference_curvature_instability(self):
+        with self.assertRaisesRegex(ValueError, "stability"):
+            simulate_transient_periodic_langevin(
+                self.params(base_barrier=3.0),
+                trajectory_count=4,
+                dimension=1,
+                dt=0.01,
+                burnin_steps=1,
+                production_steps=2,
+                record_stride=1,
+                seed=1,
+            )
 
 
 if __name__ == "__main__":
