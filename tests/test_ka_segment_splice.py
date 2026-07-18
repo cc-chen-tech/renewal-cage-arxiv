@@ -1378,6 +1378,157 @@ class SegmentGateDecisionTests(unittest.TestCase):
         self.assertIn('data-clipped="true"', text)
         self.assertIn(verdict["mechanism_state"], text)
         self.assertIn("no microscopic, spatial-facilitation, or thermodynamic claim", text)
+
+
+def paired_excess_score_fixture(*, bad_full_path_model_agreement=False):
+    grid = (1, 2, 5, 10, 25, 50, 125, 250)
+    full_scores = {1: 0.9, 2: 2.1, 3: 3.3}
+    within_excess = {
+        1: 18.0,
+        2: 15.0,
+        5: 11.0,
+        10: 8.0,
+        25: 4.0,
+        50: 2.0,
+        125: 0.2,
+    }
+    cross_excess = {
+        1: 21.0,
+        2: 18.0,
+        5: 14.0,
+        10: 11.0,
+        25: 7.0,
+        50: 5.0,
+        125: 2.0,
+    }
+    rows = []
+    for model in (
+        "within_particle_segment_shuffle",
+        "cross_particle_segment_splice",
+    ):
+        excess_by_length = (
+            within_excess
+            if model == "within_particle_segment_shuffle"
+            else cross_excess
+        )
+        for length in grid:
+            for replicate, baseline in full_scores.items():
+                score = baseline if length == 250 else baseline + excess_by_length[length]
+                if (
+                    bad_full_path_model_agreement
+                    and model == "cross_particle_segment_splice"
+                    and length == 250
+                    and replicate == 2
+                ):
+                    score += 0.01
+                rows.append(
+                    {
+                        "temperature": 0.45,
+                        "model": model,
+                        "segment_length": float(length),
+                        "replicate": float(replicate),
+                        "higher_order_score": score,
+                        "replicate_curve_pass": float(score <= 1.0),
+                        "microdynamic_closure_claim_allowed": 0.0,
+                        "spatial_facilitation_claim_allowed": 0.0,
+                        "thermodynamic_claim_allowed": 0.0,
+                    }
+                )
+    return rows
+
+
+def paired_excess_source_verdict_fixture():
+    return {
+        "mechanism_state": "mechanism_unresolved",
+        "low_mechanism_identifiable_against_full_path_control": 0.0,
+        "low_full_path_control_all_replicates_pass": 0.0,
+        "low_full_path_control_failed_replicate_count": 2.0,
+        "global_source_segment_schedule_preserved": 1.0,
+        "owner_identity_sufficiency_claim_allowed": 0.0,
+        "independent_replicate_memory_lower_bound_claim_allowed": 0.0,
+        "static_vs_finite_exchange_resolved": 0.0,
+        "microdynamic_closure_claim_allowed": 0.0,
+        "spatial_facilitation_claim_allowed": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+class PairedExcessBaselineTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.summary = load_script_module(
+            "summarize_ka_segment_splice_paired_excess.py",
+            "summarize_ka_segment_splice_paired_excess",
+        )
+
+    def classify(self, *, bad_full_path_model_agreement=False, source_verdict=None):
+        return self.summary.classify_paired_excess_gate(
+            paired_excess_score_fixture(
+                bad_full_path_model_agreement=bad_full_path_model_agreement,
+            ),
+            segment_cell_fixture(0.45, within_start=None, cross_start=None),
+            [source_verdict or paired_excess_source_verdict_fixture()],
+        )
+
+    def test_excess_rows_are_replicate_paired_to_the_full_path_baseline(self):
+        rows, gate = self.classify()
+
+        self.assertEqual(len(rows), 14)
+        selected = next(
+            row
+            for row in rows
+            if row["model"] == "within_particle_segment_shuffle"
+            and row["segment_length"] == 50.0
+        )
+        self.assertEqual(selected["independent_replicate_count"], 3.0)
+        self.assertAlmostEqual(selected["replicate_1_paired_excess"], 2.0)
+        self.assertAlmostEqual(selected["replicate_2_paired_excess"], 2.0)
+        self.assertAlmostEqual(selected["replicate_3_paired_excess"], 2.0)
+        self.assertAlmostEqual(selected["replicate_first_mean_paired_excess"], 2.0)
+        self.assertAlmostEqual(selected["replicate_first_t95_ci_low"], 2.0)
+        self.assertAlmostEqual(selected["replicate_first_t95_ci_high"], 2.0)
+        self.assertEqual(selected["paired_degradation_identified"], 1.0)
+        self.assertEqual(selected["global_source_segment_schedule_preserved"], 1.0)
+        self.assertEqual(selected["microdynamic_closure_claim_allowed"], 0.0)
+
+        self.assertEqual(gate["mechanism_state"], "mechanism_unresolved")
+        self.assertEqual(gate["input_completeness_pass"], 1.0)
+        self.assertEqual(gate["full_path_model_agreement_pass"], 1.0)
+        self.assertEqual(gate["low_full_path_control_all_replicates_pass"], 0.0)
+        self.assertEqual(gate["short_horizon_information_loss_supported_exploratory"], 1.0)
+        self.assertEqual(gate["owner_identity_information_supported_exploratory"], 1.0)
+        self.assertEqual(gate["finite_memory_state_addition_allowed"], 0.0)
+        self.assertEqual(gate["next_required_action"], "replicate_resolved_full_path_baseline_or_new_trajectory_validation")
+
+    def test_bad_source_verdict_or_full_path_disagreement_fails_closed(self):
+        _, disagreement = self.classify(bad_full_path_model_agreement=True)
+        self.assertEqual(disagreement["input_completeness_pass"], 1.0)
+        self.assertEqual(disagreement["full_path_model_agreement_pass"], 0.0)
+        self.assertEqual(disagreement["short_horizon_information_loss_supported_exploratory"], 0.0)
+        self.assertEqual(disagreement["mechanism_state"], "mechanism_unresolved")
+
+        bad_verdict = paired_excess_source_verdict_fixture()
+        bad_verdict["mechanism_state"] = "finite_single_particle_path_memory_sufficient"
+        _, rejected = self.classify(source_verdict=bad_verdict)
+        self.assertEqual(rejected["source_verdict_fail_closed"], 1.0)
+        self.assertEqual(rejected["input_completeness_pass"], 0.0)
+        self.assertEqual(rejected["finite_memory_state_addition_allowed"], 0.0)
+
+    def test_svg_is_deterministic_and_marks_exploratory_claim_boundary(self):
+        rows, gate = self.classify()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "paired-excess.svg"
+            self.summary.write_paired_excess_svg(output, rows, gate)
+            first = output.read_bytes()
+            self.summary.write_paired_excess_svg(output, rows, gate)
+            self.assertEqual(first, output.read_bytes())
+            text = first.decode()
+
+        self.assertIn("Paired excess over replicate full-path baseline", text)
+        self.assertIn("post-run exploratory", text)
+        self.assertIn("mechanism unresolved", text)
+        self.assertNotIn("nan", text.lower())
+        self.assertNotIn("inf", text.lower())
         self.assertNotIn("nan", text.lower())
         self.assertNotIn("inf", text.lower())
 

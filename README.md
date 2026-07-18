@@ -17,6 +17,12 @@ unresolved. Both nulls preserve a shared global source-segment schedule, so any
 later positive interpretation must remain conditional on that retained
 cross-particle time structure.
 
+A post-run paired-excess diagnostic is documented in
+`docs/segment-splice-paired-excess.md`. After subtracting each replicate's own
+full-path score, it finds a short-horizon excess-loss prefix through
+`tau_L=200`, but the full-path replicate baseline still fails, so the mechanism
+state remains unresolved and no finite-memory microscopic coordinate is added.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
