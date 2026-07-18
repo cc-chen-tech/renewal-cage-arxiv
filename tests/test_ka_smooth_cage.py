@@ -555,6 +555,18 @@ class SmoothCageTests(unittest.TestCase):
         np.testing.assert_allclose(
             result["velocity_laplacian"], laplacian, rtol=2e-3, atol=2e-3
         )
+        self.assertEqual(
+            result["trace_probe_velocity_laplacian_terms"].shape,
+            (dimension, len(targets), 3),
+        )
+        np.testing.assert_allclose(
+            np.mean(
+                result["trace_probe_velocity_laplacian_terms"], axis=0
+            ),
+            result["velocity_laplacian"],
+            rtol=1e-13,
+            atol=1e-13,
+        )
         np.testing.assert_allclose(
             result["ito_trace_term"],
             friction * temperature * laplacian,

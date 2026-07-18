@@ -1,5 +1,6 @@
 import sys
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -7,6 +8,15 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from cache_ka_relative_second_generator import (  # noqa: E402
+    load_second_generator_drift_cache,
+)
+from analyze_ka_relative_second_generator_closure import (  # noqa: E402
+    load_matched_second_generator_clones,
+    second_generator_resolved_state,
+)
 
 from ka_relative_mori import (  # noqa: E402
     bias_centered_phase_state,
@@ -20,6 +30,105 @@ from ka_collective_memory import discrete_mori_zwanzig_operators  # noqa: E402
 
 
 class RelativeMoriTests(unittest.TestCase):
+    def test_second_generator_state_appends_l2p_without_changing_baseline_coordinates(self):
+        shape = (4, 1, 3)
+        clone = {
+            "relative_position": np.arange(np.prod(shape), dtype=float).reshape(shape),
+            "relative_velocity": np.full(shape, 2.0),
+            "relative_drift": np.full(shape, 3.0),
+            "second_relative_generator": np.full(shape, 4.0),
+        }
+        bias = np.array([[1.0, 2.0, 3.0]])
+
+        baseline = second_generator_resolved_state(clone, bias=bias, include_l2p=False)
+        extension = second_generator_resolved_state(clone, bias=bias, include_l2p=True)
+
+        self.assertEqual(baseline.shape, (4, 3, 3))
+        self.assertEqual(extension.shape, (4, 3, 4))
+        np.testing.assert_allclose(extension[:, :, :3], baseline)
+        np.testing.assert_allclose(extension[:, :, 3], 4.0)
+
+    def test_second_generator_clones_are_matched_by_trajectory_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            drift_directory = root / "drift"
+            first_second_directory = root / "second_a"
+            second_second_directory = root / "second_b"
+            for path in (
+                drift_directory,
+                first_second_directory,
+                second_second_directory,
+            ):
+                path.mkdir()
+            targets = np.array([4])
+            shape = (8, 1, 3)
+            for clone_index, source_hash in enumerate(("hash-a", "hash-b"), start=1):
+                np.savez(
+                    drift_directory / f"clone_{clone_index:03d}_decomposed_drift.npz",
+                    relative_position=np.full(shape, clone_index, dtype=float),
+                    relative_velocity=np.full(shape, 2 * clone_index, dtype=float),
+                    center_velocity=np.zeros(shape),
+                    relative_drift=np.full(shape, 3 * clone_index, dtype=float),
+                    center_drift=np.zeros(shape),
+                    target_indices=targets,
+                    trajectory_sha256=np.asarray(source_hash),
+                    thermodynamic_claim_allowed=0.0,
+                )
+            np.savez(
+                first_second_directory / "clone_002_relative_second_generator.npz",
+                second_relative_generator=np.full(shape, 20.0),
+                target_indices=targets,
+                trajectory_sha256=np.asarray("hash-b"),
+                completed_frame_count=8.0,
+                requested_frame_count=8.0,
+                potential_protocol=np.asarray("ka_lj_cut"),
+                trace_probe_count=4.0,
+                thermodynamic_claim_allowed=0.0,
+            )
+            np.savez(
+                second_second_directory / "clone_001_relative_second_generator.npz",
+                second_relative_generator=np.full(shape, 10.0),
+                target_indices=targets,
+                trajectory_sha256=np.asarray("hash-a"),
+                completed_frame_count=8.0,
+                requested_frame_count=8.0,
+                potential_protocol=np.asarray("ka_lj_cut"),
+                trace_probe_count=4.0,
+                thermodynamic_claim_allowed=0.0,
+            )
+
+            clones = load_matched_second_generator_clones(
+                drift_directory,
+                [first_second_directory, second_second_directory],
+                maximum_frame_count=5,
+            )
+
+        self.assertEqual([clone["trajectory_sha256"] for clone in clones], ["hash-a", "hash-b"])
+        self.assertEqual(np.asarray(clones[0]["relative_position"]).shape, (5, 1, 3))
+        np.testing.assert_allclose(clones[0]["second_relative_generator"], 10.0)
+        np.testing.assert_allclose(clones[1]["second_relative_generator"], 20.0)
+
+    def test_second_generator_loader_retains_projected_force_validation_field(self):
+        shape = (2, 1, 3)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "drift.npz"
+            np.savez(
+                path,
+                relative_position=np.zeros(shape),
+                relative_velocity=np.ones(shape),
+                center_velocity=np.ones(shape),
+                relative_drift=np.full(shape, 2.0),
+                center_drift=np.full(shape, 3.0),
+                projected_force=np.full(shape, 4.0),
+                target_indices=np.array([7]),
+                trajectory_sha256=np.asarray("abc"),
+                thermodynamic_claim_allowed=0.0,
+            )
+
+            loaded = load_second_generator_drift_cache(path)
+
+        np.testing.assert_allclose(loaded["projected_force"], 4.0)
+
     def test_bias_centered_phase_state_flattens_particle_components(self):
         position = np.arange(2 * 2 * 3, dtype=float).reshape(2, 2, 3)
         velocity = 100.0 + position
@@ -216,6 +325,31 @@ class RelativeMoriTests(unittest.TestCase):
             "--innovation-block-lengths",
             "--fixed-innovation-block-length",
             "--validation-drift-cache-directory",
+        ):
+            self.assertIn(required, completed.stdout)
+
+    def test_relative_second_generator_cache_cli_exposes_frozen_numerical_controls(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "cache_ka_relative_second_generator.py"),
+                "--help",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for required in (
+            "--clone-directory",
+            "--drift-cache-directory",
+            "--output-cache-directory",
+            "--potential-protocol",
+            "--phase-space-step",
+            "--directional-step",
+            "--trace-probe-count",
+            "--trace-probe-seed",
+            "--probe-prefix-counts",
+            "--maximum-frame-count",
         ):
             self.assertIn(required, completed.stdout)
 
