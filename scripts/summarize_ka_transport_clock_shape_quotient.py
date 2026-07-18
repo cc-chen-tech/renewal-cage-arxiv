@@ -879,6 +879,7 @@ def write_transport_clock_shape_svg(
     _svg_text(parts, 90, 552, "clock-only closure rejected; residual mechanism remains unresolved", size=14, fill="#9b3a32")
     _svg_text(parts, 90, 580, "heldout MSD is a diagnostic input, not a blind prediction", size=14)
     _svg_text(parts, 90, 604, "T=0.58 canary only; no cooling, spatial, microscopic, or thermodynamic claim", size=13, fill="#46515c")
+    _svg_text(parts, 70, 92, "maximum normalized error (tolerance units)", size=12, fill="#46515c")
     _svg_text(parts, 850, 92, "gray: same time", size=12, fill="#5b6570")
     _svg_text(parts, 960, 92, "color: MSD matched", size=12, fill="#2f7d68")
     parts.append("</svg>\n")

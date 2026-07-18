@@ -77,5 +77,5 @@
 
 - [x] Add a RED artifact test requiring exact values, manifests marked non-independent, T058 canary status, and all closed claims.
 - [x] Add one concise README result paragraph; do not add manuscript prose or claim a cooling law.
-- [ ] Run focused tests, full Python 3.12 suite, result generator, arXiv package builder, and `git diff --check`.
+- [x] Run focused tests, full Python 3.12 suite, result generator, arXiv package builder, and `git diff --check`.
 - [ ] Commit intentionally, push `codex/transport-clock-shape-quotient`, create a ready PR with `gh pr create`, and inspect remote CI.
