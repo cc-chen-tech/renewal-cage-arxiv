@@ -26,6 +26,14 @@ The three restart labels share one parent trajectory, so their t95 summaries
 are exploratory correlated-parent diagnostics, not independent-sample
 confidence intervals.
 
+A post-run transport-clock / shape quotient further decomposes the failed
+T=0.45 full-path transfer. Reparameterizing the calibration observables by
+calibration MSD brings `Fs(k=2)` and `Fs(k=4)` within their frozen tolerances,
+while NGP and `Fs(k=7.25)` retain residual failures. Heldout MSD is a diagnostic
+input, not a blind prediction: this rejects clock-only closure without selecting
+finite exchange, static disorder, or spatial facilitation. T=0.58 remains a
+canary because stationarity and independent-parent controls are unresolved.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,

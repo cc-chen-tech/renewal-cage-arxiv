@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="650" viewBox="0 0 1120 650">
+<rect width="1120" height="650" fill="#ffffff"/>
+<text x="70.00" y="43.00" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" text-anchor="start" fill="#17212b">Transport clock / shape quotient</text>
+<text x="70.00" y="70.00" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#46515c">same heldout rows before and after calibration-MSD matching; no extrapolation</text>
+<rect x="70.00" y="105.00" width="480.00" height="350.00" fill="#fbfcfd" stroke="#c7ced5"/>
+<text x="86.00" y="133.00" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#17212b">T=0.45 exploratory decomposition</text>
+<line x1="125.00" y1="400.00" x2="530.00" y2="400.00" stroke="#e2e6ea" stroke-width="1"/>
+<text x="117.00" y="405.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#5b6570">0</text>
+<line x1="125.00" y1="327.94" x2="530.00" y2="327.94" stroke="#e2e6ea" stroke-width="1"/>
+<text x="117.00" y="332.94" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#5b6570">1</text>
+<line x1="125.00" y1="255.88" x2="530.00" y2="255.88" stroke="#e2e6ea" stroke-width="1"/>
+<text x="117.00" y="260.88" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#5b6570">2</text>
+<line x1="125.00" y1="183.82" x2="530.00" y2="183.82" stroke="#e2e6ea" stroke-width="1"/>
+<text x="117.00" y="188.82" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#5b6570">3</text>
+<line x1="125.00" y1="327.94" x2="530.00" y2="327.94" stroke="#9b3a32" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="528.00" y="167.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="end" fill="#9b3a32">frozen tolerance = 1</text>
+<rect x="152.62" y="290.46" width="20" height="109.54" fill="#7d8791"/>
+<rect x="178.62" y="323.00" width="20" height="77.00" fill="#b34a42"/>
+<text x="175.62" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">NGP</text>
+<rect x="253.88" y="282.93" width="20" height="117.07" fill="#7d8791"/>
+<rect x="279.88" y="391.09" width="20" height="8.91" fill="#2f7d68"/>
+<text x="276.88" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">Fs(k=2)</text>
+<rect x="355.12" y="184.96" width="20" height="215.04" fill="#7d8791"/>
+<rect x="381.12" y="363.34" width="20" height="36.66" fill="#2f7d68"/>
+<text x="378.12" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">Fs(k=4)</text>
+<rect x="456.38" y="177.35" width="20" height="222.65" fill="#7d8791"/>
+<rect x="482.38" y="318.31" width="20" height="81.69" fill="#b34a42"/>
+<text x="479.38" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">Fs(k=7.25)</text>
+<text x="86.00" y="437.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#46515c">replicate clock-drift signs: -, +, -</text>
+<rect x="570.00" y="105.00" width="480.00" height="350.00" fill="#fbfcfd" stroke="#c7ced5"/>
+<text x="586.00" y="133.00" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#17212b">T=0.58 canary only</text>
+<line x1="625.00" y1="400.00" x2="1030.00" y2="400.00" stroke="#e2e6ea" stroke-width="1"/>
+<text x="617.00" y="405.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#5b6570">0</text>
+<line x1="625.00" y1="297.92" x2="1030.00" y2="297.92" stroke="#e2e6ea" stroke-width="1"/>
+<text x="617.00" y="302.92" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#5b6570">1</text>
+<line x1="625.00" y1="195.83" x2="1030.00" y2="195.83" stroke="#e2e6ea" stroke-width="1"/>
+<text x="617.00" y="200.83" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#5b6570">2</text>
+<line x1="625.00" y1="297.92" x2="1030.00" y2="297.92" stroke="#9b3a32" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="1028.00" y="167.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="end" fill="#9b3a32">frozen tolerance = 1</text>
+<rect x="652.62" y="371.41" width="20" height="28.59" fill="#7d8791"/>
+<rect x="678.62" y="376.79" width="20" height="23.21" fill="#2f7d68"/>
+<text x="675.62" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">NGP</text>
+<rect x="753.88" y="189.11" width="20" height="210.89" fill="#7d8791"/>
+<rect x="779.88" y="342.17" width="20" height="57.83" fill="#2f7d68"/>
+<text x="776.88" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">Fs(k=2)</text>
+<rect x="855.12" y="241.85" width="20" height="158.15" fill="#7d8791"/>
+<rect x="881.12" y="315.85" width="20" height="84.15" fill="#2f7d68"/>
+<text x="878.12" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">Fs(k=4)</text>
+<rect x="956.38" y="317.85" width="20" height="82.15" fill="#7d8791"/>
+<rect x="982.38" y="338.94" width="20" height="61.06" fill="#2f7d68"/>
+<text x="979.38" y="424.00" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#17212b">Fs(k=7.25)</text>
+<text x="586.00" y="437.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#46515c">replicate clock-drift signs: -, -, -, -, -</text>
+<rect x="70" y="490" width="980" height="125" fill="#f4f6f7" stroke="#c7ced5"/>
+<text x="90.00" y="522.00" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#17212b">T=0.45: low/intermediate-k scattering transfers; NGP and cage-scale shape do not.</text>
+<text x="90.00" y="552.00" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#9b3a32">clock-only closure rejected; residual mechanism remains unresolved</text>
+<text x="90.00" y="580.00" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#17212b">heldout MSD is a diagnostic input, not a blind prediction</text>
+<text x="90.00" y="604.00" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#46515c">T=0.58 canary only; no cooling, spatial, microscopic, or thermodynamic claim</text>
+<text x="850.00" y="92.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6570">gray: same time</text>
+<text x="960.00" y="92.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#2f7d68">color: MSD matched</text>
+</svg>
