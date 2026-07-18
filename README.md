@@ -34,6 +34,14 @@ input, not a blind prediction: this rejects clock-only closure without selecting
 finite exchange, static disorder, or spatial facilitation. T=0.58 remains a
 canary because stationarity and independent-parent controls are unresolved.
 
+A gamma variance-mixture Langevin diagnostic then tests the minimal positive
+scalar-mobility explanation. Heldout MSD and NGP predict `Fs(k=2)` and
+`Fs(k=4)` within tolerance but fail at the T=0.45 cage-scale wave number
+`k=7.25` (maximum normalized error `1.3854`). A squared-OU mobility simulation
+validates the analytic slow-field limit, while an added OU-cage variance has
+insufficient exact inversion support. This is a diagnostic rejection of the
+scalar-mobility closure, not a blind microdynamic or spatial mechanism claim.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,

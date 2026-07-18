@@ -32,6 +32,10 @@ from summarize_ka_transport_clock_shape_quotient import (  # noqa: E402
     CLOSED_GATE_FIELDS as TRANSPORT_CLOCK_CLOSED_GATE_FIELDS,
     main as summarize_transport_clock_shape_quotient,
 )
+from summarize_ka_gamma_variance_mixture import (  # noqa: E402
+    CLOSED_GATE_FIELDS as GAMMA_VARIANCE_CLOSED_GATE_FIELDS,
+    main as summarize_gamma_variance_mixture,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
@@ -431,6 +435,111 @@ class ArxivPackageTests(unittest.TestCase):
         note = note_path.read_text()
         self.assertIn("full-path replicate baseline itself does not close", note)
         self.assertIn("finite_memory_state_addition_allowed = 0", note)
+
+    def test_gamma_variance_mixture_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        rows_path = data / "renewal_cage_ka_gamma_variance_mixture_rows.csv"
+        gate_path = data / "renewal_cage_ka_gamma_variance_mixture_gate.csv"
+        simulation_path = (
+            data / "renewal_cage_gamma_variance_mixture_langevin_validation.csv"
+        )
+        figure_path = ROOT / "figures" / "renewal_cage_ka_gamma_variance_mixture.svg"
+        note_path = ROOT / "docs" / "microscopic-gamma-variance-mixture.md"
+        for path in (rows_path, gate_path, simulation_path, figure_path, note_path):
+            self.assertTrue(path.is_file(), path)
+
+        with rows_path.open() as handle:
+            rows = list(csv.DictReader(handle))
+        with gate_path.open() as handle:
+            gates = list(csv.DictReader(handle))
+        with simulation_path.open() as handle:
+            simulation = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 46)
+        self.assertEqual(len(gates), 2)
+        self.assertEqual(len(simulation), 3)
+        low = next(row for row in gates if float(row["temperature"]) == 0.45)
+        high = next(row for row in gates if float(row["temperature"]) == 0.58)
+        self.assertEqual(low["analysis_status"], "scalar_mobility_cage_scale_residual")
+        self.assertAlmostEqual(
+            float(low["fs_k7p25_gamma_max_normalized_error"]),
+            1.38542105249768,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            float(low["minimum_cage_root_support_fraction"]),
+            3.0 / 7.0,
+            places=12,
+        )
+        self.assertEqual(
+            float(low["scalar_mobility_low_intermediate_k_supported_exploratory"]),
+            1.0,
+        )
+        self.assertEqual(
+            float(low["scalar_mobility_shape_closure_supported_exploratory"]),
+            0.0,
+        )
+        self.assertEqual(float(low["cage_plus_mobility_support_coverage_pass"]), 0.0)
+        self.assertEqual(high["analysis_status"], "high_temperature_canary_only")
+        self.assertEqual(float(high["high_temperature_control_resolved"]), 0.0)
+        for gate in gates:
+            self.assertEqual(float(gate["replicate_provenance_validation_pass"]), 1.0)
+            self.assertEqual(float(gate["parent_sample_count"]), 1.0)
+            self.assertEqual(float(gate["independent_replicate_count"]), 0.0)
+            for field in GAMMA_VARIANCE_CLOSED_GATE_FIELDS:
+                self.assertEqual(float(gate[field]), 0.0, (gate["temperature"], field))
+
+        slow = next(row for row in simulation if float(row["tau_D_over_t"]) == 100.0)
+        self.assertEqual(float(slow["slow_environment_limit_validation_pass"]), 1.0)
+        self.assertLess(float(slow["msd_relative_error"]), 0.015)
+        self.assertLess(float(slow["ngp_absolute_error"]), 0.035)
+        self.assertLess(float(slow["maximum_fs_absolute_error"]), 0.012)
+
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            generated = [
+                temporary / "rows.csv",
+                temporary / "gate.csv",
+                temporary / "simulation.csv",
+                temporary / "figure.svg",
+            ]
+            summarize_gamma_variance_mixture(
+                [
+                    "--low-rows",
+                    str(data / "renewal_cage_ka_replicates_T045_segment_splice_rows.csv"),
+                    "--high-rows",
+                    str(data / "renewal_cage_ka_replicates_T058_segment_splice_rows.csv"),
+                    "--low-stationarity",
+                    str(data / "renewal_cage_ka_replicates_T045_nonlinear_path_stationarity.csv"),
+                    "--high-stationarity",
+                    str(data / "renewal_cage_ka_replicates_T058_block20_nonlinear_path_stationarity.csv"),
+                    "--provenance",
+                    str(data / "renewal_cage_ka_replicates_T058_T045_provenance.csv"),
+                    "--output-rows",
+                    str(generated[0]),
+                    "--output-gate",
+                    str(generated[1]),
+                    "--output-simulation",
+                    str(generated[2]),
+                    "--output-svg",
+                    str(generated[3]),
+                ]
+            )
+            for stored, recomputed in zip(
+                (rows_path, gate_path, simulation_path, figure_path), generated
+            ):
+                self.assertEqual(stored.read_bytes(), recomputed.read_bytes())
+
+        svg = figure_path.read_text()
+        self.assertIn("maximum normalized Fs error (tolerance units)", svg)
+        self.assertIn("scalar mobility fails at cage scale", svg)
+        self.assertIn("T=0.58 canary only", svg)
+        note = re.sub(r"\s+", " ", note_path.read_text())
+        self.assertIn("linear Gaussian GLE is an exact null", note)
+        self.assertIn("heldout MSD and NGP are diagnostic inputs", note)
+        self.assertIn("microdynamic_closure_claim_allowed = 0", note)
+        readme = re.sub(r"\s+", " ", (ROOT / "README.md").read_text())
+        self.assertIn("gamma variance-mixture Langevin", readme)
+        self.assertIn("fail at the T=0.45 cage-scale wave number", readme)
 
     def test_transport_clock_shape_quotient_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

@@ -14,15 +14,14 @@ it fails.
 
 ## Tasks
 
-- [ ] Add RED unit tests for gamma/shifted-gamma formulas, Gaussian limit,
+- [x] Add RED unit tests for gamma/shifted-gamma formulas, Gaussian limit,
   bracketed cage inversion, malformed inputs, and exact provenance.
-- [ ] Implement validated real-data rows and fail-closed two-temperature gate.
-- [ ] Add RED simulation tests, then implement exact stationary OU updates and
+- [x] Implement validated real-data rows and fail-closed two-temperature gate.
+- [x] Add RED simulation tests, then implement exact stationary OU updates and
   deterministic finite-`tau_D` validation.
-- [ ] Generate deterministic CSV/SVG artifacts and derive the microscopic
+- [x] Generate deterministic CSV/SVG artifacts and derive the microscopic
   formula in a concise research note.
-- [ ] Add arXiv recomputation/claim-boundary coverage and README result text.
-- [ ] Run focused tests, full suite, result generator, arXiv builder, visual
+- [x] Add arXiv recomputation/claim-boundary coverage and README result text.
+- [x] Run focused tests, full suite, result generator, arXiv builder, visual
   inspection, and `git diff --check`.
 - [ ] Commit, push, create a ready PR, and inspect CI.
-
