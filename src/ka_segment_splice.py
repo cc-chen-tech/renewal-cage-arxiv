@@ -331,6 +331,10 @@ def audit_segment_surrogate(
     complete_path_ensemble_equal = bool(
         full_path_control and token_multiset and block_multiset and value_match
     )
+    global_source_segment_schedule_preserved = bool(
+        provenance_shape_pass
+        and np.all(source_segment == source_segment[0:1])
+    )
     return {
         "source_token_count": float(particle_count * segment_count),
         "target_token_count": float(token_provenance.size),
@@ -344,6 +348,9 @@ def audit_segment_surrogate(
             token_multiset and value_match
         ),
         "complete_particle_paths": float(provenance_shape_pass and length_match),
+        "global_source_segment_schedule_preserved": float(
+            global_source_segment_schedule_preserved
+        ),
         "within_particle_vector_multiset_preserved": float(within_particle_multiset),
         "same_source_assignment_fraction": same_source_fraction,
         "adjacent_same_source_segment_fraction": adjacent_same_source,

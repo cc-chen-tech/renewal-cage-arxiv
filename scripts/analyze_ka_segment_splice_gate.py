@@ -907,6 +907,7 @@ def classify_segment_cells(
             and float(row["segment_length_histogram_preserved"]) == 1.0
             and float(row["internal_adjacent_pair_multiset_preserved"]) == 1.0
             and float(row["complete_particle_paths"]) == 1.0
+            and float(row["global_source_segment_schedule_preserved"]) == 1.0
             and (
                 float(row["within_particle_vector_multiset_preserved"]) == 1.0
                 if model == "within_particle_segment_shuffle"
@@ -968,6 +969,12 @@ def classify_segment_cells(
                 "required_realization_count": float(expected_realizations),
                 "realization_completeness_pass": float(realization_complete),
                 "exact_information_pass": float(exact_information),
+                "global_source_segment_schedule_preserved": float(
+                    all(
+                        float(row["global_source_segment_schedule_preserved"]) == 1.0
+                        for row in quality
+                    )
+                ),
                 "provenance_claim_boundary_pass": float(provenance_pass),
                 "stationarity_control_pass": float(stationarity_pass),
                 "maximum_ensemble_msd_relative_error": maximum_msd,
@@ -979,6 +986,12 @@ def classify_segment_cells(
                 "precision_pass": float(precision_pass),
                 "curve_transfer_pass": float(curve_pass),
                 "cell_pass": float(cell_pass),
+                "full_path_control": float(
+                    segment_length == max(expected_grids[temperature])
+                ),
+                "memory_length_selectable": float(
+                    segment_length < max(expected_grids[temperature])
+                ),
                 "heldout_path_used_in_prediction": 0.0,
                 "macro_fit_parameter_count": 0.0,
                 "microdynamic_closure_claim_allowed": 0.0,

@@ -278,6 +278,7 @@ class SegmentAuditTests(unittest.TestCase):
             self.assertEqual(audit["segment_length_histogram_preserved"], 1.0)
             self.assertEqual(audit["internal_adjacent_pair_multiset_preserved"], 1.0)
             self.assertEqual(audit["complete_particle_paths"], 1.0)
+            self.assertEqual(audit["global_source_segment_schedule_preserved"], 1.0)
             self.assertEqual(audit["heldout_path_used_in_prediction"], 0.0)
             self.assertEqual(audit["macro_fit_parameter_count"], 0.0)
             self.assertEqual(audit["microdynamic_closure_claim_allowed"], 0.0)
@@ -340,6 +341,21 @@ class SegmentAuditTests(unittest.TestCase):
             model="cross_particle_segment_splice",
         )
         self.assertEqual(value_audit["global_block_vector_multiset_preserved"], 0.0)
+
+        changed_schedule = cross.source_segment.copy()
+        changed_schedule[0] = np.roll(changed_schedule[0], 1)
+        schedule_audit = audit_segment_surrogate(
+            blocks,
+            SegmentSurrogate(
+                blocks=cross.blocks.copy(),
+                source_particle=cross.source_particle.copy(),
+                source_segment=changed_schedule,
+                target_segment_lengths=cross.target_segment_lengths.copy(),
+            ),
+            segment_length=3,
+            model="cross_particle_segment_splice",
+        )
+        self.assertEqual(schedule_audit["global_source_segment_schedule_preserved"], 0.0)
 
     def test_full_path_cross_control_is_a_whole_path_permutation(self):
         blocks = encoded_blocks(particle_count=7, block_count=7)
@@ -456,6 +472,7 @@ def valid_segment_classifier_inputs():
                             "segment_length_histogram_preserved": 1.0,
                             "internal_adjacent_pair_multiset_preserved": 1.0,
                             "complete_particle_paths": 1.0,
+                            "global_source_segment_schedule_preserved": 1.0,
                             "within_particle_vector_multiset_preserved": (
                                 1.0
                                 if model == "within_particle_segment_shuffle"
@@ -599,6 +616,13 @@ class SegmentCellClassifierTests(unittest.TestCase):
         self.assertTrue(all(row["realization_completeness_pass"] == 1.0 for row in cells))
         self.assertTrue(all(row["exact_information_pass"] == 1.0 for row in cells))
         self.assertTrue(all(row["stationarity_control_pass"] == 1.0 for row in cells))
+        self.assertEqual(
+            {
+                (row["segment_length"], row["full_path_control"], row["memory_length_selectable"])
+                for row in cells
+            },
+            {(1.0, 0.0, 1.0), (2.0, 1.0, 0.0)},
+        )
 
     def test_each_quality_and_claim_boundary_can_reject_a_cell(self):
         quality_fields = (
@@ -610,6 +634,7 @@ class SegmentCellClassifierTests(unittest.TestCase):
             ("segment_length_histogram_preserved", 0.0),
             ("internal_adjacent_pair_multiset_preserved", 0.0),
             ("complete_particle_paths", 0.0),
+            ("global_source_segment_schedule_preserved", 0.0),
             ("heldout_path_used_in_prediction", 1.0),
             ("macro_fit_parameter_count", 1.0),
             ("microdynamic_closure_claim_allowed", 1.0),
@@ -1059,6 +1084,234 @@ class SegmentRunnerTests(unittest.TestCase):
         self.assertEqual(args.extended_realizations, 64)
         self.assertEqual(args.base_seed, 20260718)
         self.assertEqual(args.output_directory, Path("output"))
+
+
+def segment_cell_fixture(
+    temperature,
+    *,
+    within_start,
+    cross_start,
+    failed_support=None,
+):
+    grid = (
+        (1, 2, 5, 10, 25, 50, 125, 250)
+        if temperature == 0.45
+        else (1, 2, 4, 8, 16, 32, 37)
+    )
+    starts = {
+        "within_particle_segment_shuffle": within_start,
+        "cross_particle_segment_splice": cross_start,
+    }
+    rows = []
+    for model, start in starts.items():
+        for length in grid:
+            curve = start is not None and length >= start and length < grid[-1]
+            row = {
+                "temperature": temperature,
+                "model": model,
+                "segment_length": float(length),
+                "realization_completeness_pass": 1.0,
+                "exact_information_pass": 1.0,
+                "provenance_claim_boundary_pass": 1.0,
+                "stationarity_control_pass": 1.0,
+                "precision_pass": 1.0,
+                "global_source_segment_schedule_preserved": 1.0,
+                "curve_transfer_pass": float(curve),
+                "cell_pass": float(curve),
+                "full_path_control": float(length == grid[-1]),
+                "memory_length_selectable": float(length < grid[-1]),
+                "microdynamic_closure_claim_allowed": 0.0,
+                "spatial_facilitation_claim_allowed": 0.0,
+                "thermodynamic_claim_allowed": 0.0,
+            }
+            if failed_support is not None and model == failed_support[0] and length == failed_support[1]:
+                row[failed_support[2]] = 0.0
+                row["cell_pass"] = 0.0
+            rows.append(row)
+    return rows
+
+
+def segment_score_fixture(temperature, *, within_score=0.4, cross_score=0.7):
+    grid = (
+        (1, 2, 5, 10, 25, 50, 125, 250)
+        if temperature == 0.45
+        else (1, 2, 4, 8, 16, 32, 37)
+    )
+    replicate_count = 3 if temperature == 0.45 else 5
+    return [
+        {
+            "temperature": temperature,
+            "model": model,
+            "segment_length": float(length),
+            "replicate": float(replicate),
+            "higher_order_score": score,
+            "microdynamic_closure_claim_allowed": 0.0,
+            "spatial_facilitation_claim_allowed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        for model, score in (
+            ("within_particle_segment_shuffle", within_score),
+            ("cross_particle_segment_splice", cross_score),
+        )
+        for length in grid
+        for replicate in range(1, replicate_count + 1)
+    ]
+
+
+class SegmentMemorySelectionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.summary = load_script_module(
+            "summarize_ka_segment_splice_gate.py",
+            "summarize_ka_segment_splice_gate_selection",
+        )
+
+    def test_selector_requires_a_complete_monotone_nonfull_tail(self):
+        grid = (1, 2, 5, 10, 25, 50, 125, 250)
+        rows = segment_cell_fixture(0.45, within_start=25, cross_start=None)
+        self.assertEqual(
+            self.summary.select_monotone_memory_length(
+                rows,
+                model="within_particle_segment_shuffle",
+                temperature=0.45,
+                block_count=250,
+                required_grid=grid,
+            ),
+            25,
+        )
+        isolated = [dict(row) for row in rows]
+        for row in isolated:
+            if row["model"] == "within_particle_segment_shuffle":
+                row["curve_transfer_pass"] = float(row["segment_length"] in {2.0, 250.0})
+        self.assertIsNone(
+            self.summary.select_monotone_memory_length(
+                isolated,
+                model="within_particle_segment_shuffle",
+                temperature=0.45,
+                block_count=250,
+                required_grid=grid,
+            )
+        )
+        only_full = [dict(row) for row in rows]
+        for row in only_full:
+            if row["model"] == "within_particle_segment_shuffle":
+                row["curve_transfer_pass"] = float(row["segment_length"] == 250.0)
+        self.assertIsNone(
+            self.summary.select_monotone_memory_length(
+                only_full,
+                model="within_particle_segment_shuffle",
+                temperature=0.45,
+                block_count=250,
+                required_grid=grid,
+            )
+        )
+
+    def test_selector_rejects_incomplete_duplicate_or_unresolved_support(self):
+        grid = (1, 2, 5, 10, 25, 50, 125, 250)
+        rows = segment_cell_fixture(0.45, within_start=25, cross_start=None)
+        local = [row for row in rows if row["model"] == "within_particle_segment_shuffle"]
+        variants = (
+            local[:-1],
+            local + [dict(local[-1])],
+            [{**row, "precision_pass": 0.0} if row["segment_length"] == 25.0 else row for row in local],
+            [{**row, "memory_length_selectable": 1.0} if row["segment_length"] == 250.0 else row for row in local],
+        )
+        for variant in variants:
+            with self.assertRaises(ValueError):
+                self.summary.select_monotone_memory_length(
+                    variant,
+                    model="within_particle_segment_shuffle",
+                    temperature=0.45,
+                    block_count=250,
+                    required_grid=grid,
+                )
+
+
+class SegmentGateDecisionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.summary = load_script_module(
+            "summarize_ka_segment_splice_gate.py",
+            "summarize_ka_segment_splice_gate_decision",
+        )
+
+    def classify(self, low_within, low_cross, *, failed_support=None, within_score=0.4, cross_score=0.7):
+        return self.summary.classify_segment_splice_gate(
+            segment_cell_fixture(
+                0.45,
+                within_start=low_within,
+                cross_start=low_cross,
+                failed_support=failed_support,
+            ),
+            segment_cell_fixture(0.58, within_start=8, cross_start=8),
+            segment_score_fixture(
+                0.45,
+                within_score=within_score,
+                cross_score=cross_score,
+            ),
+            segment_score_fixture(0.58),
+        )
+
+    def test_decision_table_covers_all_five_frozen_states(self):
+        cases = (
+            (
+                25,
+                25,
+                "finite_single_particle_path_memory_sufficient_conditional_on_global_schedule",
+            ),
+            (25, 50, "persistent_environment_identity_required_beyond_local_path"),
+            (None, None, "longer_or_richer_path_state_required"),
+            (50, 25, "null_family_pathology_unresolved"),
+        )
+        for within, cross, expected in cases:
+            with self.subTest(expected=expected):
+                verdict = self.classify(within, cross)
+                self.assertEqual(verdict["mechanism_state"], expected)
+                self.assertEqual(verdict["global_source_segment_schedule_preserved"], 1.0)
+                self.assertEqual(
+                    verdict["substantive_interpretation_condition"],
+                    "conditional_on_preserved_global_source_segment_schedule",
+                )
+                self.assertEqual(verdict["within_cooling_memory_growth"], 1.0 if within else 0.0)
+                self.assertEqual(verdict["microdynamic_closure_claim_allowed"], 0.0)
+                self.assertEqual(verdict["spatial_facilitation_claim_allowed"], 0.0)
+                self.assertEqual(verdict["thermodynamic_claim_allowed"], 0.0)
+
+        unresolved = self.classify(
+            25,
+            50,
+            failed_support=("within_particle_segment_shuffle", 25, "precision_pass"),
+        )
+        self.assertEqual(unresolved["mechanism_state"], "mechanism_unresolved")
+
+    def test_substantive_states_require_all_replicate_scores_and_strict_ordering(self):
+        score_failure = self.classify(25, 25, within_score=1.01)
+        self.assertEqual(score_failure["mechanism_state"], "mechanism_unresolved")
+        tied_persistent = self.classify(25, 50, within_score=0.7, cross_score=0.7)
+        self.assertEqual(tied_persistent["mechanism_state"], "mechanism_unresolved")
+
+    def test_svg_is_deterministic_finite_and_marks_the_claim_boundary(self):
+        low = segment_cell_fixture(0.45, within_start=25, cross_start=50)
+        high = segment_cell_fixture(0.58, within_start=8, cross_start=8)
+        for index, row in enumerate(low + high):
+            row["maximum_ensemble_msd_relative_error"] = 0.01 + 0.001 * index
+            row["maximum_ensemble_ngp_absolute_error"] = 0.02 + 0.002 * index
+            row["maximum_ensemble_fs_absolute_error"] = 0.003 + 0.0001 * index
+            row["tau_L"] = 20.0 * row["segment_length"]
+        verdict = self.classify(25, 50)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "gate.svg"
+            self.summary.write_gate_svg(output, low + high, verdict)
+            first = output.read_bytes()
+            self.summary.write_gate_svg(output, low + high, verdict)
+            self.assertEqual(first, output.read_bytes())
+            text = first.decode()
+        self.assertIn("tolerance = 1", text)
+        self.assertIn("full-path control", text)
+        self.assertIn(verdict["mechanism_state"], text)
+        self.assertIn("no microscopic, spatial-facilitation, or thermodynamic claim", text)
+        self.assertNotIn("nan", text.lower())
+        self.assertNotIn("inf", text.lower())
 
 
 if __name__ == "__main__":
