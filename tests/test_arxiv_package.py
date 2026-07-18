@@ -247,6 +247,9 @@ class ArxivPackageTests(unittest.TestCase):
 
         svg = (ROOT / "figures" / "renewal_cage_ka_segment_splice_gate.svg").read_text()
         self.assertIn("full-path control", svg)
+        self.assertIn("normalized maximum error (clipped at 2.5)", svg)
+        self.assertIn("&gt;=2.5", svg)
+        self.assertIn('data-clipped="true"', svg)
         self.assertIn("no microscopic, spatial-facilitation, or thermodynamic claim", svg)
         coordinates = [float(value) for value in re.findall(r'(?:(?:x|y)[12]?|cx|cy)="([0-9.]+)"', svg)]
         self.assertTrue(coordinates)

@@ -476,8 +476,15 @@ def write_gate_svg(
                 f'<line x1="{full_x:.1f}" y1="{panel_top:.1f}" x2="{full_x:.1f}" y2="{panel_top + panel_height:.1f}" stroke="#777777" stroke-width="2"/>',
                 f'<text x="{full_x - 6:.1f}" y="{panel_top + 18:.1f}" text-anchor="end" font-size="11">full-path control</text>',
                 f'<text x="{left + panel_width / 2:.1f}" y="82" text-anchor="middle" font-size="20" font-weight="bold">T = {temperature:.2f}</text>',
+                f'<text x="{left - 62:.1f}" y="{panel_top + panel_height / 2:.1f}" text-anchor="middle" font-size="11" transform="rotate(-90 {left - 62:.1f} {panel_top + panel_height / 2:.1f})">normalized maximum error (clipped at 2.5)</text>',
             )
         )
+        for tick, label in ((0.0, "0"), (1.0, "1"), (2.0, "2"), (2.5, "&gt;=2.5")):
+            y = y_position(tick)
+            elements.append(
+                f'<line x1="{left - 5:.1f}" y1="{y:.1f}" x2="{left:.1f}" y2="{y:.1f}" stroke="#555555"/>'
+                f'<text x="{left - 9:.1f}" y="{y + 4:.1f}" text-anchor="end" font-size="10">{label}</text>'
+            )
         for model in MODELS:
             model_rows = {
                 int(_finite(row, "segment_length")): row
@@ -490,16 +497,23 @@ def write_gate_svg(
                 points = []
                 for length in lengths:
                     normalized = _finite(model_rows[length], key) / tolerance
-                    points.append((x_position(length), y_position(normalized)))
+                    points.append(
+                        (x_position(length), y_position(normalized), normalized >= 2.5)
+                    )
                 dash_attribute = f' stroke-dasharray="{dash}"' if dash else ""
-                point_text = " ".join(f"{x:.2f},{y:.2f}" for x, y in points)
+                point_text = " ".join(f"{x:.2f},{y:.2f}" for x, y, _ in points)
                 elements.append(
                     f'<polyline points="{point_text}" fill="none" stroke="{colors[model]}" stroke-width="2.2"{dash_attribute}/>'
                 )
-                elements.extend(
-                    f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3.2" fill="{colors[model]}"/>'
-                    for x, y in points
-                )
+                for x, y, clipped in points:
+                    if clipped:
+                        elements.append(
+                            f'<polygon data-clipped="true" points="{x - 4:.2f},{y + 7:.2f} {x + 4:.2f},{y + 7:.2f} {x:.2f},{y:.2f}" fill="{colors[model]}"/>'
+                        )
+                    else:
+                        elements.append(
+                            f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3.2" fill="{colors[model]}"/>'
+                        )
         for index, length in enumerate(lengths):
             x = x_position(length)
             anchor = "middle"

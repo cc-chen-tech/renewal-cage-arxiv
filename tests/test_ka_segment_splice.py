@@ -1362,6 +1362,7 @@ class SegmentGateDecisionTests(unittest.TestCase):
             row["maximum_ensemble_ngp_absolute_error"] = 0.02 + 0.002 * index
             row["maximum_ensemble_fs_absolute_error"] = 0.003 + 0.0001 * index
             row["tau_L"] = 20.0 * row["segment_length"]
+        low[0]["maximum_ensemble_msd_relative_error"] = 1.0
         verdict = self.classify(25, 50)
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "gate.svg"
@@ -1372,6 +1373,9 @@ class SegmentGateDecisionTests(unittest.TestCase):
             text = first.decode()
         self.assertIn("tolerance = 1", text)
         self.assertIn("full-path control", text)
+        self.assertIn("normalized maximum error (clipped at 2.5)", text)
+        self.assertIn("&gt;=2.5", text)
+        self.assertIn('data-clipped="true"', text)
         self.assertIn(verdict["mechanism_state"], text)
         self.assertIn("no microscopic, spatial-facilitation, or thermodynamic claim", text)
         self.assertNotIn("nan", text.lower())
