@@ -40,6 +40,15 @@ from summarize_ka_activated_cage_geometry import (  # noqa: E402
     STRONG_ZERO_FLAGS as ACTIVATED_GEOMETRY_ZERO_FLAGS,
     main as summarize_activated_cage_geometry,
 )
+from summarize_ka_count_overdispersed_geometry import (  # noqa: E402
+    CLAIM_FLAGS as COUNT_OVERDISPERSED_ZERO_FLAGS,
+    analyze_committed_tables as analyze_count_overdispersed_geometry,
+)
+from analyze_transient_periodic_langevin import (  # noqa: E402
+    CLAIM_FLAGS as TRANSIENT_LANGEVIN_ZERO_FLAGS,
+    render_ablation_svg,
+    run_ablation as run_transient_langevin_ablation,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
@@ -51,6 +60,8 @@ class ArxivPackageTests(unittest.TestCase):
         except (TypeError, ValueError):
             self.assertEqual(stored[key], str(expected))
         else:
+            if math.isnan(stored_value) and math.isnan(expected_value):
+                return
             tolerance = max(1e-10, abs(expected_value) * 1e-11)
             self.assertAlmostEqual(stored_value, expected_value, delta=tolerance)
 
@@ -65,6 +76,96 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertEqual(set(stored_gate), set(computed_gate))
         for key, value in computed_gate.items():
             self.assertSerializedValueMatches(stored_gate, key, value)
+
+    def test_transient_periodic_langevin_is_recomputed_and_claim_limited(self):
+        data = ROOT / "data"
+        quotient_rows_path = data / "renewal_cage_ka_count_overdispersed_geometry_rows.csv"
+        quotient_gate_path = data / "renewal_cage_ka_count_overdispersed_geometry_gate.csv"
+        ablation_rows_path = data / "renewal_cage_transient_periodic_langevin_ablation.csv"
+        ablation_gate_path = data / "renewal_cage_transient_periodic_langevin_gate.csv"
+        figure_path = ROOT / "figures" / "renewal_cage_transient_periodic_langevin.svg"
+        note_path = ROOT / "docs" / "microscopic-transient-periodic-langevin.md"
+        for path in (
+            quotient_rows_path,
+            quotient_gate_path,
+            ablation_rows_path,
+            ablation_gate_path,
+            figure_path,
+            note_path,
+        ):
+            self.assertTrue(path.is_file(), path)
+
+        with quotient_rows_path.open() as handle:
+            stored_quotient_rows = list(csv.DictReader(handle))
+        with quotient_gate_path.open() as handle:
+            stored_quotient_gates = list(csv.DictReader(handle))
+        computed_quotient_rows, computed_quotient_gates = (
+            analyze_count_overdispersed_geometry(ROOT)
+        )
+        self.assertCsvRowsMatchComputedRows(
+            stored_quotient_rows,
+            computed_quotient_rows,
+        )
+        self.assertCsvRowsMatchComputedRows(
+            stored_quotient_gates,
+            computed_quotient_gates,
+        )
+
+        with ablation_rows_path.open() as handle:
+            stored_ablation_rows = list(csv.DictReader(handle))
+        with ablation_gate_path.open() as handle:
+            stored_ablation_gate = next(csv.DictReader(handle))
+        computed_ablation_rows, computed_ablation_gate = (
+            run_transient_langevin_ablation(seed=20260718, quick=False)
+        )
+        self.assertCsvRowsMatchComputedRows(
+            stored_ablation_rows,
+            computed_ablation_rows,
+        )
+        self.assertCsvGateMatchesComputedGate(
+            stored_ablation_gate,
+            computed_ablation_gate,
+        )
+
+        figure = figure_path.read_text()
+        self.assertEqual(
+            figure,
+            render_ablation_svg(computed_ablation_rows, computed_ablation_gate),
+        )
+        self.assertIn("count Fano factor", figure)
+        self.assertIn("successive cage-step correlation", figure)
+        self.assertIn("synthetic capability only", figure.lower())
+        match = re.search(r'viewBox="0 0 ([0-9.]+) ([0-9.]+)"', figure)
+        self.assertIsNotNone(match)
+        width, height = map(float, match.groups())
+        for axis, limit in (("x", width), ("y", height)):
+            coordinates = [
+                float(value)
+                for value in re.findall(rf'\b{axis}="([0-9.]+)"', figure)
+            ]
+            self.assertTrue(coordinates)
+            self.assertGreaterEqual(min(coordinates), 0.0)
+            self.assertLessEqual(max(coordinates), limit)
+
+        note = note_path.read_text()
+        for text in (
+            "20/21",
+            "0.041088459",
+            "0.046642857",
+            "static_periodic",
+            "rate_only",
+            "elastic_only",
+            "full_transient",
+            "Uneyama",
+            "synthetic capability",
+            "diagnostic input",
+            "unresolved",
+        ):
+            self.assertIn(text, note)
+        for key in COUNT_OVERDISPERSED_ZERO_FLAGS:
+            self.assertEqual(float(computed_quotient_gates[0][key]), 0.0)
+        for key in TRANSIENT_LANGEVIN_ZERO_FLAGS:
+            self.assertEqual(float(computed_ablation_gate[key]), 0.0)
 
     def test_memory_hierarchy_is_recomputed_and_claim_limited(self):
         data = ROOT / "data"

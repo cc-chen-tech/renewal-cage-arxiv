@@ -236,16 +236,111 @@ def run_ablation(
     return rows, gate
 
 
+def render_ablation_svg(
+    rows: list[dict[str, float | str]],
+    gate: dict[str, float | str],
+) -> str:
+    """Render a deterministic compact comparison of rate and recoil metrics."""
+
+    if [str(row["model"]) for row in rows] != [
+        "static_periodic",
+        "rate_only",
+        "elastic_only",
+        "full_transient",
+    ]:
+        raise ValueError("ablation rows must use the frozen model order")
+    colors = ("#687078", "#2f6fb0", "#2f8a62", "#c84d43")
+    labels = ("static", "rate only", "elastic only", "full")
+    fano_values = [float(row["count_fano_factor"]) for row in rows]
+    correlation_values = [float(row["successive_vector_correlation"]) for row in rows]
+    if any(not math.isfinite(value) for value in fano_values + correlation_values):
+        raise ValueError("ablation metrics must be finite")
+    fano_top = max(1.5, math.ceil(max(fano_values) * 10.0) / 10.0 + 0.1)
+    plot_top = 108.0
+    plot_bottom = 360.0
+    plot_height = plot_bottom - plot_top
+    fano_y = lambda value: plot_bottom - plot_height * value / fano_top
+    correlation_low = -0.12
+    correlation_high = 0.04
+    correlation_y = lambda value: plot_top + plot_height * (
+        correlation_high - value
+    ) / (correlation_high - correlation_low)
+    correlation_zero = correlation_y(0.0)
+    lines = [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">',
+        '<rect x="0" y="0" width="980" height="520" fill="#ffffff"/>',
+        '<text x="490" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#1f2529">Continuous transient-periodic Langevin ablation</text>',
+        '<text x="490" y="54" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4a5359">same thermal SDE and seed; barrier disorder and elastic recoil are switched separately</text>',
+        '<text x="260" y="84" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#1f2529">count Fano factor</text>',
+        '<text x="740" y="84" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#1f2529">successive cage-step correlation</text>',
+        '<line x1="70" y1="360" x2="450" y2="360" stroke="#3f474c" stroke-width="1"/>',
+        f'<line x1="550" y1="{correlation_zero:.3f}" x2="930" y2="{correlation_zero:.3f}" stroke="#3f474c" stroke-width="1"/>',
+        f'<text x="558" y="{correlation_zero - 5.0:.3f}" font-family="Arial, sans-serif" font-size="10" fill="#5b646a">zero</text>',
+    ]
+    for tick in (0.0, 0.5, 1.0, fano_top):
+        y = fano_y(tick)
+        lines.append(
+            f'<line x1="66" y1="{y:.3f}" x2="450" y2="{y:.3f}" stroke="#e1e5e7" stroke-width="1"/>'
+        )
+        lines.append(
+            f'<text x="60" y="{y + 4.0:.3f}" text-anchor="end" font-family="Arial, sans-serif" font-size="10" fill="#5b646a">{tick:g}</text>'
+        )
+    for tick in (-0.12, -0.08, -0.04, 0.0, 0.04):
+        y = correlation_y(tick)
+        lines.append(
+            f'<line x1="546" y1="{y:.3f}" x2="930" y2="{y:.3f}" stroke="#e1e5e7" stroke-width="1"/>'
+        )
+        lines.append(
+            f'<text x="540" y="{y + 4.0:.3f}" text-anchor="end" font-family="Arial, sans-serif" font-size="10" fill="#5b646a">{tick:.2f}</text>'
+        )
+    for index, (label, color, fano, correlation) in enumerate(
+        zip(labels, colors, fano_values, correlation_values)
+    ):
+        left_x = 92.0 + 88.0 * index
+        fano_top_y = fano_y(fano)
+        lines.extend(
+            [
+                f'<rect x="{left_x:.1f}" y="{fano_top_y:.3f}" width="54" height="{plot_bottom - fano_top_y:.3f}" fill="{color}"/>',
+                f'<text x="{left_x + 27.0:.1f}" y="{fano_top_y - 7.0:.3f}" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">{fano:.3f}</text>',
+                f'<text x="{left_x + 27.0:.1f}" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">{label}</text>',
+            ]
+        )
+        right_x = 572.0 + 88.0 * index
+        value_y = correlation_y(correlation)
+        rectangle_y = min(correlation_zero, value_y)
+        rectangle_height = abs(value_y - correlation_zero)
+        lines.extend(
+            [
+                f'<rect x="{right_x:.1f}" y="{rectangle_y:.3f}" width="54" height="{rectangle_height:.3f}" fill="{color}"/>',
+                f'<text x="{right_x + 27.0:.1f}" y="{value_y + 15.0:.3f}" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1f2529">{correlation:.3f}</text>',
+                f'<text x="{right_x + 27.0:.1f}" y="382" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#333b40">{label}</text>',
+            ]
+        )
+    lines.extend(
+        [
+            '<rect x="70" y="414" width="860" height="67" fill="#f5f7f8" stroke="#d4dade"/>',
+            f'<text x="90" y="438" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#1f2529">rate Fano increase: {int(float(gate["rate_disorder_count_fano_increase"]))}   elastic recoil ordering: {int(float(gate["elastic_memory_more_negative_step_correlation"]))}   full joint signature: {int(float(gate["full_model_joint_signature_pass"]))}</text>',
+            '<text x="90" y="461" font-family="Arial, sans-serif" font-size="12" fill="#4a5359">Synthetic capability only. No KA hidden coordinate, spatial facilitation, thermodynamic transition, or blind macro closure is identified.</text>',
+            '<text x="490" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#687078">continuous trajectories; non-recrossing dwell = 5 recorded frames</text>',
+            '</svg>',
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--output-rows", type=Path, required=True)
     parser.add_argument("--output-gate", type=Path, required=True)
+    parser.add_argument("--output-figure", type=Path, required=True)
     args = parser.parse_args()
     rows, gate = run_ablation(seed=args.seed, quick=args.quick)
     write_rows(args.output_rows, rows)
     write_rows(args.output_gate, [gate])
+    args.output_figure.parent.mkdir(parents=True, exist_ok=True)
+    args.output_figure.write_text(render_ablation_svg(rows, gate))
 
 
 if __name__ == "__main__":

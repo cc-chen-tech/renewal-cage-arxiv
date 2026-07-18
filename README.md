@@ -52,6 +52,19 @@ must enter the next cumulant closure. Heldout MSD and NGP remain diagnostic
 inputs, and all microscopic, spatial, unique-potential, and thermodynamic claim
 flags remain zero.
 
+A count-overdispersed geometry quotient now adds the calibration two-clock
+Fano factor to the same cumulant inversion. It restores T=0.45 physical support
+from `8/21` to `20/21`, but the maximum `Fs(k=7.25)` error remains
+`0.04109 > 0.03`; count fluctuations fix the moment budget but not cage-scale
+shape. A continuous transient-periodic Langevin canary then couples the tagged
+coordinate to a slow elastic coordinate `q` and a squared-OU barrier coordinate
+`z` in one FDT-consistent potential. Frozen ablations show that `z` raises
+count Fano while `q` produces negative successive cage-step correlation, and
+the full model produces both without discrete event rules. This is synthetic
+mechanism capability, not identification of `q,z` in KA or blind macro closure;
+all microscopic, spatial, unique-potential, and thermodynamic flags remain
+zero. See `docs/microscopic-transient-periodic-langevin.md`.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
