@@ -120,6 +120,19 @@ class VarianceMixtureKernelTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.summary.mixture_log_scattering(*arguments)
 
+    def test_csv_serialization_absorbs_platform_transcendental_drift(self):
+        self.assertEqual(self.summary.CSV_FLOAT_SIGNIFICANT_DIGITS, 8)
+        macos_value = 4.21459089287e-05
+        linux_value = 4.21459089148e-05
+        self.assertEqual(
+            self.summary.canonical_csv_value(macos_value),
+            self.summary.canonical_csv_value(linux_value),
+        )
+        self.assertNotEqual(
+            self.summary.canonical_csv_value(1.0),
+            self.summary.canonical_csv_value(1.0001),
+        )
+
     def test_scores_only_supported_complete_cells_and_keeps_claims_closed(self):
         rows = self.summary.compute_shape_quotient_rows(
             quotient_rows() + quotient_rows(supported=False)

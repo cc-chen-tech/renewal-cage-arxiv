@@ -669,22 +669,22 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertAlmostEqual(
             float(low["maximum_baseline_normalized_error"]),
             1.13359180983653,
-            places=12,
+            delta=5e-8,
         )
         self.assertAlmostEqual(
             float(low["maximum_fourth_normalized_error"]),
             5.66701641386661,
-            places=12,
+            delta=5e-8,
         )
         self.assertAlmostEqual(
             float(low["maximum_gamma_normalized_error"]),
             0.465837665728119,
-            places=12,
+            delta=5e-8,
         )
         self.assertAlmostEqual(
             float(low["maximum_inverse_gaussian_normalized_error"]),
             0.422604946010197,
-            places=12,
+            delta=5e-8,
         )
         self.assertEqual(float(low["family_robust_resummation_pass"]), 1.0)
         self.assertEqual(

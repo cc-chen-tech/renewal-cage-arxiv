@@ -33,7 +33,7 @@ OUTPUT_CLOSED_CLAIMS = (
 )
 FS_TOLERANCE = 0.03
 NGP_TOLERANCE = 0.30
-CSV_FLOAT_SIGNIFICANT_DIGITS = 15
+CSV_FLOAT_SIGNIFICANT_DIGITS = 8
 SOURCE_GATE_CLOSED_CLAIMS = (
     "blind_prediction_claim_allowed",
     "clock_only_closure_allowed",
