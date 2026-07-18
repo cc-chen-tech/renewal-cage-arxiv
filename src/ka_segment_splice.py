@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 import numpy as np
 
@@ -348,3 +349,71 @@ def audit_segment_surrogate(
         "spatial_facilitation_claim_allowed": 0.0,
         "thermodynamic_claim_allowed": 0.0,
     }
+
+
+def cumulative_observables_many_lags(
+    blocks: np.ndarray,
+    *,
+    block_counts: tuple[int, ...] | list[int],
+    wave_numbers: np.ndarray,
+) -> dict[int, dict[str, float]]:
+    """Evaluate frozen block-path observables from one cumulative prefix array."""
+
+    values = _validated_blocks(blocks)
+    try:
+        counts = tuple(block_counts)
+    except TypeError as error:
+        raise ValueError("block_counts must be a nonempty integer sequence") from error
+    if (
+        not counts
+        or len(set(counts)) != len(counts)
+        or any(
+            isinstance(count, bool)
+            or not isinstance(count, int)
+            or not 1 <= count <= values.shape[1]
+            for count in counts
+        )
+    ):
+        raise ValueError("block_counts must be unique integers on the block axis")
+    waves = np.asarray(wave_numbers, dtype=float)
+    if (
+        waves.ndim != 1
+        or len(waves) < 1
+        or np.any(~np.isfinite(waves))
+        or np.any(waves <= 0.0)
+    ):
+        raise ValueError("wave_numbers must be a positive finite vector")
+    prefix = np.concatenate(
+        [
+            np.zeros((values.shape[0], 1, values.shape[2])),
+            np.cumsum(values, axis=1),
+        ],
+        axis=1,
+    )
+    result: dict[int, dict[str, float]] = {}
+    for count in counts:
+        cumulative = prefix[:, count:] - prefix[:, :-count]
+        vectors = cumulative.reshape(-1, values.shape[2])
+        squared = np.sum(vectors**2, axis=1)
+        msd = float(np.mean(squared))
+        fourth = float(np.mean(squared**2))
+        row = {
+            "block_count": float(count),
+            "particle_window_count": float(len(vectors)),
+            "msd": msd,
+            "fourth_moment": fourth,
+            "ngp": (
+                values.shape[2]
+                / (values.shape[2] + 2.0)
+                * fourth
+                / msd**2
+                - 1.0
+                if msd > 0.0
+                else math.nan
+            ),
+        }
+        for wave_number in waves:
+            key = f"characteristic_k{wave_number:g}".replace(".", "p")
+            row[key] = float(np.mean(np.cos(wave_number * vectors)))
+        result[count] = row
+    return result
