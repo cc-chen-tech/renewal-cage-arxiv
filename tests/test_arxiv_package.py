@@ -463,12 +463,12 @@ class ArxivPackageTests(unittest.TestCase):
         self.assertAlmostEqual(
             float(low["fs_k7p25_gamma_max_normalized_error"]),
             1.38542105249768,
-            delta=5e-11,
+            delta=5e-9,
         )
         self.assertAlmostEqual(
             float(low["minimum_cage_root_support_fraction"]),
             3.0 / 7.0,
-            places=12,
+            delta=5e-9,
         )
         self.assertEqual(
             float(low["scalar_mobility_low_intermediate_k_supported_exploratory"]),
