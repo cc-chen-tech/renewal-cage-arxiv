@@ -42,6 +42,23 @@ ABLATION_MODELS = frozenset(
     }
 )
 
+PREDICTION_OBSERVABLES = (
+    "msd",
+    "ngp",
+    "fs_k2",
+    "fs_k4",
+    "fs_k7p25",
+)
+CURVE_LIMITS = {"msd": 0.10, "ngp": 0.30, "fs": 0.03}
+MC_LIMITS = {"msd": 0.01, "ngp": 0.03, "fs": 0.003}
+REQUIRED_MECHANISM_ABLATIONS = (
+    "mean_rate_null",
+    "one_step_jump_law",
+    "two_point_path_spectrum",
+    "static_particle_environment",
+    "finite_exchange_environment",
+)
+
 
 def _as_float(row: Mapping[str, object], key: str) -> float:
     try:
@@ -385,3 +402,326 @@ def generate_ablation_path(
         exchange_count=exchange_count,
         forced_exchange_count=forced_exchange_count,
     )
+
+
+def _group_rows(
+    rows: Sequence[Mapping[str, object]], keys: Sequence[str]
+) -> list[tuple[tuple[object, ...], list[Mapping[str, object]]]]:
+    groups: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
+    for row in rows:
+        try:
+            key = tuple(row[name] for name in keys)
+        except KeyError as error:
+            raise ValueError(f"missing grouping field: {error.args[0]}") from error
+        groups.setdefault(key, []).append(row)
+    return sorted(groups.items(), key=lambda item: tuple(map(str, item[0])))
+
+
+def _finite_values(rows: Sequence[Mapping[str, object]], key: str) -> np.ndarray:
+    try:
+        values = np.asarray([float(row[key]) for row in rows], dtype=float)
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"missing or invalid prediction field: {key}") from error
+    if not np.all(np.isfinite(values)):
+        raise ValueError(f"prediction field must be finite: {key}")
+    return values
+
+
+def _constant_target(rows: Sequence[Mapping[str, object]], key: str) -> float:
+    values = _finite_values(rows, key)
+    if not np.allclose(values, values[0], rtol=0.0, atol=1e-12):
+        raise ValueError(f"target changed within aggregation unit: {key}")
+    return float(values[0])
+
+
+def _add_curve_errors(row: dict[str, object]) -> None:
+    target_msd = float(row["target_msd"])
+    msd_delta = abs(float(row["predicted_msd"]) - target_msd)
+    row["msd_relative_error"] = (
+        msd_delta / abs(target_msd)
+        if target_msd != 0.0
+        else (0.0 if msd_delta == 0.0 else math.inf)
+    )
+    row["ngp_absolute_error"] = abs(
+        float(row["predicted_ngp"]) - float(row["target_ngp"])
+    )
+    for observable in ("fs_k2", "fs_k4", "fs_k7p25"):
+        row[f"absolute_error_{observable}"] = abs(
+            float(row[f"predicted_{observable}"])
+            - float(row[f"target_{observable}"])
+        )
+
+
+def summarize_restarts(
+    realization_rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    """Average stochastic realizations inside each child restart first."""
+
+    if not realization_rows:
+        return []
+    output: list[dict[str, object]] = []
+    keys = ("temperature", "restart", "model", "lag")
+    for group_key, rows in _group_rows(realization_rows, keys):
+        summary = dict(zip(keys, group_key, strict=True))
+        realization_labels = {int(float(row["realization"])) for row in rows}
+        if len(realization_labels) != len(rows):
+            raise ValueError("realization labels must be unique within a restart")
+        summary["realization_count"] = len(rows)
+        for observable in PREDICTION_OBSERVABLES:
+            predictions = _finite_values(rows, f"predicted_{observable}")
+            summary[f"predicted_{observable}"] = float(np.mean(predictions))
+            summary[f"mc_se_{observable}"] = (
+                float(np.std(predictions, ddof=1) / math.sqrt(len(predictions)))
+                if len(predictions) > 1
+                else 0.0
+            )
+            summary[f"target_{observable}"] = _constant_target(
+                rows, f"target_{observable}"
+            )
+        summary["support_pass"] = min(
+            float(row.get("support_pass", 1.0)) for row in rows
+        )
+        _add_curve_errors(summary)
+        output.append(summary)
+    return output
+
+
+def summarize_parents(
+    restart_summaries: Sequence[Mapping[str, object]],
+    parent_ledger: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    """Average child restarts inside their source parent before scoring errors."""
+
+    parent_by_child: dict[tuple[float, int], str] = {}
+    for row in parent_ledger:
+        key = (float(row["temperature"]), int(float(row["replicate"])))
+        parent = str(row["parent_id"])
+        if key in parent_by_child and parent_by_child[key] != parent:
+            raise ValueError("child restart maps to multiple parents")
+        parent_by_child[key] = parent
+
+    parent_rows: list[dict[str, object]] = []
+    for row in restart_summaries:
+        child_key = (float(row["temperature"]), int(float(row["restart"])))
+        try:
+            parent_id = parent_by_child[child_key]
+        except KeyError as error:
+            raise ValueError("restart summary is missing parent provenance") from error
+        enriched = dict(row)
+        enriched["parent_id"] = parent_id
+        parent_rows.append(enriched)
+
+    output: list[dict[str, object]] = []
+    keys = ("temperature", "parent_id", "model", "lag")
+    for group_key, rows in _group_rows(parent_rows, keys):
+        summary = dict(zip(keys, group_key, strict=True))
+        summary["child_restart_count"] = len(rows)
+        summary["realization_count"] = sum(
+            int(float(row["realization_count"])) for row in rows
+        )
+        for observable in PREDICTION_OBSERVABLES:
+            predictions = _finite_values(rows, f"predicted_{observable}")
+            targets = _finite_values(rows, f"target_{observable}")
+            child_se = _finite_values(rows, f"mc_se_{observable}")
+            summary[f"predicted_{observable}"] = float(np.mean(predictions))
+            summary[f"target_{observable}"] = float(np.mean(targets))
+            summary[f"mc_se_{observable}"] = float(
+                math.sqrt(float(np.sum(child_se * child_se))) / len(rows)
+            )
+        summary["support_pass"] = min(float(row["support_pass"]) for row in rows)
+        _add_curve_errors(summary)
+        output.append(summary)
+    return output
+
+
+def _fs_error_values(row: Mapping[str, object]) -> list[float]:
+    values = [
+        float(value)
+        for key, value in row.items()
+        if str(key).startswith("absolute_error_fs_k")
+    ]
+    if not values:
+        raise ValueError("curve row is missing multi-k Fs errors")
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("curve errors must be finite")
+    return values
+
+
+def higher_order_score(row: Mapping[str, object]) -> float:
+    return max(
+        float(row["ngp_absolute_error"]) / CURVE_LIMITS["ngp"],
+        max(_fs_error_values(row)) / CURVE_LIMITS["fs"],
+    )
+
+
+def curve_pass(rows: Sequence[Mapping[str, object]]) -> bool:
+    if not rows:
+        return False
+    return all(
+        float(row.get("support_pass", 1.0)) == 1.0
+        and float(row["msd_relative_error"]) <= CURVE_LIMITS["msd"]
+        and float(row["ngp_absolute_error"]) <= CURVE_LIMITS["ngp"]
+        and max(_fs_error_values(row)) <= CURVE_LIMITS["fs"]
+        and float(row.get("mc_se_msd", 0.0)) <= MC_LIMITS["msd"]
+        and float(row.get("mc_se_ngp", 0.0)) <= MC_LIMITS["ngp"]
+        and max(
+            float(value)
+            for key, value in row.items()
+            if str(key).startswith("mc_se_fs_k")
+        )
+        <= MC_LIMITS["fs"]
+        for row in rows
+    )
+
+
+def summarize_model_verdicts(
+    parent_summaries: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    verdicts: list[dict[str, object]] = []
+    keys = ("temperature", "parent_id", "model")
+    for group_key, rows in _group_rows(parent_summaries, keys):
+        verdict = dict(zip(keys, group_key, strict=True))
+        verdict["lag_count"] = len(rows)
+        verdict["curve_gate_pass"] = float(curve_pass(rows))
+        verdict["higher_order_gate_pass"] = float(
+            all(higher_order_score(row) <= 1.0 for row in rows)
+        )
+        verdict["maximum_higher_order_score"] = max(
+            higher_order_score(row) for row in rows
+        )
+        verdict["support_pass"] = min(
+            float(row.get("support_pass", 1.0)) for row in rows
+        )
+        verdict["precision_pass"] = float(
+            all(
+                float(row.get("mc_se_msd", 0.0)) <= MC_LIMITS["msd"]
+                and float(row.get("mc_se_ngp", 0.0)) <= MC_LIMITS["ngp"]
+                and max(
+                    float(value)
+                    for key, value in row.items()
+                    if str(key).startswith("mc_se_fs_k")
+                )
+                <= MC_LIMITS["fs"]
+                for row in rows
+            )
+        )
+        verdicts.append(verdict)
+    return verdicts
+
+
+def _closed_gate_defaults() -> dict[str, object]:
+    return {
+        "mechanism_state": "unclassified",
+        "failure_localization": "not_applicable",
+        "positive_memory_closure_claim_allowed": 0.0,
+        "microdynamic_closure_claim_allowed": 0.0,
+        "complete_microscopic_closure_claim_allowed": 0.0,
+        "spatial_facilitation_claim_allowed": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+        "thermodynamic_glass_transition_claim_allowed": 0.0,
+    }
+
+
+def _verdict_lookup(
+    verdicts: Sequence[Mapping[str, object]], model: str
+) -> dict[str, Mapping[str, object]]:
+    return {
+        str(row["parent_id"]): row
+        for row in verdicts
+        if float(row["temperature"]) == 0.45 and str(row["model"]) == model
+    }
+
+
+def _required_ablation_pattern_holds(
+    verdicts: Sequence[Mapping[str, object]], full: Mapping[str, Mapping[str, object]]
+) -> bool:
+    if len(full) < 3:
+        return False
+    for model in REQUIRED_MECHANISM_ABLATIONS:
+        ablation = _verdict_lookup(verdicts, model)
+        if set(ablation) != set(full):
+            return False
+        higher_order_failures = sum(
+            float(row["higher_order_gate_pass"]) == 0.0 for row in ablation.values()
+        )
+        strict_improvements = sum(
+            float(full[parent]["maximum_higher_order_score"])
+            < float(ablation[parent]["maximum_higher_order_score"])
+            for parent in full
+        )
+        if higher_order_failures < 2 or strict_improvements < 2:
+            return False
+    return True
+
+
+def _localize_candidate_failure(
+    *,
+    verdicts: Sequence[Mapping[str, object]],
+    full: Mapping[str, Mapping[str, object]],
+    upper: Mapping[str, Mapping[str, object]],
+) -> str:
+    if any(
+        float(row["support_pass"]) == 0.0 or float(row["precision_pass"]) == 0.0
+        for row in full.values()
+    ):
+        return "data_volume_or_support"
+    if set(upper) != set(full) or any(
+        float(row["curve_gate_pass"]) == 0.0 for row in upper.values()
+    ):
+        return "cross_particle_or_unmodeled_coupling"
+    static = _verdict_lookup(verdicts, "static_particle_environment")
+    finite = _verdict_lookup(verdicts, "finite_exchange_environment")
+    if static and all(float(row["curve_gate_pass"]) == 1.0 for row in static.values()):
+        return "environment_lifetime_or_state"
+    if finite and any(
+        parent in finite
+        and float(finite[parent]["maximum_higher_order_score"])
+        < float(full[parent]["maximum_higher_order_score"])
+        for parent in full
+    ):
+        return "ordered_path_kernel"
+    return "multiple_unresolved"
+
+
+def classify_memory_closure_gate(
+    *,
+    parent_summaries: Sequence[Mapping[str, object]],
+    blockers: Sequence[Mapping[str, object]],
+    upper_control_parents: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Apply the frozen fail-closed gate at the independent-parent level."""
+
+    result = _closed_gate_defaults()
+    primary_blockers = [
+        row for row in blockers if str(row.get("evidence_role", "primary")) != "canary_only"
+    ]
+    if any(int(float(row["missing_parent_count"])) > 0 for row in primary_blockers):
+        result["mechanism_state"] = "blocked_independent_parent_validation"
+        return result
+    if any(float(row["stationarity_pass"]) == 0.0 for row in primary_blockers):
+        result["mechanism_state"] = "blocked_stationarity_control"
+        return result
+
+    verdicts = summarize_model_verdicts(parent_summaries)
+    upper_verdicts = summarize_model_verdicts(upper_control_parents)
+    full = _verdict_lookup(verdicts, "full_candidate")
+    upper = _verdict_lookup(upper_verdicts, "contiguous_empirical_upper_control")
+    if len(full) < 3:
+        result["mechanism_state"] = "blocked_independent_parent_validation"
+        return result
+    if any(float(row["curve_gate_pass"]) == 0.0 for row in full.values()) or any(
+        float(row["curve_gate_pass"]) == 0.0 for row in upper.values()
+    ) or set(upper) != set(full):
+        result["mechanism_state"] = "candidate_rejected"
+        result["failure_localization"] = _localize_candidate_failure(
+            verdicts=verdicts, full=full, upper=upper
+        )
+        return result
+    if not _required_ablation_pattern_holds(verdicts, full):
+        result["mechanism_state"] = "ablation_pattern_unresolved"
+        return result
+    result["mechanism_state"] = (
+        "positive_memory_closure_supported_within_tested_family"
+    )
+    result["positive_memory_closure_claim_allowed"] = 1.0
+    return result

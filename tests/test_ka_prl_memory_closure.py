@@ -234,5 +234,209 @@ class MemoryKernelTests(unittest.TestCase):
             )
 
 
+class ParentAggregationTests(unittest.TestCase):
+    @staticmethod
+    def realization_row(*, restart, realization, predicted_msd):
+        return {
+            "temperature": 0.45,
+            "restart": restart,
+            "model": "full_candidate",
+            "realization": realization,
+            "lag": 20.0,
+            "predicted_msd": predicted_msd,
+            "predicted_ngp": 0.25,
+            "predicted_fs_k2": 0.8,
+            "predicted_fs_k4": 0.6,
+            "predicted_fs_k7p25": 0.4,
+            "target_msd": 2.0,
+            "target_ngp": 0.25,
+            "target_fs_k2": 0.8,
+            "target_fs_k4": 0.6,
+            "target_fs_k7p25": 0.4,
+        }
+
+    def test_parent_summary_averages_children_before_error(self):
+        rows = [
+            self.realization_row(restart=1, realization=0, predicted_msd=1.0),
+            self.realization_row(restart=2, realization=0, predicted_msd=3.0),
+        ]
+        restarts = closure.summarize_restarts(rows)
+        parents = closure.summarize_parents(
+            restarts,
+            [
+                {"temperature": 0.45, "replicate": 1, "parent_id": "parent-a"},
+                {"temperature": 0.45, "replicate": 2, "parent_id": "parent-a"},
+            ],
+        )
+
+        self.assertEqual(len(parents), 1)
+        self.assertAlmostEqual(parents[0]["predicted_msd"], 2.0)
+        self.assertAlmostEqual(parents[0]["msd_relative_error"], 0.0)
+        self.assertEqual(parents[0]["child_restart_count"], 2)
+
+    def test_restart_summary_computes_monte_carlo_error_before_parent_pooling(self):
+        rows = [
+            self.realization_row(restart=1, realization=0, predicted_msd=1.0),
+            self.realization_row(restart=1, realization=1, predicted_msd=3.0),
+        ]
+        summary = closure.summarize_restarts(rows)[0]
+
+        self.assertAlmostEqual(summary["predicted_msd"], 2.0)
+        self.assertAlmostEqual(summary["mc_se_msd"], 1.0)
+        self.assertEqual(summary["realization_count"], 2)
+
+    def test_target_drift_within_restart_fails_closed(self):
+        rows = [
+            self.realization_row(restart=1, realization=0, predicted_msd=1.0),
+            self.realization_row(restart=1, realization=1, predicted_msd=1.0),
+        ]
+        rows[1]["target_msd"] = 2.1
+        with self.assertRaisesRegex(ValueError, "target"):
+            closure.summarize_restarts(rows)
+
+
+class MemoryClosureGateTests(unittest.TestCase):
+    REQUIRED_ABLATIONS = (
+        "mean_rate_null",
+        "one_step_jump_law",
+        "two_point_path_spectrum",
+        "static_particle_environment",
+        "finite_exchange_environment",
+    )
+
+    @staticmethod
+    def blocker(*, missing=0, stationary=1.0):
+        return {
+            "temperature": 0.45,
+            "evidence_role": "primary",
+            "missing_parent_count": missing,
+            "stationarity_pass": stationary,
+        }
+
+    @staticmethod
+    def parent_row(*, parent, model, ngp_error=0.0, msd_error=0.0):
+        return {
+            "temperature": 0.45,
+            "parent_id": parent,
+            "model": model,
+            "lag": 100.0,
+            "msd_relative_error": msd_error,
+            "ngp_absolute_error": ngp_error,
+            "absolute_error_fs_k2": 0.0,
+            "absolute_error_fs_k4": 0.0,
+            "absolute_error_fs_k7p25": 0.0,
+            "mc_se_msd": 0.0,
+            "mc_se_ngp": 0.0,
+            "mc_se_fs_k2": 0.0,
+            "mc_se_fs_k4": 0.0,
+            "mc_se_fs_k7p25": 0.0,
+            "support_pass": 1.0,
+        }
+
+    def parent_rows(self, *, full_fails=False, ablations_fail=True):
+        rows = []
+        for parent_index in range(3):
+            parent = f"parent-{parent_index}"
+            rows.append(
+                self.parent_row(
+                    parent=parent,
+                    model="full_candidate",
+                    msd_error=0.2 if full_fails and parent_index == 0 else 0.0,
+                )
+            )
+            for model in self.REQUIRED_ABLATIONS:
+                rows.append(
+                    self.parent_row(
+                        parent=parent,
+                        model=model,
+                        ngp_error=0.31
+                        if ablations_fail and parent_index < 2
+                        else 0.0,
+                    )
+                )
+        return rows
+
+    def upper_controls(self, *, pass_all=True):
+        return [
+            self.parent_row(
+                parent=f"parent-{index}",
+                model="contiguous_empirical_upper_control",
+                msd_error=0.0 if pass_all else 0.2,
+            )
+            for index in range(3)
+        ]
+
+    def test_ensemble_average_cannot_rescue_failed_parent(self):
+        gate = closure.classify_memory_closure_gate(
+            parent_summaries=self.parent_rows(full_fails=True),
+            blockers=[self.blocker()],
+            upper_control_parents=self.upper_controls(),
+        )
+
+        self.assertEqual(gate["mechanism_state"], "candidate_rejected")
+        self.assertEqual(gate["positive_memory_closure_claim_allowed"], 0.0)
+
+    def test_gate_truth_table_is_fail_closed(self):
+        cases = (
+            (
+                "blocked_independent_parent_validation",
+                self.parent_rows(),
+                [self.blocker(missing=1)],
+                self.upper_controls(),
+            ),
+            (
+                "blocked_stationarity_control",
+                self.parent_rows(),
+                [self.blocker(stationary=0.0)],
+                self.upper_controls(),
+            ),
+            (
+                "candidate_rejected",
+                self.parent_rows(full_fails=True),
+                [self.blocker()],
+                self.upper_controls(),
+            ),
+            (
+                "ablation_pattern_unresolved",
+                self.parent_rows(ablations_fail=False),
+                [self.blocker()],
+                self.upper_controls(),
+            ),
+            (
+                "positive_memory_closure_supported_within_tested_family",
+                self.parent_rows(),
+                [self.blocker()],
+                self.upper_controls(),
+            ),
+        )
+        for expected, parent_rows, blockers, controls in cases:
+            with self.subTest(expected=expected):
+                gate = closure.classify_memory_closure_gate(
+                    parent_summaries=parent_rows,
+                    blockers=blockers,
+                    upper_control_parents=controls,
+                )
+                self.assertEqual(gate["mechanism_state"], expected)
+                self.assertEqual(gate["microdynamic_closure_claim_allowed"], 0.0)
+                self.assertEqual(gate["complete_microscopic_closure_claim_allowed"], 0.0)
+                self.assertEqual(gate["spatial_facilitation_claim_allowed"], 0.0)
+                self.assertEqual(gate["thermodynamic_claim_allowed"], 0.0)
+                self.assertEqual(
+                    gate["thermodynamic_glass_transition_claim_allowed"], 0.0
+                )
+                if expected.startswith("positive_memory"):
+                    self.assertEqual(
+                        gate["positive_memory_closure_claim_allowed"], 1.0
+                    )
+
+    def test_higher_order_score_and_precision_are_frozen(self):
+        row = self.parent_row(parent="p", model="m", ngp_error=0.15)
+        row["absolute_error_fs_k7p25"] = 0.024
+        self.assertAlmostEqual(closure.higher_order_score(row), 0.8)
+        self.assertTrue(closure.curve_pass([row]))
+        row["mc_se_fs_k7p25"] = 0.0031
+        self.assertFalse(closure.curve_pass([row]))
+
+
 if __name__ == "__main__":
     unittest.main()
