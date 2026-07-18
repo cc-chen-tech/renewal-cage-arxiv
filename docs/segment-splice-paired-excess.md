@@ -21,8 +21,10 @@ numerically shared.
 ## Result
 
 The paired inputs are complete and preserve the global source-segment schedule.
-The full-path baseline still fails independent-replicate closure: two of three
-low-temperature replicates have full-path scores above the unit tolerance.
+The three restart labels come from distinct parent frames and velocity seeds,
+but all share one parent trajectory; they are not independently prepared parent
+samples. Two of three restart labels have full-path scores above the unit
+tolerance.
 Therefore the mechanism state remains
 
 ```text
@@ -31,10 +33,11 @@ mechanism_unresolved
 
 The excess analysis identifies a short-horizon information-loss prefix through
 `L=10`, corresponding to `tau_L=200`, for both segment nulls. At longer finite
-horizons the replicate-first t95 intervals include zero, so they are
-unresolved. Owner identity remains an exploratory signal: all 21 cross-minus-
-within contrasts are positive, with replicate-first mean `2.071862` and t95
-interval `[0.876874, 3.266850]`.
+horizons the restart-label t95 summaries include zero, so they are unresolved.
+These t95 intervals are descriptive correlated-parent summaries, not
+independent-sample confidence intervals. Owner identity remains an exploratory
+signal: all 21 cross-minus-within contrasts are positive, with restart-first
+mean `2.071862` and t95 summary `[0.876874, 3.266850]`.
 
 ## Interpretation
 
@@ -51,6 +54,7 @@ paired_excess_equivalence_claim_allowed = 0
 independent_replicate_memory_lower_bound_claim_allowed = 0
 finite_memory_state_addition_allowed = 0
 owner_identity_sufficiency_claim_allowed = 0
+replicate_first_interval_independence_claim_allowed = 0
 microdynamic_closure_claim_allowed = 0
 spatial_facilitation_claim_allowed = 0
 thermodynamic_claim_allowed = 0
