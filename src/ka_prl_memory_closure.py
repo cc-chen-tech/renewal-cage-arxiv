@@ -725,3 +725,51 @@ def classify_memory_closure_gate(
     )
     result["positive_memory_closure_claim_allowed"] = 1.0
     return result
+
+
+def build_claim_ledger(gate: Mapping[str, object]) -> list[dict[str, object]]:
+    """Emit the frozen candidate claim and permanently closed scope boundaries."""
+
+    mechanism_state = str(gate["mechanism_state"])
+    positive_allowed = float(gate["positive_memory_closure_claim_allowed"])
+    statements = (
+        (
+            "positive_memory_closure",
+            "In the low-temperature Kob-Andersen glass former, relaxation dynamics "
+            "cannot be reconstructed from the mean event rate, one-step jump law, or "
+            "two-point path spectrum. Accurate reconstruction requires ordered "
+            "cage-path memory and a persistent particle-level environment.",
+            positive_allowed,
+            mechanism_state,
+        ),
+        (
+            "complete_microscopic_closure",
+            "The tested single-particle memory model is a complete microscopic closure.",
+            0.0,
+            "outside_preregistered_claim_boundary",
+        ),
+        (
+            "spatial_facilitation",
+            "The tested evidence establishes spatial facilitation.",
+            0.0,
+            "outside_preregistered_claim_boundary",
+        ),
+        (
+            "thermodynamic_glass_transition",
+            "The tested evidence establishes a thermodynamic glass transition.",
+            0.0,
+            "outside_preregistered_claim_boundary",
+        ),
+    )
+    return [
+        {
+            "claim_id": claim_id,
+            "claim_statement": statement,
+            "claim_allowed": allowed,
+            "claim_state": state,
+            "question": "What microscopic information is minimally required to reconstruct low-temperature glassy relaxation?",
+            "wording_frozen_before_positive_model_run": 1.0,
+            "thresholds_frozen_before_positive_model_run": 1.0,
+        }
+        for claim_id, statement, allowed, state in statements
+    ]

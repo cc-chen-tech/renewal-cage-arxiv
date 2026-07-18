@@ -438,5 +438,186 @@ class MemoryClosureGateTests(unittest.TestCase):
         self.assertFalse(closure.curve_pass([row]))
 
 
+class MemoryClosureCliTests(unittest.TestCase):
+    @staticmethod
+    def load_cli():
+        path = ROOT / "scripts" / "analyze_ka_prl_memory_closure.py"
+        spec = importlib.util.spec_from_file_location("analyze_ka_prl_memory_closure", path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def write_rows(path, rows):
+        with path.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def audit_inputs(self, directory):
+        base = Path(directory)
+        base.mkdir(parents=True, exist_ok=True)
+        provenance = base / "provenance.csv"
+        low_stationarity = base / "low_stationarity.csv"
+        high_stationarity = base / "high_stationarity.csv"
+        self.write_rows(provenance, ParentProvenanceTests().provenance_rows())
+        self.write_rows(low_stationarity, ParentProvenanceTests.stationarity(True))
+        self.write_rows(high_stationarity, ParentProvenanceTests.stationarity(False))
+        return provenance, low_stationarity, high_stationarity
+
+    @staticmethod
+    def output_arguments(output):
+        return [
+            "--output-parent-ledger",
+            str(output / "parents.csv"),
+            "--output-blockers",
+            str(output / "blockers.csv"),
+            "--output-gate",
+            str(output / "gate.csv"),
+            "--output-claim-ledger",
+            str(output / "claims.csv"),
+        ]
+
+    def run_audit(self, source, output):
+        provenance, low_stationarity, high_stationarity = self.audit_inputs(source)
+        arguments = [
+            "--audit-only",
+            "--provenance",
+            str(provenance),
+            "--low-stationarity",
+            str(low_stationarity),
+            "--high-stationarity",
+            str(high_stationarity),
+            *self.output_arguments(output),
+        ]
+        self.load_cli().main(arguments)
+
+    def test_cli_audit_only_writes_exact_parent_blocker_and_closed_claims(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            output = base / "out"
+            output.mkdir()
+            self.run_audit(base / "source", output)
+            with (output / "blockers.csv").open() as handle:
+                blockers = list(csv.DictReader(handle))
+            low = next(row for row in blockers if float(row["temperature"]) == 0.45)
+            warm = next(row for row in blockers if float(row["temperature"]) == 0.58)
+            with (output / "gate.csv").open() as handle:
+                gate = next(csv.DictReader(handle))
+
+            self.assertEqual(low["blocker_state"], "missing_independent_parents")
+            self.assertEqual(low["available_parent_count"], "1")
+            self.assertEqual(low["missing_parent_count"], "2")
+            self.assertEqual(low["shared_parent_resampling_can_satisfy"], "0")
+            self.assertEqual(
+                warm["blocker_state"], "stationarity_and_independent_parents"
+            )
+            self.assertEqual(
+                gate["mechanism_state"], "blocked_independent_parent_validation"
+            )
+            self.assertEqual(gate["positive_memory_closure_claim_allowed"], "0")
+
+    def test_cli_audit_outputs_are_byte_deterministic(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            first_source = base / "first_source"
+            second_source = base / "second_source"
+            first_source.mkdir()
+            second_source.mkdir()
+            first = base / "first"
+            second = base / "second"
+            first.mkdir()
+            second.mkdir()
+            self.run_audit(first_source, first)
+            self.run_audit(second_source, second)
+
+            self.assertEqual(
+                {path.name: path.read_bytes() for path in first.iterdir()},
+                {path.name: path.read_bytes() for path in second.iterdir()},
+            )
+
+    def test_correlated_parent_diagnostic_is_deterministic_and_never_reads_targets_as_inputs(self):
+        cli = self.load_cli()
+        generator = np.random.default_rng(91)
+        blocks_by_restart = {
+            restart: generator.normal(size=(4, 160, 3))
+            for restart in (1, 2, 3)
+        }
+        targets = []
+        spectral = []
+        lags = (20, 100, 200, 500, 1000, 2000, 3000)
+        for restart, blocks in blocks_by_restart.items():
+            observed = cli.cumulative_observables_many_lags(
+                blocks,
+                block_counts=tuple(lag // 20 for lag in lags),
+                wave_numbers=np.asarray((2.0, 4.0, 7.25)),
+            )
+            for lag in lags:
+                row = observed[lag // 20]
+                target = {
+                    "replicate": restart,
+                    "temperature": 0.45,
+                    "lag": lag,
+                    "observed_msd": row["msd"],
+                    "observed_ngp": row["ngp"],
+                    "observed_fs_k2": row["characteristic_k2"],
+                    "observed_fs_k4": row["characteristic_k4"],
+                    "observed_fs_k7p25": row["characteristic_k7p25"],
+                }
+                targets.append(target)
+                for realization in range(8):
+                    spectral.append(
+                        {
+                            "model": "radial_multivariate_surrogate",
+                            "replicate": restart,
+                            "realization": realization,
+                            "temperature": 0.45,
+                            "lag": lag,
+                            "predicted_msd": row["msd"],
+                            "predicted_ngp": row["ngp"],
+                            "predicted_fs_k2": row["characteristic_k2"],
+                            "predicted_fs_k4": row["characteristic_k4"],
+                            "predicted_fs_k7p25": row["characteristic_k7p25"],
+                            **{key: value for key, value in target.items() if key.startswith("observed_")},
+                        }
+                    )
+        crossings = [
+            {
+                "temperature_group": "low",
+                "replicate": restart,
+                "block_size": 20,
+                "efold_crossing_time": 200 + restart,
+            }
+            for restart in (1, 2, 3)
+        ]
+        arguments = {
+            "blocks_by_restart": blocks_by_restart,
+            "target_rows": targets,
+            "crossing_rows": crossings,
+            "spectral_source_rows": spectral,
+            "temperature": 0.45,
+            "realizations": 16,
+        }
+
+        first = cli.predict_correlated_parent_diagnostic(**arguments)
+        second = cli.predict_correlated_parent_diagnostic(**arguments)
+
+        self.assertEqual(first, second)
+        self.assertEqual({row["model"] for row in first}, {
+            "mean_rate_null",
+            "one_step_jump_law",
+            "two_point_path_spectrum",
+            "static_particle_environment",
+            "finite_exchange_environment",
+            "full_candidate",
+            "contiguous_empirical_upper_control",
+        })
+        self.assertTrue(all(row["heldout_path_used_in_prediction"] == 0.0 for row in first))
+        self.assertTrue(
+            all(row["heldout_observables_used_as_model_inputs"] == 0.0 for row in first)
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
