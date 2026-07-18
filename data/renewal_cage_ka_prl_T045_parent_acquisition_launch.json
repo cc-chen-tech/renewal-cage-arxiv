@@ -1,0 +1,65 @@
+{
+  "acquisition_manifest_sha256": "c7c73b7bc903cf28ee0d04b103ebabd05a4202fc483e12fcf7328ad1ecd14167",
+  "claim_flags": {
+    "complete_microscopic_closure_claim_allowed": 0,
+    "positive_memory_closure_claim_allowed": 0,
+    "spatial_facilitation_claim_allowed": 0,
+    "thermodynamic_glass_transition_claim_allowed": 0
+  },
+  "deployed_commit": "dda89cc2c4de57307001e772706275dd09790124",
+  "jobs": [
+    {
+      "cpu_seconds_delta_over_5s": 2.54,
+      "error_match_count": 0,
+      "lammps_log_bytes_at_snapshot": 0,
+      "lammps_log_path": "/root/prl-memory-closure-acquisition/runs/p02/log.lammps",
+      "parent_id": "ka-t045-independent-p02-20260719",
+      "pid": 50273,
+      "process_state": "running",
+      "progress_signal": "cpu_time_increased_logs_buffered",
+      "remote_output_directory": "/root/prl-memory-closure-acquisition/runs/p02",
+      "resident_set_bytes": 24625152,
+      "screen_log_bytes_at_snapshot": 0,
+      "screen_log_path": "/root/prl-memory-closure-acquisition/runs/p02/screen.log"
+    },
+    {
+      "cpu_seconds_delta_over_5s": 2.37,
+      "error_match_count": 0,
+      "lammps_log_bytes_at_snapshot": 0,
+      "lammps_log_path": "/root/prl-memory-closure-acquisition/runs/p03/log.lammps",
+      "parent_id": "ka-t045-independent-p03-20260719",
+      "pid": 50274,
+      "process_state": "running",
+      "progress_signal": "cpu_time_increased_logs_buffered",
+      "remote_output_directory": "/root/prl-memory-closure-acquisition/runs/p03",
+      "resident_set_bytes": 24580096,
+      "screen_log_bytes_at_snapshot": 0,
+      "screen_log_path": "/root/prl-memory-closure-acquisition/runs/p03/screen.log"
+    }
+  ],
+  "lammps_binary_sha256": "fbb4f8993b9b14be5a41afffcf1efc42a6ae01f6d0beba5cb0ff7caedd3fe962",
+  "launch_state": "running_verified",
+  "remote_launch_status_path": "/root/prl-memory-closure-acquisition/launch_status.json",
+  "remote_launch_status_sha256": "6b32c2541904ed87b13cb0499b4e5e94bc06e3d4ccf033f8bc1452b8cd781927",
+  "remote_repository_path": "/root/prl-memory-closure-acquisition/repo",
+  "resource_snapshot": {
+    "disk_available_bytes": 22687698944,
+    "execution_mode": "parallel_two_parent_jobs",
+    "load_average_1m": 3.34,
+    "logical_cpu_count": 2,
+    "memory_available_bytes": 1473327104,
+    "memory_total_bytes": 1961869312,
+    "nice_adjustment": "retained_because_preexisting_compute_pid_49179_was_active",
+    "nice_value": 15,
+    "other_active_compute": {
+      "command": "scripts/cache_ka_l2p_deterministic_diffusion.py",
+      "pid": 49179,
+      "resident_set_bytes": 225996800
+    },
+    "parallelism_decision": "keep_two_lammps_jobs_parallel_each_uses_about_24MB_RSS_and_memory_available_exceeds_1GiB",
+    "swap_total_bytes": 4294963200
+  },
+  "schema_version": 1,
+  "started_at_utc": "2026-07-18T19:55:11Z",
+  "verified_at_utc": "2026-07-18T19:58:44Z"
+}

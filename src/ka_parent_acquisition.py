@@ -134,6 +134,71 @@ def validate_prelaunch_spec(spec: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def validate_launch_record(
+    record: dict[str, Any],
+    *,
+    acquisition_spec: dict[str, Any],
+    acquisition_spec_sha256: str,
+) -> dict[str, Any]:
+    """Validate the non-sensitive remote launch snapshot against the frozen spec."""
+
+    result = copy.deepcopy(record)
+    spec = validate_prelaunch_spec(acquisition_spec)
+    if result.get("schema_version") != 1:
+        raise ValueError("launch schema_version must equal one")
+    if result.get("launch_state") != "running_verified":
+        raise ValueError("launch record must describe verified running jobs")
+    if not _is_hex(result.get("deployed_commit"), 40):
+        raise ValueError("deployed commit must be a Git hash")
+    if not _is_hex(acquisition_spec_sha256, 64):
+        raise ValueError("acquisition spec SHA256 is invalid")
+    if result.get("acquisition_manifest_sha256") != acquisition_spec_sha256:
+        raise ValueError("launch record does not join the frozen acquisition manifest")
+    if result.get("lammps_binary_sha256") != spec["lammps"]["binary_sha256"]:
+        raise ValueError("launch binary hash disagrees with the frozen acquisition")
+    if not _is_hex(result.get("remote_launch_status_sha256"), 64):
+        raise ValueError("remote launch-status SHA256 is invalid")
+    for key in ("remote_launch_status_path", "remote_repository_path"):
+        if not str(result.get(key, "")).startswith("/"):
+            raise ValueError(f"{key} must be an absolute remote path")
+
+    resources = result.get("resource_snapshot", {})
+    if int(resources.get("logical_cpu_count", 0)) != 2:
+        raise ValueError("launch resource snapshot must record two logical CPUs")
+    for key in (
+        "memory_total_bytes",
+        "memory_available_bytes",
+        "swap_total_bytes",
+        "disk_available_bytes",
+    ):
+        if int(resources.get(key, 0)) <= 0:
+            raise ValueError(f"launch resource snapshot has invalid {key}")
+    if resources.get("execution_mode") != "parallel_two_parent_jobs":
+        raise ValueError("both independently prepared parents must remain launched")
+    if int(resources.get("nice_value", -1)) != 15:
+        raise ValueError("resource snapshot must record the actual launch priority")
+
+    frozen_parents = {parent["parent_id"]: parent for parent in spec["parents"]}
+    jobs = result.get("jobs")
+    if not isinstance(jobs, list) or {job.get("parent_id") for job in jobs} != set(
+        frozen_parents
+    ):
+        raise ValueError("launch jobs do not match the frozen parent set")
+    for job in jobs:
+        parent = frozen_parents[job["parent_id"]]
+        if int(job.get("pid", 0)) <= 0 or job.get("process_state") != "running":
+            raise ValueError("every launch PID must be verified running")
+        if job.get("remote_output_directory") != parent["remote_output_directory"]:
+            raise ValueError("launch output directory disagrees with the frozen parent")
+        if int(job.get("error_match_count", -1)) != 0:
+            raise ValueError("launch log contains an error signature")
+        if int(job.get("resident_set_bytes", 0)) <= 0:
+            raise ValueError("launch PID must have a positive resident set")
+    if any(float(value) != 0.0 for value in result.get("claim_flags", {}).values()):
+        raise ValueError("all launch claim flags must remain zero")
+    return result
+
+
 def _initial_state(spec: dict[str, Any], parent: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, float]:
     system = spec["system"]
     particle_count = int(system["particle_count"])

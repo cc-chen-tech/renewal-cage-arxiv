@@ -9,6 +9,7 @@ import numpy as np
 from src.ka_parent_acquisition import (
     prepare_parent_acquisition,
     validate_acquisition_spec,
+    validate_launch_record,
     validate_prelaunch_spec,
 )
 
@@ -86,6 +87,27 @@ def frozen_spec() -> dict[str, object]:
 
 
 class ParentAcquisitionTests(unittest.TestCase):
+    def test_committed_launch_record_joins_frozen_manifest_and_keeps_claims_closed(self):
+        manifest_path = (
+            ROOT / "data" / "renewal_cage_ka_prl_T045_parent_acquisition_manifest.json"
+        )
+        launch_path = (
+            ROOT / "data" / "renewal_cage_ka_prl_T045_parent_acquisition_launch.json"
+        )
+        manifest = json.loads(manifest_path.read_text())
+        launch = validate_launch_record(
+            json.loads(launch_path.read_text()),
+            acquisition_spec=manifest,
+            acquisition_spec_sha256=sha256(manifest_path),
+        )
+        self.assertEqual(launch["launch_state"], "running_verified")
+        self.assertEqual(
+            {job["parent_id"] for job in launch["jobs"]},
+            {parent["parent_id"] for parent in manifest["parents"]},
+        )
+        self.assertTrue(all(job["pid"] > 0 for job in launch["jobs"]))
+        self.assertTrue(all(value == 0 for value in launch["claim_flags"].values()))
+
     def test_committed_manifest_freezes_rendered_inputs_and_code_revision(self):
         path = ROOT / "data" / "renewal_cage_ka_prl_T045_parent_acquisition_manifest.json"
         spec = validate_prelaunch_spec(json.loads(path.read_text()))
