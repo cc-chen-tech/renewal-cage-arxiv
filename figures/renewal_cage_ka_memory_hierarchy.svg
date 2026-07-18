@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
+<rect width="100%" height="100%" fill="#f8f9fa"/>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#5f6368"/></marker></defs>
+<style>text{font-family:Arial,sans-serif;letter-spacing:0;fill:#202124}</style>
+<text x="490" y="40" text-anchor="middle" font-size="22" font-weight="700">Information-ablation hierarchy</text>
+<text x="490" y="67" text-anchor="middle" font-size="13">Held-out KA dynamics: add information only when the prior level fails</text>
+<rect x="35" y="105" width="205" height="112" rx="6" fill="#ffffff" stroke="#3c4043"/><circle cx="63" cy="133" r="16" fill="#b3261e"/><text x="63" y="138" text-anchor="middle" fill="#ffffff" font-weight="700">1</text><text x="137.5" y="171" text-anchor="middle" font-size="14" font-weight="700">One-step recoil</text><text x="137.5" y="199" text-anchor="middle" font-size="13" fill="#b3261e" font-weight="700">REJECTED</text><path d="M 242 161 L 263 161" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/><rect x="270" y="105" width="205" height="112" rx="6" fill="#ffffff" stroke="#3c4043"/><circle cx="298" cy="133" r="16" fill="#b3261e"/><text x="298" y="138" text-anchor="middle" fill="#ffffff" font-weight="700">2</text><text x="372.5" y="171" text-anchor="middle" font-size="14" font-weight="700">Anchor semi-Markov</text><text x="372.5" y="199" text-anchor="middle" font-size="13" fill="#b3261e" font-weight="700">REJECTED</text><path d="M 477 161 L 498 161" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/><rect x="505" y="105" width="205" height="112" rx="6" fill="#ffffff" stroke="#3c4043"/><circle cx="533" cy="133" r="16" fill="#b3261e"/><text x="533" y="138" text-anchor="middle" fill="#ffffff" font-weight="700">3</text><text x="607.5" y="171" text-anchor="middle" font-size="14" font-weight="700">Identity, order shuffled</text><text x="607.5" y="199" text-anchor="middle" font-size="13" fill="#b3261e" font-weight="700">REJECTED</text><path d="M 712 161 L 733 161" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/><rect x="740" y="105" width="205" height="112" rx="6" fill="#ffffff" stroke="#3c4043"/><circle cx="768" cy="133" r="16" fill="#137333"/><text x="768" y="138" text-anchor="middle" fill="#ffffff" font-weight="700">4</text><text x="842.5" y="171" text-anchor="middle" font-size="14" font-weight="700">Ordered path (particle)</text><text x="842.5" y="199" text-anchor="middle" font-size="13" fill="#137333" font-weight="700">CLOSES BOTH T</text>
+<rect x="55" y="270" width="420" height="118" rx="6" fill="#e6f4ea" stroke="#137333"/>
+<text x="265" y="300" text-anchor="middle" font-size="16" font-weight="700">Independent environment evidence</text>
+<text x="265" y="329" text-anchor="middle" font-size="14">finite exchange supported; tested pure static rate null rejected</text>
+<text x="265" y="356" text-anchor="middle" font-size="13">exchange growth CI low = 1.33</text>
+<text x="265" y="377" text-anchor="middle" font-size="12">static-environment family remains unexcluded</text>
+<rect x="505" y="270" width="420" height="118" rx="6" fill="#fef7e0" stroke="#b06000"/>
+<text x="715" y="300" text-anchor="middle" font-size="16" font-weight="700">Spatial covariance: measurement only</text>
+<text x="715" y="329" text-anchor="middle" font-size="14">positive short-range covariance; spatial cause not identified</text>
+<text x="715" y="356" text-anchor="middle" font-size="13">decay length = 0.695</text>
+<text x="715" y="377" text-anchor="middle" font-size="12">spatial facilitation claim allowed = 0</text>
+<text x="490" y="438" text-anchor="middle" font-size="15" font-weight="700">Selected next candidate: particle-conditioned finite-exchange ordered-path kernel</text>
+<text x="490" y="468" text-anchor="middle" font-size="13">Effective dynamical diagnostic; no microdynamic closure, spatial-causation, or thermodynamic-glass claim.</text>
+<text x="490" y="496" text-anchor="middle" font-size="11">state: ordered_particle_path_required_finite_exchange_supported</text>
+</svg>
