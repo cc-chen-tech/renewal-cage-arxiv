@@ -517,6 +517,7 @@ class ArxivPackageTests(unittest.TestCase):
             self.assertEqual(figure_path.read_bytes(), generated_figure.read_bytes())
 
         svg = figure_path.read_text()
+        self.assertIn("maximum normalized error (tolerance units)", svg)
         self.assertIn("heldout MSD is a diagnostic input, not a blind prediction", svg)
         self.assertIn("T=0.58 canary only", svg)
         self.assertIn("clock-only closure rejected", svg)

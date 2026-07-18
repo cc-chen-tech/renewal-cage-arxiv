@@ -55,6 +55,7 @@
 <text x="90.00" y="552.00" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#9b3a32">clock-only closure rejected; residual mechanism remains unresolved</text>
 <text x="90.00" y="580.00" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#17212b">heldout MSD is a diagnostic input, not a blind prediction</text>
 <text x="90.00" y="604.00" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#46515c">T=0.58 canary only; no cooling, spatial, microscopic, or thermodynamic claim</text>
+<text x="70.00" y="92.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#46515c">maximum normalized error (tolerance units)</text>
 <text x="850.00" y="92.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6570">gray: same time</text>
 <text x="960.00" y="92.00" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#2f7d68">color: MSD matched</text>
 </svg>

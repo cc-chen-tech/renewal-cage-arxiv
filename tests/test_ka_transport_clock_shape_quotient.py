@@ -515,6 +515,7 @@ class TransportClockShapeRealArtifactTests(unittest.TestCase):
         self.assertEqual(len(list(csv.DictReader(first[1].decode().splitlines()))), 2)
         svg = first[2].decode()
         self.assertIn("Transport clock / shape quotient", svg)
+        self.assertIn("maximum normalized error (tolerance units)", svg)
         self.assertIn("heldout MSD is a diagnostic input", svg)
         self.assertIn("T=0.58 canary only", svg)
         self.assertIn("clock-only closure rejected", svg)
