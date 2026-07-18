@@ -20,7 +20,10 @@ from ka_l2p_conditional_diffusion import (  # noqa: E402
     nested_diffusion_estimates,
     rademacher_velocity_probes,
 )
-from ka_local_cage import ka_lj_sparse_force_generator_observables  # noqa: E402
+from ka_local_cage import (  # noqa: E402
+    ka_lj_sparse_force_generator_multi,
+    ka_lj_sparse_force_generator_observables,
+)
 from ka_replicates import load_lammps_custom_trajectory  # noqa: E402
 from ka_smooth_cage import (  # noqa: E402
     smooth_cage_l2p_velocity_directional_derivative_batch,
@@ -201,8 +204,6 @@ def cache_clone(
             sensitivity_error = np.asarray(saved["step_relative_frobenius_error"]).copy()
 
     protocol = str(second["potential_protocol"])
-    all_particles = np.arange(len(particle_types), dtype=int)
-
     def save(done: int) -> None:
         atomic_savez(
             output_path,
@@ -226,6 +227,14 @@ def cache_clone(
         )
 
     for frame in range(completed, frame_count):
+        steps = [args.velocity_step]
+        if frame < len(sensitivity_error):
+            steps.extend(args.sensitivity_velocity_steps)
+        responses_by_step = {
+            step: np.empty((len(probes), len(targets), 3), dtype=float)
+            for step in steps
+        }
+        all_particles = np.arange(len(particle_types), dtype=int)
         base = ka_lj_sparse_force_generator_observables(
             positions[frame],
             velocities=velocities[frame],
@@ -234,41 +243,41 @@ def cache_clone(
             target_indices=all_particles,
             potential_protocol=protocol,
         )
-        force = np.asarray(base["force"])
-        force_generator = np.asarray(base["force_generator"])
-
-        def responses_for_step(step: float) -> np.ndarray:
-            responses = []
-            for probe in probes:
-                directional_force_generator = ka_lj_sparse_force_generator_observables(
-                    positions[frame],
-                    velocities=probe,
-                    particle_types=particle_types,
-                    box_lengths=box_lengths,
-                    target_indices=all_particles,
-                    potential_protocol=protocol,
-                )["force_generator"]
-                response = smooth_cage_l2p_velocity_directional_derivative_batch(
-                    positions[frame],
-                    velocities=velocities[frame],
-                    velocity_direction=probe,
-                    forces=force,
-                    force_generator=force_generator,
-                    force_generator_direction=np.asarray(directional_force_generator),
-                    particle_types=particle_types,
-                    box_lengths=box_lengths,
-                    target_indices=targets,
-                    friction=args.friction,
-                    directional_step=args.directional_step,
-                    phase_space_step=args.phase_space_step,
-                    velocity_step=step,
-                    target_batch_size=args.target_batch_size,
-                )["l2p_velocity_directional_derivative"]
-                responses.append(response)
-            return np.asarray(responses)
+        directional_force_generators = np.asarray(
+            ka_lj_sparse_force_generator_multi(
+                positions[frame],
+                velocity_fields=probes,
+                particle_types=particle_types,
+                box_lengths=box_lengths,
+                target_indices=all_particles,
+                potential_protocol=protocol,
+            )["force_generator"]
+        )
+        for probe_index, probe in enumerate(probes):
+            for step in steps:
+                responses_by_step[step][probe_index] = (
+                    smooth_cage_l2p_velocity_directional_derivative_batch(
+                        positions[frame],
+                        velocities=velocities[frame],
+                        velocity_direction=probe,
+                        forces=np.asarray(base["force"]),
+                        force_generator=np.asarray(base["force_generator"]),
+                        force_generator_direction=directional_force_generators[
+                            probe_index
+                        ],
+                        particle_types=particle_types,
+                        box_lengths=box_lengths,
+                        target_indices=targets,
+                        friction=args.friction,
+                        directional_step=args.directional_step,
+                        phase_space_step=args.phase_space_step,
+                        velocity_step=step,
+                        target_batch_size=args.target_batch_size,
+                    )["l2p_velocity_directional_derivative"]
+                )
 
         estimates = nested_diffusion_estimates(
-            responses_for_step(args.velocity_step),
+            responses_by_step[args.velocity_step],
             prefix_counts=prefixes,
             friction=args.friction,
             temperature=args.temperature,
@@ -279,7 +288,7 @@ def cache_clone(
         if frame < len(sensitivity_error):
             for slot, step in enumerate(args.sensitivity_velocity_steps):
                 sensitivity = nested_diffusion_estimates(
-                    responses_for_step(step),
+                    responses_by_step[step],
                     prefix_counts=(prefixes[-1],),
                     friction=args.friction,
                     temperature=args.temperature,

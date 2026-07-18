@@ -72,6 +72,7 @@ from ka_local_cage import (  # noqa: E402
     ka_lj_force_and_isotropic_curvature,
     ka_lj_force_generator_observables,
     ka_lj_sparse_force_generator_observables,
+    ka_lj_sparse_force_generator_multi,
     ka_lj_second_force_generator,
     ka_lj_shell_forces,
     precursor_event_hazard_diagnostic,
@@ -4900,6 +4901,43 @@ class KAReplicatePreparationTests(unittest.TestCase):
                 float(np.max(sparse["candidate_count"])), len(positions)
             )
             self.assertEqual(float(sparse["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sparse_multi_velocity_force_generator_matches_repeated_geometry(self):
+        rng = np.random.default_rng(20260719)
+        positions = rng.uniform(0.0, 9.0, size=(96, 3))
+        velocity_fields = rng.normal(size=(5, 96, 3))
+        particle_types = np.arange(96, dtype=int) % 2
+        box_lengths = np.full(3, 9.0)
+        targets = np.array([0, 7, 22, 51, 95])
+
+        for protocol in ("ka_lj_cut", "ka_lj_c3_switch"):
+            multi = ka_lj_sparse_force_generator_multi(
+                positions,
+                velocity_fields=velocity_fields,
+                particle_types=particle_types,
+                box_lengths=box_lengths,
+                target_indices=targets,
+                potential_protocol=protocol,
+            )
+            repeated = np.asarray(
+                [
+                    ka_lj_sparse_force_generator_observables(
+                        positions,
+                        velocities=velocity,
+                        particle_types=particle_types,
+                        box_lengths=box_lengths,
+                        target_indices=targets,
+                        potential_protocol=protocol,
+                    )["force_generator"]
+                    for velocity in velocity_fields
+                ]
+            )
+
+            np.testing.assert_allclose(
+                multi["force_generator"], repeated, rtol=2e-13, atol=2e-13
+            )
+            self.assertEqual(multi["force_generator"].shape, (5, 5, 3))
+            self.assertEqual(float(multi["thermodynamic_claim_allowed"]), 0.0)
 
     def test_ka_force_generator_matches_directional_force_derivative_and_hessian_noise(self):
         positions = np.array([[0.0, 0.0, 0.0], [1.13, 0.17, -0.08]])

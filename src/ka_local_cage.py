@@ -636,6 +636,113 @@ def ka_lj_sparse_force_generator_observables(
     }
 
 
+def ka_lj_sparse_force_generator_multi(
+    positions: np.ndarray,
+    *,
+    velocity_fields: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    potential_protocol: str = "ka_lj_cut",
+) -> dict[str, np.ndarray | float]:
+    """Contract one sparse KA pair-Hessian geometry with many velocity fields."""
+
+    positions = np.asarray(positions, dtype=float)
+    fields = np.asarray(velocity_fields, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or fields.ndim != 3
+        or fields.shape[1:] != positions.shape
+        or len(fields) < 1
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(fields))
+    ):
+        raise ValueError("positions and velocity_fields must be aligned finite arrays")
+    if particle_types.shape != (len(positions),) or np.any(
+        (particle_types < 0) | (particle_types > 1)
+    ):
+        raise ValueError("particle_types must be aligned KA 0/1 labels")
+    if box_lengths.shape != (3,) or np.any(~np.isfinite(box_lengths)) or np.any(
+        box_lengths <= 0.0
+    ):
+        raise ValueError("box_lengths must be a finite positive three-vector")
+    if (
+        targets.ndim != 1
+        or len(targets) < 1
+        or np.any(targets < 0)
+        or np.any(targets >= len(positions))
+    ):
+        raise ValueError("target_indices must select one or more particles")
+    if potential_protocol not in {"ka_lj_cut", "ka_lj_c3_switch"}:
+        raise ValueError("unsupported KA pair-potential protocol")
+
+    wrapped = np.mod(positions, box_lengths)
+    maximum_cutoff = _CUTOFF_SCALE * float(np.max(_SIGMA))
+    cell_count = np.maximum(np.floor(box_lengths / maximum_cutoff).astype(int), 1)
+    cell_width = box_lengths / cell_count
+    particle_cells = np.floor(wrapped / cell_width).astype(int)
+    particle_cells = np.minimum(particle_cells, cell_count - 1)
+    buckets: dict[tuple[int, int, int], list[int]] = {}
+    for particle, cell in enumerate(particle_cells):
+        key = tuple(int(value) for value in cell)
+        buckets.setdefault(key, []).append(particle)
+
+    force_generator = np.empty((len(fields), len(targets), 3), dtype=float)
+    candidate_count = np.empty(len(targets), dtype=int)
+    identity = np.eye(3)
+    offsets = tuple(product((-1, 0, 1), repeat=3))
+    for slot, target in enumerate(targets):
+        center = particle_cells[target]
+        neighbor_cells = {
+            tuple(int(value) for value in np.mod(center + offset, cell_count))
+            for offset in offsets
+        }
+        candidates = np.asarray(
+            sorted(
+                particle
+                for cell in neighbor_cells
+                for particle in buckets.get(cell, ())
+            ),
+            dtype=int,
+        )
+        candidate_count[slot] = len(candidates)
+        displacement = wrapped[target] - wrapped[candidates]
+        displacement -= box_lengths * np.rint(displacement / box_lengths)
+        distance = np.linalg.norm(displacement, axis=1)
+        epsilon = _EPSILON[particle_types[target], particle_types[candidates]]
+        sigma = _SIGMA[particle_types[target], particle_types[candidates]]
+        _, first, second, _ = ka_lj_radial_derivatives(
+            distance,
+            epsilon=epsilon,
+            sigma=sigma,
+            protocol=potential_protocol,
+        )
+        safe_distance = np.maximum(distance, 1e-12)
+        first_over_r = first / safe_distance
+        unit = displacement / safe_distance[:, None]
+        pair_hessian = (
+            (second - first_over_r)[:, None, None]
+            * unit[:, :, None]
+            * unit[:, None, :]
+            + first_over_r[:, None, None] * identity
+        )
+        relative_velocity = fields[:, target, None, :] - fields[:, candidates, :]
+        force_generator[:, slot] = -np.sum(
+            np.einsum("nab,pnb->pna", pair_hessian, relative_velocity), axis=1
+        )
+    return {
+        "force_generator": force_generator,
+        "candidate_count": candidate_count,
+        "cell_count": cell_count,
+        "minimum_cell_width": float(np.min(cell_width)),
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def ka_lj_second_force_generator(
     positions: np.ndarray,
     *,
