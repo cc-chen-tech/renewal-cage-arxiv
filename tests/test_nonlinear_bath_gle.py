@@ -248,6 +248,8 @@ class NonlinearBathGleTests(unittest.TestCase):
         self.assertEqual(primary["production_steps"], 400000)
         self.assertEqual(primary["event_sample_stride"], 10)
         self.assertEqual(primary["equilibrium_sample_stride"], 100)
+        self.assertEqual(primary["potential_amplitude"], 1.74)
+        self.assertEqual(primary["physical_barrier_height"], 3.48)
         self.assertEqual(constant["seed"], primary["seed"])
         self.assertEqual(no_bath["seed"], primary["seed"])
         np.testing.assert_array_equal(
@@ -271,6 +273,8 @@ class NonlinearBathGleTests(unittest.TestCase):
             requested_step_count=500000,
         )
         self.assertIn("gle_source_sha256", expected)
+        self.assertEqual(expected["potential_amplitude"], 1.74)
+        self.assertEqual(expected["physical_barrier_height"], 3.48)
         validate_checkpoint_metadata(dict(expected), expected)
         for key, replacement in (
             ("frozen_simulation_protocol", "canary"),
@@ -278,6 +282,7 @@ class NonlinearBathGleTests(unittest.TestCase):
             ("gle_source_sha256", "changed-dependency"),
             ("requested_step_count", 499999.0),
             ("seed", 1.0),
+            ("physical_barrier_height", 1.74),
         ):
             changed = dict(expected)
             changed[key] = replacement

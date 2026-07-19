@@ -100,6 +100,8 @@ def frozen_simulation_protocol(mode: str) -> dict[str, object]:
         "equilibrium_sample_stride": equilibrium_stride,
         "event_sample_time": event_stride * time_step,
         "equilibrium_sample_time": equilibrium_stride * time_step,
+        "potential_amplitude": float(controls.barrier),
+        "physical_barrier_height": float(2.0 * controls.barrier),
     }
 
 
@@ -141,6 +143,8 @@ def checkpoint_metadata(
         "friction": float(controls.friction),
         "period": float(controls.period),
         "barrier": float(controls.barrier),
+        "potential_amplitude": float(protocol["potential_amplitude"]),
+        "physical_barrier_height": float(protocol["physical_barrier_height"]),
         "rates": controls.rates.copy(),
         "amplitudes": controls.amplitudes.copy(),
         "modulation": controls.modulation.copy(),

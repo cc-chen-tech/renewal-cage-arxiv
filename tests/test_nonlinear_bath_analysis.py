@@ -149,6 +149,8 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
             np.savez_compressed(valid_path, **payload)
             loaded = load_complete_cache(valid_path, expected_mode="canary")
             self.assertEqual(loaded["completed_step_count"], steps)
+            self.assertEqual(loaded["potential_amplitude"], 1.74)
+            self.assertEqual(loaded["physical_barrier_height"], 3.48)
 
             changed = dict(payload)
             changed["barrier"] = 1.75

@@ -151,6 +151,8 @@ def load_complete_cache(path: Path, *, expected_mode: str) -> dict[str, object]:
         "controls": controls,
         "event_sample_time": float(protocol["event_sample_time"]),
         "equilibrium_sample_time": float(protocol["equilibrium_sample_time"]),
+        "potential_amplitude": float(protocol["potential_amplitude"]),
+        "physical_barrier_height": float(protocol["physical_barrier_height"]),
         "production_time": float(protocol["production_steps"])
         * controls.time_step,
     }
@@ -1038,6 +1040,8 @@ def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict
         "simulator_sha256": simulator_hash,
         "gle_source_sha256": gle_hash,
         "analyzer_sha256": file_sha256(Path(__file__)),
+        "potential_amplitude": production["potential_amplitude"],
+        "physical_barrier_height": production["physical_barrier_height"],
         "canary_reconstruction_relative_error": full_reconstruction,
         "half_step_reconstruction_relative_error": half_reconstruction,
         "maximum_reconstruction_relative_error": maximum_reconstruction,

@@ -132,7 +132,8 @@ The frozen dimensionless parameters are
 T          = 0.58
 gamma_0    = 1
 ell        = 1
-V_0        = 1.74
+V_0        = 1.74 (potential amplitude)
+Delta W    = 2 V_0 = 3.48 (minimum-to-maximum barrier height)
 alpha      = [0.20, 1.00]
 c          = [1.00, 0.55]
 epsilon    = [0.45, 0.25]
@@ -143,6 +144,12 @@ production = 400 tau per trajectory
 trajectories = 256
 seed       = 20260811
 ```
+
+The implementation retains the historical control field name `barrier=1.74`
+for compatibility, but provenance and verdicts separately record
+`potential_amplitude=1.74` and `physical_barrier_height=3.48`. Any Kramers-scale
+interpretation must use `Delta W=3.48`, not the control-field label. This
+clarification changes no trajectory parameter.
 
 Production simulation runs sequentially on the approved remote compute node.
 No production trajectory is generated locally. The full parameter vector,
