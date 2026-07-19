@@ -58,6 +58,146 @@ class PositionDependentKernelTests(unittest.TestCase):
             numerical[..., coordinate] = (forward - backward) / (2.0 * step)
         np.testing.assert_allclose(analytic, numerical, rtol=2e-9, atol=2e-9)
 
+    def test_regularized_mz_system_recovers_causal_kernel(self):
+        from ka_position_dependent_kernel import (
+            assemble_mz_volterra_system,
+            fit_radial_basis_scale,
+            predict_mz_drift,
+            radial_vector_basis,
+            radial_vector_basis_jacobian,
+            solve_regularized_mz_kernel,
+        )
+
+        rng = np.random.default_rng(20260719)
+        position = rng.normal(size=(3, 15, 5, 3))
+        velocity = rng.normal(size=position.shape)
+        scale = fit_radial_basis_scale(position)
+        support = 4
+        mean_force = np.array([0.20, -0.10, 0.05])
+        memory = np.array(
+            [
+                [0.30, -0.08, 0.04],
+                [0.20, 0.05, -0.03],
+                [0.10, -0.02, 0.01],
+                [0.04, 0.01, 0.02],
+            ]
+        )
+        basis = radial_vector_basis(position, scale)
+        jacobian = radial_vector_basis_jacobian(position, scale)
+        jacobian_velocity = np.einsum(
+            "ctpbik,ctpk->ctpbi",
+            jacobian,
+            velocity,
+        )
+        acceleration = np.zeros_like(position)
+        for time_index in range(support - 1, position.shape[1]):
+            value = np.einsum(
+                "b,cpbi->cpi",
+                mean_force,
+                basis[:, time_index],
+            )
+            for lag in range(support):
+                value -= np.einsum(
+                    "b,cpbi->cpi",
+                    memory[lag],
+                    jacobian_velocity[:, time_index - lag],
+                )
+            acceleration[:, time_index] = value
+
+        system = assemble_mz_volterra_system(
+            position,
+            velocity,
+            acceleration,
+            scale=scale,
+            support=support,
+        )
+        fitted = solve_regularized_mz_kernel(system, ridge=0.0)
+        np.testing.assert_allclose(
+            fitted["mean_force_coefficients"],
+            mean_force,
+            rtol=2e-12,
+            atol=2e-12,
+        )
+        np.testing.assert_allclose(
+            fitted["memory_coefficients"],
+            memory,
+            rtol=2e-12,
+            atol=2e-12,
+        )
+        predicted = predict_mz_drift(
+            position,
+            velocity,
+            scale=scale,
+            mean_force_coefficients=fitted["mean_force_coefficients"],
+            memory_coefficients=fitted["memory_coefficients"],
+        )
+        np.testing.assert_allclose(
+            predicted,
+            acceleration[:, support - 1 :],
+            rtol=2e-12,
+            atol=2e-12,
+        )
+        regularized = solve_regularized_mz_kernel(system, ridge=1e-2)
+        self.assertTrue(np.isfinite(regularized["condition_number"]))
+        self.assertLess(
+            np.linalg.norm(regularized["memory_coefficients"]),
+            np.linalg.norm(fitted["memory_coefficients"]),
+        )
+
+    def test_mz_system_rejects_invalid_paths_support_and_ridge(self):
+        from ka_position_dependent_kernel import (
+            assemble_mz_volterra_system,
+            fit_radial_basis_scale,
+            solve_regularized_mz_kernel,
+        )
+
+        rng = np.random.default_rng(8)
+        position = rng.normal(size=(2, 8, 3, 3))
+        velocity = rng.normal(size=position.shape)
+        acceleration = rng.normal(size=position.shape)
+        scale = fit_radial_basis_scale(position)
+
+        nonfinite = position.copy()
+        nonfinite[0, 0, 0, 0] = np.nan
+        with self.assertRaisesRegex(ValueError, "finite"):
+            assemble_mz_volterra_system(
+                nonfinite,
+                velocity,
+                acceleration,
+                scale=scale,
+                support=2,
+            )
+        with self.assertRaisesRegex(ValueError, "align"):
+            assemble_mz_volterra_system(
+                position,
+                velocity[:, :-1],
+                acceleration,
+                scale=scale,
+                support=2,
+            )
+        with self.assertRaisesRegex(ValueError, "support"):
+            assemble_mz_volterra_system(
+                position,
+                velocity,
+                acceleration,
+                scale=scale,
+                support=9,
+            )
+
+        system = assemble_mz_volterra_system(
+            position,
+            velocity,
+            acceleration,
+            scale=scale,
+            support=2,
+        )
+        with self.assertRaisesRegex(ValueError, "ridge"):
+            solve_regularized_mz_kernel(system, ridge=-1e-4)
+        unresolved = dict(system)
+        unresolved["design"] = np.zeros_like(system["design"])
+        with self.assertRaisesRegex(ValueError, "unresolved columns"):
+            solve_regularized_mz_kernel(unresolved, ridge=1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()
