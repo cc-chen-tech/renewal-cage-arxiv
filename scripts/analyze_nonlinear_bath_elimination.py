@@ -25,6 +25,7 @@ from nonlinear_bath_diagnostics import (  # noqa: E402
 )
 from nonlinear_bath_gle import (  # noqa: E402
     NonlinearBathControls,
+    gibbs_stationarity_audit,
     periodic_coupling,
     reconstruct_auxiliary_path,
 )
@@ -783,13 +784,41 @@ def canary_preflight(
     canary_error = _reconstruction_error(canary)
     half_step_error = _reconstruction_error(half_step)
     maximum_error = max(canary_error, half_step_error)
-    passed = maximum_error <= 5e-11
+    stationarity_results = []
+    for cache in (canary, half_step):
+        controls = cache["controls"]
+        if not isinstance(controls, NonlinearBathControls):
+            raise ValueError("canary controls are invalid")
+        positions = np.asarray(cache["equilibrium_positions"])
+        momenta = np.asarray(cache["equilibrium_momenta"])
+        auxiliary = np.asarray(cache["equilibrium_auxiliary"])
+        stationarity_results.append(
+            gibbs_stationarity_audit(
+                positions.reshape(-1),
+                momenta.reshape(-1),
+                auxiliary.reshape(-1, len(controls.rates)),
+                controls=controls,
+            )
+        )
+    maximum_stationarity_residual = max(
+        float(result["maximum_normalized_stationarity_residual"])
+        for result in stationarity_results
+    )
+    gibbs_derived = all(
+        float(result["gibbs_invariant_density_derived"]) == 1.0
+        for result in stationarity_results
+    )
+    passed = maximum_error <= 5e-11 and gibbs_derived
     return {
         "record": "canary_preflight",
         "canary_reconstruction_relative_error": canary_error,
         "half_step_reconstruction_relative_error": half_step_error,
         "maximum_reconstruction_relative_error": maximum_error,
         "reconstruction_tolerance": 5e-11,
+        "maximum_normalized_stationarity_residual": (
+            maximum_stationarity_residual
+        ),
+        "gibbs_invariant_density_derived": float(gibbs_derived),
         "finite_state_and_provenance_validated": 1.0,
         "canary_preflight_pass": float(passed),
         "exact_nonlinear_bath_elimination_supported": 0.0,
@@ -831,9 +860,21 @@ def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict
         gle_sha256=gle_hash,
     )
     diagnostics = {mode: _cache_equilibrium(cache) for mode, cache in caches.items()}
-    full_reconstruction = _reconstruction_error(caches["canary"])
-    half_reconstruction = _reconstruction_error(caches["canary-half-step"])
-    maximum_reconstruction = max(full_reconstruction, half_reconstruction)
+    preflight = canary_preflight(
+        caches["canary"],
+        caches["canary-half-step"],
+    )
+    if float(preflight["canary_preflight_pass"]) != 1.0:
+        raise ValueError("full analysis rejects a failed canary preflight")
+    full_reconstruction = float(
+        preflight["canary_reconstruction_relative_error"]
+    )
+    half_reconstruction = float(
+        preflight["half_step_reconstruction_relative_error"]
+    )
+    maximum_reconstruction = float(
+        preflight["maximum_reconstruction_relative_error"]
+    )
     canary_rows = _equilibrium_rows("canary", diagnostics["canary"])
     half_rows = _equilibrium_rows(
         "canary-half-step",
@@ -1000,6 +1041,12 @@ def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict
         "canary_reconstruction_relative_error": full_reconstruction,
         "half_step_reconstruction_relative_error": half_reconstruction,
         "maximum_reconstruction_relative_error": maximum_reconstruction,
+        "maximum_normalized_stationarity_residual": preflight[
+            "maximum_normalized_stationarity_residual"
+        ],
+        "gibbs_invariant_density_derived": preflight[
+            "gibbs_invariant_density_derived"
+        ],
         "half_step_equilibrium_not_worse": float(half_step_not_worse),
         "bath_replay_pooled_normalized_rmse": replay[
             "pooled_normalized_rmse"

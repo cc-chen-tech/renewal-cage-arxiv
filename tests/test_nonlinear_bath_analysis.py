@@ -204,6 +204,11 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         passed = canary_preflight(cache, dict(cache))
         self.assertEqual(passed["canary_preflight_pass"], 1.0)
         self.assertEqual(passed["maximum_reconstruction_relative_error"], 0.0)
+        self.assertEqual(passed["gibbs_invariant_density_derived"], 1.0)
+        self.assertLess(
+            passed["maximum_normalized_stationarity_residual"],
+            2e-14,
+        )
         for claim in (
             "autonomous_single_particle_gle_allowed",
             "complete_event_clock_closure_allowed",
