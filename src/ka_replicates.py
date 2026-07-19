@@ -2177,6 +2177,287 @@ def correlated_jump_propagator(
     return rows
 
 
+def interval_conditioned_event_statistics(
+    events: dict[str, np.ndarray],
+    *,
+    frame_count: int,
+    particle_count: int,
+    lags: tuple[int, ...],
+    wave_numbers: np.ndarray,
+    origin_stride: int,
+) -> dict[int, dict[str, np.ndarray]]:
+    """Estimate P(N;t) and net event-path kernels K_t(displacement|N)."""
+
+    particles = np.asarray(events["particle"], dtype=int)
+    raw_times = np.asarray(events["time"])
+    times = np.asarray(raw_times, dtype=int)
+    jumps = np.asarray(events["jump_vector"], dtype=float)
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if (
+        isinstance(frame_count, bool)
+        or not isinstance(frame_count, int)
+        or frame_count < 2
+        or isinstance(particle_count, bool)
+        or not isinstance(particle_count, int)
+        or particle_count < 1
+        or isinstance(origin_stride, bool)
+        or not isinstance(origin_stride, int)
+        or origin_stride < 1
+    ):
+        raise ValueError("trajectory sizes and origin_stride must be positive integers")
+    if (
+        particles.ndim != 1
+        or raw_times.shape != particles.shape
+        or jumps.ndim != 2
+        or jumps.shape[0] != len(particles)
+        or jumps.shape[1] < 1
+        or np.any(~np.isfinite(raw_times))
+        or np.any(raw_times != times)
+        or np.any(~np.isfinite(jumps))
+        or np.any(particles < 0)
+        or np.any(particles >= particle_count)
+        or np.any(times < 0)
+        or np.any(times >= frame_count)
+    ):
+        raise ValueError("event arrays must be aligned, finite, integer-timed, and in range")
+    if (
+        not isinstance(lags, tuple)
+        or len(lags) == 0
+        or len(set(lags)) != len(lags)
+        or any(isinstance(lag, bool) or not isinstance(lag, int) for lag in lags)
+        or any(lag < 1 or lag >= frame_count for lag in lags)
+        or wave_numbers.ndim != 1
+        or len(wave_numbers) == 0
+        or np.any(~np.isfinite(wave_numbers))
+        or np.any(wave_numbers <= 0.0)
+    ):
+        raise ValueError("lags and wave_numbers must form positive finite grids")
+
+    particle_event_counts = np.bincount(particles, minlength=particle_count)
+    count_support = int(np.max(particle_event_counts, initial=0)) + 1
+    accumulators: dict[int, dict[str, np.ndarray]] = {}
+    for lag in lags:
+        accumulators[lag] = {
+            "sample_count": np.zeros(count_support, dtype=float),
+            "msd_sum": np.zeros(count_support, dtype=float),
+            "fourth_sum": np.zeros(count_support, dtype=float),
+            **{
+                f"characteristic_k{wave_number:g}_sum".replace(".", "p"): np.zeros(
+                    count_support, dtype=float
+                )
+                for wave_number in wave_numbers
+            },
+        }
+
+    for particle in range(particle_count):
+        indices = np.flatnonzero(particles == particle)
+        increments = np.zeros((frame_count, jumps.shape[1]), dtype=float)
+        count_increments = np.zeros(frame_count, dtype=int)
+        if len(indices):
+            np.add.at(increments, times[indices], jumps[indices])
+            np.add.at(count_increments, times[indices], 1)
+        event_path = np.cumsum(increments, axis=0)
+        count_path = np.cumsum(count_increments)
+        for lag in lags:
+            origins = np.arange(0, frame_count - lag, origin_stride, dtype=int)
+            displacement = event_path[origins + lag] - event_path[origins]
+            counts = count_path[origins + lag] - count_path[origins]
+            squared = np.sum(displacement**2, axis=1)
+            accumulator = accumulators[lag]
+            accumulator["sample_count"] += np.bincount(
+                counts, minlength=count_support
+            )
+            accumulator["msd_sum"] += np.bincount(
+                counts, weights=squared, minlength=count_support
+            )
+            accumulator["fourth_sum"] += np.bincount(
+                counts, weights=squared**2, minlength=count_support
+            )
+            for wave_number in wave_numbers:
+                key = f"characteristic_k{wave_number:g}_sum".replace(".", "p")
+                characteristic = np.mean(
+                    np.cos(wave_number * displacement), axis=1
+                )
+                accumulator[key] += np.bincount(
+                    counts, weights=characteristic, minlength=count_support
+                )
+
+    result: dict[int, dict[str, np.ndarray]] = {}
+    for lag, accumulator in accumulators.items():
+        retained = np.flatnonzero(accumulator["sample_count"] > 0.0)
+        maximum = int(retained[-1])
+        sample_count = accumulator["sample_count"][: maximum + 1]
+        local: dict[str, np.ndarray] = {
+            "sample_count": sample_count,
+            "count_pmf": sample_count / np.sum(sample_count),
+        }
+        for output_key, sum_key in (
+            ("conditional_msd", "msd_sum"),
+            ("conditional_fourth_moment", "fourth_sum"),
+        ):
+            values = np.zeros(maximum + 1, dtype=float)
+            np.divide(
+                accumulator[sum_key][: maximum + 1],
+                sample_count,
+                out=values,
+                where=sample_count > 0.0,
+            )
+            local[output_key] = values
+        for wave_number in wave_numbers:
+            suffix = f"k{wave_number:g}".replace(".", "p")
+            values = np.zeros(maximum + 1, dtype=float)
+            np.divide(
+                accumulator[f"characteristic_{suffix}_sum"][: maximum + 1],
+                sample_count,
+                out=values,
+                where=sample_count > 0.0,
+            )
+            local[f"conditional_characteristic_{suffix}"] = values
+        result[lag] = local
+    return result
+
+
+def pool_interval_path_kernels(
+    statistics: dict[int, dict[str, np.ndarray]],
+    *,
+    wave_numbers: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Pool lag-resolved path kernels into one sample-weighted K(displacement|N)."""
+
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if (
+        not statistics
+        or wave_numbers.ndim != 1
+        or len(wave_numbers) == 0
+        or np.any(~np.isfinite(wave_numbers))
+        or np.any(wave_numbers <= 0.0)
+    ):
+        raise ValueError("statistics and wave_numbers must be nonempty and finite")
+    observable_keys = (
+        "conditional_msd",
+        "conditional_fourth_moment",
+        *(
+            f"conditional_characteristic_k{wave_number:g}".replace(".", "p")
+            for wave_number in wave_numbers
+        ),
+    )
+    maximum_support = max(
+        len(np.asarray(local.get("sample_count", [])))
+        for local in statistics.values()
+    )
+    if maximum_support == 0:
+        raise ValueError("interval kernels have empty count support")
+    sample_count = np.zeros(maximum_support, dtype=float)
+    weighted = {
+        key: np.zeros(maximum_support, dtype=float) for key in observable_keys
+    }
+    for local in statistics.values():
+        counts = np.asarray(local.get("sample_count", []), dtype=float)
+        if (
+            counts.ndim != 1
+            or len(counts) == 0
+            or np.any(~np.isfinite(counts))
+            or np.any(counts < 0.0)
+        ):
+            raise ValueError("interval sample counts must be finite nonnegative vectors")
+        support = len(counts)
+        sample_count[:support] += counts
+        for key in observable_keys:
+            values = np.asarray(local.get(key, []), dtype=float)
+            if values.shape != counts.shape or np.any(~np.isfinite(values)):
+                raise ValueError("interval kernel observables must align with sample counts")
+            weighted[key][:support] += counts * values
+    if not np.any(sample_count > 0.0):
+        raise ValueError("pooled path kernel has no supported counts")
+    result = {"sample_count": sample_count}
+    for key, values in weighted.items():
+        result[key] = np.divide(
+            values,
+            sample_count,
+            out=np.zeros_like(values),
+            where=sample_count > 0.0,
+        )
+    return result
+
+
+def mix_interval_count_and_path_kernel(
+    marginal: dict[str, np.ndarray],
+    kernel: dict[str, np.ndarray],
+    *,
+    wave_numbers: np.ndarray,
+    dimension: int,
+) -> dict[str, float]:
+    """Mix one interval-count marginal with one lag-conditioned path kernel."""
+
+    count_pmf = np.asarray(marginal["count_pmf"], dtype=float)
+    sample_count = np.asarray(kernel["sample_count"], dtype=float)
+    conditional_msd = np.asarray(kernel["conditional_msd"], dtype=float)
+    conditional_fourth = np.asarray(
+        kernel["conditional_fourth_moment"], dtype=float
+    )
+    wave_numbers = np.asarray(wave_numbers, dtype=float)
+    if (
+        count_pmf.ndim != 1
+        or len(count_pmf) == 0
+        or sample_count.ndim != 1
+        or len(sample_count) == 0
+        or conditional_msd.shape != sample_count.shape
+        or conditional_fourth.shape != sample_count.shape
+        or np.any(~np.isfinite(count_pmf))
+        or np.any(count_pmf < 0.0)
+        or not math.isclose(float(np.sum(count_pmf)), 1.0, abs_tol=1e-10)
+        or np.any(~np.isfinite(sample_count))
+        or np.any(sample_count < 0.0)
+        or np.any(~np.isfinite(conditional_msd))
+        or np.any(conditional_msd < 0.0)
+        or np.any(~np.isfinite(conditional_fourth))
+        or np.any(conditional_fourth < 0.0)
+        or wave_numbers.ndim != 1
+        or len(wave_numbers) == 0
+        or np.any(~np.isfinite(wave_numbers))
+        or np.any(wave_numbers <= 0.0)
+        or isinstance(dimension, bool)
+        or not isinstance(dimension, int)
+        or dimension < 1
+    ):
+        raise ValueError("interval marginal and kernel inputs are outside their domains")
+
+    support = min(len(count_pmf), len(sample_count))
+    valid = sample_count[:support] > 0.0
+    covered_probability = float(np.sum(count_pmf[:support][valid]))
+    if covered_probability <= 0.0:
+        raise ValueError("path kernel does not cover any count probability")
+    weights = count_pmf[:support][valid] / covered_probability
+    event_msd = float(np.dot(weights, conditional_msd[:support][valid]))
+    event_fourth = float(np.dot(weights, conditional_fourth[:support][valid]))
+    event_ngp = (
+        dimension * event_fourth / ((dimension + 2.0) * event_msd**2) - 1.0
+        if event_msd > 0.0
+        else 0.0
+    )
+    result = {
+        "covered_count_probability": covered_probability,
+        "omitted_count_probability": max(0.0, 1.0 - covered_probability),
+        "event_msd": event_msd,
+        "event_fourth_moment": event_fourth,
+        "event_ngp": event_ngp,
+    }
+    for wave_number in wave_numbers:
+        suffix = f"k{wave_number:g}".replace(".", "p")
+        values = np.asarray(kernel[f"conditional_characteristic_{suffix}"], dtype=float)
+        if (
+            values.shape != sample_count.shape
+            or np.any(~np.isfinite(values))
+            or np.any(values < -1.0)
+            or np.any(values > 1.0)
+        ):
+            raise ValueError("conditional event characteristics must lie in [-1, 1]")
+        result[f"event_characteristic_{suffix}"] = float(
+            np.dot(weights, values[:support][valid])
+        )
+    return result
+
+
 def posterior_weighted_state_displacement_kernels(
     counts: np.ndarray,
     displacements: np.ndarray,

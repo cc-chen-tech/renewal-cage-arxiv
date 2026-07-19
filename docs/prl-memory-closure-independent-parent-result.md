@@ -183,9 +183,9 @@ The commands and all output paths are documented in
 Validation is reported in three separate layers:
 
 - scientific result: parent gate blocked and full candidate rejected as above;
-- engineering validation: 51 focused acquisition, completion, ingestion,
+- engineering validation: 62 focused acquisition, completion, ingestion,
   lineage, and memory-closure tests pass; the complete local Python 3.12 suite
-  reports `Ran 1076 tests in 40.186s — OK`; the new fail-closed acquisition
+  reports `Ran 1090 tests in 25.691s — OK`; the new fail-closed acquisition
   import bundle rebuilds byte-identically; six lineage-bound input artifacts, the two
   raw-audit artifacts, and eight downstream artifacts rebuild
   byte-identically; runtime input hashes, Python syntax, and `git diff --check`

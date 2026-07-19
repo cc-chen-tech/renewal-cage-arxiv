@@ -90,8 +90,10 @@ thermodynamic claims remain closed. See `docs/ka-shape-mechanism-selection.md`.
 
 The independent-parent PRL memory-closure test is documented in
 [`docs/prl-memory-closure-independent-parent-result.md`](docs/prl-memory-closure-independent-parent-result.md).
-The available `T=0.45` restart labels contribute only one of three required
-source parents, and `T=0.58` contributes one of five. Restart-first reanalysis
+Only one `T=0.45` parent is currently scientifically eligible; two newly
+prepared parent outputs fail closed because their historical launcher did not
+persist an exit code. `T=0.58` still contributes one of five required source
+parents. Restart-first reanalysis
 finds that neither source parent passes stationarity (no `T=0.45` child passes
 all three comparisons; only `T=0.58` child 4 does). Heldout, environment, and
 spectral rows now pass exact parent/source/complete-trajectory hash joins, but
@@ -100,6 +102,24 @@ parents. The paired-schedule particle-conditioned finite-exchange ordered-path
 candidate also fails every `T=0.45` child. The PRL claim therefore remains
 blocked; complete microscopic closure, spatial facilitation, and
 thermodynamic-transition claims remain outside scope.
+
+A physical-lag-conditioned event-transfer diagnostic now replaces the global
+`n`-jump kernel by the calibration-measured `K_t(displacement | N=n)` and
+separately swaps the event-count marginal, conditional path kernel, and cage
+residual across the calibration/held-out split. At `T=0.45`, the fully
+calibration-only ensemble canary passes held-out MSD, pooled NGP, multi-`k`
+`F_s`, `D`, `tau_alpha`, and `D tau_alpha`; individual restarts do not pass, and
+the three restarts share one parent trajectory. A matched ablation keeps the
+same empirical `P_t(N)` and calibration residual but pools the path kernel over
+lag: its MSD/NGP and derived-scalar gates pass, while its maximum multi-`k`
+`F_s` error is `0.0331` and fails the frozen `0.03` tolerance. Restoring
+`K_t` lowers that maximum to `0.0239`, although only two of three restart labels
+improve in mean `F_s` error. At `T=0.58`, even the all-held oracle factorization
+fails. The result therefore supports a retrospective low-temperature ensemble
+shape canary, not a preregistered forecast, uniform restart improvement,
+finite-memory mechanism, universal cage-event representation, spatial theory,
+or thermodynamic glass theory. See
+`docs/ka-interval-conditioned-event-transfer.md`.
 
 The model combines:
 
