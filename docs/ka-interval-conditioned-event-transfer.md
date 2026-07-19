@@ -106,6 +106,10 @@ python3 scripts/summarize_ka_interval_conditioned_event_transfer.py
 python3 -m unittest tests.test_ka_interval_conditioned_event_transfer -v
 ```
 
+Interval caches are bound to the full trajectory SHA-256 and the complete event
+extraction protocol. Legacy or mismatched caches are rejected; pass
+`--rebuild-cache` to recompute and replace them explicitly.
+
 The next decisive test is a preregistered calibration/held-out transfer on at
 least three independently prepared parent trajectories per temperature. The
 high-temperature branch requires a different displacement representation before
