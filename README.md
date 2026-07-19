@@ -90,10 +90,10 @@ thermodynamic claims remain closed. See `docs/ka-shape-mechanism-selection.md`.
 
 The independent-parent PRL memory-closure test is documented in
 [`docs/prl-memory-closure-independent-parent-result.md`](docs/prl-memory-closure-independent-parent-result.md).
-Only one `T=0.45` parent is currently scientifically eligible; two newly
-prepared parent outputs fail closed because their historical launcher did not
-persist an exit code. `T=0.58` still contributes one of five required source
-parents. Restart-first reanalysis
+Only one pre-existing `T=0.45` source parent is currently auditable; two newly
+prepared parent outputs remain completion-ineligible because their historical
+launcher did not persist an exit code. `T=0.58` still contributes one of five
+required source parents. Restart-first reanalysis
 finds that neither source parent passes stationarity (no `T=0.45` child passes
 all three comparisons; only `T=0.58` child 4 does). Heldout, environment, and
 spectral rows now pass exact parent/source/complete-trajectory hash joins, but

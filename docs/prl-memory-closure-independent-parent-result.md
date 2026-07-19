@@ -118,9 +118,10 @@ vocabulary. That label does **not** establish spatial facilitation.
 
 The candidate positive-memory claim remains closed for three independent reasons:
 
-1. only one of three required `T=0.45` parents is currently scientifically
-   eligible; two new independent acquisition attempts have complete outputs but
-   fail closed because their original launcher did not persist an exit code;
+1. only one of three required `T=0.45` source parents is currently auditable;
+   two new independent acquisition attempts have complete outputs but remain
+   completion-ineligible because their original launcher did not persist an
+   exit code;
 2. the available `T=0.45` parent fails restart-first stationarity;
 3. the full candidate fails the replicate-first correlated-parent diagnostic.
 
