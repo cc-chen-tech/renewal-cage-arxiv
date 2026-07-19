@@ -310,9 +310,13 @@ Q_rs(X) = 2 gamma T A_r(X) A_s(X)^T
         = Gamma(g_r,g_s)(X).
 ```
 
-The current gate uses the `Q_33=Q_c` block to score the `L2p` innovation. It
-does not yet derive all `Q_rs` cross blocks or `Q_44=Q_d`. Therefore even a
-successful `L3p` quotient is not a complete single-particle Langevin model.
+The frozen gate uses the `Q_33=Q_c` block to score the `L2p` innovation. A
+post-freeze analytic implementation now constructs every `Q_rs` block for
+`r,s=0,...,3` from the common microscopic thermostat, including a raw-frame
+construction of `A_0,...,A_3`. This implementation is not an outcome or input
+of the frozen quotient, and its cross blocks have not passed a held closure
+test. It also does not derive `Q_44=Q_d`. Therefore even a successful `L3p`
+quotient is not a complete single-particle Langevin model.
 
 Completion would require separate held evidence for all of the following:
 

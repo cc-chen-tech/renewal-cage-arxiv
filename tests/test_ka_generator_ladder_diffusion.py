@@ -9,6 +9,82 @@ sys.path.insert(0, str(ROOT / "src"))
 
 
 class GeneratorLadderDiffusionTests(unittest.TestCase):
+    @staticmethod
+    def microscopic_configuration():
+        return {
+            "positions": np.array(
+                [
+                    [0.10, -0.20, 0.30],
+                    [1.05, -0.10, 0.25],
+                    [-0.65, 0.55, 0.35],
+                    [0.05, -1.15, 0.60],
+                ]
+            ),
+            "particle_types": np.array([0, 0, 1, 0]),
+            "box_lengths": np.array([20.0, 20.0, 20.0]),
+        }
+
+    def test_microscopic_frame_builds_a0_through_a3_and_all_noise_blocks(self):
+        from ka_generator_ladder_diffusion import (
+            smooth_cage_generator_ladder_velocity_jacobians_batch,
+        )
+        from ka_smooth_cage import smooth_force_support_cage_batch
+
+        inputs = self.microscopic_configuration()
+        positions = inputs["positions"]
+        velocities = np.arange(12, dtype=float).reshape(4, 3) / 17.0 - 0.2
+        targets = np.array([0, 2])
+        friction = 0.7
+        temperature = 0.58
+        step = 2e-5
+        a3 = np.random.default_rng(39).normal(size=(2, 3, 4, 3))
+        result = smooth_cage_generator_ladder_velocity_jacobians_batch(
+            positions,
+            velocities=velocities,
+            particle_types=inputs["particle_types"],
+            box_lengths=inputs["box_lengths"],
+            target_indices=targets,
+            l2p_velocity_jacobian=a3,
+            friction=friction,
+            temperature=temperature,
+            position_step=step,
+        )
+
+        common = {
+            "velocities": velocities,
+            "particle_types": inputs["particle_types"],
+            "box_lengths": inputs["box_lengths"],
+            "target_indices": targets,
+            "compute_gram": False,
+            "return_jacobian": True,
+        }
+        base = smooth_force_support_cage_batch(positions, **common)["jacobian"]
+        plus = smooth_force_support_cage_batch(
+            positions + step * velocities,
+            **common,
+        )["jacobian"]
+        minus = smooth_force_support_cage_batch(
+            positions - step * velocities,
+            **common,
+        )["jacobian"]
+        derivative = (plus - minus) / (2.0 * step)
+        matrices = np.asarray(result["velocity_jacobians"])
+        np.testing.assert_array_equal(matrices[0], 0.0)
+        np.testing.assert_allclose(matrices[1], np.transpose(base, (0, 2, 1, 3)))
+        np.testing.assert_allclose(
+            matrices[2],
+            np.transpose(2.0 * derivative - friction * base, (0, 2, 1, 3)),
+        )
+        np.testing.assert_array_equal(matrices[3], a3)
+        expected_blocks = 2.0 * friction * temperature * np.einsum(
+            "rtanb,stcnb->rstac",
+            matrices,
+            matrices,
+        )
+        np.testing.assert_allclose(result["diffusion_blocks"], expected_blocks)
+        self.assertEqual(result["full_microscopic_velocity_jacobians_retained"], 1.0)
+        self.assertEqual(result["projected_state_autonomous"], 0.0)
+
     def test_local_characteristics_shift_generator_chain_and_match_ito_formula(self):
         from ka_generator_ladder_diffusion import (
             generator_ladder_local_characteristics,

@@ -6,6 +6,8 @@ import math
 
 import numpy as np
 
+from ka_smooth_cage import smooth_force_support_cage_batch
+
 
 _CLOSED_CLAIMS = {
     "finite_generator_ladder_closure_supported": 0.0,
@@ -194,3 +196,93 @@ def quadratic_test_generator(
         gradient @ local_drift
         + 0.5 * np.einsum("ij,ij->", curvature, local_diffusion)
     )
+
+
+def smooth_cage_generator_ladder_velocity_jacobians_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    l2p_velocity_jacobian: np.ndarray,
+    friction: float,
+    temperature: float,
+    position_step: float,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float | str]:
+    """Build ``A_0,...,A_3`` and their common-noise blocks on one frame."""
+
+    position = np.asarray(positions, dtype=float)
+    velocity = np.asarray(velocities, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    a3 = np.asarray(l2p_velocity_jacobian, dtype=float)
+    if (
+        position.ndim != 2
+        or position.shape[1] != 3
+        or velocity.shape != position.shape
+        or targets.ndim != 1
+        or len(targets) < 1
+        or a3.shape != (len(targets), 3, len(position), 3)
+        or np.any(~np.isfinite(position))
+        or np.any(~np.isfinite(velocity))
+        or np.any(~np.isfinite(a3))
+    ):
+        raise ValueError("microscopic frame and L2p Jacobian must be finite and aligned")
+    if not math.isfinite(position_step) or position_step <= 0.0:
+        raise ValueError("position_step must be finite and positive")
+    common = {
+        "velocities": velocity,
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "target_batch_size": target_batch_size,
+        "compute_gram": False,
+        "return_jacobian": True,
+    }
+    base = np.asarray(
+        smooth_force_support_cage_batch(position, **common)["jacobian"],
+        dtype=float,
+    )
+    step = float(position_step)
+    plus = np.asarray(
+        smooth_force_support_cage_batch(
+            position + step * velocity,
+            **common,
+        )["jacobian"],
+        dtype=float,
+    )
+    minus = np.asarray(
+        smooth_force_support_cage_batch(
+            position - step * velocity,
+            **common,
+        )["jacobian"],
+        dtype=float,
+    )
+    directional_derivative = (plus - minus) / (2.0 * step)
+    a1 = np.transpose(base, (0, 2, 1, 3))
+    a2 = np.asarray(
+        lp_velocity_jacobian(
+            base,
+            directional_derivative,
+            friction=friction,
+        )["lp_velocity_jacobian"],
+        dtype=float,
+    )
+    matrices = np.stack((np.zeros_like(a1), a1, a2, a3))
+    diffusion = generator_ladder_conditional_diffusion(
+        matrices,
+        friction=friction,
+        temperature=temperature,
+    )
+    return {
+        "velocity_jacobians": matrices,
+        "cage_jacobian": base,
+        "cage_jacobian_velocity_derivative": directional_derivative,
+        "position_step": step,
+        **diffusion,
+        "microscopic_state_conditioned": 1.0,
+        "full_microscopic_velocity_jacobians_retained": 1.0,
+        "projected_state_autonomous": 0.0,
+        **_CLOSED_CLAIMS,
+    }
