@@ -11,6 +11,100 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 
 class PositionDependentKernelAnalysisTests(unittest.TestCase):
+    @staticmethod
+    def _synthetic_kernel_clones() -> list[dict[str, object]]:
+        from ka_position_dependent_kernel import (
+            radial_vector_basis,
+            radial_vector_basis_jacobian,
+        )
+
+        clones = []
+        reference_scale = {
+            "mu_r2": 3.0,
+            "sigma_r2": 2.0,
+            "epsilon_r2": 0.05,
+        }
+        for clone_index in range(1, 5):
+            rng = np.random.default_rng(900 + clone_index)
+            position = rng.normal(size=(32, 7, 3))
+            velocity = rng.normal(size=position.shape)
+            basis = radial_vector_basis(position, reference_scale)
+            jacobian = radial_vector_basis_jacobian(position, reference_scale)
+            jacobian_velocity = np.einsum(
+                "tpbik,tpk->tpbi",
+                jacobian,
+                velocity,
+            )
+            acceleration = np.einsum(
+                "b,tpbi->tpi",
+                np.array([0.25, -0.14, 0.08]),
+                basis,
+            )
+            acceleration[1:] -= np.einsum(
+                "b,tpbi->tpi",
+                np.array([0.18, 0.11, -0.07]),
+                jacobian_velocity[:-1],
+            )
+            clones.append(
+                {
+                    "clone_index": float(clone_index),
+                    "relative_position": position,
+                    "relative_velocity": velocity,
+                    "relative_drift": acceleration,
+                }
+            )
+        return clones
+
+    def test_nested_nonparametric_selection_is_whole_clone_and_outer_held_blind(self):
+        from analyze_ka_position_dependent_kernel import (
+            select_nonparametric_hierarchy,
+        )
+
+        clones = self._synthetic_kernel_clones()
+        candidates, selections = select_nonparametric_hierarchy(
+            clones,
+            supports=(2, 3),
+            ridge_grid=(0.0, 1e-6),
+            permutation_seed=20260719,
+        )
+        self.assertEqual(len(candidates), 4 * 3 * 2 * 2)
+        self.assertEqual(len(selections), 4 * 3)
+        self.assertTrue(all(row["fit_uses_outer_held_clone"] == 0.0 for row in candidates))
+        self.assertTrue(all(row["inner_validation_fold_count"] == 3.0 for row in candidates))
+        self.assertTrue(all(row["fit_uses_outer_held_clone"] == 0.0 for row in selections))
+        for held_clone in range(1, 5):
+            selected = {
+                row["model"]: row
+                for row in selections
+                if row["held_clone_index"] == float(held_clone)
+            }
+            self.assertLess(
+                selected["finite_basis_mz_position_kernel"]["mean_inner_normalized_rmse"],
+                selected["stationary_scalar_nonparametric_volterra"]["mean_inner_normalized_rmse"],
+            )
+            self.assertLess(
+                selected["finite_basis_mz_position_kernel"]["mean_inner_normalized_rmse"],
+                selected["time_permuted_position_null"]["mean_inner_normalized_rmse"],
+            )
+
+        mutated = [dict(clone) for clone in clones]
+        mutated[3] = {
+            **mutated[3],
+            "relative_position": 50.0 * np.asarray(mutated[3]["relative_position"]),
+            "relative_drift": -30.0 * np.asarray(mutated[3]["relative_drift"]),
+        }
+        _, changed = select_nonparametric_hierarchy(
+            mutated,
+            supports=(2, 3),
+            ridge_grid=(0.0, 1e-6),
+            permutation_seed=20260719,
+        )
+        original_held_four = [
+            row for row in selections if row["held_clone_index"] == 4.0
+        ]
+        changed_held_four = [row for row in changed if row["held_clone_index"] == 4.0]
+        self.assertEqual(original_held_four, changed_held_four)
+
     def test_cli_and_loader_require_frozen_four_clone_provenance(self):
         from analyze_ka_position_dependent_kernel import (
             file_sha256,

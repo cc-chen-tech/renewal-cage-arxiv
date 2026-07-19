@@ -181,6 +181,68 @@ class PositionDependentKernelTests(unittest.TestCase):
         )
         np.testing.assert_allclose(predicted, acceleration[:, 1:], atol=2e-12)
 
+    def test_projected_correlation_system_recovers_exact_mz_kernel(self):
+        from ka_position_dependent_kernel import (
+            assemble_mz_correlation_system,
+            fit_radial_basis_scale,
+            radial_vector_basis,
+            radial_vector_basis_jacobian,
+            solve_regularized_mz_kernel,
+        )
+
+        rng = np.random.default_rng(812)
+        position = rng.normal(size=(3, 28, 7, 3))
+        velocity = rng.normal(size=position.shape)
+        scale = fit_radial_basis_scale(position)
+        support = 4
+        mean_force = np.array([0.3, -0.12, 0.07])
+        memory = np.array(
+            [
+                [0.25, -0.06, 0.03],
+                [0.14, 0.04, -0.02],
+                [0.08, -0.01, 0.015],
+                [0.03, 0.02, 0.01],
+            ]
+        )
+        basis = radial_vector_basis(position, scale)
+        jacobian = radial_vector_basis_jacobian(position, scale)
+        jacobian_velocity = np.einsum(
+            "ctpbik,ctpk->ctpbi",
+            jacobian,
+            velocity,
+        )
+        acceleration = np.zeros_like(position)
+        for time_index in range(support - 1, position.shape[1]):
+            acceleration[:, time_index] = np.einsum(
+                "b,cpbi->cpi",
+                mean_force,
+                basis[:, time_index],
+            )
+            for lag in range(support):
+                acceleration[:, time_index] -= np.einsum(
+                    "b,cpbi->cpi",
+                    memory[lag],
+                    jacobian_velocity[:, time_index - lag],
+                )
+
+        system = assemble_mz_correlation_system(
+            position,
+            velocity,
+            acceleration,
+            scale=scale,
+            support=support,
+        )
+        self.assertEqual(system["correlation_identity"], 1.0)
+        self.assertEqual(system["fit_uses_held_clone"], 0.0)
+        self.assertLess(system["design"].shape[0], position.size)
+        fitted = solve_regularized_mz_kernel(system, ridge=0.0)
+        np.testing.assert_allclose(
+            fitted["mean_force_coefficients"], mean_force, atol=3e-12
+        )
+        np.testing.assert_allclose(
+            fitted["memory_coefficients"], memory, atol=3e-12
+        )
+
     def test_mz_system_rejects_invalid_paths_support_and_ridge(self):
         from ka_position_dependent_kernel import (
             assemble_mz_volterra_system,

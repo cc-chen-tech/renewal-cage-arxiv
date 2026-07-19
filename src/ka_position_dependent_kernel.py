@@ -183,6 +183,136 @@ def assemble_mz_volterra_system(
     }
 
 
+def assemble_mz_correlation_system(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    acceleration: np.ndarray,
+    *,
+    scale: dict[str, float],
+    support: int,
+    basis_indices: tuple[int, ...] = (0, 1, 2),
+    memory_position: np.ndarray | None = None,
+    projection_lag_count: int | None = None,
+) -> dict[str, object]:
+    """Assemble the finite-basis MZ projected-correlation identity."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    memory_positions = positions
+    if memory_position is not None:
+        memory_positions, memory_velocities = _finite_clone_paths(
+            memory_position,
+            velocity,
+        )
+        if memory_velocities.shape != velocities.shape:
+            raise ValueError("memory positions must align with kernel paths")
+    accelerations = np.asarray(acceleration, dtype=float)
+    indices = tuple(basis_indices)
+    lag_count = (
+        positions.shape[1] - support + 1
+        if projection_lag_count is None
+        else projection_lag_count
+    )
+    if (
+        accelerations.shape != positions.shape
+        or np.any(~np.isfinite(accelerations))
+        or isinstance(support, bool)
+        or not isinstance(support, (int, np.integer))
+        or support < 1
+        or support > positions.shape[1]
+        or isinstance(lag_count, bool)
+        or not isinstance(lag_count, (int, np.integer))
+        or lag_count < 1
+        or support - 1 + lag_count > positions.shape[1]
+        or len(indices) < 1
+        or len(set(indices)) != len(indices)
+        or any(
+            isinstance(index, bool)
+            or not isinstance(index, (int, np.integer))
+            or index < 0
+            or index > 2
+            for index in indices
+        )
+    ):
+        raise ValueError("acceleration and support must align with kernel paths")
+    basis = radial_vector_basis(positions, scale)[..., indices, :]
+    jacobian = radial_vector_basis_jacobian(memory_positions, scale)[
+        ..., indices, :, :
+    ]
+    jacobian_velocity = np.einsum(
+        "ctpbik,ctpk->ctpbi",
+        jacobian,
+        velocities,
+    )
+    design_rows = []
+    target_rows = []
+    time_count = positions.shape[1]
+    particle_count = positions.shape[2]
+    maximum_projection_lag = support - 1 + int(lag_count) - 1
+    for clone in range(positions.shape[0]):
+        mean_correlations = []
+        memory_correlations = []
+        target_correlations = []
+        origin_count = time_count - maximum_projection_lag
+        scale_factor = float(origin_count * particle_count * 3)
+        left = basis[clone, :origin_count]
+        for lag in range(maximum_projection_lag + 1):
+            mean_correlations.append(
+                np.einsum(
+                    "opli,opji->lj",
+                    left,
+                    basis[clone, lag : lag + origin_count],
+                )
+                / scale_factor
+            )
+            memory_correlations.append(
+                -np.einsum(
+                    "opli,opji->lj",
+                    left,
+                    jacobian_velocity[clone, lag : lag + origin_count],
+                )
+                / scale_factor
+            )
+            target_correlations.append(
+                np.einsum(
+                    "opli,opi->l",
+                    left,
+                    accelerations[clone, lag : lag + origin_count],
+                )
+                / scale_factor
+            )
+        for time_lag in range(
+            support - 1,
+            support - 1 + int(lag_count),
+        ):
+            target_rows.append(target_correlations[time_lag])
+            design_rows.append(
+                np.concatenate(
+                    (
+                        mean_correlations[time_lag],
+                        *(memory_correlations[time_lag - lag] for lag in range(support)),
+                    ),
+                    axis=1,
+                )
+            )
+    design = np.concatenate(design_rows, axis=0)
+    target = np.concatenate(target_rows, axis=0)
+    if np.linalg.matrix_rank(design) < 1:
+        raise ValueError("MZ correlation design has zero numerical rank")
+    return {
+        "design": design,
+        "target": target,
+        "basis_count": len(indices),
+        "basis_indices": indices,
+        "support": int(support),
+        "training_clone_count": int(positions.shape[0]),
+        "correlation_lag_count": int(lag_count),
+        "particle_count": int(particle_count),
+        "correlation_identity": 1.0,
+        "fit_uses_held_clone": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def solve_regularized_mz_kernel(
     system: dict[str, object],
     ridge: float,
@@ -271,10 +401,19 @@ def predict_mz_drift(
     mean_force_coefficients: np.ndarray,
     memory_coefficients: np.ndarray,
     basis_indices: tuple[int, ...] | None = None,
+    memory_position: np.ndarray | None = None,
 ) -> np.ndarray:
     """Predict exact-generator drift on each clone without crossing boundaries."""
 
     positions, velocities = _finite_clone_paths(position, velocity)
+    memory_positions = positions
+    if memory_position is not None:
+        memory_positions, memory_velocities = _finite_clone_paths(
+            memory_position,
+            velocity,
+        )
+        if memory_velocities.shape != velocities.shape:
+            raise ValueError("memory positions must align with kernel paths")
     mean_force = np.asarray(mean_force_coefficients, dtype=float)
     memory = np.asarray(memory_coefficients, dtype=float)
     indices = (
@@ -298,7 +437,9 @@ def predict_mz_drift(
     ):
         raise ValueError("MZ coefficients must be finite and aligned")
     basis = radial_vector_basis(positions, scale)[..., indices, :]
-    jacobian = radial_vector_basis_jacobian(positions, scale)[..., indices, :, :]
+    jacobian = radial_vector_basis_jacobian(memory_positions, scale)[
+        ..., indices, :, :
+    ]
     jacobian_velocity = np.einsum(
         "ctpbik,ctpk->ctpbi",
         jacobian,

@@ -135,6 +135,9 @@ For each outer held clone:
 3. Select ridge from `[0, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2]` after column
    normalization of the training design. Zero ridge is admissible only for a
    full-column-rank design with finite condition number.
+   For support `S`, the projected-correlation system uses the `S` outer lags
+   `S-1..2S-2` and one common time-origin window ending before lag `2S-2`.
+   This is the finite-basis correlation identity, not a subsample of raw rows.
 4. Select auxiliary rank from `[1, 2, 4, 8]` and positive decay rates from the
    fixed grid `logspace(log10(0.05), log10(50), 32)` by the same inner folds.
    Within each training fold, select poles greedily from this dictionary by the
