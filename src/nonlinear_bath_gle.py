@@ -207,7 +207,10 @@ def gibbs_stationarity_audit(
             auxiliary_thermostat_residual
         ),
         "maximum_normalized_stationarity_residual": maximum,
-        "gibbs_invariant_density_derived": float(maximum <= 5e-13),
+        "periodic_quotient_gibbs_invariant_density_derived": float(
+            maximum <= 5e-13
+        ),
+        "unwrapped_position_gibbs_probability_allowed": 0.0,
         **_CLOSED_CLAIMS,
     }
 

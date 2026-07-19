@@ -807,7 +807,10 @@ def canary_preflight(
         for result in stationarity_results
     )
     gibbs_derived = all(
-        float(result["gibbs_invariant_density_derived"]) == 1.0
+        float(
+            result["periodic_quotient_gibbs_invariant_density_derived"]
+        )
+        == 1.0
         for result in stationarity_results
     )
     passed = maximum_error <= 5e-11 and gibbs_derived
@@ -820,7 +823,10 @@ def canary_preflight(
         "maximum_normalized_stationarity_residual": (
             maximum_stationarity_residual
         ),
-        "gibbs_invariant_density_derived": float(gibbs_derived),
+        "periodic_quotient_gibbs_invariant_density_derived": float(
+            gibbs_derived
+        ),
+        "unwrapped_position_gibbs_probability_allowed": 0.0,
         "finite_state_and_provenance_validated": 1.0,
         "canary_preflight_pass": float(passed),
         "exact_nonlinear_bath_elimination_supported": 0.0,
@@ -1048,9 +1054,10 @@ def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict
         "maximum_normalized_stationarity_residual": preflight[
             "maximum_normalized_stationarity_residual"
         ],
-        "gibbs_invariant_density_derived": preflight[
-            "gibbs_invariant_density_derived"
+        "periodic_quotient_gibbs_invariant_density_derived": preflight[
+            "periodic_quotient_gibbs_invariant_density_derived"
         ],
+        "unwrapped_position_gibbs_probability_allowed": 0.0,
         "half_step_equilibrium_not_worse": float(half_step_not_worse),
         "bath_replay_pooled_normalized_rmse": replay[
             "pooled_normalized_rmse"

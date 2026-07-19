@@ -208,7 +208,12 @@ class NonlinearBathGleTests(unittest.TestCase):
         ):
             np.testing.assert_allclose(result[key], 0.0, rtol=0.0, atol=2e-14)
         self.assertLess(result["maximum_normalized_stationarity_residual"], 2e-14)
-        self.assertEqual(result["gibbs_invariant_density_derived"], 1.0)
+        self.assertEqual(
+            result["periodic_quotient_gibbs_invariant_density_derived"],
+            1.0,
+        )
+        self.assertEqual(result["unwrapped_position_gibbs_probability_allowed"], 0.0)
+        self.assertNotIn("gibbs_invariant_density_derived", result)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
 
     def test_remote_simulator_cli_exposes_only_frozen_modes(self):

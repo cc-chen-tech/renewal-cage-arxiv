@@ -116,6 +116,8 @@ def equilibrium_diagnostics(
         "position_histogram": empirical,
         "position_gibbs_probability": expected,
         "position_gibbs_total_variation": total_variation,
+        "position_coordinate": "wrapped_modulo_period",
+        "unwrapped_position_gibbs_probability_allowed": 0.0,
         "position_bin_count": float(position_bin_count),
         "equilibrium_gate_pass": float(passed),
         **_CLOSED_CLAIMS,

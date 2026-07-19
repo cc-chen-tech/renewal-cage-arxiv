@@ -38,17 +38,28 @@ The `p-z_a` coupling is antisymmetric. For any smooth position-dependent
 p^T C_a(u) z_a + z_a^T[-C_a(u)^T p] = 0.
 ```
 
-Together with the matched diagonal thermostats, the invariant density is
+Together with the matched diagonal thermostats, the invariant probability
+density on the periodic quotient `u mod ell` is
 
 ```text
 rho(u,p,z) proportional to
 exp{-[W(u) + |p|^2/2 + sum_a |z_a|^2/2]/T}.
 ```
 
+The unwrapped coordinate `u in R` is diffusive across periodic cells, so this
+expression is not normalizable on the full real line. It is an invariant Gibbs
+probability only for `(u mod ell,p,z)`; on the unwrapped space it defines at
+most a periodic sigma-finite invariant measure. Machine-readable outputs use
+
+```text
+periodic_quotient_gibbs_invariant_density_derived = 1
+unwrapped_position_gibbs_probability_allowed = 0
+```
+
 No renewal event, waiting-time law, escape rate, or phenomenological hazard is
 present in this parent dynamics.
 
-This invariance is an exact Fokker-Planck statement, not a numerical
+This quotient-space invariance is an exact Fokker-Planck statement, not a numerical
 equilibration assumption. The conservative vector field has zero phase-space
 divergence and annihilates the total energy:
 

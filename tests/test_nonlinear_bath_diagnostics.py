@@ -53,6 +53,8 @@ class NonlinearBathDiagnosticsTests(unittest.TestCase):
         self.assertLess(result["maximum_auxiliary_temperature_relative_error"], 0.03)
         self.assertLess(result["maximum_momentum_auxiliary_correlation"], 0.03)
         self.assertLess(result["position_gibbs_total_variation"], 1e-12)
+        self.assertEqual(result["position_coordinate"], "wrapped_modulo_period")
+        self.assertEqual(result["unwrapped_position_gibbs_probability_allowed"], 0.0)
         self.assertEqual(result["equilibrium_gate_pass"], 1.0)
 
     def test_fixed_path_bath_replay_matches_constant_kernel(self):

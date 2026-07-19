@@ -206,7 +206,12 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         passed = canary_preflight(cache, dict(cache))
         self.assertEqual(passed["canary_preflight_pass"], 1.0)
         self.assertEqual(passed["maximum_reconstruction_relative_error"], 0.0)
-        self.assertEqual(passed["gibbs_invariant_density_derived"], 1.0)
+        self.assertEqual(
+            passed["periodic_quotient_gibbs_invariant_density_derived"],
+            1.0,
+        )
+        self.assertEqual(passed["unwrapped_position_gibbs_probability_allowed"], 0.0)
+        self.assertNotIn("gibbs_invariant_density_derived", passed)
         self.assertLess(
             passed["maximum_normalized_stationarity_residual"],
             2e-14,
