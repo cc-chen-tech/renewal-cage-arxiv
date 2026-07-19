@@ -118,7 +118,9 @@ vocabulary. That label does **not** establish spatial facilitation.
 
 The candidate positive-memory claim remains closed for three independent reasons:
 
-1. only one of three required `T=0.45` parents exists; and
+1. only one of three required `T=0.45` parents is currently scientifically
+   eligible; two new independent acquisition attempts have complete outputs but
+   fail closed because their original launcher did not persist an exit code;
 2. the available `T=0.45` parent fails restart-first stationarity;
 3. the full candidate fails the replicate-first correlated-parent diagnostic.
 
@@ -134,6 +136,31 @@ flag remains zero in
 `data/renewal_cage_ka_prl_memory_closure_claim_ledger.csv`.
 
 ## Reproduction
+
+The passive completion watcher is
+`scripts/watch_ka_parent_completion.py`. It never signals a process or edits a
+run directory and has no credential option. Its remote snapshot found both new
+PIDs already exited. Each parent has 10001 frames, timesteps 0 through
+10000000, exactly 1000 atoms per frame, a final restart, zero matched LAMMPS
+error signatures, and complete-file SHA256 hashes. Because the historical
+launcher did not save `wait` status, both explicit exit codes are unavailable;
+`data/renewal_cage_ka_prl_T045_parent_acquisition_completion.json` therefore
+records `blocked_missing_observed_exit_code` rather than inferring success from
+the files.
+
+`scripts/import_ka_independent_parent_acquisition.py` is the one-click importer.
+It validates completion and parent hashes before opening any trajectory. For an
+eligible bundle it loads each parent separately, takes 0--5000 tau as
+calibration and 5000--10000 tau as heldout, writes parent-keyed MSD, NGP and
+multi-k Fs targets, runs all three stationarity comparisons per parent,
+estimates the environment lifetime from calibration only, builds the frozen
+two-point spectral surrogate, and executes the 64-realization six-ablation
+gate. On the current completion artifact it stops before trajectory I/O and
+writes the machine-readable fail-closed bundle under
+`data/renewal_cage_ka_prl_T045_parent_acquisition_import/`. No trajectory was
+downloaded merely to bypass the missing-exit blocker; if the transient
+authenticated SSH session expires before a later authorized transfer, an SSH
+key or new interactive authentication is required and no password is stored.
 
 `scripts/bind_ka_prl_input_lineage.py` verifies ensemble and child manifests,
 hashes each complete trajectory, and deterministically binds that identity into
@@ -156,9 +183,10 @@ The commands and all output paths are documented in
 Validation is reported in three separate layers:
 
 - scientific result: parent gate blocked and full candidate rejected as above;
-- engineering validation: 42 focused acquisition, lineage, memory-closure, and
-  package-recomputation tests pass; the complete local Python 3.12 suite reports
-  `Ran 1066 tests in 80.886s — OK`; six lineage-bound input artifacts, the two
+- engineering validation: 51 focused acquisition, completion, ingestion,
+  lineage, and memory-closure tests pass; the complete local Python 3.12 suite
+  reports `Ran 1076 tests in 40.186s — OK`; the new fail-closed acquisition
+  import bundle rebuilds byte-identically; six lineage-bound input artifacts, the two
   raw-audit artifacts, and eight downstream artifacts rebuild
   byte-identically; runtime input hashes, Python syntax, and `git diff --check`
   pass; and `scripts/build_arxiv_package.py` exits zero with

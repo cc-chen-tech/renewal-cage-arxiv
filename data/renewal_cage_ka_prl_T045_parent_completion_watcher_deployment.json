@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "deployment_state": "completed_passive_snapshot",
+  "source_base_commit": "66136a39b8cc7cdff6852afd45dd5f9e7266993d",
+  "source_git_state_at_deployment": "candidate_sources_not_yet_committed",
+  "remote_python": "/usr/bin/python3.11",
+  "remote_watcher_root": "/root/prl-memory-closure-acquisition/completion-watcher",
+  "remote_watcher_script_path": "/root/prl-memory-closure-acquisition/completion-watcher/scripts/watch_ka_parent_completion.py",
+  "remote_watcher_script_sha256": "d484d2ad84cbab751b6636890de430a3fc8f2386de6eabfec4bb01f1be08b369",
+  "remote_watcher_module_path": "/root/prl-memory-closure-acquisition/completion-watcher/src/ka_parent_completion.py",
+  "remote_watcher_module_sha256": "9b6bc09831985a693cada74120f0c53ad81da85b6b4c8c2e8a16043c737ef1f8",
+  "remote_completion_status_path": "/root/prl-memory-closure-acquisition/completion_status.json",
+  "remote_completion_status_sha256": "fa5424dbe13df97c68c96f116317b1f1e7724fcdb0b39210e652d97f61409987",
+  "remote_completion_status_size_bytes": 4170,
+  "local_completion_artifact": "data/renewal_cage_ka_prl_T045_parent_acquisition_completion.json",
+  "local_completion_status_sha256": "fa5424dbe13df97c68c96f116317b1f1e7724fcdb0b39210e652d97f61409987",
+  "parent_pids": {
+    "ka-t045-independent-p02-20260719": 50273,
+    "ka-t045-independent-p03-20260719": 50274
+  },
+  "watcher_modified_run_outputs": false,
+  "credentials_persisted": false,
+  "authentication_state_at_transfer": "authenticated_ephemeral_ssh_control_connection",
+  "authentication_requirement_after_session_expiry": "requires_ssh_key_or_interactive_reauthentication",
+  "scientific_ingestion_allowed": false,
+  "positive_memory_closure_claim_allowed": 0,
+  "complete_microscopic_closure_claim_allowed": 0,
+  "spatial_facilitation_claim_allowed": 0,
+  "thermodynamic_glass_transition_claim_allowed": 0
+}

@@ -1,0 +1,9 @@
+{
+  "blocker_state": "blocked_missing_observed_exit_code",
+  "claims_remain_closed": true,
+  "credentials_persisted": false,
+  "pipeline_state": "completion_blocked_fail_closed",
+  "schema_version": 1,
+  "scientific_gate_executed": false,
+  "trajectory_files_opened": 0
+}
