@@ -137,6 +137,10 @@ For each outer held clone:
    full-column-rank design with finite condition number.
 4. Select auxiliary rank from `[1, 2, 4, 8]` and positive decay rates from the
    fixed grid `logspace(log10(0.05), log10(50), 32)` by the same inner folds.
+   Within each training fold, select poles greedily from this dictionary by the
+   reduction in least-squares reconstruction error of that fold's fitted `M2`
+   temporal coefficient matrix. Refit all selected exponential amplitudes after
+   every added pole. The outer held clone never enters this OMP step.
 5. Refit the selected model on all three training clones and score the held
    clone once.
 

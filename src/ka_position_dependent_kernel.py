@@ -321,6 +321,84 @@ def predict_mz_drift(
     return prediction
 
 
+def select_decay_rates_from_memory(
+    memory_coefficients: np.ndarray,
+    *,
+    frame_time: float,
+    decay_grid: np.ndarray,
+    rank: int,
+) -> dict[str, object]:
+    """Select positive exponential poles from a training M2 memory kernel."""
+
+    memory = np.asarray(memory_coefficients, dtype=float)
+    rates = np.asarray(decay_grid, dtype=float)
+    dt = float(frame_time)
+    if (
+        memory.ndim != 2
+        or memory.shape[0] < 2
+        or memory.shape[1] < 1
+        or np.any(~np.isfinite(memory))
+        or not math.isfinite(dt)
+        or dt <= 0.0
+        or rates.ndim != 1
+        or len(rates) < 1
+        or np.any(~np.isfinite(rates))
+        or np.any(rates <= 0.0)
+        or np.any(np.diff(rates) <= 0.0)
+        or isinstance(rank, bool)
+        or not isinstance(rank, (int, np.integer))
+        or rank < 1
+        or rank > len(rates)
+    ):
+        raise ValueError(
+            "training memory, frame time, decay grid, and rank must be resolved"
+        )
+    memory_scale = math.sqrt(float(np.mean(memory**2)))
+    if not math.isfinite(memory_scale) or memory_scale <= 0.0:
+        raise ValueError("training memory must have positive finite scale")
+
+    time = np.arange(memory.shape[0], dtype=float) * dt
+    dictionary = np.exp(-time[:, None] * rates[None, :])
+    selected: list[int] = []
+    amplitudes = np.empty((0, memory.shape[1]), dtype=float)
+    residual_square = float(np.sum(memory**2))
+    for _ in range(int(rank)):
+        best: tuple[float, int, np.ndarray] | None = None
+        for candidate in range(len(rates)):
+            if candidate in selected:
+                continue
+            trial = selected + [candidate]
+            trial_amplitudes = np.linalg.lstsq(
+                dictionary[:, trial],
+                memory,
+                rcond=None,
+            )[0]
+            residual = memory - dictionary[:, trial] @ trial_amplitudes
+            trial_square = float(np.sum(residual**2))
+            if best is None or trial_square < best[0]:
+                best = (trial_square, candidate, trial_amplitudes)
+        if best is None:
+            raise RuntimeError("positive-pole OMP exhausted its fixed dictionary")
+        residual_square, candidate, amplitudes = best
+        selected.append(candidate)
+
+    normalized_rmse = math.sqrt(
+        residual_square / memory.size
+    ) / memory_scale
+    return {
+        "selected_decay_rates": rates[selected].copy(),
+        "exponential_amplitudes": amplitudes,
+        "normalized_reconstruction_rmse": normalized_rmse,
+        "selection_uses_held_clone": 0.0,
+        "positive_decay_grid_only": 1.0,
+        "autonomous_single_particle_gle_allowed": 0.0,
+        "complete_event_clock_closure_allowed": 0.0,
+        "kramers_escape_claim_allowed": 0.0,
+        "spatial_facilitation_claim_allowed": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 def _validated_decay(
     decay_rates: np.ndarray,
     frame_time: float,

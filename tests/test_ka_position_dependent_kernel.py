@@ -389,6 +389,27 @@ class PositionDependentKernelTests(unittest.TestCase):
         self.assertEqual(thermodynamic_fit["positive_prony_factorization"], 1.0)
         self.assertEqual(thermodynamic_fit["all_projected_gram_matrices_psd"], 1.0)
 
+    def test_training_kernel_omp_selects_positive_decay_grid_without_held_data(self):
+        from ka_position_dependent_kernel import select_decay_rates_from_memory
+
+        decay_grid = np.array([0.1, 0.2, 0.5, 1.0, 2.0, 5.0])
+        time = np.arange(100) * 0.02
+        memory = (
+            np.exp(-0.2 * time)[:, None] * np.array([[1.0, -0.5, 0.2]])
+            + 0.5
+            * np.exp(-2.0 * time)[:, None]
+            * np.array([[0.7, 0.4, -0.3]])
+        )
+        result = select_decay_rates_from_memory(
+            memory,
+            frame_time=0.02,
+            decay_grid=decay_grid,
+            rank=2,
+        )
+        np.testing.assert_array_equal(result["selected_decay_rates"], [0.2, 2.0])
+        self.assertLess(result["normalized_reconstruction_rmse"], 1e-12)
+        self.assertEqual(result["selection_uses_held_clone"], 0.0)
+
     def test_classifier_separates_mz_real_pole_and_positive_prony_claims(self):
         from ka_position_dependent_kernel import (
             classify_position_dependent_kernel_gate,
