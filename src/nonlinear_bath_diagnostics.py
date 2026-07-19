@@ -451,5 +451,9 @@ def classify_nonlinear_bath_gate(
         "synthetic_bath_level_fdt_replay_supported": float(replay),
         "synthetic_delayed_hazard_emerges": float(delayed),
         "real_ka_position_dependent_kernel_authorized": float(authorized),
+        "real_ka_kernel_identifiability_test_required": 1.0,
+        "positive_prony_kernel_identified_in_ka": 0.0,
+        "finite_auxiliary_rank_identified_in_ka": 0.0,
+        "oscillatory_matrix_bath_authorized": 0.0,
         **_CLOSED_CLAIMS,
     }

@@ -145,6 +145,10 @@ class NonlinearBathDiagnosticsTests(unittest.TestCase):
         self.assertEqual(verdict["synthetic_bath_level_fdt_replay_supported"], 1.0)
         self.assertEqual(verdict["synthetic_delayed_hazard_emerges"], 1.0)
         self.assertEqual(verdict["real_ka_position_dependent_kernel_authorized"], 1.0)
+        self.assertEqual(verdict["positive_prony_kernel_identified_in_ka"], 0.0)
+        self.assertEqual(verdict["finite_auxiliary_rank_identified_in_ka"], 0.0)
+        self.assertEqual(verdict["oscillatory_matrix_bath_authorized"], 0.0)
+        self.assertEqual(verdict["real_ka_kernel_identifiability_test_required"], 1.0)
         for claim in (
             "autonomous_single_particle_gle_allowed",
             "complete_event_clock_closure_allowed",

@@ -288,6 +288,26 @@ mechanism. A later real-data specification must estimate `W`, the kernel
 spectrum, and the minimum auxiliary rank on training clones and must predict
 held-clone first passage, MSD, NGP, and multi-`k F_s` without retuning.
 
+The two-mode diagonal OU bath is only a frozen synthetic realization, not an
+identified KA kernel family. A general Mori-Zwanzig position-dependent kernel
+need not be a positive sum of separable exponentials. Therefore every verdict
+also reports
+
+```text
+real_ka_kernel_identifiability_test_required = 1
+positive_prony_kernel_identified_in_ka = 0
+finite_auxiliary_rank_identified_in_ka = 0
+oscillatory_matrix_bath_authorized = 0
+```
+
+The real-KA follow-up must first estimate a nonparametric Volterra kernel on
+training clones. Positive diagonal-Prony, higher-order rational, and damped
+oscillatory matrix realizations must then be compared at fixed complexity by
+held-clone orthogonal-force whiteness and held first-passage/macro prediction.
+The auxiliary rank and pole family are selected without reading held outcomes.
+Failure of the positive-Prony family may authorize the oscillatory matrix bath;
+the present synthetic result cannot.
+
 ## Literature relation
 
 - Vroylandt and Monmarche rigorously derive nonlinear-force GLEs with
@@ -300,3 +320,9 @@ held-clone first passage, MSD, NGP, and multi-`k F_s` without retuning.
 - Likelihood-based auxiliary-variable GLEs can reproduce first-passage
   distributions, but this experiment fixes the thermodynamically consistent
   extended SDE before fitting any first-passage data.
+- Lei, Baker, and Li parameterize GLE kernels by rational Laplace functions and
+  embed the result in an extended stochastic system with exact second FDT.
+- Lang and Lu use regularized Prony estimation and make kernel identifiability
+  an explicit part of the inference problem. This supports the required
+  nonparametric-versus-realization gate above, not the assumption that KA has a
+  two-positive-pole kernel.
