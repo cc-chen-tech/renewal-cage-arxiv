@@ -48,6 +48,27 @@ exp{-[W(u) + |p|^2/2 + sum_a |z_a|^2/2]/T}.
 No renewal event, waiting-time law, escape rate, or phenomenological hazard is
 present in this parent dynamics.
 
+This invariance is an exact Fokker-Planck statement, not a numerical
+equilibration assumption. The conservative vector field has zero phase-space
+divergence and annihilates the total energy:
+
+```text
+p grad W + p(-grad W) = 0,
+p sum_a C_a z_a + sum_a z_a(-C_a p) = 0.
+```
+
+For the momentum thermostat, division of its adjoint Fokker-Planck action by
+the Gibbs density gives
+
+```text
+gamma_0(1-p^2/T) + gamma_0(p^2/T-1) = 0,
+```
+
+and each auxiliary thermostat gives the identical cancellation with
+`gamma_0,p` replaced by `alpha_a,z_a`. Dependence of `C_a` on `u` introduces no
+extra divergence because the coupled drifts are differentiated with respect to
+`p` and `z_a`, not with respect to `u`.
+
 ## Exact elimination
 
 Each auxiliary coordinate has the exact solution

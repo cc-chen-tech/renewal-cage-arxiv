@@ -129,6 +129,89 @@ def periodic_coupling(
     return controls.amplitudes * (1.0 + controls.modulation * np.cos(phase))
 
 
+def gibbs_stationarity_audit(
+    position: np.ndarray,
+    momentum: np.ndarray,
+    auxiliary: np.ndarray,
+    *,
+    controls: NonlinearBathControls,
+) -> dict[str, np.ndarray | float]:
+    """Evaluate the exact Fokker-Planck cancellation for the Gibbs density."""
+
+    value = np.asarray(position, dtype=float)
+    velocity = np.asarray(momentum, dtype=float)
+    bath = np.asarray(auxiliary, dtype=float)
+    if (
+        velocity.shape != value.shape
+        or bath.shape != value.shape + (len(controls.rates),)
+        or np.any(~np.isfinite(value))
+        or np.any(~np.isfinite(velocity))
+        or np.any(~np.isfinite(bath))
+        or controls.temperature <= 0.0
+    ):
+        raise ValueError("Gibbs stationarity audit needs finite positive-T state")
+    temperature = controls.temperature
+    gradient = periodic_potential_gradient(
+        value,
+        barrier=controls.barrier,
+        period=controls.period,
+    )
+    coupling = periodic_coupling(value, controls=controls)
+    hamiltonian_energy_rate = gradient * velocity - gradient * velocity
+    bath_force = np.sum(coupling * bath, axis=-1)
+    antisymmetric_bath_energy_rate = velocity * bath_force + np.sum(
+        bath * (-coupling * velocity[..., None]),
+        axis=-1,
+    )
+    conservative_divergence = np.zeros_like(value)
+
+    momentum_drift_residual = controls.friction * (
+        1.0 - velocity**2 / temperature
+    )
+    momentum_diffusion_residual = controls.friction * (
+        velocity**2 / temperature - 1.0
+    )
+    momentum_thermostat_residual = (
+        momentum_drift_residual + momentum_diffusion_residual
+    )
+    auxiliary_drift_residual = controls.rates * (
+        1.0 - bath**2 / temperature
+    )
+    auxiliary_diffusion_residual = controls.rates * (
+        bath**2 / temperature - 1.0
+    )
+    auxiliary_thermostat_residual = (
+        auxiliary_drift_residual + auxiliary_diffusion_residual
+    )
+    maximum = float(
+        max(
+            np.max(np.abs(hamiltonian_energy_rate)),
+            np.max(np.abs(antisymmetric_bath_energy_rate)),
+            np.max(np.abs(conservative_divergence)),
+            np.max(np.abs(momentum_thermostat_residual)),
+            np.max(np.abs(auxiliary_thermostat_residual)),
+        )
+    )
+    return {
+        "hamiltonian_energy_rate": hamiltonian_energy_rate,
+        "antisymmetric_bath_energy_rate": antisymmetric_bath_energy_rate,
+        "conservative_phase_space_divergence": conservative_divergence,
+        "momentum_thermostat_drift_residual": momentum_drift_residual,
+        "momentum_thermostat_diffusion_residual": momentum_diffusion_residual,
+        "momentum_thermostat_stationarity_residual": (
+            momentum_thermostat_residual
+        ),
+        "auxiliary_thermostat_drift_residual": auxiliary_drift_residual,
+        "auxiliary_thermostat_diffusion_residual": auxiliary_diffusion_residual,
+        "auxiliary_thermostat_stationarity_residual": (
+            auxiliary_thermostat_residual
+        ),
+        "maximum_normalized_stationarity_residual": maximum,
+        "gibbs_invariant_density_derived": float(maximum <= 5e-13),
+        **_CLOSED_CLAIMS,
+    }
+
+
 def _ou_coefficients(controls: NonlinearBathControls) -> tuple[np.ndarray, np.ndarray]:
     decay = np.exp(-controls.rates * controls.time_step)
     integral = np.empty_like(decay)

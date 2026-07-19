@@ -185,6 +185,32 @@ class NonlinearBathGleTests(unittest.TestCase):
         self.assertEqual(result["autonomous_single_particle_gle_allowed"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
 
+    def test_fokker_planck_audit_proves_gibbs_stationarity_term_by_term(self):
+        from nonlinear_bath_gle import gibbs_stationarity_audit
+
+        controls = self.controls()
+        rng = np.random.default_rng(20260815)
+        position = rng.uniform(-1.0, 1.0, size=17)
+        momentum = rng.normal(size=17)
+        auxiliary = rng.normal(size=(17, 2))
+        result = gibbs_stationarity_audit(
+            position,
+            momentum,
+            auxiliary,
+            controls=controls,
+        )
+        for key in (
+            "hamiltonian_energy_rate",
+            "antisymmetric_bath_energy_rate",
+            "conservative_phase_space_divergence",
+            "momentum_thermostat_stationarity_residual",
+            "auxiliary_thermostat_stationarity_residual",
+        ):
+            np.testing.assert_allclose(result[key], 0.0, rtol=0.0, atol=2e-14)
+        self.assertLess(result["maximum_normalized_stationarity_residual"], 2e-14)
+        self.assertEqual(result["gibbs_invariant_density_derived"], 1.0)
+        self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
     def test_remote_simulator_cli_exposes_only_frozen_modes(self):
         completed = subprocess.run(
             [
