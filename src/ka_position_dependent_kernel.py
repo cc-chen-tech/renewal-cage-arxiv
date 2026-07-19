@@ -791,17 +791,14 @@ def two_position_fdt_covariance(
     return covariance
 
 
-def _fit_linear_memory_features(
+def _prepare_linear_memory_statistics(
     mean_features: np.ndarray,
     memory_features: np.ndarray,
     acceleration: np.ndarray,
-    *,
-    ridge: float,
 ) -> dict[str, object]:
     mean = np.asarray(mean_features, dtype=float)
     memory = np.asarray(memory_features, dtype=float)
     target_array = np.asarray(acceleration, dtype=float)
-    ridge_value = float(ridge)
     if (
         mean.ndim != 5
         or memory.ndim != 5
@@ -814,10 +811,8 @@ def _fit_linear_memory_features(
         or np.any(~np.isfinite(mean))
         or np.any(~np.isfinite(memory))
         or np.any(~np.isfinite(target_array))
-        or not math.isfinite(ridge_value)
-        or ridge_value < 0.0
     ):
-        raise ValueError("linear memory features and ridge must be finite and aligned")
+        raise ValueError("linear memory features must be finite and aligned")
     features = np.concatenate((mean, memory), axis=-2)
     design = np.moveaxis(features, -1, -2).reshape(-1, features.shape[-2])
     target = target_array.reshape(-1)
@@ -825,25 +820,75 @@ def _fit_linear_memory_features(
     if np.any(column_scale <= 0.0) or np.any(~np.isfinite(column_scale)):
         raise ValueError("linear memory feature design has unresolved columns")
     normalized = design / column_scale
-    singular_values = np.linalg.svd(normalized, compute_uv=False)
-    rank = int(np.linalg.matrix_rank(normalized))
-    if ridge_value == 0.0 and rank != normalized.shape[1]:
-        raise ValueError("zero-ridge memory fit requires full column rank")
-    mean_count = mean.shape[-2]
-    penalty = np.ones(normalized.shape[1])
-    penalty[:mean_count] = 0.0
-    augmented_design = np.concatenate(
-        (normalized, np.diag(np.sqrt(ridge_value * penalty))),
-        axis=0,
+    gram = np.einsum("ni,nj->ij", normalized, normalized, optimize=False)
+    target_projection = np.einsum("ni,n->i", normalized, target, optimize=False)
+    eigenvalues = np.linalg.eigvalsh(gram)
+    eigenvalues = np.maximum(eigenvalues, 0.0)
+    singular_values = np.sqrt(eigenvalues[::-1])
+    tolerance = (
+        max(normalized.shape)
+        * np.finfo(float).eps
+        * max(float(singular_values[0]), np.finfo(float).tiny)
     )
-    augmented_target = np.concatenate((target, np.zeros(normalized.shape[1])))
+    rank = int(np.sum(singular_values > tolerance))
+    return {
+        "normalized_gram": gram,
+        "normalized_target_projection": target_projection,
+        "target_square": float(np.dot(target, target)),
+        "column_scale": column_scale,
+        "mean_count": int(mean.shape[-2]),
+        "feature_count": int(normalized.shape[1]),
+        "row_count": int(normalized.shape[0]),
+        "numerical_rank": float(rank),
+        "singular_values": singular_values,
+    }
+
+
+def _solve_linear_memory_statistics(
+    statistics: dict[str, object],
+    *,
+    ridge: float,
+) -> dict[str, object]:
+    gram = np.asarray(statistics.get("normalized_gram"), dtype=float)
+    target_projection = np.asarray(
+        statistics.get("normalized_target_projection"),
+        dtype=float,
+    )
+    column_scale = np.asarray(statistics.get("column_scale"), dtype=float)
+    singular_values = np.asarray(statistics.get("singular_values"), dtype=float)
+    try:
+        mean_count = int(statistics["mean_count"])
+        feature_count = int(statistics["feature_count"])
+        rank = int(float(statistics["numerical_rank"]))
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError("linear memory statistics are incomplete") from error
+    ridge_value = float(ridge)
+    if (
+        gram.shape != (feature_count, feature_count)
+        or target_projection.shape != (feature_count,)
+        or column_scale.shape != (feature_count,)
+        or singular_values.shape != (feature_count,)
+        or mean_count < 1
+        or mean_count >= feature_count
+        or np.any(~np.isfinite(gram))
+        or np.any(~np.isfinite(target_projection))
+        or np.any(~np.isfinite(column_scale))
+        or np.any(column_scale <= 0.0)
+        or np.any(~np.isfinite(singular_values))
+        or not math.isfinite(ridge_value)
+        or ridge_value < 0.0
+    ):
+        raise ValueError("linear memory statistics and ridge must be resolved")
+    if ridge_value == 0.0 and rank != feature_count:
+        raise ValueError("zero-ridge memory fit requires full column rank")
+    penalty = np.ones(feature_count)
+    penalty[:mean_count] = 0.0
     normalized_coefficients = np.linalg.lstsq(
-        augmented_design,
-        augmented_target,
+        gram + np.diag(ridge_value * penalty),
+        target_projection,
         rcond=None,
     )[0]
     coefficients = normalized_coefficients / column_scale
-    prediction = np.einsum("...fi,f->...i", features, coefficients)
     condition = (
         float(singular_values[0] / singular_values[-1])
         if singular_values[-1] > 0.0
@@ -852,7 +897,6 @@ def _fit_linear_memory_features(
     return {
         "mean_coefficients": coefficients[:mean_count],
         "memory_coefficients": coefficients[mean_count:],
-        "linear_prediction": prediction,
         "condition_number": condition,
         "numerical_rank": float(rank),
         "singular_values": singular_values,
@@ -860,7 +904,31 @@ def _fit_linear_memory_features(
     }
 
 
-def fit_real_pole_model(
+def _fit_linear_memory_features(
+    mean_features: np.ndarray,
+    memory_features: np.ndarray,
+    acceleration: np.ndarray,
+    *,
+    ridge: float,
+) -> dict[str, object]:
+    statistics = _prepare_linear_memory_statistics(
+        mean_features,
+        memory_features,
+        acceleration,
+    )
+    fitted = _solve_linear_memory_statistics(statistics, ridge=ridge)
+    features = np.concatenate((mean_features, memory_features), axis=-2)
+    fitted["linear_prediction"] = np.einsum(
+        "...fi,f->...i",
+        features,
+        np.concatenate(
+            (fitted["mean_coefficients"], fitted["memory_coefficients"])
+        ),
+    )
+    return fitted
+
+
+def prepare_real_pole_model(
     position: np.ndarray,
     velocity: np.ndarray,
     acceleration: np.ndarray,
@@ -868,9 +936,8 @@ def fit_real_pole_model(
     scale: dict[str, float],
     decay_rates: np.ndarray,
     frame_time: float,
-    ridge: float,
 ) -> dict[str, object]:
-    """Fit a signed past-position real-pole MZ realization."""
+    """Build one reusable signed real-pole sufficient-statistics system."""
 
     positions, velocities = _finite_clone_paths(position, velocity)
     target = np.asarray(acceleration, dtype=float)
@@ -886,29 +953,86 @@ def fit_real_pole_model(
     history = np.asarray(history_result["history_features"])
     memory_features = -history.reshape(*history.shape[:3], -1, 3)
     mean_features = radial_vector_basis(positions, scale)
-    fitted = _fit_linear_memory_features(
+    statistics = _prepare_linear_memory_statistics(
         mean_features,
         memory_features,
         target,
-        ridge=ridge,
     )
-    pole_count = len(np.asarray(decay_rates))
-    prediction = np.asarray(fitted["linear_prediction"])
-    residual_variance = float(np.mean((target - prediction) ** 2))
     return {
-        "prediction": prediction,
+        "statistics": statistics,
+        "pole_count": float(len(np.asarray(decay_rates))),
+        "decay_rates": np.asarray(decay_rates, dtype=float).copy(),
+        "fit_uses_held_clone": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def solve_prepared_real_pole_model(
+    prepared: dict[str, object],
+    *,
+    ridge: float,
+) -> dict[str, object]:
+    """Solve one ridge value from a reusable signed real-pole system."""
+
+    try:
+        pole_count = int(float(prepared["pole_count"]))
+        rates = np.asarray(prepared["decay_rates"], dtype=float)
+        statistics = prepared["statistics"]
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError("prepared real-pole model is incomplete") from error
+    if pole_count < 1 or rates.shape != (pole_count,) or np.any(rates <= 0.0):
+        raise ValueError("prepared real-pole model has invalid positive poles")
+    fitted = _solve_linear_memory_statistics(statistics, ridge=ridge)
+    return {
         "mean_force_coefficients": fitted["mean_coefficients"],
         "pole_coefficients": np.asarray(fitted["memory_coefficients"]).reshape(
             pole_count,
             3,
         ),
-        "training_residual_variance": residual_variance,
         "condition_number": fitted["condition_number"],
         "numerical_rank": fitted["numerical_rank"],
         "ridge": fitted["ridge"],
-        "decay_rates": np.asarray(decay_rates, dtype=float).copy(),
+        "decay_rates": rates.copy(),
         "positive_prony_factorization": 0.0,
         "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def fit_real_pole_model(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    acceleration: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    frame_time: float,
+    ridge: float,
+) -> dict[str, object]:
+    """Fit a signed past-position real-pole MZ realization."""
+
+    prepared = prepare_real_pole_model(
+        position,
+        velocity,
+        acceleration,
+        scale=scale,
+        decay_rates=decay_rates,
+        frame_time=frame_time,
+    )
+    fitted = solve_prepared_real_pole_model(prepared, ridge=ridge)
+    prediction = predict_real_pole_drift(
+        position,
+        velocity,
+        scale=scale,
+        decay_rates=decay_rates,
+        frame_time=frame_time,
+        mean_force_coefficients=fitted["mean_force_coefficients"],
+        pole_coefficients=fitted["pole_coefficients"],
+    )
+    target = np.asarray(acceleration, dtype=float)
+    return {
+        **fitted,
+        "prediction": prediction,
+        "training_residual_variance": float(np.mean((target - prediction) ** 2)),
     }
 
 
@@ -972,7 +1096,7 @@ def _radial_coupling_basis(
     )
 
 
-def fit_two_position_prony_model(
+def prepare_two_position_prony_model(
     position: np.ndarray,
     velocity: np.ndarray,
     acceleration: np.ndarray,
@@ -980,9 +1104,8 @@ def fit_two_position_prony_model(
     scale: dict[str, float],
     decay_rates: np.ndarray,
     frame_time: float,
-    ridge: float,
 ) -> dict[str, object]:
-    """Fit symmetric pole Grams and project each to a positive rank-one bath."""
+    """Build one reusable symmetric two-position Prony fit system."""
 
     positions, velocities = _finite_clone_paths(position, velocity)
     target = np.asarray(acceleration, dtype=float)
@@ -1022,12 +1145,38 @@ def fit_two_position_prony_model(
             feature_rows.append(-feature)
     memory_features = np.stack(feature_rows, axis=-2)
     mean_features = radial_vector_basis(positions, scale)
-    fitted = _fit_linear_memory_features(
+    statistics = _prepare_linear_memory_statistics(
         mean_features,
         memory_features,
         target,
-        ridge=ridge,
     )
+    return {
+        "statistics": statistics,
+        "decay_rates": rates.copy(),
+        "gram_pairs": gram_pairs,
+        "fit_uses_held_clone": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def solve_prepared_two_position_prony_model(
+    prepared: dict[str, object],
+    *,
+    ridge: float,
+) -> dict[str, object]:
+    """Solve and project one ridge value from a reusable Prony system."""
+
+    try:
+        rates = np.asarray(prepared["decay_rates"], dtype=float)
+        gram_pairs = tuple(tuple(pair) for pair in prepared["gram_pairs"])
+        statistics = prepared["statistics"]
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError("prepared two-position Prony model is incomplete") from error
+    if rates.ndim != 1 or len(rates) < 1 or np.any(rates <= 0.0):
+        raise ValueError("prepared two-position Prony model has invalid poles")
+    if gram_pairs != ((0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)):
+        raise ValueError("prepared two-position Prony Gram basis is invalid")
+    fitted = _solve_linear_memory_statistics(statistics, ridge=ridge)
     raw_grams = np.zeros((len(rates), 3, 3), dtype=float)
     offset = 0
     for pole in range(len(rates)):
@@ -1047,31 +1196,14 @@ def fit_two_position_prony_model(
                 coupling_coefficients[pole],
                 coupling_coefficients[pole],
             )
-    auxiliary = two_position_auxiliary_features(
-        positions,
-        velocities,
-        scale=scale,
-        decay_rates=rates,
-        coupling_coefficients=coupling_coefficients,
-        frame_time=frame_time,
-    )
-    mean_prediction = np.einsum(
-        "b,ctpbi->ctpi",
-        fitted["mean_coefficients"],
-        mean_features,
-    )
-    prediction = mean_prediction + np.asarray(auxiliary["force"])
-    residual_variance = float(np.mean((target - prediction) ** 2))
     minimum_projected_eigenvalue = float(
         min(np.min(np.linalg.eigvalsh(gram)) for gram in projected_grams)
     )
     return {
-        "prediction": prediction,
         "mean_force_coefficients": fitted["mean_coefficients"],
         "raw_gram_matrices": raw_grams,
         "projected_gram_matrices": projected_grams,
         "coupling_coefficients": coupling_coefficients,
-        "training_residual_variance": residual_variance,
         "condition_number": fitted["condition_number"],
         "numerical_rank": fitted["numerical_rank"],
         "ridge": fitted["ridge"],
@@ -1082,6 +1214,44 @@ def fit_two_position_prony_model(
         ),
         "positive_prony_factorization": 1.0,
         "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def fit_two_position_prony_model(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    acceleration: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    frame_time: float,
+    ridge: float,
+) -> dict[str, object]:
+    """Fit symmetric pole Grams and project each to a positive rank-one bath."""
+
+    prepared = prepare_two_position_prony_model(
+        position,
+        velocity,
+        acceleration,
+        scale=scale,
+        decay_rates=decay_rates,
+        frame_time=frame_time,
+    )
+    fitted = solve_prepared_two_position_prony_model(prepared, ridge=ridge)
+    prediction = predict_two_position_prony_drift(
+        position,
+        velocity,
+        scale=scale,
+        decay_rates=decay_rates,
+        coupling_coefficients=fitted["coupling_coefficients"],
+        frame_time=frame_time,
+        mean_force_coefficients=fitted["mean_force_coefficients"],
+    )
+    target = np.asarray(acceleration, dtype=float)
+    return {
+        **fitted,
+        "prediction": prediction,
+        "training_residual_variance": float(np.mean((target - prediction) ** 2)),
     }
 
 

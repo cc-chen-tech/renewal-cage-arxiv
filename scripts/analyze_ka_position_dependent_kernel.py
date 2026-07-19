@@ -29,7 +29,11 @@ from ka_position_dependent_kernel import (  # noqa: E402
     predict_mz_drift,
     predict_real_pole_drift,
     predict_two_position_prony_drift,
+    prepare_real_pole_model,
+    prepare_two_position_prony_model,
     select_decay_rates_from_memory,
+    solve_prepared_real_pole_model,
+    solve_prepared_two_position_prony_model,
     solve_regularized_mz_kernel,
     two_position_fdt_covariance,
 )
@@ -458,17 +462,30 @@ def select_auxiliary_hierarchy(
                     dtype=float,
                 )
                 pole_text = ",".join(f"{value:.17g}" for value in selected_rates)
+                prepared_models = {
+                    AUXILIARY_MODELS[0]: prepare_real_pole_model(
+                        fit_position,
+                        fit_velocity,
+                        fit_acceleration,
+                        scale=scale,
+                        decay_rates=selected_rates,
+                        frame_time=dt,
+                    ),
+                    AUXILIARY_MODELS[1]: prepare_two_position_prony_model(
+                        fit_position,
+                        fit_velocity,
+                        fit_acceleration,
+                        scale=scale,
+                        decay_rates=selected_rates,
+                        frame_time=dt,
+                    ),
+                }
                 for model in AUXILIARY_MODELS:
                     for ridge in ridges:
                         try:
                             if model == AUXILIARY_MODELS[0]:
-                                fitted = fit_real_pole_model(
-                                    fit_position,
-                                    fit_velocity,
-                                    fit_acceleration,
-                                    scale=scale,
-                                    decay_rates=selected_rates,
-                                    frame_time=dt,
+                                fitted = solve_prepared_real_pole_model(
+                                    prepared_models[model],
                                     ridge=ridge,
                                 )
                                 prediction = predict_real_pole_drift(
@@ -483,13 +500,8 @@ def select_auxiliary_hierarchy(
                                     pole_coefficients=fitted["pole_coefficients"],
                                 )
                             else:
-                                fitted = fit_two_position_prony_model(
-                                    fit_position,
-                                    fit_velocity,
-                                    fit_acceleration,
-                                    scale=scale,
-                                    decay_rates=selected_rates,
-                                    frame_time=dt,
+                                fitted = solve_prepared_two_position_prony_model(
+                                    prepared_models[model],
                                     ridge=ridge,
                                 )
                                 prediction = predict_two_position_prony_drift(

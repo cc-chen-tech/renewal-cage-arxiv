@@ -371,8 +371,12 @@ class PositionDependentKernelTests(unittest.TestCase):
             fit_radial_basis_scale,
             fit_real_pole_model,
             fit_two_position_prony_model,
+            prepare_real_pole_model,
+            prepare_two_position_prony_model,
             predict_real_pole_drift,
             predict_two_position_prony_drift,
+            solve_prepared_real_pole_model,
+            solve_prepared_two_position_prony_model,
             radial_vector_basis,
             real_pole_history_features,
             two_position_auxiliary_features,
@@ -435,6 +439,25 @@ class PositionDependentKernelTests(unittest.TestCase):
             atol=3e-12,
         )
         self.assertEqual(real_fit["positive_prony_factorization"], 0.0)
+        prepared_real = prepare_real_pole_model(
+            position,
+            velocity,
+            real_drift,
+            scale=scale,
+            decay_rates=rates,
+            frame_time=frame_time,
+        )
+        solved_real = solve_prepared_real_pole_model(prepared_real, ridge=0.0)
+        np.testing.assert_allclose(
+            solved_real["mean_force_coefficients"],
+            real_fit["mean_force_coefficients"],
+            atol=3e-12,
+        )
+        np.testing.assert_allclose(
+            solved_real["pole_coefficients"],
+            real_fit["pole_coefficients"],
+            atol=3e-12,
+        )
 
         coupling_coefficients = np.array(
             [[0.8, 0.1, -0.05], [0.45, -0.08, 0.12]]
@@ -481,6 +504,28 @@ class PositionDependentKernelTests(unittest.TestCase):
         )
         self.assertEqual(thermodynamic_fit["positive_prony_factorization"], 1.0)
         self.assertEqual(thermodynamic_fit["all_projected_gram_matrices_psd"], 1.0)
+        prepared_prony = prepare_two_position_prony_model(
+            position,
+            velocity,
+            thermodynamic_drift,
+            scale=scale,
+            decay_rates=rates,
+            frame_time=frame_time,
+        )
+        solved_prony = solve_prepared_two_position_prony_model(
+            prepared_prony,
+            ridge=0.0,
+        )
+        np.testing.assert_allclose(
+            solved_prony["mean_force_coefficients"],
+            thermodynamic_fit["mean_force_coefficients"],
+            atol=3e-12,
+        )
+        np.testing.assert_allclose(
+            solved_prony["coupling_coefficients"],
+            thermodynamic_fit["coupling_coefficients"],
+            atol=3e-12,
+        )
 
     def test_training_kernel_omp_selects_positive_decay_grid_without_held_data(self):
         from ka_position_dependent_kernel import select_decay_rates_from_memory
