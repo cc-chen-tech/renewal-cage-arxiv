@@ -19,7 +19,12 @@ from analyze_ka_projected_ito_innovations import load_drift_cache  # noqa: E402
 from ka_position_dependent_kernel import (  # noqa: E402
     assemble_mz_correlation_system,
     fit_radial_basis_scale,
+    fit_real_pole_model,
+    fit_two_position_prony_model,
     predict_mz_drift,
+    predict_real_pole_drift,
+    predict_two_position_prony_drift,
+    select_decay_rates_from_memory,
     solve_regularized_mz_kernel,
 )
 
@@ -35,6 +40,11 @@ NONPARAMETRIC_MODELS = (
     "stationary_scalar_nonparametric_volterra",
     "finite_basis_mz_position_kernel",
     "time_permuted_position_null",
+)
+
+AUXILIARY_MODELS = (
+    "past_position_real_pole",
+    "two_position_positive_prony",
 )
 
 
@@ -338,6 +348,230 @@ def select_nonparametric_hierarchy(
                     ],
                     "inner_validation_fold_count": float(len(outer_training)),
                     "fit_uses_outer_held_clone": 0.0,
+                    "fit_uses_event_or_macro_observable": 0.0,
+                    "thermodynamic_claim_allowed": 0.0,
+                }
+            )
+    for row in candidates:
+        row.pop("_ridge_grid_index")
+    return candidates, selections
+
+
+def select_auxiliary_hierarchy(
+    clones: list[dict[str, object]],
+    nonparametric_selections: list[dict[str, object]],
+    *,
+    ranks: tuple[int, ...],
+    ridge_grid: tuple[float, ...],
+    decay_grid: np.ndarray,
+    frame_time: float,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Select M3/M4 while deriving every pole inside its inner fit fold."""
+
+    if len(clones) != 4:
+        raise ValueError("auxiliary hierarchy requires exactly four clones")
+    rank_grid = tuple(int(value) for value in ranks)
+    ridges = tuple(float(value) for value in ridge_grid)
+    rates = np.asarray(decay_grid, dtype=float)
+    dt = float(frame_time)
+    if (
+        len(rank_grid) < 1
+        or len(set(rank_grid)) != len(rank_grid)
+        or any(value < 1 or value > len(rates) for value in rank_grid)
+        or len(ridges) < 1
+        or len(set(ridges)) != len(ridges)
+        or any(not math.isfinite(value) or value < 0.0 for value in ridges)
+        or rates.ndim != 1
+        or len(rates) < 1
+        or np.any(~np.isfinite(rates))
+        or np.any(rates <= 0.0)
+        or np.any(np.diff(rates) <= 0.0)
+        or not math.isfinite(dt)
+        or dt <= 0.0
+    ):
+        raise ValueError("auxiliary grids and frame time must be finite and resolved")
+    mz_selection = {
+        int(float(row["held_clone_index"])) - 1: row
+        for row in nonparametric_selections
+        if row.get("model") == "finite_basis_mz_position_kernel"
+    }
+    if set(mz_selection) != set(range(4)):
+        raise ValueError("one M2 selection is required for every outer fold")
+
+    candidates: list[dict[str, object]] = []
+    selections: list[dict[str, object]] = []
+    for outer_held in range(4):
+        outer_training = tuple(index for index in range(4) if index != outer_held)
+        support = int(float(mz_selection[outer_held]["selected_memory_support"]))
+        mz_ridge = float(mz_selection[outer_held]["selected_ridge"])
+        score_grid = {
+            (model, rank, ridge): []
+            for model in AUXILIARY_MODELS
+            for rank in rank_grid
+            for ridge in ridges
+        }
+        pole_grid: dict[tuple[str, int, float], list[str]] = {
+            key: [] for key in score_grid
+        }
+        for inner_held in outer_training:
+            inner_training = tuple(
+                index for index in outer_training if index != inner_held
+            )
+            fit_position, fit_velocity, fit_acceleration = _kernel_clone_arrays(
+                clones,
+                inner_training,
+            )
+            held_position, held_velocity, held_acceleration = _kernel_clone_arrays(
+                clones,
+                (inner_held,),
+            )
+            scale = fit_radial_basis_scale(fit_position)
+            mz_system = assemble_mz_correlation_system(
+                fit_position,
+                fit_velocity,
+                fit_acceleration,
+                scale=scale,
+                support=support,
+                projection_lag_count=support,
+            )
+            mz_fit = solve_regularized_mz_kernel(mz_system, ridge=mz_ridge)
+            for rank in rank_grid:
+                if rank > support:
+                    continue
+                pole_selection = select_decay_rates_from_memory(
+                    np.asarray(mz_fit["memory_coefficients"]),
+                    frame_time=dt,
+                    decay_grid=rates,
+                    rank=rank,
+                )
+                selected_rates = np.asarray(
+                    pole_selection["selected_decay_rates"],
+                    dtype=float,
+                )
+                pole_text = ",".join(f"{value:.17g}" for value in selected_rates)
+                for model in AUXILIARY_MODELS:
+                    for ridge in ridges:
+                        try:
+                            if model == AUXILIARY_MODELS[0]:
+                                fitted = fit_real_pole_model(
+                                    fit_position,
+                                    fit_velocity,
+                                    fit_acceleration,
+                                    scale=scale,
+                                    decay_rates=selected_rates,
+                                    frame_time=dt,
+                                    ridge=ridge,
+                                )
+                                prediction = predict_real_pole_drift(
+                                    held_position,
+                                    held_velocity,
+                                    scale=scale,
+                                    decay_rates=selected_rates,
+                                    frame_time=dt,
+                                    mean_force_coefficients=fitted[
+                                        "mean_force_coefficients"
+                                    ],
+                                    pole_coefficients=fitted["pole_coefficients"],
+                                )
+                            else:
+                                fitted = fit_two_position_prony_model(
+                                    fit_position,
+                                    fit_velocity,
+                                    fit_acceleration,
+                                    scale=scale,
+                                    decay_rates=selected_rates,
+                                    frame_time=dt,
+                                    ridge=ridge,
+                                )
+                                prediction = predict_two_position_prony_drift(
+                                    held_position,
+                                    held_velocity,
+                                    scale=scale,
+                                    decay_rates=selected_rates,
+                                    coupling_coefficients=fitted[
+                                        "coupling_coefficients"
+                                    ],
+                                    frame_time=dt,
+                                    mean_force_coefficients=fitted[
+                                        "mean_force_coefficients"
+                                    ],
+                                )
+                            score = _normalized_drift_rmse(
+                                held_acceleration[:, support - 1 :],
+                                prediction[:, support - 1 :],
+                            )
+                        except (ValueError, np.linalg.LinAlgError):
+                            continue
+                        key = (model, rank, ridge)
+                        score_grid[key].append(score)
+                        pole_grid[key].append(pole_text)
+
+        for model in AUXILIARY_MODELS:
+            model_rows = []
+            for rank in rank_grid:
+                for ridge_index, ridge in enumerate(ridges):
+                    key = (model, rank, ridge)
+                    scores = score_grid[key]
+                    valid = len(scores) == len(outer_training)
+                    row = {
+                        "record": "inner_candidate",
+                        "held_clone_index": float(outer_held + 1),
+                        "model": model,
+                        "selected_m2_support": float(support),
+                        "selected_m2_ridge": mz_ridge,
+                        "auxiliary_rank": float(rank),
+                        "ridge": ridge,
+                        "mean_inner_normalized_rmse": float(np.mean(scores))
+                        if valid
+                        else math.inf,
+                        "maximum_inner_normalized_rmse": float(np.max(scores))
+                        if valid
+                        else math.inf,
+                        "inner_validation_fold_count": float(len(scores)),
+                        "inner_selected_decay_rates": ";".join(pole_grid[key]),
+                        "all_selected_decay_rates_positive": float(
+                            valid and all(float(value) > 0.0 for text in pole_grid[key] for value in text.split(","))
+                        ),
+                        "candidate_valid": float(valid),
+                        "fit_uses_outer_held_clone": 0.0,
+                        "pole_selection_uses_outer_held_clone": 0.0,
+                        "fit_uses_event_or_macro_observable": 0.0,
+                        "thermodynamic_claim_allowed": 0.0,
+                        "_ridge_grid_index": ridge_index,
+                    }
+                    candidates.append(row)
+                    model_rows.append(row)
+            valid_rows = [row for row in model_rows if row["candidate_valid"] == 1.0]
+            if not valid_rows:
+                raise ValueError("no resolved nested auxiliary candidate remains")
+            selected = min(
+                valid_rows,
+                key=lambda row: (
+                    float(row["mean_inner_normalized_rmse"]),
+                    float(row["maximum_inner_normalized_rmse"]),
+                    float(row["auxiliary_rank"]),
+                    int(row["_ridge_grid_index"]),
+                ),
+            )
+            selections.append(
+                {
+                    "record": "outer_selection",
+                    "held_clone_index": float(outer_held + 1),
+                    "model": model,
+                    "selected_m2_support": float(support),
+                    "selected_m2_ridge": mz_ridge,
+                    "selected_auxiliary_rank": selected["auxiliary_rank"],
+                    "selected_ridge": selected["ridge"],
+                    "mean_inner_normalized_rmse": selected[
+                        "mean_inner_normalized_rmse"
+                    ],
+                    "maximum_inner_normalized_rmse": selected[
+                        "maximum_inner_normalized_rmse"
+                    ],
+                    "all_selected_decay_rates_positive": 1.0,
+                    "inner_validation_fold_count": float(len(outer_training)),
+                    "fit_uses_outer_held_clone": 0.0,
+                    "pole_selection_uses_outer_held_clone": 0.0,
                     "fit_uses_event_or_macro_observable": 0.0,
                     "thermodynamic_claim_allowed": 0.0,
                 }

@@ -717,6 +717,80 @@ def reconstruct_auxiliary_innovations(
     )
 
 
+def force_autocovariance(
+    force: np.ndarray,
+    maximum_lag: int,
+) -> np.ndarray:
+    """Return the component-averaged pathwise force autocovariance."""
+
+    values = np.asarray(force, dtype=float)
+    if (
+        values.ndim != 4
+        or values.shape[0] < 1
+        or values.shape[1] < 2
+        or values.shape[2] < 1
+        or values.shape[3] != 3
+        or np.any(~np.isfinite(values))
+        or isinstance(maximum_lag, bool)
+        or not isinstance(maximum_lag, (int, np.integer))
+        or maximum_lag < 0
+        or maximum_lag >= values.shape[1]
+    ):
+        raise ValueError("force paths and covariance lag must be finite and aligned")
+    covariance = np.empty(maximum_lag + 1, dtype=float)
+    covariance[0] = float(np.mean(values**2))
+    for lag in range(1, maximum_lag + 1):
+        covariance[lag] = float(np.mean(values[:, lag:] * values[:, :-lag]))
+    return covariance
+
+
+def two_position_fdt_covariance(
+    position: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    coupling_coefficients: np.ndarray,
+    temperature: float,
+    frame_time: float,
+    maximum_lag: int,
+) -> np.ndarray:
+    """Evaluate the positive-Prony second-FDT covariance on an observed path."""
+
+    positions = _finite_vectors(position)
+    if positions.ndim != 4:
+        raise ValueError("FDT positions must be clone-time-particle vectors")
+    rates, _, rho, _ = _validated_decay(decay_rates, frame_time)
+    thermal_energy = float(temperature)
+    if (
+        not math.isfinite(thermal_energy)
+        or thermal_energy <= 0.0
+        or isinstance(maximum_lag, bool)
+        or not isinstance(maximum_lag, (int, np.integer))
+        or maximum_lag < 0
+        or maximum_lag >= positions.shape[1]
+    ):
+        raise ValueError("FDT temperature and lag must be finite and physical")
+    coupling = _isotropic_radial_coupling(
+        positions,
+        scale=scale,
+        coupling_coefficients=coupling_coefficients,
+    )
+    if coupling.shape[-3] != len(rates):
+        raise ValueError("FDT coupling rank must align with positive poles")
+    covariance = np.empty(maximum_lag + 1, dtype=float)
+    for lag in range(maximum_lag + 1):
+        later = coupling[:, lag:]
+        earlier = coupling[:, : positions.shape[1] - lag]
+        pole_overlap = np.mean(
+            np.sum(later * earlier, axis=(-2, -1)) / 3.0,
+            axis=(0, 1, 2),
+        )
+        covariance[lag] = thermal_energy * float(
+            np.sum((rho**lag) * pole_overlap)
+        )
+    return covariance
+
+
 def _fit_linear_memory_features(
     mean_features: np.ndarray,
     memory_features: np.ndarray,
@@ -836,6 +910,45 @@ def fit_real_pole_model(
         "positive_prony_factorization": 0.0,
         "thermodynamic_claim_allowed": 0.0,
     }
+
+
+def predict_real_pole_drift(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    frame_time: float,
+    mean_force_coefficients: np.ndarray,
+    pole_coefficients: np.ndarray,
+) -> np.ndarray:
+    """Evaluate a fitted signed past-position real-pole drift."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    rates, _, _, _ = _validated_decay(decay_rates, frame_time)
+    mean = np.asarray(mean_force_coefficients, dtype=float)
+    coefficients = np.asarray(pole_coefficients, dtype=float)
+    if (
+        mean.shape != (3,)
+        or coefficients.shape != (len(rates), 3)
+        or np.any(~np.isfinite(mean))
+        or np.any(~np.isfinite(coefficients))
+    ):
+        raise ValueError("real-pole prediction coefficients must be finite and aligned")
+    history = np.asarray(
+        real_pole_history_features(
+            positions,
+            velocities,
+            scale=scale,
+            decay_rates=rates,
+            frame_time=frame_time,
+        )["history_features"]
+    )
+    return np.einsum(
+        "b,ctpbi->ctpi",
+        mean,
+        radial_vector_basis(positions, scale),
+    ) - np.einsum("ctpabi,ab->ctpi", history, coefficients)
 
 
 def _radial_coupling_basis(
@@ -972,6 +1085,37 @@ def fit_two_position_prony_model(
     }
 
 
+def predict_two_position_prony_drift(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    coupling_coefficients: np.ndarray,
+    frame_time: float,
+    mean_force_coefficients: np.ndarray,
+) -> np.ndarray:
+    """Evaluate a fitted positive two-position Prony force-memory drift."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    mean = np.asarray(mean_force_coefficients, dtype=float)
+    if mean.shape != (3,) or np.any(~np.isfinite(mean)):
+        raise ValueError("positive-Prony mean-force coefficients must be finite")
+    auxiliary = two_position_auxiliary_features(
+        positions,
+        velocities,
+        scale=scale,
+        decay_rates=decay_rates,
+        coupling_coefficients=coupling_coefficients,
+        frame_time=frame_time,
+    )
+    return np.einsum(
+        "b,ctpbi->ctpi",
+        mean,
+        radial_vector_basis(positions, scale),
+    ) + np.asarray(auxiliary["force"])
+
+
 _KERNEL_MODELS = (
     "stationary_scalar_nonparametric_volterra",
     "finite_basis_mz_position_kernel",
@@ -1063,20 +1207,16 @@ def held_kernel_diagnostics(
                     )
                 )
 
-    auxiliary_items = (
-        auxiliary_innovation,
-        observed_fdt_covariance,
-        target_fdt_covariance,
+    innovation_applicable = auxiliary_innovation is not None
+    fdt_applicable = (
+        observed_fdt_covariance is not None and target_fdt_covariance is not None
     )
-    auxiliary_applicable = all(item is not None for item in auxiliary_items)
-    if any(item is not None for item in auxiliary_items) and not auxiliary_applicable:
-        raise ValueError("auxiliary innovation and both FDT arrays are jointly required")
+    if (observed_fdt_covariance is None) != (target_fdt_covariance is None):
+        raise ValueError("observed and target FDT arrays are jointly required")
     innovation_correlation = 0.0
     fdt_error = 0.0
-    if auxiliary_applicable:
+    if innovation_applicable:
         innovation = np.asarray(auxiliary_innovation, dtype=float)
-        observed_fdt = np.asarray(observed_fdt_covariance, dtype=float)
-        target_fdt = np.asarray(target_fdt_covariance, dtype=float)
         if (
             innovation.ndim != 5
             or innovation.shape[0] != positions.shape[0]
@@ -1084,13 +1224,8 @@ def held_kernel_diagnostics(
             or innovation.shape[-1] != 3
             or innovation.shape[1] < 2
             or np.any(~np.isfinite(innovation))
-            or observed_fdt.shape != target_fdt.shape
-            or observed_fdt.ndim != 1
-            or len(observed_fdt) < 1
-            or np.any(~np.isfinite(observed_fdt))
-            or np.any(~np.isfinite(target_fdt))
         ):
-            raise ValueError("auxiliary and FDT diagnostics must be finite and aligned")
+            raise ValueError("auxiliary innovations must be finite and aligned")
         innovation_correlations = []
         active_lag = min(maximum_lag, innovation.shape[1] - 1)
         for lag in range(1, active_lag + 1):
@@ -1102,6 +1237,17 @@ def held_kernel_diagnostics(
                     )
                 )
         innovation_correlation = max(innovation_correlations, default=0.0)
+    if fdt_applicable:
+        observed_fdt = np.asarray(observed_fdt_covariance, dtype=float)
+        target_fdt = np.asarray(target_fdt_covariance, dtype=float)
+        if (
+            observed_fdt.shape != target_fdt.shape
+            or observed_fdt.ndim != 1
+            or len(observed_fdt) < 1
+            or np.any(~np.isfinite(observed_fdt))
+            or np.any(~np.isfinite(target_fdt))
+        ):
+            raise ValueError("FDT diagnostics must be finite and aligned")
         target_scale = math.sqrt(float(np.mean(target_fdt**2)))
         if target_scale <= 0.0:
             raise ValueError("FDT target must have positive scale")
@@ -1120,7 +1266,13 @@ def held_kernel_diagnostics(
             innovation_correlation
         ),
         "second_fdt_covariance_normalized_rmse": fdt_error,
-        "auxiliary_diagnostics_applicable": float(auxiliary_applicable),
+        "auxiliary_diagnostics_applicable": float(
+            innovation_applicable or fdt_applicable
+        ),
+        "auxiliary_innovation_diagnostics_applicable": float(
+            innovation_applicable
+        ),
+        "second_fdt_diagnostics_applicable": float(fdt_applicable),
         "thermodynamic_claim_allowed": 0.0,
     }
 
@@ -1208,7 +1360,7 @@ def classify_position_dependent_kernel_gate(
             if scalar_count < 1.0 or rank_value != rank or rank < 1:
                 raise ValueError("realization rows require positive count and rank")
             ranks.append(rank)
-            fold_pass.append(
+            deterministic_pass = (
                 candidate_rmse <= 1.10 * mz_rmse
                 and candidate_nll <= mz_nll + 0.05 * scalar_count
                 and _finite_row_value(
@@ -1216,22 +1368,25 @@ def classify_position_dependent_kernel_gate(
                     "maximum_normalized_resolved_basis_residual_correlation",
                 )
                 <= 0.20
-                and _finite_row_value(
-                    row,
-                    "maximum_normalized_auxiliary_innovation_autocorrelation",
-                )
-                <= 0.20
-                and _finite_row_value(
-                    row,
-                    "second_fdt_covariance_normalized_rmse",
-                )
-                <= 0.30
-                and _finite_row_value(row, "auxiliary_diagnostics_applicable")
-                == 1.0
                 and _finite_row_value(row, "all_selected_decay_rates_positive")
                 == 1.0
                 and _finite_row_value(row, "all_fitted_arrays_finite") == 1.0
             )
+            if model == _KERNEL_MODELS[3]:
+                deterministic_pass = (
+                    deterministic_pass
+                    and _finite_row_value(
+                        row,
+                        "second_fdt_covariance_normalized_rmse",
+                    )
+                    <= 0.30
+                    and _finite_row_value(
+                        row,
+                        "second_fdt_diagnostics_applicable",
+                    )
+                    == 1.0
+                )
+            fold_pass.append(deterministic_pass)
         return bool(mz_identified and all(fold_pass)), ranks
 
     real_pole_identified, _ = realization_pass(_KERNEL_MODELS[2])
@@ -1254,6 +1409,8 @@ def classify_position_dependent_kernel_gate(
             positive_prony_identified
         ),
         "finite_auxiliary_rank_identified_in_ka": float(rank_identified),
+        "latent_auxiliary_innovation_identified_in_ka": 0.0,
+        "stochastic_auxiliary_bath_identified_in_ka": 0.0,
         "selected_auxiliary_rank": float(positive_ranks[0])
         if rank_identified
         else 0.0,

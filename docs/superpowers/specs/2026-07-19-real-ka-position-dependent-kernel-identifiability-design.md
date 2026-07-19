@@ -1,5 +1,18 @@
 # Real-KA Position-Dependent Kernel Identifiability Design
 
+## Pre-run revision note
+
+The original committed design incorrectly required latent auxiliary-innovation
+whiteness and a second-FDT target for both `M3` and `M4`. Before any production
+run, implementation showed that a signed `M3` kernel has no positive covariance
+target and that multiple latent `z_a` states cannot be uniquely reconstructed
+from one observed three-vector force. The corrected gate treats `M3` as a
+deterministic real-pole realization and tests second FDT only for the positive
+`M4` kernel using directly observable residual-force covariance. Latent-state
+innovation and full stochastic-bath claims remain closed. This revision does
+not change trajectories, targets, folds, basis, supports, ridges, rank/pole
+grids, seeds, or numerical tolerances.
+
 ## Objective
 
 Determine which part of a single-particle generalized Langevin equation is
@@ -207,17 +220,21 @@ all fitted arrays and condition diagnostics are finite.
 The improvement ratios are additionally summarized replicate-first with a
 two-sided 95 percent `t` interval whose upper endpoint must remain below `1`.
 
-The real-pole `M3` and positive-Prony `M4` realizations are each supported only
-if they pass all of the following in every held clone:
+The real-pole `M3` realization is supported only if it passes all of the
+following in every held clone:
 
 ```text
 drift RMSE <= 1.10 * M2 drift RMSE,
 drift NLL  <= M2 drift NLL + 0.05 * held scalar-component count,
 maximum normalized resolved-basis residual correlation <= 0.20,
-maximum normalized auxiliary innovation autocorrelation at lags 1..40 <= 0.20,
-second-FDT covariance normalized RMSE <= 0.30,
 all selected alpha_a > 0.
 ```
+
+The positive-Prony `M4` realization must pass the same deterministic gates and
+additionally requires its directly testable second-FDT residual-force
+covariance normalized RMSE to be at most `0.30` in every held clone. Latent
+auxiliary-innovation whiteness is descriptive only when an observation model
+identifies the latent states; it cannot open a claim in this experiment.
 
 The NLL allowance is therefore `0.05` per held scalar component, not a fixed
 unnormalized total-likelihood allowance.
@@ -233,6 +250,8 @@ past_position_real_pole_identified_in_ka = 0/1
 two_position_positive_prony_identified_in_ka = 0/1
 positive_prony_kernel_identified_in_ka = 0/1
 finite_auxiliary_rank_identified_in_ka = 0/1
+latent_auxiliary_innovation_identified_in_ka = 0
+stochastic_auxiliary_bath_identified_in_ka = 0
 oscillatory_matrix_bath_authorized = 0/1
 autonomous_single_particle_gle_allowed = 0
 complete_event_clock_closure_allowed = 0

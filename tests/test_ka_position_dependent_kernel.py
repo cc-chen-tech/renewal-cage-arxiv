@@ -371,6 +371,8 @@ class PositionDependentKernelTests(unittest.TestCase):
             fit_radial_basis_scale,
             fit_real_pole_model,
             fit_two_position_prony_model,
+            predict_real_pole_drift,
+            predict_two_position_prony_drift,
             radial_vector_basis,
             real_pole_history_features,
             two_position_auxiliary_features,
@@ -419,6 +421,19 @@ class PositionDependentKernelTests(unittest.TestCase):
             real_coefficients,
             atol=3e-12,
         )
+        np.testing.assert_allclose(
+            predict_real_pole_drift(
+                position,
+                velocity,
+                scale=scale,
+                decay_rates=rates,
+                frame_time=frame_time,
+                mean_force_coefficients=real_fit["mean_force_coefficients"],
+                pole_coefficients=real_fit["pole_coefficients"],
+            ),
+            real_fit["prediction"],
+            atol=3e-12,
+        )
         self.assertEqual(real_fit["positive_prony_factorization"], 0.0)
 
         coupling_coefficients = np.array(
@@ -448,6 +463,22 @@ class PositionDependentKernelTests(unittest.TestCase):
             rtol=2e-10,
             atol=2e-10,
         )
+        np.testing.assert_allclose(
+            predict_two_position_prony_drift(
+                position,
+                velocity,
+                scale=scale,
+                decay_rates=rates,
+                coupling_coefficients=thermodynamic_fit["coupling_coefficients"],
+                frame_time=frame_time,
+                mean_force_coefficients=thermodynamic_fit[
+                    "mean_force_coefficients"
+                ],
+            ),
+            thermodynamic_fit["prediction"],
+            rtol=2e-10,
+            atol=2e-10,
+        )
         self.assertEqual(thermodynamic_fit["positive_prony_factorization"], 1.0)
         self.assertEqual(thermodynamic_fit["all_projected_gram_matrices_psd"], 1.0)
 
@@ -471,6 +502,46 @@ class PositionDependentKernelTests(unittest.TestCase):
         np.testing.assert_array_equal(result["selected_decay_rates"], [0.2, 2.0])
         self.assertLess(result["normalized_reconstruction_rmse"], 1e-12)
         self.assertEqual(result["selection_uses_held_clone"], 0.0)
+
+    def test_two_position_prony_has_direct_pathwise_second_fdt_target(self):
+        from ka_position_dependent_kernel import (
+            force_autocovariance,
+            two_position_fdt_covariance,
+        )
+
+        position = np.zeros((2, 12, 4, 3))
+        scale = {"mu_r2": 0.0, "sigma_r2": 1.0, "epsilon_r2": 0.1}
+        rates = np.array([0.4, 1.7])
+        coupling = np.array([[0.8, 0.0, 0.0], [0.35, 0.0, 0.0]])
+        temperature = 0.58
+        frame_time = 0.02
+        covariance = two_position_fdt_covariance(
+            position,
+            scale=scale,
+            decay_rates=rates,
+            coupling_coefficients=coupling,
+            temperature=temperature,
+            frame_time=frame_time,
+            maximum_lag=5,
+        )
+        expected = temperature * np.sum(
+            coupling[:, 0, None] ** 2
+            * np.exp(-rates[:, None] * frame_time * np.arange(6)[None, :]),
+            axis=0,
+        )
+        np.testing.assert_allclose(covariance, expected, atol=2e-15)
+
+        force = np.arange(2 * 12 * 4 * 3, dtype=float).reshape(2, 12, 4, 3)
+        observed = force_autocovariance(force, maximum_lag=3)
+        direct = np.array(
+            [
+                np.mean(force * force)
+                if lag == 0
+                else np.mean(force[:, lag:] * force[:, :-lag])
+                for lag in range(4)
+            ]
+        )
+        np.testing.assert_allclose(observed, direct)
 
     def test_classifier_separates_mz_real_pole_and_positive_prony_claims(self):
         from ka_position_dependent_kernel import (
@@ -499,6 +570,7 @@ class PositionDependentKernelTests(unittest.TestCase):
                             "maximum_normalized_auxiliary_innovation_autocorrelation": 0.1,
                             "second_fdt_covariance_normalized_rmse": 0.2,
                             "auxiliary_diagnostics_applicable": 1.0,
+                            "second_fdt_diagnostics_applicable": 1.0,
                             "selected_auxiliary_rank": 2.0,
                             "all_selected_decay_rates_positive": 1.0,
                             "all_fitted_arrays_finite": 1.0,
@@ -515,6 +587,8 @@ class PositionDependentKernelTests(unittest.TestCase):
         self.assertEqual(passed["selected_auxiliary_rank"], 2.0)
         self.assertEqual(passed["oscillatory_matrix_bath_authorized"], 0.0)
         self.assertLess(passed["mz_rmse_ratio_t95_high"], 1.0)
+        self.assertEqual(passed["latent_auxiliary_innovation_identified_in_ka"], 0.0)
+        self.assertEqual(passed["stochastic_auxiliary_bath_identified_in_ka"], 0.0)
 
         inconsistent = passing_rows()
         for row in inconsistent:
@@ -545,20 +619,33 @@ class PositionDependentKernelTests(unittest.TestCase):
         )
         self.assertEqual(failed_verdict["positive_prony_kernel_identified_in_ka"], 0.0)
 
-        realization_failed = passing_rows()
-        for row in realization_failed:
-            if row["model"] in {
-                "past_position_real_pole",
-                "two_position_positive_prony",
-            }:
+        prony_fdt_failed = passing_rows()
+        for row in prony_fdt_failed:
+            if row["model"] == "two_position_positive_prony":
                 row["second_fdt_covariance_normalized_rmse"] = 0.4
-        unresolved = classify_position_dependent_kernel_gate(realization_failed)
+        unresolved = classify_position_dependent_kernel_gate(prony_fdt_failed)
         self.assertEqual(unresolved["real_ka_position_dependent_mz_kernel_identified"], 1.0)
-        self.assertEqual(unresolved["past_position_real_pole_identified_in_ka"], 0.0)
+        self.assertEqual(unresolved["past_position_real_pole_identified_in_ka"], 1.0)
         self.assertEqual(unresolved["positive_prony_kernel_identified_in_ka"], 0.0)
-        self.assertEqual(unresolved["oscillatory_matrix_bath_authorized"], 1.0)
+        self.assertEqual(unresolved["oscillatory_matrix_bath_authorized"], 0.0)
 
-        for verdict in (passed, inconsistent_verdict, failed_verdict, unresolved):
+        no_latent_observation = passing_rows()
+        for row in no_latent_observation:
+            if row["model"] == "past_position_real_pole":
+                row["auxiliary_diagnostics_applicable"] = 0.0
+                row["second_fdt_diagnostics_applicable"] = 0.0
+                row["maximum_normalized_auxiliary_innovation_autocorrelation"] = 0.0
+                row["second_fdt_covariance_normalized_rmse"] = 0.0
+        deterministic = classify_position_dependent_kernel_gate(no_latent_observation)
+        self.assertEqual(deterministic["past_position_real_pole_identified_in_ka"], 1.0)
+
+        for verdict in (
+            passed,
+            inconsistent_verdict,
+            failed_verdict,
+            unresolved,
+            deterministic,
+        ):
             self.assertEqual(verdict["real_ka_kernel_identifiability_test_required"], 1.0)
             for claim in (
                 "autonomous_single_particle_gle_allowed",
@@ -626,6 +713,8 @@ class PositionDependentKernelTests(unittest.TestCase):
         )
         self.assertEqual(diagnostics["held_scalar_component_count"], residual.size)
         self.assertEqual(diagnostics["auxiliary_diagnostics_applicable"], 1.0)
+        self.assertEqual(diagnostics["auxiliary_innovation_diagnostics_applicable"], 1.0)
+        self.assertEqual(diagnostics["second_fdt_diagnostics_applicable"], 1.0)
         self.assertEqual(diagnostics["thermodynamic_claim_allowed"], 0.0)
 
 

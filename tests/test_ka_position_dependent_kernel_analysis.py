@@ -105,6 +105,53 @@ class PositionDependentKernelAnalysisTests(unittest.TestCase):
         changed_held_four = [row for row in changed if row["held_clone_index"] == 4.0]
         self.assertEqual(original_held_four, changed_held_four)
 
+    def test_nested_auxiliary_selection_derives_poles_inside_each_training_fold(self):
+        from analyze_ka_position_dependent_kernel import (
+            select_auxiliary_hierarchy,
+            select_nonparametric_hierarchy,
+        )
+
+        clones = self._synthetic_kernel_clones()
+        _, nonparametric = select_nonparametric_hierarchy(
+            clones,
+            supports=(2, 3),
+            ridge_grid=(1e-6,),
+            permutation_seed=20260719,
+        )
+        candidates, selections = select_auxiliary_hierarchy(
+            clones,
+            nonparametric,
+            ranks=(1, 2),
+            ridge_grid=(1e-6, 1e-4),
+            decay_grid=np.array([0.1, 0.3, 1.0, 3.0]),
+            frame_time=0.01,
+        )
+        self.assertEqual(len(candidates), 4 * 2 * 2 * 2)
+        self.assertEqual(len(selections), 4 * 2)
+        self.assertTrue(all(row["fit_uses_outer_held_clone"] == 0.0 for row in candidates))
+        self.assertTrue(all(row["pole_selection_uses_outer_held_clone"] == 0.0 for row in candidates))
+        self.assertTrue(all(row["inner_validation_fold_count"] == 3.0 for row in candidates))
+        self.assertTrue(all(row["all_selected_decay_rates_positive"] == 1.0 for row in selections))
+
+        mutated = [dict(clone) for clone in clones]
+        mutated[3] = {
+            **mutated[3],
+            "relative_position": 40.0 * np.asarray(mutated[3]["relative_position"]),
+            "relative_drift": -20.0 * np.asarray(mutated[3]["relative_drift"]),
+        }
+        _, changed = select_auxiliary_hierarchy(
+            mutated,
+            nonparametric,
+            ranks=(1, 2),
+            ridge_grid=(1e-6, 1e-4),
+            decay_grid=np.array([0.1, 0.3, 1.0, 3.0]),
+            frame_time=0.01,
+        )
+        self.assertEqual(
+            [row for row in selections if row["held_clone_index"] == 4.0],
+            [row for row in changed if row["held_clone_index"] == 4.0],
+        )
+
     def test_cli_and_loader_require_frozen_four_clone_provenance(self):
         from analyze_ka_position_dependent_kernel import (
             file_sha256,
