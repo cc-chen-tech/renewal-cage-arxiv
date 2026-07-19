@@ -467,7 +467,7 @@ def main() -> None:
         summaries.append(row)
     summaries.append(classify_l3p_quotient(details, numerical))
     write_rows(output_path(args.output_prefix, "_details.csv"), details)
-    write_rows(output_path(args.output_prefix, "_numerical.csv"), numerical)
+    write_rows(output_path(args.output_prefix, "_convergence.csv"), numerical)
     write_rows(output_path(args.output_prefix, "_summary.csv"), summaries)
     if args.figure_path is not None:
         write_diagnostic_svg(args.figure_path, details)
