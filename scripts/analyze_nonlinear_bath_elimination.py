@@ -154,6 +154,12 @@ def load_complete_cache(path: Path, *, expected_mode: str) -> dict[str, object]:
         "equilibrium_sample_time": float(protocol["equilibrium_sample_time"]),
         "potential_amplitude": float(protocol["potential_amplitude"]),
         "physical_barrier_height": float(protocol["physical_barrier_height"]),
+        "brownian_subincrements_per_step": int(
+            protocol["brownian_subincrements_per_step"]
+        ),
+        "underlying_brownian_time_step": float(
+            protocol["underlying_brownian_time_step"]
+        ),
         "production_time": float(protocol["production_steps"])
         * controls.time_step,
     }
@@ -814,8 +820,52 @@ def canary_preflight(
         == 1.0
         for result in stationarity_results
     )
-    full_bias = gibbs_one_step_moment_bias(controls=canary["controls"])
-    half_bias = gibbs_one_step_moment_bias(controls=half_step["controls"])
+    full_controls = canary["controls"]
+    half_controls = half_step["controls"]
+    if not isinstance(full_controls, NonlinearBathControls) or not isinstance(
+        half_controls, NonlinearBathControls
+    ):
+        raise ValueError("canary controls are invalid")
+    full_subincrements = int(canary.get("brownian_subincrements_per_step", 0))
+    half_subincrements = int(
+        half_step.get("brownian_subincrements_per_step", 0)
+    )
+    full_underlying_step = float(
+        canary.get("underlying_brownian_time_step", float("nan"))
+    )
+    half_underlying_step = float(
+        half_step.get("underlying_brownian_time_step", float("nan"))
+    )
+    brownian_path_coupled = (
+        full_subincrements == 2
+        and half_subincrements == 1
+        and math.isclose(
+            full_controls.time_step,
+            2.0 * half_controls.time_step,
+            rel_tol=0.0,
+            abs_tol=1e-15,
+        )
+        and math.isclose(
+            full_underlying_step,
+            half_underlying_step,
+            rel_tol=0.0,
+            abs_tol=1e-15,
+        )
+        and math.isclose(
+            full_underlying_step,
+            full_controls.time_step / full_subincrements,
+            rel_tol=0.0,
+            abs_tol=1e-15,
+        )
+        and math.isclose(
+            half_underlying_step,
+            half_controls.time_step / half_subincrements,
+            rel_tol=0.0,
+            abs_tol=1e-15,
+        )
+    )
+    full_bias = gibbs_one_step_moment_bias(controls=full_controls)
+    half_bias = gibbs_one_step_moment_bias(controls=half_controls)
 
     def contraction_ratio(half_value: float, full_value: float) -> float:
         if full_value == 0.0:
@@ -836,7 +886,7 @@ def canary_preflight(
             )
         )
     )
-    passed = maximum_error <= 5e-11 and gibbs_derived
+    passed = maximum_error <= 5e-11 and gibbs_derived and brownian_path_coupled
     return {
         "record": "canary_preflight",
         "canary_reconstruction_relative_error": canary_error,
@@ -870,6 +920,10 @@ def canary_preflight(
         "analytic_half_step_local_bias_contraction_pass": float(
             momentum_bias_ratio <= 0.251 and auxiliary_bias_ratio <= 0.251
         ),
+        "canary_brownian_path_coupled": float(brownian_path_coupled),
+        "canary_underlying_brownian_time_step": full_underlying_step,
+        "canary_full_subincrements_per_step": float(full_subincrements),
+        "canary_half_subincrements_per_step": float(half_subincrements),
         "finite_state_and_provenance_validated": 1.0,
         "canary_preflight_pass": float(passed),
         "exact_nonlinear_bath_elimination_supported": 0.0,
@@ -1124,6 +1178,18 @@ def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict
         ],
         "analytic_half_step_local_bias_contraction_pass": preflight[
             "analytic_half_step_local_bias_contraction_pass"
+        ],
+        "canary_brownian_path_coupled": preflight[
+            "canary_brownian_path_coupled"
+        ],
+        "canary_underlying_brownian_time_step": preflight[
+            "canary_underlying_brownian_time_step"
+        ],
+        "canary_full_subincrements_per_step": preflight[
+            "canary_full_subincrements_per_step"
+        ],
+        "canary_half_subincrements_per_step": preflight[
+            "canary_half_subincrements_per_step"
         ],
         "half_step_equilibrium_not_worse": float(half_step_not_worse),
         "bath_replay_pooled_normalized_rmse": replay[

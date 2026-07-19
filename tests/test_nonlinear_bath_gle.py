@@ -311,6 +311,19 @@ class NonlinearBathGleTests(unittest.TestCase):
         self.assertEqual(primary["equilibrium_sample_stride"], 100)
         self.assertEqual(primary["potential_amplitude"], 1.74)
         self.assertEqual(primary["physical_barrier_height"], 3.48)
+        self.assertEqual(primary["brownian_subincrements_per_step"], 1)
+        self.assertEqual(
+            frozen_simulation_protocol("canary")[
+                "brownian_subincrements_per_step"
+            ],
+            2,
+        )
+        self.assertEqual(
+            frozen_simulation_protocol("canary-half-step")[
+                "brownian_subincrements_per_step"
+            ],
+            1,
+        )
         self.assertEqual(constant["seed"], primary["seed"])
         self.assertEqual(no_bath["seed"], primary["seed"])
         np.testing.assert_array_equal(
@@ -362,12 +375,63 @@ class NonlinearBathGleTests(unittest.TestCase):
             ("requested_step_count", 499999.0),
             ("seed", 1.0),
             ("physical_barrier_height", 1.74),
+            ("brownian_subincrements_per_step", 2.0),
         ):
             changed = dict(expected)
             changed[key] = replacement
             with self.subTest(key=key):
                 with self.assertRaisesRegex(ValueError, "checkpoint provenance"):
                     validate_checkpoint_metadata(changed, expected)
+
+    def test_canary_full_and_half_steps_share_exact_brownian_refinement(self):
+        from simulate_nonlinear_bath_elimination import (
+            _draw_step_normals,
+            frozen_simulation_protocol,
+        )
+
+        full = frozen_simulation_protocol("canary")
+        half = frozen_simulation_protocol("canary-half-step")
+        full_rng = np.random.default_rng(20260811)
+        half_rng = np.random.default_rng(20260811)
+        full_draws = [
+            _draw_step_normals(
+                full_rng,
+                trajectory_count=3,
+                controls=full["controls"],
+                subincrements=2,
+            )
+            for _ in range(2)
+        ]
+        half_draws = [
+            _draw_step_normals(
+                half_rng,
+                trajectory_count=3,
+                controls=half["controls"],
+                subincrements=1,
+            )
+            for _ in range(4)
+        ]
+        half_decay = np.exp(-half["controls"].rates * half["controls"].time_step)
+        for coarse in range(2):
+            first = half_draws[2 * coarse]
+            second = half_draws[2 * coarse + 1]
+            np.testing.assert_allclose(
+                full_draws[coarse]["normal_p"],
+                (first["normal_p"] + second["normal_p"]) / np.sqrt(2.0),
+                rtol=0.0,
+                atol=0.0,
+            )
+            np.testing.assert_allclose(
+                full_draws[coarse]["normal_z"],
+                (
+                    half_decay * first["normal_z"]
+                    + second["normal_z"]
+                )
+                / np.sqrt(1.0 + half_decay**2),
+                rtol=0.0,
+                atol=2e-16,
+            )
+        np.testing.assert_array_equal(full_rng.normal(size=8), half_rng.normal(size=8))
 
     def test_simulation_guard_requires_remote_environment_marker(self):
         from simulate_nonlinear_bath_elimination import (

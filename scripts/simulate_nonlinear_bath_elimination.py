@@ -58,6 +58,7 @@ def frozen_simulation_protocol(mode: str) -> dict[str, object]:
         raise ValueError("unknown nonlinear-bath simulation mode")
     time_step = 5e-4 if mode == "canary-half-step" else 1e-3
     is_canary = mode in {"canary", "canary-half-step"}
+    brownian_subincrements = 2 if mode == "canary" else 1
     modulation = np.array([0.45, 0.25])
     amplitudes = np.array([1.00, 0.55])
     if mode == "null-constant-coupling":
@@ -101,6 +102,8 @@ def frozen_simulation_protocol(mode: str) -> dict[str, object]:
         "equilibrium_sample_time": equilibrium_stride * time_step,
         "potential_amplitude": float(controls.barrier),
         "physical_barrier_height": float(2.0 * controls.barrier),
+        "brownian_subincrements_per_step": brownian_subincrements,
+        "underlying_brownian_time_step": time_step / brownian_subincrements,
     }
 
 
@@ -144,6 +147,12 @@ def checkpoint_metadata(
         "barrier": float(controls.barrier),
         "potential_amplitude": float(protocol["potential_amplitude"]),
         "physical_barrier_height": float(protocol["physical_barrier_height"]),
+        "brownian_subincrements_per_step": float(
+            protocol["brownian_subincrements_per_step"]
+        ),
+        "underlying_brownian_time_step": float(
+            protocol["underlying_brownian_time_step"]
+        ),
         "rates": controls.rates.copy(),
         "amplitudes": controls.amplitudes.copy(),
         "modulation": controls.modulation.copy(),
@@ -189,6 +198,48 @@ def _sample_equilibrium_positions(
         size=count,
     )
     return controls.period * np.asarray(angle, dtype=float) / (2.0 * np.pi)
+
+
+def _draw_step_normals(
+    rng: np.random.Generator,
+    *,
+    trajectory_count: int,
+    controls: NonlinearBathControls,
+    subincrements: int,
+) -> dict[str, np.ndarray]:
+    """Aggregate a shared fine Brownian stream into one integrator step."""
+
+    if (
+        isinstance(trajectory_count, bool)
+        or not isinstance(trajectory_count, (int, np.integer))
+        or trajectory_count < 1
+        or isinstance(subincrements, bool)
+        or not isinstance(subincrements, (int, np.integer))
+        or subincrements < 1
+    ):
+        raise ValueError("Brownian refinement counts must be positive integers")
+    momentum_draws = []
+    auxiliary_draws = []
+    for _ in range(subincrements):
+        momentum_draws.append(rng.normal(size=trajectory_count))
+        auxiliary_draws.append(
+            rng.normal(size=(trajectory_count, len(controls.rates)))
+        )
+    normal_p = np.sum(momentum_draws, axis=0) / math.sqrt(subincrements)
+    substep_decay = np.exp(
+        -controls.rates * controls.time_step / subincrements
+    )
+    exponents = np.arange(subincrements - 1, -1, -1)
+    weights = substep_decay[None] ** exponents[:, None]
+    normalization = np.sqrt(np.sum(weights**2, axis=0))
+    normal_z = np.sum(
+        weights[:, None, :] * np.asarray(auxiliary_draws),
+        axis=0,
+    ) / normalization
+    return {
+        "normal_p": normal_p,
+        "normal_z": normal_z,
+    }
 
 
 def _atomic_savez(path: Path, **arrays: object) -> None:
@@ -255,6 +306,7 @@ def validate_checkpoint_payload(
     burn_in = int(protocol["burn_in_steps"])
     event_stride = int(protocol["event_sample_stride"])
     equilibrium_stride = int(protocol["equilibrium_sample_stride"])
+    brownian_subincrements = int(protocol["brownian_subincrements_per_step"])
     mode_count = len(controls.rates)
     completed = _checkpoint_integer(
         saved,
@@ -511,8 +563,14 @@ def run_simulation(
         )
 
     for step_index in range(completed, requested):
-        normal_p = rng.normal(size=trajectory_count)
-        normal_z = rng.normal(size=(trajectory_count, len(controls.rates)))
+        normals = _draw_step_normals(
+            rng,
+            trajectory_count=trajectory_count,
+            controls=controls,
+            subincrements=brownian_subincrements,
+        )
+        normal_p = normals["normal_p"]
+        normal_z = normals["normal_z"]
         if is_canary:
             canary_normal_p[step_index] = normal_p
             canary_normal_z[step_index] = normal_z

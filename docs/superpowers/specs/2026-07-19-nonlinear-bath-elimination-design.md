@@ -222,6 +222,25 @@ factor of four; it does not make the discrete scheme exactly Gibbs preserving.
 The canary half-step gate therefore tests numerical convergence of the chosen
 integrator, not validity of the continuous invariant-measure proof.
 
+The full-step and half-step canaries use one nested Brownian path. For momentum,
+two fine normals are aggregated as
+
+```text
+G_full = (G_1 + G_2)/sqrt(2).
+```
+
+For auxiliary mode `a`, with half-step decay `r_a=exp(-alpha_a dt/2)`, exact OU
+composition gives
+
+```text
+G_(a,full) = (r_a G_(a,1) + G_(a,2))/sqrt(1+r_a^2).
+```
+
+The random stream is consumed in interleaved `(G_p,G_z)` half-step order, so
+both canaries have identical initial states, underlying fine increments, and
+final RNG state. Their difference is therefore a coupled discretization error,
+not a comparison of independent stochastic paths.
+
 ## Numerical and physical gates
 
 ### 1. Algebraic reconstruction

@@ -151,6 +151,8 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
             self.assertEqual(loaded["completed_step_count"], steps)
             self.assertEqual(loaded["potential_amplitude"], 1.74)
             self.assertEqual(loaded["physical_barrier_height"], 3.48)
+            self.assertEqual(loaded["brownian_subincrements_per_step"], 2)
+            self.assertEqual(loaded["underlying_brownian_time_step"], 5e-4)
 
             changed = dict(payload)
             changed["barrier"] = 1.75
@@ -198,6 +200,8 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         )
         cache = {
             "controls": controls,
+            "brownian_subincrements_per_step": 2,
+            "underlying_brownian_time_step": 5e-4,
             "equilibrium_positions": np.zeros((3, 2)),
             "equilibrium_momenta": np.zeros((3, 2)),
             "equilibrium_auxiliary": np.zeros((3, 2, 2)),
@@ -215,8 +219,14 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
             phases=controls.phases,
             time_step=0.5 * controls.time_step,
         )
+        half_cache["brownian_subincrements_per_step"] = 1
+        half_cache["underlying_brownian_time_step"] = 5e-4
         passed = canary_preflight(cache, half_cache)
         self.assertEqual(passed["canary_preflight_pass"], 1.0)
+        self.assertEqual(passed["canary_brownian_path_coupled"], 1.0)
+        self.assertEqual(passed["canary_underlying_brownian_time_step"], 5e-4)
+        self.assertEqual(passed["canary_full_subincrements_per_step"], 2.0)
+        self.assertEqual(passed["canary_half_subincrements_per_step"], 1.0)
         self.assertEqual(passed["maximum_reconstruction_relative_error"], 0.0)
         self.assertEqual(
             passed["periodic_quotient_gibbs_invariant_density_derived"],
@@ -246,6 +256,12 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         corrupted["equilibrium_auxiliary"] = corrupted_auxiliary
         failed = canary_preflight(cache, corrupted)
         self.assertEqual(failed["canary_preflight_pass"], 0.0)
+
+        uncoupled = dict(half_cache)
+        uncoupled["underlying_brownian_time_step"] = 2.5e-4
+        failed_coupling = canary_preflight(cache, uncoupled)
+        self.assertEqual(failed_coupling["canary_brownian_path_coupled"], 0.0)
+        self.assertEqual(failed_coupling["canary_preflight_pass"], 0.0)
 
     def test_hazard_scoring_uses_only_training_fit_and_fixed_survival_grid(self):
         from analyze_nonlinear_bath_elimination import score_hazard_models
