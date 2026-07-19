@@ -467,3 +467,297 @@ def reconstruct_auxiliary_innovations(
         - rho[None, None, None, :, None] * states[:, :-1]
         + forcing[None, None, None, :, None] * projected_velocity
     )
+
+
+_KERNEL_MODELS = (
+    "stationary_scalar_nonparametric_volterra",
+    "finite_basis_mz_position_kernel",
+    "past_position_real_pole",
+    "two_position_positive_prony",
+    "time_permuted_position_null",
+)
+
+_BROAD_CLAIMS = (
+    "autonomous_single_particle_gle_allowed",
+    "complete_event_clock_closure_allowed",
+    "kramers_escape_claim_allowed",
+    "spatial_facilitation_claim_allowed",
+    "thermodynamic_claim_allowed",
+)
+
+
+def _absolute_correlation(left: np.ndarray, right: np.ndarray) -> float:
+    first = np.asarray(left, dtype=float).reshape(-1)
+    second = np.asarray(right, dtype=float).reshape(-1)
+    if len(first) != len(second) or len(first) < 2:
+        raise ValueError("correlation arrays must be aligned and nontrivial")
+    first = first - np.mean(first)
+    second = second - np.mean(second)
+    denominator = math.sqrt(float(np.dot(first, first) * np.dot(second, second)))
+    if denominator == 0.0:
+        return 0.0
+    return abs(float(np.dot(first, second) / denominator))
+
+
+def held_kernel_diagnostics(
+    observed_acceleration: np.ndarray,
+    predicted_acceleration: np.ndarray,
+    position: np.ndarray,
+    velocity: np.ndarray,
+    *,
+    scale: dict[str, float],
+    training_residual_variance: float,
+    maximum_lag: int,
+    auxiliary_innovation: np.ndarray | None = None,
+    observed_fdt_covariance: np.ndarray | None = None,
+    target_fdt_covariance: np.ndarray | None = None,
+) -> dict[str, float]:
+    """Score one held path using scales and residual variance fixed on training."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    observed = np.asarray(observed_acceleration, dtype=float)
+    predicted = np.asarray(predicted_acceleration, dtype=float)
+    variance = float(training_residual_variance)
+    if (
+        observed.shape != positions.shape
+        or predicted.shape != positions.shape
+        or np.any(~np.isfinite(observed))
+        or np.any(~np.isfinite(predicted))
+        or not math.isfinite(variance)
+        or variance <= 0.0
+        or isinstance(maximum_lag, bool)
+        or not isinstance(maximum_lag, (int, np.integer))
+        or maximum_lag < 0
+        or maximum_lag >= positions.shape[1]
+    ):
+        raise ValueError("held paths, training variance, and lag must be finite")
+    residual = observed - predicted
+    observed_scale = math.sqrt(float(np.mean(observed**2)))
+    if observed_scale <= 0.0:
+        raise ValueError("held observed acceleration must have positive scale")
+    drift_rmse = math.sqrt(float(np.mean(residual**2))) / observed_scale
+    drift_nll = 0.5 * residual.size * math.log(2.0 * math.pi * variance) + (
+        0.5 * float(np.sum(residual**2)) / variance
+    )
+
+    basis = radial_vector_basis(positions, scale)
+    jacobian = radial_vector_basis_jacobian(positions, scale)
+    jacobian_velocity = np.einsum(
+        "ctpbik,ctpk->ctpbi",
+        jacobian,
+        velocities,
+    )
+    resolved_correlations = []
+    for lag in range(maximum_lag + 1):
+        later_residual = residual[:, lag:]
+        stop = positions.shape[1] - lag
+        for feature in (basis[:, :stop], jacobian_velocity[:, :stop]):
+            for basis_index in range(feature.shape[-2]):
+                resolved_correlations.append(
+                    _absolute_correlation(
+                        later_residual,
+                        feature[..., basis_index, :],
+                    )
+                )
+
+    auxiliary_items = (
+        auxiliary_innovation,
+        observed_fdt_covariance,
+        target_fdt_covariance,
+    )
+    auxiliary_applicable = all(item is not None for item in auxiliary_items)
+    if any(item is not None for item in auxiliary_items) and not auxiliary_applicable:
+        raise ValueError("auxiliary innovation and both FDT arrays are jointly required")
+    innovation_correlation = 0.0
+    fdt_error = 0.0
+    if auxiliary_applicable:
+        innovation = np.asarray(auxiliary_innovation, dtype=float)
+        observed_fdt = np.asarray(observed_fdt_covariance, dtype=float)
+        target_fdt = np.asarray(target_fdt_covariance, dtype=float)
+        if (
+            innovation.ndim != 5
+            or innovation.shape[0] != positions.shape[0]
+            or innovation.shape[2] != positions.shape[2]
+            or innovation.shape[-1] != 3
+            or innovation.shape[1] < 2
+            or np.any(~np.isfinite(innovation))
+            or observed_fdt.shape != target_fdt.shape
+            or observed_fdt.ndim != 1
+            or len(observed_fdt) < 1
+            or np.any(~np.isfinite(observed_fdt))
+            or np.any(~np.isfinite(target_fdt))
+        ):
+            raise ValueError("auxiliary and FDT diagnostics must be finite and aligned")
+        innovation_correlations = []
+        active_lag = min(maximum_lag, innovation.shape[1] - 1)
+        for lag in range(1, active_lag + 1):
+            for mode in range(innovation.shape[-2]):
+                innovation_correlations.append(
+                    _absolute_correlation(
+                        innovation[:, lag:, :, mode],
+                        innovation[:, :-lag, :, mode],
+                    )
+                )
+        innovation_correlation = max(innovation_correlations, default=0.0)
+        target_scale = math.sqrt(float(np.mean(target_fdt**2)))
+        if target_scale <= 0.0:
+            raise ValueError("FDT target must have positive scale")
+        fdt_error = math.sqrt(float(np.mean((observed_fdt - target_fdt) ** 2))) / (
+            target_scale
+        )
+    return {
+        "drift_rmse": drift_rmse,
+        "drift_nll": drift_nll,
+        "held_scalar_component_count": float(residual.size),
+        "maximum_normalized_resolved_basis_residual_correlation": max(
+            resolved_correlations,
+            default=0.0,
+        ),
+        "maximum_normalized_auxiliary_innovation_autocorrelation": (
+            innovation_correlation
+        ),
+        "second_fdt_covariance_normalized_rmse": fdt_error,
+        "auxiliary_diagnostics_applicable": float(auxiliary_applicable),
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def _finite_row_value(row: dict[str, object], key: str) -> float:
+    try:
+        value = float(row[key])
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"kernel gate row lacks finite {key}") from error
+    if not math.isfinite(value):
+        raise ValueError(f"kernel gate row lacks finite {key}")
+    return value
+
+
+def classify_position_dependent_kernel_gate(
+    rows: list[dict[str, object]],
+) -> dict[str, float | str]:
+    """Classify the exact four-fold frozen kernel model grid."""
+
+    expected = {(clone, model) for clone in range(1, 5) for model in _KERNEL_MODELS}
+    indexed: dict[tuple[int, str], dict[str, object]] = {}
+    for row in rows:
+        clone_value = _finite_row_value(row, "held_clone_index")
+        clone = int(clone_value)
+        model = str(row.get("model", ""))
+        key = (clone, model)
+        if clone_value != clone or key not in expected or key in indexed:
+            raise ValueError("kernel gate rows must form one exact four-fold model grid")
+        indexed[key] = row
+    if set(indexed) != expected:
+        raise ValueError("kernel gate rows must form one exact four-fold model grid")
+
+    ratios = []
+    mz_fold_pass = []
+    for clone in range(1, 5):
+        scalar = indexed[(clone, _KERNEL_MODELS[0])]
+        mz = indexed[(clone, _KERNEL_MODELS[1])]
+        permuted = indexed[(clone, _KERNEL_MODELS[4])]
+        scalar_rmse = _finite_row_value(scalar, "drift_rmse")
+        mz_rmse = _finite_row_value(mz, "drift_rmse")
+        permuted_rmse = _finite_row_value(permuted, "drift_rmse")
+        scalar_nll = _finite_row_value(scalar, "drift_nll")
+        mz_nll = _finite_row_value(mz, "drift_nll")
+        permuted_nll = _finite_row_value(permuted, "drift_nll")
+        if scalar_rmse <= 0.0:
+            raise ValueError("stationary scalar RMSE must be positive")
+        ratio = mz_rmse / scalar_rmse
+        ratios.append(ratio)
+        mz_fold_pass.append(
+            ratio <= 0.90
+            and mz_nll < scalar_nll
+            and mz_rmse < permuted_rmse
+            and mz_nll < permuted_nll
+            and _finite_row_value(
+                mz,
+                "maximum_normalized_resolved_basis_residual_correlation",
+            )
+            <= 0.20
+            and _finite_row_value(mz, "all_fitted_arrays_finite") == 1.0
+        )
+    ratio_array = np.asarray(ratios)
+    ratio_mean = float(np.mean(ratio_array))
+    ratio_se = float(np.std(ratio_array, ddof=1) / math.sqrt(len(ratio_array)))
+    t95 = 3.182446305284263
+    ratio_low = ratio_mean - t95 * ratio_se
+    ratio_high = ratio_mean + t95 * ratio_se
+    mz_identified = all(mz_fold_pass) and ratio_high < 1.0
+
+    def realization_pass(model: str) -> tuple[bool, list[int]]:
+        fold_pass = []
+        ranks = []
+        for clone in range(1, 5):
+            mz = indexed[(clone, _KERNEL_MODELS[1])]
+            row = indexed[(clone, model)]
+            mz_rmse = _finite_row_value(mz, "drift_rmse")
+            candidate_rmse = _finite_row_value(row, "drift_rmse")
+            mz_nll = _finite_row_value(mz, "drift_nll")
+            candidate_nll = _finite_row_value(row, "drift_nll")
+            scalar_count = _finite_row_value(
+                row,
+                "held_scalar_component_count",
+            )
+            rank_value = _finite_row_value(row, "selected_auxiliary_rank")
+            rank = int(rank_value)
+            if scalar_count < 1.0 or rank_value != rank or rank < 1:
+                raise ValueError("realization rows require positive count and rank")
+            ranks.append(rank)
+            fold_pass.append(
+                candidate_rmse <= 1.10 * mz_rmse
+                and candidate_nll <= mz_nll + 0.05 * scalar_count
+                and _finite_row_value(
+                    row,
+                    "maximum_normalized_resolved_basis_residual_correlation",
+                )
+                <= 0.20
+                and _finite_row_value(
+                    row,
+                    "maximum_normalized_auxiliary_innovation_autocorrelation",
+                )
+                <= 0.20
+                and _finite_row_value(
+                    row,
+                    "second_fdt_covariance_normalized_rmse",
+                )
+                <= 0.30
+                and _finite_row_value(row, "auxiliary_diagnostics_applicable")
+                == 1.0
+                and _finite_row_value(row, "all_selected_decay_rates_positive")
+                == 1.0
+                and _finite_row_value(row, "all_fitted_arrays_finite") == 1.0
+            )
+        return bool(mz_identified and all(fold_pass)), ranks
+
+    real_pole_identified, _ = realization_pass(_KERNEL_MODELS[2])
+    positive_prony_identified, positive_ranks = realization_pass(_KERNEL_MODELS[3])
+    rank_identified = positive_prony_identified and len(set(positive_ranks)) == 1
+    oscillatory_authorized = (
+        mz_identified
+        and not real_pole_identified
+        and not positive_prony_identified
+    )
+    return {
+        "record": "verdict",
+        "real_ka_kernel_identifiability_test_required": 1.0,
+        "real_ka_position_dependent_mz_kernel_identified": float(mz_identified),
+        "past_position_real_pole_identified_in_ka": float(real_pole_identified),
+        "two_position_positive_prony_identified_in_ka": float(
+            positive_prony_identified
+        ),
+        "positive_prony_kernel_identified_in_ka": float(
+            positive_prony_identified
+        ),
+        "finite_auxiliary_rank_identified_in_ka": float(rank_identified),
+        "selected_auxiliary_rank": float(positive_ranks[0])
+        if rank_identified
+        else 0.0,
+        "oscillatory_matrix_bath_authorized": float(oscillatory_authorized),
+        "mz_rmse_ratio_mean": ratio_mean,
+        "mz_rmse_ratio_standard_error": ratio_se,
+        "mz_rmse_ratio_t95_low": ratio_low,
+        "mz_rmse_ratio_t95_high": ratio_high,
+        **{claim: 0.0 for claim in _BROAD_CLAIMS},
+    }

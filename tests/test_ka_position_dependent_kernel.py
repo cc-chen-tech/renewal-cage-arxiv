@@ -267,6 +267,162 @@ class PositionDependentKernelTests(unittest.TestCase):
         self.assertEqual(real_pole["positive_prony_factorization"], 0.0)
         self.assertEqual(real_pole["history_features"].shape, (2, 9, 4, 2, 3, 3))
 
+    def test_classifier_separates_mz_real_pole_and_positive_prony_claims(self):
+        from ka_position_dependent_kernel import (
+            classify_position_dependent_kernel_gate,
+        )
+
+        def passing_rows():
+            rows = []
+            model_values = {
+                "stationary_scalar_nonparametric_volterra": (1.0, 1.0),
+                "finite_basis_mz_position_kernel": (0.8, 0.8),
+                "past_position_real_pole": (0.85, 0.82),
+                "two_position_positive_prony": (0.86, 0.82),
+                "time_permuted_position_null": (0.95, 0.95),
+            }
+            for held_clone in range(1, 5):
+                for model, (rmse, nll) in model_values.items():
+                    rows.append(
+                        {
+                            "held_clone_index": float(held_clone),
+                            "model": model,
+                            "drift_rmse": rmse,
+                            "drift_nll": nll,
+                            "held_scalar_component_count": 100.0,
+                            "maximum_normalized_resolved_basis_residual_correlation": 0.1,
+                            "maximum_normalized_auxiliary_innovation_autocorrelation": 0.1,
+                            "second_fdt_covariance_normalized_rmse": 0.2,
+                            "auxiliary_diagnostics_applicable": 1.0,
+                            "selected_auxiliary_rank": 2.0,
+                            "all_selected_decay_rates_positive": 1.0,
+                            "all_fitted_arrays_finite": 1.0,
+                        }
+                    )
+            return rows
+
+        passed = classify_position_dependent_kernel_gate(passing_rows())
+        self.assertEqual(passed["real_ka_position_dependent_mz_kernel_identified"], 1.0)
+        self.assertEqual(passed["past_position_real_pole_identified_in_ka"], 1.0)
+        self.assertEqual(passed["two_position_positive_prony_identified_in_ka"], 1.0)
+        self.assertEqual(passed["positive_prony_kernel_identified_in_ka"], 1.0)
+        self.assertEqual(passed["finite_auxiliary_rank_identified_in_ka"], 1.0)
+        self.assertEqual(passed["selected_auxiliary_rank"], 2.0)
+        self.assertEqual(passed["oscillatory_matrix_bath_authorized"], 0.0)
+        self.assertLess(passed["mz_rmse_ratio_t95_high"], 1.0)
+
+        inconsistent = passing_rows()
+        for row in inconsistent:
+            if row["model"] == "two_position_positive_prony" and row[
+                "held_clone_index"
+            ] == 4.0:
+                row["selected_auxiliary_rank"] = 4.0
+        inconsistent_verdict = classify_position_dependent_kernel_gate(inconsistent)
+        self.assertEqual(
+            inconsistent_verdict["two_position_positive_prony_identified_in_ka"],
+            1.0,
+        )
+        self.assertEqual(
+            inconsistent_verdict["finite_auxiliary_rank_identified_in_ka"],
+            0.0,
+        )
+
+        mz_failed = passing_rows()
+        for row in mz_failed:
+            if row["model"] == "finite_basis_mz_position_kernel" and row[
+                "held_clone_index"
+            ] == 1.0:
+                row["drift_rmse"] = 0.95
+        failed_verdict = classify_position_dependent_kernel_gate(mz_failed)
+        self.assertEqual(
+            failed_verdict["real_ka_position_dependent_mz_kernel_identified"],
+            0.0,
+        )
+        self.assertEqual(failed_verdict["positive_prony_kernel_identified_in_ka"], 0.0)
+
+        realization_failed = passing_rows()
+        for row in realization_failed:
+            if row["model"] in {
+                "past_position_real_pole",
+                "two_position_positive_prony",
+            }:
+                row["second_fdt_covariance_normalized_rmse"] = 0.4
+        unresolved = classify_position_dependent_kernel_gate(realization_failed)
+        self.assertEqual(unresolved["real_ka_position_dependent_mz_kernel_identified"], 1.0)
+        self.assertEqual(unresolved["past_position_real_pole_identified_in_ka"], 0.0)
+        self.assertEqual(unresolved["positive_prony_kernel_identified_in_ka"], 0.0)
+        self.assertEqual(unresolved["oscillatory_matrix_bath_authorized"], 1.0)
+
+        for verdict in (passed, inconsistent_verdict, failed_verdict, unresolved):
+            self.assertEqual(verdict["real_ka_kernel_identifiability_test_required"], 1.0)
+            for claim in (
+                "autonomous_single_particle_gle_allowed",
+                "complete_event_clock_closure_allowed",
+                "kramers_escape_claim_allowed",
+                "spatial_facilitation_claim_allowed",
+                "thermodynamic_claim_allowed",
+            ):
+                self.assertEqual(verdict[claim], 0.0)
+
+    def test_held_diagnostics_use_frozen_training_variance_and_aligned_features(self):
+        from ka_position_dependent_kernel import (
+            fit_radial_basis_scale,
+            held_kernel_diagnostics,
+        )
+
+        rng = np.random.default_rng(101)
+        position = rng.normal(size=(1, 12, 6, 3))
+        velocity = rng.normal(size=position.shape)
+        observed = rng.normal(size=position.shape)
+        residual = 0.15 * rng.normal(size=position.shape)
+        predicted = observed - residual
+        scale = fit_radial_basis_scale(position)
+        innovation = rng.normal(size=(1, 11, 6, 2, 3))
+        observed_fdt = np.array([1.0, 0.4, 0.2])
+        target_fdt = np.array([1.0, 0.5, 0.1])
+        diagnostics = held_kernel_diagnostics(
+            observed,
+            predicted,
+            position,
+            velocity,
+            scale=scale,
+            training_residual_variance=2.0,
+            maximum_lag=2,
+            auxiliary_innovation=innovation,
+            observed_fdt_covariance=observed_fdt,
+            target_fdt_covariance=target_fdt,
+        )
+        expected_rmse = np.sqrt(np.mean(residual**2)) / np.sqrt(
+            np.mean(observed**2)
+        )
+        expected_nll = 0.5 * residual.size * np.log(4.0 * np.pi) + 0.25 * np.sum(
+            residual**2
+        )
+        self.assertAlmostEqual(diagnostics["drift_rmse"], expected_rmse)
+        self.assertAlmostEqual(diagnostics["drift_nll"], expected_nll)
+        self.assertLessEqual(
+            diagnostics[
+                "maximum_normalized_resolved_basis_residual_correlation"
+            ],
+            1.0,
+        )
+        self.assertLessEqual(
+            diagnostics[
+                "maximum_normalized_auxiliary_innovation_autocorrelation"
+            ],
+            1.0,
+        )
+        expected_fdt = np.sqrt(np.mean((observed_fdt - target_fdt) ** 2)) / np.sqrt(
+            np.mean(target_fdt**2)
+        )
+        self.assertAlmostEqual(
+            diagnostics["second_fdt_covariance_normalized_rmse"],
+            expected_fdt,
+        )
+        self.assertEqual(diagnostics["held_scalar_component_count"], residual.size)
+        self.assertEqual(diagnostics["auxiliary_diagnostics_applicable"], 1.0)
+        self.assertEqual(diagnostics["thermodynamic_claim_allowed"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
