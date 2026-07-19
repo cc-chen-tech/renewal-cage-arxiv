@@ -144,6 +144,43 @@ class PositionDependentKernelTests(unittest.TestCase):
             np.linalg.norm(fitted["memory_coefficients"]),
         )
 
+    def test_stationary_scalar_baseline_uses_only_linear_radial_basis(self):
+        from ka_position_dependent_kernel import (
+            assemble_mz_volterra_system,
+            fit_radial_basis_scale,
+            predict_mz_drift,
+            solve_regularized_mz_kernel,
+        )
+
+        rng = np.random.default_rng(44)
+        position = rng.normal(size=(2, 9, 4, 3))
+        velocity = rng.normal(size=position.shape)
+        acceleration = 0.4 * position.copy()
+        acceleration[:, 1:] -= 0.2 * velocity[:, :-1]
+        scale = fit_radial_basis_scale(position)
+        system = assemble_mz_volterra_system(
+            position,
+            velocity,
+            acceleration,
+            scale=scale,
+            support=2,
+            basis_indices=(0,),
+        )
+        self.assertEqual(system["design"].shape[1], 3)
+        self.assertEqual(system["basis_indices"], (0,))
+        fitted = solve_regularized_mz_kernel(system, ridge=0.0)
+        self.assertEqual(fitted["mean_force_coefficients"].shape, (1,))
+        self.assertEqual(fitted["memory_coefficients"].shape, (2, 1))
+        predicted = predict_mz_drift(
+            position,
+            velocity,
+            scale=scale,
+            mean_force_coefficients=fitted["mean_force_coefficients"],
+            memory_coefficients=fitted["memory_coefficients"],
+            basis_indices=(0,),
+        )
+        np.testing.assert_allclose(predicted, acceleration[:, 1:], atol=2e-12)
+
     def test_mz_system_rejects_invalid_paths_support_and_ridge(self):
         from ka_position_dependent_kernel import (
             assemble_mz_volterra_system,

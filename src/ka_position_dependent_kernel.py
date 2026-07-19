@@ -126,11 +126,13 @@ def assemble_mz_volterra_system(
     *,
     scale: dict[str, float],
     support: int,
+    basis_indices: tuple[int, ...] = (0, 1, 2),
 ) -> dict[str, object]:
     """Assemble one joint causal MZ regression without crossing clone edges."""
 
     positions, velocities = _finite_clone_paths(position, velocity)
     accelerations = np.asarray(acceleration, dtype=float)
+    indices = tuple(basis_indices)
     if (
         accelerations.shape != positions.shape
         or np.any(~np.isfinite(accelerations))
@@ -138,10 +140,19 @@ def assemble_mz_volterra_system(
         or not isinstance(support, (int, np.integer))
         or support < 1
         or support > positions.shape[1]
+        or len(indices) < 1
+        or len(set(indices)) != len(indices)
+        or any(
+            isinstance(index, bool)
+            or not isinstance(index, (int, np.integer))
+            or index < 0
+            or index > 2
+            for index in indices
+        )
     ):
         raise ValueError("acceleration and support must align with kernel paths")
-    basis = radial_vector_basis(positions, scale)
-    jacobian = radial_vector_basis_jacobian(positions, scale)
+    basis = radial_vector_basis(positions, scale)[..., indices, :]
+    jacobian = radial_vector_basis_jacobian(positions, scale)[..., indices, :, :]
     jacobian_velocity = np.einsum(
         "ctpbik,ctpk->ctpbi",
         jacobian,
@@ -161,7 +172,8 @@ def assemble_mz_volterra_system(
     return {
         "design": design,
         "target": target,
-        "basis_count": 3,
+        "basis_count": len(indices),
+        "basis_indices": indices,
         "support": int(support),
         "training_clone_count": int(positions.shape[0]),
         "valid_time_count": int(positions.shape[1] - first),
@@ -182,6 +194,7 @@ def solve_regularized_mz_kernel(
     try:
         basis_count = int(system["basis_count"])
         support = int(system["support"])
+        basis_indices = tuple(system["basis_indices"])
     except (KeyError, TypeError, ValueError) as error:
         raise ValueError("MZ Volterra system metadata is incomplete") from error
     ridge_value = float(ridge)
@@ -192,7 +205,11 @@ def solve_regularized_mz_kernel(
         or design.shape[0] != len(target)
         or design.shape[1] != expected_columns
         or design.shape[0] < design.shape[1]
-        or basis_count != 3
+        or basis_count < 1
+        or basis_count > 3
+        or len(basis_indices) != basis_count
+        or len(set(basis_indices)) != basis_count
+        or any(index < 0 or index > 2 for index in basis_indices)
         or support < 1
         or np.any(~np.isfinite(design))
         or np.any(~np.isfinite(target))
@@ -236,6 +253,7 @@ def solve_regularized_mz_kernel(
             basis_count,
         ),
         "ridge": ridge_value,
+        "basis_indices": basis_indices,
         "numerical_rank": float(numerical_rank),
         "condition_number": condition_number,
         "singular_values": singular_values,
@@ -252,24 +270,35 @@ def predict_mz_drift(
     scale: dict[str, float],
     mean_force_coefficients: np.ndarray,
     memory_coefficients: np.ndarray,
+    basis_indices: tuple[int, ...] | None = None,
 ) -> np.ndarray:
     """Predict exact-generator drift on each clone without crossing boundaries."""
 
     positions, velocities = _finite_clone_paths(position, velocity)
     mean_force = np.asarray(mean_force_coefficients, dtype=float)
     memory = np.asarray(memory_coefficients, dtype=float)
+    indices = (
+        tuple(range(len(mean_force)))
+        if basis_indices is None
+        else tuple(basis_indices)
+    )
     if (
-        mean_force.shape != (3,)
+        mean_force.ndim != 1
+        or len(mean_force) < 1
+        or len(mean_force) > 3
         or memory.ndim != 2
-        or memory.shape[1] != 3
+        or memory.shape[1] != len(mean_force)
         or memory.shape[0] < 1
         or memory.shape[0] > positions.shape[1]
         or np.any(~np.isfinite(mean_force))
         or np.any(~np.isfinite(memory))
+        or len(indices) != len(mean_force)
+        or len(set(indices)) != len(indices)
+        or any(index < 0 or index > 2 for index in indices)
     ):
         raise ValueError("MZ coefficients must be finite and aligned")
-    basis = radial_vector_basis(positions, scale)
-    jacobian = radial_vector_basis_jacobian(positions, scale)
+    basis = radial_vector_basis(positions, scale)[..., indices, :]
+    jacobian = radial_vector_basis_jacobian(positions, scale)[..., indices, :, :]
     jacobian_velocity = np.einsum(
         "ctpbik,ctpk->ctpbi",
         jacobian,
