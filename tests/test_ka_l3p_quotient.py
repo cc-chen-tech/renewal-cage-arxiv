@@ -330,6 +330,38 @@ class L3pQuotientTests(unittest.TestCase):
         self.assertLess(real, 0.25 * held_variance["l3p_time_permuted"])
         self.assertLess(real, 0.25 * held_variance["l2p_backward_difference"])
 
+    def test_l3p_svg_labels_unclipped_nll_and_memory_axes(self):
+        from analyze_ka_l3p_generator_quotient import write_diagnostic_svg
+        from ka_l3p_quotient import L3P_QUOTIENT_MODELS
+
+        rows = []
+        for fold in range(1, 5):
+            for index, model in enumerate(L3P_QUOTIENT_MODELS):
+                rows.append(
+                    {
+                        "fold_index": float(fold),
+                        "model": model,
+                        "negative_log_likelihood": 1.0 + 0.4 * fold + index,
+                        "maximum_absolute_squared_whitened_correlation": (
+                            0.02 + 0.08 * index + 0.01 * fold
+                        ),
+                    }
+                )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "l3p.svg"
+            write_diagnostic_svg(path, rows)
+            svg = path.read_text()
+        for phrase in (
+            "Microscopic L3p generator-coordinate quotient",
+            "exact Qc whitening",
+            "unclipped axes",
+            "held negative log-likelihood",
+            "maximum absolute squared whitened correlation",
+            "tolerance = 0.05",
+            *L3P_QUOTIENT_MODELS,
+        ):
+            self.assertIn(phrase, svg)
+
 
 if __name__ == "__main__":
     unittest.main()

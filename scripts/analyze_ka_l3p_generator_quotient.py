@@ -256,8 +256,11 @@ def write_diagnostic_svg(path: Path, rows: list[dict[str, object]]) -> None:
             )
         if reference is not None:
             yy = y(reference, limits)
-            svg.append(
-                f'<line x1="{panel_x}" y1="{yy:.3f}" x2="{panel_x + panel_width}" y2="{yy:.3f}" stroke="#15191e" stroke-dasharray="7 5"/>'
+            svg.extend(
+                [
+                    f'<line x1="{panel_x}" y1="{yy:.3f}" x2="{panel_x + panel_width}" y2="{yy:.3f}" stroke="#15191e" stroke-dasharray="7 5"/>',
+                    f'<text x="{panel_x + panel_width - 6}" y="{yy - 7:.3f}" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#15191e">tolerance = 0.05</text>',
+                ]
             )
         for model in L3P_QUOTIENT_MODELS:
             points = " ".join(
