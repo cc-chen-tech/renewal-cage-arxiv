@@ -410,12 +410,15 @@ def classify_nonlinear_bath_gate(
     )
     replay = exact and bool(bath_replay_gate_pass)
     authorized = exact and bool(equilibrium_gate_pass) and replay
+    delay_grid_boundary_excluded = (
+        delay_time_bootstrap_ci95_low > float(_DELAY_TIME_GRID[0])
+    )
     delayed = (
         held_delayed_negative_log_likelihood
         < held_constant_negative_log_likelihood
         and held_delayed_integrated_survival_error
         <= 0.90 * held_constant_integrated_survival_error
-        and delay_time_bootstrap_ci95_low > 0.0
+        and delay_grid_boundary_excluded
     )
     return {
         "record": "verdict",
@@ -442,6 +445,8 @@ def classify_nonlinear_bath_gate(
         "delay_time_bootstrap_ci95_low": float(
             delay_time_bootstrap_ci95_low
         ),
+        "delay_grid_minimum": float(_DELAY_TIME_GRID[0]),
+        "delay_grid_boundary_excluded": float(delay_grid_boundary_excluded),
         "exact_nonlinear_bath_elimination_supported": float(exact),
         "synthetic_bath_level_fdt_replay_supported": float(replay),
         "synthetic_delayed_hazard_emerges": float(delayed),

@@ -193,6 +193,12 @@ exact kernel. The pooled normalized RMSE must be at most `0.15`, and every lag
 must have normalized RMSE at most `0.30`. Endogenous trajectory samples are
 not reused as if they were conditionally independent bath draws.
 
+The replay uses trajectories `0:32`, their first `20 tau` after production
+burn-in, seed `20260813`, and the stored `0.01 tau` coordinate spacing. The
+time-permuted coupling ablation uses seed `20260814`; it changes only the
+coordinate order supplied to `C_a(u_t)` in the replay target, not the simulated
+parent path or bath noise.
+
 ### 4. Cage first passage
 
 A cage index is the nearest periodic minimum. An accepted cage transition
@@ -210,11 +216,19 @@ The delayed fit profiles the analytic maximum-likelihood `lambda` over the
 fixed grid `tau_d = geomspace(1e-3, 1e2, 801) tau`; it does not optimize or
 extend this grid after seeing held trajectories.
 
+Held survival is evaluated on the fixed grid `linspace(0, 100, 201) tau`.
+Integrated survival error is the trapezoidal integral of the absolute
+empirical Kaplan-Meier minus model-survival difference, divided by `100 tau`.
+The delay confidence interval uses 400 complete-trajectory bootstrap samples
+from the training half with seed `20260812`. A positive-delay result requires
+the 95% lower bound to be strictly above the frozen grid minimum `1e-3 tau`;
+mere positivity induced by the constrained grid is not sufficient.
+
 The synthetic dynamics supports the delayed effective clock only if the held
 delayed model has lower negative log likelihood, at least 10% lower integrated
-survival error, and `tau_d > 0` with a trajectory-bootstrap 95% lower bound
-above zero. Failure is retained as a negative result; parameters are not tuned
-after reading this gate.
+survival error, and the trajectory-bootstrap 95% lower bound on `tau_d` is
+strictly above the frozen grid minimum. Failure is retained as a negative
+result; parameters are not tuned after reading this gate.
 
 ### 5. Nulls and ablations
 

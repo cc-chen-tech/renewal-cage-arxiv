@@ -168,6 +168,20 @@ class NonlinearBathDiagnosticsTests(unittest.TestCase):
         self.assertEqual(no_clock["synthetic_delayed_hazard_emerges"], 0.0)
         self.assertEqual(no_clock["real_ka_position_dependent_kernel_authorized"], 1.0)
 
+        grid_boundary = classify_nonlinear_bath_gate(
+            maximum_reconstruction_relative_error=1e-12,
+            half_step_equilibrium_not_worse=True,
+            equilibrium_gate_pass=True,
+            bath_replay_gate_pass=True,
+            held_constant_negative_log_likelihood=10.0,
+            held_delayed_negative_log_likelihood=8.0,
+            held_constant_integrated_survival_error=0.20,
+            held_delayed_integrated_survival_error=0.15,
+            delay_time_bootstrap_ci95_low=1e-3,
+        )
+        self.assertEqual(grid_boundary["synthetic_delayed_hazard_emerges"], 0.0)
+        self.assertEqual(grid_boundary["delay_grid_boundary_excluded"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
