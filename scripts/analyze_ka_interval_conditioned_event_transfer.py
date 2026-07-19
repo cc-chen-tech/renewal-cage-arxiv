@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import sys
@@ -33,6 +34,9 @@ LAGS_BY_TEMPERATURE = {
 CALIBRATION_TIME = {"045": 5000, "058": 750}
 WAVE_NUMBERS = np.array([2.0, 4.0, 7.25])
 ORIGIN_STRIDE = 8
+CACHE_SCHEMA_VERSION = 1
+CACHE_FINGERPRINT_JSON_KEY = "cache_fingerprint_json"
+CACHE_FINGERPRINT_SHA256_KEY = "cache_fingerprint_sha256"
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -52,6 +56,65 @@ def write_rows(path: Path, rows: list[dict[str, object]]) -> None:
 
 def wave_key(wave_number: float) -> str:
     return f"k{wave_number:g}".replace(".", "p")
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _canonical_fingerprint_json(fingerprint: dict[str, object]) -> str:
+    return json.dumps(
+        fingerprint,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    )
+
+
+def build_interval_cache_fingerprint(
+    *,
+    trajectory_path: Path,
+    manifest: dict[str, object],
+    replicate_spec: dict[str, object],
+    label: str,
+    window: str,
+    first_frame: int,
+    stop_frame: int,
+    expected_frame_count: int,
+    debye_waller_factor: float,
+    lags: tuple[int, ...],
+    wave_numbers: np.ndarray,
+    half_window: int,
+    origin_stride: int,
+    trajectory_sha256: str | None = None,
+) -> dict[str, object]:
+    """Bind a sufficient-statistics cache to its raw trajectory and protocol."""
+
+    return {
+        "cache_kind": "ka_interval_conditioned_event_statistics",
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "trajectory_sha256": trajectory_sha256 or file_sha256(trajectory_path),
+        "manifest_source_doi": str(manifest.get("source_doi", "")),
+        "manifest_source_sha256": str(manifest.get("source_sha256", "")),
+        "temperature_label": str(label),
+        "replicate": int(replicate_spec["replicate"]),
+        "source_frame_index": int(replicate_spec["source_frame_index"]),
+        "velocity_seed": int(replicate_spec["velocity_seed"]),
+        "window": str(window),
+        "first_frame": int(first_frame),
+        "stop_frame": int(stop_frame),
+        "expected_frame_count": int(expected_frame_count),
+        "debye_waller_factor": float(debye_waller_factor),
+        "lags": [int(lag) for lag in lags],
+        "wave_numbers": [float(value) for value in wave_numbers],
+        "half_window": int(half_window),
+        "origin_stride": int(origin_stride),
+    }
 
 
 def canonicalize_interval_statistics(
@@ -90,21 +153,49 @@ def canonicalize_interval_statistics(
 
 
 def save_interval_statistics(
-    path: Path, statistics: dict[int, dict[str, np.ndarray]]
+    path: Path,
+    statistics: dict[int, dict[str, np.ndarray]],
+    *,
+    fingerprint: dict[str, object],
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    fingerprint_json = _canonical_fingerprint_json(fingerprint)
     arrays = {
         f"lag_{lag}_{key}": np.asarray(value)
         for lag, local in statistics.items()
         for key, value in canonicalize_interval_statistics(local).items()
     }
-    np.savez_compressed(path, **arrays)
+    arrays[CACHE_FINGERPRINT_JSON_KEY] = np.asarray(fingerprint_json)
+    arrays[CACHE_FINGERPRINT_SHA256_KEY] = np.asarray(
+        hashlib.sha256(fingerprint_json.encode("ascii")).hexdigest()
+    )
+    temporary = path.with_name(path.name + ".tmp.npz")
+    np.savez_compressed(temporary, **arrays)
+    temporary.replace(path)
 
 
 def load_interval_statistics(
-    path: Path, lags: tuple[int, ...]
+    path: Path,
+    lags: tuple[int, ...],
+    *,
+    expected_fingerprint: dict[str, object],
 ) -> dict[int, dict[str, np.ndarray]]:
-    with np.load(path) as archive:
+    with np.load(path, allow_pickle=False) as archive:
+        if (
+            CACHE_FINGERPRINT_JSON_KEY not in archive
+            or CACHE_FINGERPRINT_SHA256_KEY not in archive
+        ):
+            raise ValueError(f"interval cache lacks a fingerprint: {path}")
+        stored_json = str(np.asarray(archive[CACHE_FINGERPRINT_JSON_KEY]).item())
+        stored_sha256 = str(
+            np.asarray(archive[CACHE_FINGERPRINT_SHA256_KEY]).item()
+        )
+        actual_sha256 = hashlib.sha256(stored_json.encode("ascii")).hexdigest()
+        if stored_sha256 != actual_sha256:
+            raise ValueError(f"interval cache fingerprint is corrupt: {path}")
+        expected_json = _canonical_fingerprint_json(expected_fingerprint)
+        if stored_json != expected_json:
+            raise ValueError(f"interval cache fingerprint mismatch: {path}")
         result = {}
         for lag in lags:
             prefix = f"lag_{lag}_"
@@ -270,6 +361,7 @@ def generate_tables(
     trajectory_root: Path,
     cache_directory: Path,
     labels: tuple[str, ...],
+    rebuild_cache: bool = False,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     detailed: list[dict[str, object]] = []
     ablation: list[dict[str, object]] = []
@@ -299,17 +391,39 @@ def generate_tables(
         for replicate_spec in manifest["replicates"]:
             replicate = int(replicate_spec["replicate"])
             directory = ensemble_directory / str(replicate_spec["directory"])
+            trajectory_path = directory / "trajectory.lammpstrj"
+            trajectory_hash = file_sha256(trajectory_path)
             statistics: dict[str, dict[int, dict[str, np.ndarray]]] = {}
             for window, first_frame, stop_frame in (
                 ("calibration", 0, calibration_time + 1),
                 ("heldout", calibration_time, expected_frame_count),
             ):
                 cache_path = cache_directory / f"T{label}_replicate_{replicate:02d}_{window}.npz"
-                if cache_path.is_file():
-                    statistics[window] = load_interval_statistics(cache_path, lags)
+                fingerprint = build_interval_cache_fingerprint(
+                    trajectory_path=trajectory_path,
+                    trajectory_sha256=trajectory_hash,
+                    manifest=manifest,
+                    replicate_spec=replicate_spec,
+                    label=label,
+                    window=window,
+                    first_frame=first_frame,
+                    stop_frame=stop_frame,
+                    expected_frame_count=expected_frame_count,
+                    debye_waller_factor=thresholds[replicate],
+                    lags=lags,
+                    wave_numbers=WAVE_NUMBERS,
+                    half_window=5,
+                    origin_stride=ORIGIN_STRIDE,
+                )
+                if cache_path.is_file() and not rebuild_cache:
+                    statistics[window] = load_interval_statistics(
+                        cache_path,
+                        lags,
+                        expected_fingerprint=fingerprint,
+                    )
                     continue
                 positions = load_a_positions(
-                    directory / "trajectory.lammpstrj",
+                    trajectory_path,
                     expected_frame_count=expected_frame_count,
                     first_frame=first_frame,
                     stop_frame=stop_frame,
@@ -332,7 +446,11 @@ def generate_tables(
                     wave_numbers=WAVE_NUMBERS,
                     origin_stride=ORIGIN_STRIDE,
                 )
-                save_interval_statistics(cache_path, statistics[window])
+                save_interval_statistics(
+                    cache_path,
+                    statistics[window],
+                    fingerprint=fingerprint,
+                )
             pooled_calibration_kernel = pool_interval_path_kernels(
                 statistics["calibration"], wave_numbers=WAVE_NUMBERS
             )
@@ -395,6 +513,7 @@ def generate_rows(
     trajectory_root: Path,
     cache_directory: Path,
     labels: tuple[str, ...],
+    rebuild_cache: bool = False,
 ) -> list[dict[str, object]]:
     """Compatibility wrapper returning the complete three-channel cube."""
 
@@ -402,6 +521,7 @@ def generate_rows(
         trajectory_root=trajectory_root,
         cache_directory=cache_directory,
         labels=labels,
+        rebuild_cache=rebuild_cache,
     )[0]
 
 
@@ -409,6 +529,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--trajectory-root", type=Path, default=_default_trajectory_root())
     parser.add_argument("--cache-directory", type=Path, default=Path("/tmp/ka_interval_stats"))
+    parser.add_argument(
+        "--rebuild-cache",
+        action="store_true",
+        help="recompute and overwrite interval caches instead of reusing them",
+    )
     parser.add_argument("--temperature", choices=("045", "058", "both"), default="both")
     parser.add_argument(
         "--output",
@@ -428,6 +553,7 @@ def main() -> None:
         trajectory_root=arguments.trajectory_root,
         cache_directory=arguments.cache_directory,
         labels=labels,
+        rebuild_cache=arguments.rebuild_cache,
     )
     write_rows(arguments.output, rows)
     write_rows(arguments.ablation_output, ablation)

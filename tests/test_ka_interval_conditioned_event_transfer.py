@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import importlib.util
 import math
 import sys
@@ -72,14 +73,117 @@ class IntervalConditionedEventTransferTests(unittest.TestCase):
                 "conditional_characteristic_k7p25": np.array([1.0, 0.05]),
             }
         }
+        fingerprint = {
+            "schema_version": 1,
+            "trajectory_sha256": "abc123",
+            "window": "calibration",
+        }
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "cache.npz"
-            self.generator.save_interval_statistics(path, statistics)
-            loaded = self.generator.load_interval_statistics(path, (2,))
+            self.generator.save_interval_statistics(
+                path, statistics, fingerprint=fingerprint
+            )
+            loaded = self.generator.load_interval_statistics(
+                path, (2,), expected_fingerprint=fingerprint
+            )
 
         self.assertEqual(set(loaded), {2})
         for key, expected in statistics[2].items():
             np.testing.assert_array_equal(loaded[2][key], expected)
+
+    def test_interval_cache_rejects_a_configuration_fingerprint_mismatch(self):
+        statistics = {
+            2: {
+                "count_pmf": np.array([1.0]),
+                "sample_count": np.array([4.0]),
+                "conditional_msd": np.array([0.0]),
+                "conditional_fourth_moment": np.array([0.0]),
+                "conditional_characteristic_k2": np.array([1.0]),
+                "conditional_characteristic_k4": np.array([1.0]),
+                "conditional_characteristic_k7p25": np.array([1.0]),
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cache.npz"
+            self.generator.save_interval_statistics(
+                path,
+                statistics,
+                fingerprint={"schema_version": 1, "debye_waller_factor": 0.05},
+            )
+
+            with self.assertRaisesRegex(ValueError, "fingerprint mismatch"):
+                self.generator.load_interval_statistics(
+                    path,
+                    (2,),
+                    expected_fingerprint={
+                        "schema_version": 1,
+                        "debye_waller_factor": 0.06,
+                    },
+                )
+
+    def test_interval_cache_rejects_legacy_unfingerprinted_archive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cache.npz"
+            np.savez_compressed(
+                path,
+                lag_2_count_pmf=np.array([1.0]),
+                lag_2_sample_count=np.array([4.0]),
+            )
+
+            with self.assertRaisesRegex(ValueError, "lacks a fingerprint"):
+                self.generator.load_interval_statistics(
+                    path,
+                    (2,),
+                    expected_fingerprint={"schema_version": 1},
+                )
+
+    def test_interval_cache_fingerprint_binds_trajectory_and_protocol(self):
+        manifest = {
+            "source_doi": "10.5281/zenodo.7469766",
+            "source_sha256": "source-hash",
+            "production_time_tau": 10,
+        }
+        replicate_spec = {
+            "replicate": 1,
+            "directory": "replicate_01",
+            "source_frame_index": 7,
+            "velocity_seed": 11,
+        }
+        controls = {
+            "manifest": manifest,
+            "replicate_spec": replicate_spec,
+            "label": "045",
+            "window": "calibration",
+            "first_frame": 0,
+            "stop_frame": 6,
+            "expected_frame_count": 11,
+            "debye_waller_factor": 0.05,
+            "lags": (2,),
+            "wave_numbers": np.array([2.0, 4.0, 7.25]),
+            "half_window": 5,
+            "origin_stride": 8,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            trajectory = Path(directory) / "trajectory.lammpstrj"
+            trajectory.write_bytes(b"first trajectory")
+            original = self.generator.build_interval_cache_fingerprint(
+                trajectory_path=trajectory, **controls
+            )
+            threshold_changed = self.generator.build_interval_cache_fingerprint(
+                trajectory_path=trajectory,
+                **{**controls, "debye_waller_factor": 0.06},
+            )
+            trajectory.write_bytes(b"second trajectory")
+            trajectory_changed = self.generator.build_interval_cache_fingerprint(
+                trajectory_path=trajectory, **controls
+            )
+
+        self.assertNotEqual(original, threshold_changed)
+        self.assertNotEqual(original, trajectory_changed)
+        self.assertEqual(
+            original["trajectory_sha256"],
+            hashlib.sha256(b"first trajectory").hexdigest(),
+        )
 
     def test_three_channel_shapley_attribution_is_exact(self):
         values = {
