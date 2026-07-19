@@ -151,6 +151,12 @@ avoids replacing the measured bath timescale by an Euler decay. A 16-trajectory,
 the full production cache stores seeds, checkpoints, downsampled coordinates,
 and event records rather than duplicating all noise arrays.
 
+The event coordinate is retained every `0.01 tau`; equilibrium `(u,p,z)`
+samples are retained every `0.10 tau`. Canary initial conditions are sampled
+from the known Gibbs density so the primary/half-step discretization comparison
+does not depend on a two-tau burn-in. Production and null runs retain the
+frozen `100 tau` burn-in.
+
 ## Numerical and physical gates
 
 ### 1. Algebraic reconstruction

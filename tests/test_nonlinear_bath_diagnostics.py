@@ -1,5 +1,6 @@
 import sys
 import unittest
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -39,13 +40,15 @@ class NonlinearBathDiagnosticsTests(unittest.TestCase):
             scale=np.sqrt(controls.temperature),
             size=(len(position), 1),
         )
-        result = equilibrium_diagnostics(
-            position,
-            momentum,
-            auxiliary,
-            controls=controls,
-            position_bin_count=40,
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            result = equilibrium_diagnostics(
+                position,
+                momentum,
+                auxiliary,
+                controls=controls,
+                position_bin_count=40,
+            )
         self.assertLess(result["momentum_temperature_relative_error"], 0.03)
         self.assertLess(result["maximum_auxiliary_temperature_relative_error"], 0.03)
         self.assertLess(result["maximum_momentum_auxiliary_correlation"], 0.03)

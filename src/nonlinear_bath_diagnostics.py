@@ -77,12 +77,14 @@ def equilibrium_diagnostics(
     for mode in range(bath.shape[-1]):
         centered_bath = bath[..., mode].ravel() - float(np.mean(bath[..., mode]))
         denominator = math.sqrt(
-            float(centered_velocity @ centered_velocity)
-            * float(centered_bath @ centered_bath)
+            float(np.mean(centered_velocity**2))
+            * float(np.mean(centered_bath**2))
         )
         if denominator <= 0.0:
             raise ValueError("equilibrium correlations need nonzero variance")
-        correlations.append(float(centered_velocity @ centered_bath) / denominator)
+        correlations.append(
+            float(np.mean(centered_velocity * centered_bath)) / denominator
+        )
     maximum_correlation = float(np.max(np.abs(correlations)))
 
     half_period = 0.5 * controls.period

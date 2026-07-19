@@ -1,11 +1,14 @@
 import sys
+import subprocess
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 class NonlinearBathGleTests(unittest.TestCase):
@@ -181,6 +184,201 @@ class NonlinearBathGleTests(unittest.TestCase):
         self.assertEqual(result["exact_nonlinear_bath_elimination_supported"], 0.0)
         self.assertEqual(result["autonomous_single_particle_gle_allowed"], 0.0)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
+
+    def test_remote_simulator_cli_exposes_only_frozen_modes(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "simulate_nonlinear_bath_elimination.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        for phrase in (
+            "--output-path",
+            "--mode",
+            "canary",
+            "canary-half-step",
+            "production",
+            "null-constant-coupling",
+            "null-no-bath",
+            "--checkpoint-interval",
+            "--resume",
+        ):
+            self.assertIn(phrase, completed.stdout)
+
+    def test_frozen_remote_protocol_keeps_primary_and_null_streams_paired(self):
+        from simulate_nonlinear_bath_elimination import frozen_simulation_protocol
+
+        primary = frozen_simulation_protocol("production")
+        constant = frozen_simulation_protocol("null-constant-coupling")
+        no_bath = frozen_simulation_protocol("null-no-bath")
+        self.assertEqual(primary["seed"], 20260811)
+        self.assertEqual(primary["trajectory_count"], 256)
+        self.assertEqual(primary["burn_in_steps"], 100000)
+        self.assertEqual(primary["production_steps"], 400000)
+        self.assertEqual(primary["event_sample_stride"], 10)
+        self.assertEqual(primary["equilibrium_sample_stride"], 100)
+        self.assertEqual(constant["seed"], primary["seed"])
+        self.assertEqual(no_bath["seed"], primary["seed"])
+        np.testing.assert_array_equal(
+            constant["controls"].modulation,
+            np.zeros(2),
+        )
+        np.testing.assert_array_equal(
+            no_bath["controls"].amplitudes,
+            np.zeros(2),
+        )
+
+    def test_checkpoint_metadata_rejects_any_provenance_change(self):
+        from simulate_nonlinear_bath_elimination import (
+            checkpoint_metadata,
+            validate_checkpoint_metadata,
+        )
+
+        expected = checkpoint_metadata(
+            frozen_simulation_protocol="production",
+            source_sha256="abc123",
+            requested_step_count=500000,
+        )
+        self.assertIn("gle_source_sha256", expected)
+        validate_checkpoint_metadata(dict(expected), expected)
+        for key, replacement in (
+            ("frozen_simulation_protocol", "canary"),
+            ("source_sha256", "changed"),
+            ("gle_source_sha256", "changed-dependency"),
+            ("requested_step_count", 499999.0),
+            ("seed", 1.0),
+        ):
+            changed = dict(expected)
+            changed[key] = replacement
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, "checkpoint provenance"):
+                    validate_checkpoint_metadata(changed, expected)
+
+    def test_simulation_guard_requires_remote_environment_marker(self):
+        from simulate_nonlinear_bath_elimination import (
+            require_remote_execution,
+            run_simulation,
+        )
+
+        with mock.patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "remote-only"):
+                require_remote_execution()
+            with mock.patch(
+                "simulate_nonlinear_bath_elimination._sample_equilibrium_positions",
+                side_effect=AssertionError("remote guard bypassed"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "remote-only"):
+                    run_simulation(
+                        Path("must-not-be-created.npz"),
+                        mode="canary",
+                        checkpoint_interval=100,
+                        resume=False,
+                    )
+        with mock.patch.dict(
+            "os.environ",
+            {"RENEWAL_CAGE_REMOTE_COMPUTE": "1"},
+            clear=True,
+        ):
+            require_remote_execution()
+            with mock.patch(
+                "simulate_nonlinear_bath_elimination._sample_equilibrium_positions",
+                side_effect=AssertionError("invalid interval entered simulation"),
+            ):
+                with self.assertRaisesRegex(ValueError, "checkpoint interval"):
+                    run_simulation(
+                        Path("must-not-be-created.npz"),
+                        mode="canary",
+                        checkpoint_interval=0,
+                        resume=False,
+                    )
+
+    def test_checkpoint_payload_rejects_inconsistent_or_nonfinite_state(self):
+        from simulate_nonlinear_bath_elimination import (
+            checkpoint_metadata,
+            frozen_simulation_protocol,
+            validate_checkpoint_payload,
+        )
+
+        mode = "canary"
+        protocol = frozen_simulation_protocol(mode)
+        provenance = checkpoint_metadata(
+            frozen_simulation_protocol=mode,
+            source_sha256="abc123",
+            requested_step_count=int(protocol["requested_step_count"]),
+        )
+        trajectories = int(protocol["trajectory_count"])
+        steps = int(protocol["requested_step_count"])
+        modes = len(protocol["controls"].rates)
+        payload = {
+            **provenance,
+            "completed_step_count": float(steps),
+            "stored_event_sample_count": float(steps + 1),
+            "stored_equilibrium_sample_count": float(steps + 1),
+            "cache_complete": 1.0,
+            "current_position": np.zeros(trajectories),
+            "current_momentum": np.zeros(trajectories),
+            "current_auxiliary": np.zeros((trajectories, modes)),
+            "event_positions": np.zeros((steps + 1, trajectories)),
+            "equilibrium_positions": np.zeros((steps + 1, trajectories)),
+            "equilibrium_momenta": np.zeros((steps + 1, trajectories)),
+            "equilibrium_auxiliary": np.zeros(
+                (steps + 1, trajectories, modes)
+            ),
+            "canary_normal_p": np.zeros((steps, trajectories)),
+            "canary_normal_z": np.zeros((steps, trajectories, modes)),
+            "rng_state_json": np.asarray(
+                __import__("json").dumps(
+                    np.random.default_rng(3).bit_generator.state
+                )
+            ),
+            "exact_nonlinear_bath_elimination_supported": 0.0,
+            "synthetic_bath_level_fdt_replay_supported": 0.0,
+            "synthetic_delayed_hazard_emerges": 0.0,
+            "real_ka_position_dependent_kernel_authorized": 0.0,
+            "autonomous_single_particle_gle_allowed": 0.0,
+            "complete_event_clock_closure_allowed": 0.0,
+            "kramers_escape_claim_allowed": 0.0,
+            "spatial_facilitation_claim_allowed": 0.0,
+            "thermodynamic_claim_allowed": 0.0,
+        }
+        validated = validate_checkpoint_payload(
+            payload,
+            provenance=provenance,
+            protocol=protocol,
+        )
+        self.assertEqual(validated["completed_step_count"], steps)
+        self.assertEqual(validated["event_sample_count"], steps + 1)
+
+        corruptions = {
+            "fractional completed count": ("completed_step_count", steps - 0.5),
+            "event count mismatch": ("stored_event_sample_count", steps),
+            "bad state shape": ("current_position", np.zeros(trajectories - 1)),
+            "nonfinite state": (
+                "current_momentum",
+                np.full(trajectories, np.nan),
+            ),
+            "truncated normals": (
+                "canary_normal_p",
+                np.zeros((steps - 1, trajectories)),
+            ),
+            "invalid rng json": ("rng_state_json", np.asarray("not-json")),
+            "open broad claim": ("thermodynamic_claim_allowed", 1.0),
+        }
+        for label, (key, value) in corruptions.items():
+            changed = dict(payload)
+            changed[key] = value
+            with self.subTest(label=label):
+                with self.assertRaisesRegex(ValueError, "checkpoint payload"):
+                    validate_checkpoint_payload(
+                        changed,
+                        provenance=provenance,
+                        protocol=protocol,
+                    )
 
 
 if __name__ == "__main__":
