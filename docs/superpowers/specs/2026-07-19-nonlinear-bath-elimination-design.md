@@ -200,6 +200,10 @@ constant hazard: h(t) = lambda,
 delayed hazard:  h(t) = lambda [1 - exp(-t/tau_d)]^2.
 ```
 
+The delayed fit profiles the analytic maximum-likelihood `lambda` over the
+fixed grid `tau_d = geomspace(1e-3, 1e2, 801) tau`; it does not optimize or
+extend this grid after seeing held trajectories.
+
 The synthetic dynamics supports the delayed effective clock only if the held
 delayed model has lower negative log likelihood, at least 10% lower integrated
 survival error, and `tau_d > 0` with a trajectory-bootstrap 95% lower bound
