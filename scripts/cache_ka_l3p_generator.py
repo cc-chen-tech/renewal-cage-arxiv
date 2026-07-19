@@ -428,6 +428,9 @@ def cache_clone(
             **provenance,
             completed_frame_count=float(done),
             checkpoint_interval=float(args.checkpoint_interval),
+            numerical_classifier_revision=np.asarray(
+                "sqrt_epsilon_monotonic_equivalence_v2"
+            ),
             **numerical_verdict(),
         )
 
@@ -455,6 +458,8 @@ def cache_clone(
         "laplacian_prefixes",
         "laplacian_velocity_derivative_prefixes",
     )
+    if completed == frame_count:
+        save(completed)
     for frame in range(completed, frame_count):
         frame_common = {
             **common,

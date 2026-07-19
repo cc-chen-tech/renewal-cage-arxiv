@@ -238,6 +238,9 @@ class L3pQuotientTests(unittest.TestCase):
                 "requested_frame_count": 90.0,
                 "l3p_numerical_gate_pass": 1.0,
                 "numerical_state": np.asarray("l3p_generator_numerically_resolved"),
+                "numerical_classifier_revision": np.asarray(
+                    "sqrt_epsilon_monotonic_equivalence_v2"
+                ),
                 "prefix_16_32_error": np.zeros((1, 4)),
                 "position_primary_reference_error": np.zeros((1, 4)),
                 "position_coarse_reference_error": np.zeros((1, 4)),

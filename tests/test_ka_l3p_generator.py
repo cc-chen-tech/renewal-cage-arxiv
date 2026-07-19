@@ -533,6 +533,22 @@ class L3pGeneratorTests(unittest.TestCase):
         self.assertEqual(unresolved["l3p_numerical_gate_pass"], 0.0)
         self.assertEqual(unresolved["finite_component_gate_pass"], 0.0)
 
+        resolution_limited = {
+            key: item.copy() for key, item in passing.items()
+        }
+        resolution_limited["cage_primary_reference_error"][:] = 5e-10
+        resolution_limited["cage_coarse_reference_error"][:] = 4e-10
+        resolved = classify_l3p_numerical_canary(**resolution_limited)
+        self.assertEqual(resolved["l3p_numerical_gate_pass"], 1.0)
+        self.assertEqual(
+            resolved["cage_monotonicity_equivalent_at_resolution_floor"],
+            1.0,
+        )
+        self.assertAlmostEqual(
+            resolved["monotonicity_resolution_floor"],
+            np.sqrt(np.finfo(float).eps),
+        )
+
     def test_l3p_cache_cli_freezes_provenance(self):
         completed = subprocess.run(
             [
@@ -764,6 +780,11 @@ class L3pGeneratorTests(unittest.TestCase):
                 )
             self.assertEqual(resumed["completed_frame_count"], 2)
             resumed_mock.assert_not_called()
+            with np.load(output_path, allow_pickle=False) as cache:
+                self.assertEqual(
+                    str(cache["numerical_classifier_revision"]),
+                    "sqrt_epsilon_monotonic_equivalence_v2",
+                )
 
 
 if __name__ == "__main__":

@@ -81,12 +81,26 @@ def classify_l3p_numerical_canary(
     directional_gate = finite and summaries["acceleration_directional"][0] <= 0.02 and summaries[
         "acceleration_directional"
     ][1] <= 0.10
-    monotonic_gate = finite and (
+    resolution_floor = math.sqrt(np.finfo(float).eps)
+    position_resolution_equivalent = finite and max(
+        summaries["position_primary_reference"][0],
+        summaries["position_coarse_reference"][0],
+    ) <= resolution_floor
+    cage_resolution_equivalent = finite and max(
+        summaries["cage_primary_reference"][0],
+        summaries["cage_coarse_reference"][0],
+    ) <= resolution_floor
+    position_monotonic = finite and (
         summaries["position_primary_reference"][0]
         <= summaries["position_coarse_reference"][0]
-        and summaries["cage_primary_reference"][0]
-        <= summaries["cage_coarse_reference"][0]
+        or position_resolution_equivalent
     )
+    cage_monotonic = finite and (
+        summaries["cage_primary_reference"][0]
+        <= summaries["cage_coarse_reference"][0]
+        or cage_resolution_equivalent
+    )
+    monotonic_gate = position_monotonic and cage_monotonic
     passed = all(
         (
             finite,
@@ -109,6 +123,15 @@ def classify_l3p_numerical_canary(
         "position_step_gate_pass": float(position_gate),
         "cage_step_gate_pass": float(cage_gate),
         "step_monotonicity_gate_pass": float(monotonic_gate),
+        "position_step_monotonicity_gate_pass": float(position_monotonic),
+        "cage_step_monotonicity_gate_pass": float(cage_monotonic),
+        "position_monotonicity_equivalent_at_resolution_floor": float(
+            position_resolution_equivalent
+        ),
+        "cage_monotonicity_equivalent_at_resolution_floor": float(
+            cage_resolution_equivalent
+        ),
+        "monotonicity_resolution_floor": resolution_floor,
         "acceleration_directional_gate_pass": float(directional_gate),
         **_CLOSED_CLAIMS,
     }

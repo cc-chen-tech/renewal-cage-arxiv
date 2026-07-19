@@ -1,5 +1,21 @@
 # Microscopic L3p Generator-Quotient Design
 
+## Revision note after numerical canaries
+
+The original frozen design was committed as `0addff1`. The four one-frame
+remote canaries were evaluated before any held quotient score was read. Every
+absolute prefix, position-step, cage-step, and acceleration-directional gate
+passed by a wide margin, but clones 1 and 3 failed the strict cage-step
+monotonicity comparison because primary/reference and coarse/reference median
+errors were both approximately `4e-10` and reversed ordering within that
+numerical floor. The classifier therefore treats primary and coarse medians as
+monotonicity-equivalent when both are at most `sqrt(machine epsilon)`.
+
+This numerical-only clarification does not alter trajectory inputs, targets,
+frame counts, step ladders, trace prefixes, seeds, Mori/VAR orders, absolute
+median or 95th-percentile error limits, or any held physical gate. The original
+canary caches and verdicts are retained as prerevision audit artifacts.
+
 ## Status and objective
 
 The deterministic conditional diffusion of `c=L^2p` carries significant

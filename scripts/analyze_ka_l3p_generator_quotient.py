@@ -74,6 +74,7 @@ def load_l3p_caches(
                 "requested_frame_count",
                 "l3p_numerical_gate_pass",
                 "numerical_state",
+                "numerical_classifier_revision",
                 "finite_l3p_gaussian_closure_supported",
                 "thermodynamic_claim_allowed",
                 *_NUMERICAL_ARRAYS,
@@ -91,6 +92,9 @@ def load_l3p_caches(
             estimator = str(_scalar(cache, "estimator"))
             saved_gate = float(_scalar(cache, "l3p_numerical_gate_pass"))
             saved_state = str(_scalar(cache, "numerical_state"))
+            classifier_revision = str(
+                _scalar(cache, "numerical_classifier_revision")
+            )
             numerical_arrays = {
                 key: np.asarray(cache[key], dtype=float) for key in _NUMERICAL_ARRAYS
             }
@@ -107,6 +111,8 @@ def load_l3p_caches(
                 or float(_scalar(cache, "thermodynamic_claim_allowed")) != 0.0
                 or saved_gate != 1.0
                 or saved_state != "l3p_generator_numerically_resolved"
+                or classifier_revision
+                != "sqrt_epsilon_monotonic_equivalence_v2"
                 or float(recomputed["l3p_numerical_gate_pass"]) != saved_gate
                 or str(recomputed["numerical_state"]) != saved_state
             ):
@@ -117,6 +123,7 @@ def load_l3p_caches(
                 "trajectory_sha256": source_hash,
                 "potential_protocol": protocol,
                 "path": str(path.resolve()),
+                "numerical_classifier_revision": classifier_revision,
                 "numerical_verdict": recomputed,
                 **{key: value.copy() for key, value in numerical_arrays.items()},
                 "thermodynamic_claim_allowed": 0.0,
