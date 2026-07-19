@@ -22,6 +22,7 @@ from analyze_ka_l2p_conditional_diffusion import (  # noqa: E402
 from analyze_ka_relative_second_generator_closure import (  # noqa: E402
     load_matched_second_generator_clones,
 )
+from cache_ka_l3p_generator import file_sha256  # noqa: E402
 from ka_l2p_conditional_diffusion import (  # noqa: E402
     conditional_covariance_diagnostic,
     fit_scaled_conditional_covariance,
@@ -66,6 +67,8 @@ def load_l3p_caches(
         with np.load(path, allow_pickle=False) as cache:
             required = {
                 "trajectory_sha256",
+                "drift_cache_sha256",
+                "second_generator_cache_sha256",
                 "target_indices",
                 "potential_protocol",
                 "estimator",
@@ -82,6 +85,10 @@ def load_l3p_caches(
             if not required.issubset(cache.files):
                 raise ValueError(f"incomplete L3p cache: {path}")
             source_hash = str(_scalar(cache, "trajectory_sha256"))
+            drift_cache_hash = str(_scalar(cache, "drift_cache_sha256"))
+            second_cache_hash = str(
+                _scalar(cache, "second_generator_cache_sha256")
+            )
             if source_hash in by_hash:
                 raise ValueError("duplicate microscopic L3p trajectory hash")
             targets = np.asarray(cache["target_indices"], dtype=int)
@@ -121,6 +128,8 @@ def load_l3p_caches(
                 "l3p_generator": values.copy(),
                 "target_indices": targets.copy(),
                 "trajectory_sha256": source_hash,
+                "drift_cache_sha256": drift_cache_hash,
+                "second_generator_cache_sha256": second_cache_hash,
                 "potential_protocol": protocol,
                 "path": str(path.resolve()),
                 "numerical_classifier_revision": classifier_revision,
@@ -134,13 +143,25 @@ def load_l3p_caches(
         if source_hash not in by_hash:
             raise ValueError("L3p cache is missing a matched clone")
         loaded = by_hash[source_hash]
+        try:
+            drift_path = Path(str(clone["drift_cache_path"]))
+            second_path = Path(str(clone["second_generator_cache_path"]))
+        except KeyError as error:
+            raise ValueError("matched clone lacks upstream cache provenance") from error
         if (
             not np.array_equal(loaded["target_indices"], clone["target_indices"])
             or str(loaded["potential_protocol"]) != str(clone["potential_protocol"])
             or len(np.asarray(loaded["l3p_generator"]))
             < len(np.asarray(clone["relative_position"]))
+            or not drift_path.is_file()
+            or not second_path.is_file()
+            or str(loaded["drift_cache_sha256"]) != file_sha256(drift_path)
+            or str(loaded["second_generator_cache_sha256"])
+            != file_sha256(second_path)
         ):
-            raise ValueError("L3p cache does not align with the resolved clone")
+            raise ValueError(
+                "L3p cache does not align with the resolved clone or upstream cache hash"
+            )
         matched.append(loaded)
     if len(by_hash) != len(clones):
         raise ValueError("L3p cache directory contains unmatched clones")

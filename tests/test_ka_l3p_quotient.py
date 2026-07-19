@@ -230,6 +230,7 @@ class L3pQuotientTests(unittest.TestCase):
 
     def test_analysis_cli_and_loader_require_frozen_resolved_l3p_caches(self):
         from analyze_ka_l3p_generator_quotient import load_l3p_caches
+        from cache_ka_l3p_generator import file_sha256
 
         completed = subprocess.run(
             [
@@ -257,9 +258,19 @@ class L3pQuotientTests(unittest.TestCase):
 
         clone = self.synthetic_clone(0)
         with tempfile.TemporaryDirectory() as directory:
+            drift_path = Path(directory) / "drift-source.npz"
+            second_path = Path(directory) / "second-source.npz"
+            drift_path.write_bytes(b"frozen drift cache")
+            second_path.write_bytes(b"frozen second-generator cache")
+            clone["drift_cache_path"] = str(drift_path)
+            clone["second_generator_cache_path"] = str(second_path)
             path = Path(directory) / "clone_001_l3p_generator.npz"
             payload = {
                 "trajectory_sha256": np.asarray(clone["trajectory_sha256"]),
+                "drift_cache_sha256": np.asarray(file_sha256(drift_path)),
+                "second_generator_cache_sha256": np.asarray(
+                    file_sha256(second_path)
+                ),
                 "target_indices": clone["target_indices"],
                 "potential_protocol": np.asarray("ka_lj_cut"),
                 "estimator": np.asarray("microscopic_l3p_generator_quotient"),
@@ -286,6 +297,11 @@ class L3pQuotientTests(unittest.TestCase):
                 loaded[0]["l3p_generator"],
                 clone["l3p_generator"],
             )
+
+            drift_path.write_bytes(b"mutated drift cache")
+            with self.assertRaisesRegex(ValueError, "upstream cache hash"):
+                load_l3p_caches(Path(directory), [clone])
+            drift_path.write_bytes(b"frozen drift cache")
 
             payload["l3p_numerical_gate_pass"] = 0.0
             payload["numerical_state"] = np.asarray(
