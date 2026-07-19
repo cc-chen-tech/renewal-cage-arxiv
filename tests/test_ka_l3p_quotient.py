@@ -28,6 +28,36 @@ class L3pQuotientTests(unittest.TestCase):
             "thermodynamic_claim_allowed": 0.0,
         }
 
+    @staticmethod
+    def predictive_generator_clone(seed):
+        rng = np.random.default_rng(seed)
+        times, targets = 320, 8
+        shape = (times, targets, 3)
+
+        def ar_path(coefficient):
+            values = np.zeros(shape)
+            noise = rng.normal(size=shape)
+            for time in range(1, times):
+                values[time] = coefficient * values[time - 1] + noise[time]
+            return values
+
+        l3p = rng.normal(size=shape)
+        l2p = np.zeros(shape)
+        noise = 0.20 * rng.normal(size=shape)
+        for time in range(times - 1):
+            l2p[time + 1] = 0.20 * l2p[time] + 1.50 * l3p[time] + noise[time + 1]
+        return {
+            "relative_position": ar_path(0.75),
+            "relative_velocity": ar_path(0.55),
+            "relative_drift": ar_path(0.35),
+            "second_relative_generator": l2p,
+            "l3p_generator": l3p,
+            "target_indices": np.arange(targets, dtype=int),
+            "trajectory_sha256": f"predictive-{seed}",
+            "potential_protocol": "ka_lj_cut",
+            "thermodynamic_claim_allowed": 0.0,
+        }
+
     def test_fifth_coordinate_models_are_causal_and_target_paired(self):
         from ka_l3p_quotient import quotient_fifth_coordinate
 
@@ -264,6 +294,41 @@ class L3pQuotientTests(unittest.TestCase):
             np.savez_compressed(path, **payload)
             with self.assertRaisesRegex(ValueError, "numerical gate"):
                 load_l3p_caches(Path(directory), [clone])
+
+    def test_real_generator_coordinate_beats_time_and_history_nulls_end_to_end(self):
+        from ka_l3p_quotient import (
+            L3P_QUOTIENT_MODELS,
+            augment_l3p_quotient_clone,
+            extract_l3p_quotient_fold,
+        )
+
+        clones = [self.predictive_generator_clone(seed) for seed in range(4)]
+        held_variance = {}
+        for model in L3P_QUOTIENT_MODELS:
+            augmented = [
+                augment_l3p_quotient_clone(
+                    clone,
+                    model=model,
+                    frame_time=0.01,
+                    permutation_seed=20260802 + index,
+                )
+                for index, clone in enumerate(clones)
+            ]
+            fold = extract_l3p_quotient_fold(
+                augmented[:3],
+                augmented[3],
+                memory_order=1,
+                bath_order=1,
+                ridge_regularization=1e-8,
+                var_ridge_regularization=1e-6,
+            )
+            residual = np.asarray(fold["held_l2p_vector_innovation"])
+            held_variance[model] = float(np.mean(residual**2))
+
+        real = held_variance["l3p_generator"]
+        self.assertLess(real, 0.25 * held_variance["l2p_exact_q_baseline"])
+        self.assertLess(real, 0.25 * held_variance["l3p_time_permuted"])
+        self.assertLess(real, 0.25 * held_variance["l2p_backward_difference"])
 
 
 if __name__ == "__main__":
