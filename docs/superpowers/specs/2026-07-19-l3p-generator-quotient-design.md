@@ -273,6 +273,67 @@ microscopic coordinate carries omitted single-particle information. It does
 not prove a finite generator hierarchy, an autonomous environment variable,
 Kramers escape, event-clock closure, spatial facilitation, or thermodynamics.
 
+## Completion audit for a projected single-particle Langevin equation
+
+The exact generator ladder makes the remaining requirements explicit. Define
+
+```text
+g0 = u,
+g1 = Lu   = p,
+g2 = L2u  = Lp,
+g3 = L3u  = L2p,
+g4 = L4u  = L3p.
+```
+
+Ito's formula gives the exact but generally non-autonomous projected system
+
+```text
+dg_r = g_(r+1) dt + sqrt(2 gamma T) A_r(X) dW,
+A_r(X) = D_V g_r(X).
+```
+
+For the first resolved levels,
+
+```text
+A_0 = 0,
+A_1 = J,
+A_2 = 2 D_R J[V] - gamma J,
+A_3 = D_V(L2p) = A_c.
+```
+
+Because every level is driven by the same many-particle thermostat, the full
+conditional diffusion is a correlated block matrix, not independent noise on
+each coordinate:
+
+```text
+Q_rs(X) = 2 gamma T A_r(X) A_s(X)^T
+        = Gamma(g_r,g_s)(X).
+```
+
+The current gate uses the `Q_33=Q_c` block to score the `L2p` innovation. It
+does not yet derive all `Q_rs` cross blocks or `Q_44=Q_d`. Therefore even a
+successful `L3p` quotient is not a complete single-particle Langevin model.
+
+Completion would require separate held evidence for all of the following:
+
+1. **Drift closure:** the last retained generator drift is a function of the
+   retained state, without hidden dependence on the full configuration.
+2. **Block-diffusion closure:** every measured `Q_rs(X)` is reproducible from
+   the retained state, including cross-coordinate noise orientation.
+3. **Martingale closure:** tensor-whitened residuals satisfy the fixed linear,
+   squared-memory, covariance, kurtosis, and Gaussian-shape gates.
+4. **Finite hierarchy:** the next exact generator coordinate does not add
+   held predictive information beyond the retained state.
+5. **First-passage bridge:** cage escape, persistence/exchange, and any delayed
+   hazard follow from first passage of the continuous projected process rather
+   than being inserted as event rules.
+6. **Spatial and thermodynamic boundaries:** single-particle closure does not
+   by itself establish facilitation fields, configurational entropy, heat
+   capacity anomalies, or a Kauzmann transition.
+
+These conditions define the requested endpoint. They are not outcome fields
+of the present `L3p` experiment and do not alter its frozen decisions.
+
 ## Execution and provenance
 
 - All production canaries and four-clone calculations run sequentially on the
