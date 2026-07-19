@@ -20,7 +20,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from nonlinear_bath_gle import (  # noqa: E402
     NonlinearBathControls,
     nonlinear_bath_step,
-    periodic_potential,
 )
 
 
@@ -182,18 +181,14 @@ def _sample_equilibrium_positions(
     count: int,
     controls: NonlinearBathControls,
 ) -> np.ndarray:
-    grid = np.linspace(-0.5 * controls.period, 0.5 * controls.period, 65537)
-    weight = np.exp(
-        -periodic_potential(
-            grid,
-            barrier=controls.barrier,
-            period=controls.period,
-        )
-        / controls.temperature
+    if controls.temperature <= 0.0:
+        raise ValueError("equilibrium initialization requires positive temperature")
+    angle = rng.vonmises(
+        0.0,
+        controls.barrier / controls.temperature,
+        size=count,
     )
-    cdf = np.cumsum(weight)
-    cdf /= cdf[-1]
-    return np.interp(rng.random(count), cdf, grid)
+    return controls.period * np.asarray(angle, dtype=float) / (2.0 * np.pi)
 
 
 def _atomic_savez(path: Path, **arrays: object) -> None:

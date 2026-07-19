@@ -196,6 +196,12 @@ from the known Gibbs density so the primary/half-step discretization comparison
 does not depend on a two-tau burn-in. Production and null runs retain the
 frozen `100 tau` burn-in.
 
+For `W=V_0[1-cos(2 pi u/ell)]`, the exact quotient-space position law is von
+Mises with angle `theta=2 pi u/ell` and concentration `kappa=V_0/T=3`. Initial
+positions are sampled directly from this law; no discretized CDF or duplicated
+periodic endpoint is used. Momentum and auxiliary coordinates are sampled from
+their exact independent centered Gaussians of variance `T`.
+
 ## Numerical and physical gates
 
 ### 1. Algebraic reconstruction

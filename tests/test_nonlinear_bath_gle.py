@@ -266,6 +266,24 @@ class NonlinearBathGleTests(unittest.TestCase):
             np.zeros(2),
         )
 
+    def test_equilibrium_position_initializer_uses_exact_von_mises_law(self):
+        from simulate_nonlinear_bath_elimination import (
+            _sample_equilibrium_positions,
+        )
+
+        class RecordingRng:
+            def __init__(self):
+                self.call = None
+
+            def vonmises(self, mu, kappa, size):
+                self.call = (mu, kappa, size)
+                return np.array([-np.pi, 0.0, 0.5 * np.pi])
+
+        rng = RecordingRng()
+        positions = _sample_equilibrium_positions(rng, 3, self.controls())
+        self.assertEqual(rng.call, (0.0, 3.0, 3))
+        np.testing.assert_allclose(positions, np.array([-0.5, 0.0, 0.25]))
+
     def test_checkpoint_metadata_rejects_any_provenance_change(self):
         from simulate_nonlinear_bath_elimination import (
             checkpoint_metadata,
