@@ -1018,6 +1018,99 @@ class KAReplicatePreparationTests(unittest.TestCase):
         self.assertAlmostEqual(rows[3]["conditional_msd"], 1.0)
         self.assertAlmostEqual(rows[2]["conditional_characteristic_k1"], 1.0)
 
+    def test_interval_conditioned_event_statistics_preserve_lag_and_count_context(self):
+        estimate = getattr(
+            ka_replicates,
+            "interval_conditioned_event_statistics",
+            None,
+        )
+        self.assertIsNotNone(estimate)
+        events = {
+            "particle": np.array([0, 0]),
+            "time": np.array([1, 3]),
+            "jump_vector": np.array([[1.0, 0.0], [-1.0, 0.0]]),
+        }
+
+        statistics = estimate(
+            events,
+            frame_count=5,
+            particle_count=2,
+            lags=(2, 4),
+            wave_numbers=np.array([1.0]),
+            origin_stride=1,
+        )
+
+        short = statistics[2]
+        self.assertEqual(short["sample_count"].tolist(), [3.0, 3.0])
+        np.testing.assert_allclose(short["count_pmf"], [0.5, 0.5])
+        np.testing.assert_allclose(short["conditional_msd"], [0.0, 1.0])
+        np.testing.assert_allclose(short["conditional_fourth_moment"], [0.0, 1.0])
+        self.assertAlmostEqual(
+            short["conditional_characteristic_k1"][1],
+            0.5 * (1.0 + math.cos(1.0)),
+        )
+
+        long = statistics[4]
+        self.assertEqual(long["sample_count"].tolist(), [1.0, 0.0, 1.0])
+        self.assertAlmostEqual(long["conditional_msd"][2], 0.0)
+        self.assertAlmostEqual(long["conditional_characteristic_k1"][2], 1.0)
+
+    def test_interval_count_kernel_mixture_reports_uncovered_probability(self):
+        mix = getattr(ka_replicates, "mix_interval_count_and_path_kernel", None)
+        self.assertIsNotNone(mix)
+        marginal = {
+            "count_pmf": np.array([0.25, 0.75]),
+        }
+        kernel = {
+            "sample_count": np.array([5.0, 7.0]),
+            "conditional_msd": np.array([0.0, 2.0]),
+            "conditional_fourth_moment": np.array([0.0, 4.0]),
+            "conditional_characteristic_k1": np.array([1.0, 0.5]),
+        }
+
+        result = mix(marginal, kernel, wave_numbers=np.array([1.0]), dimension=3)
+
+        self.assertAlmostEqual(result["omitted_count_probability"], 0.0)
+        self.assertAlmostEqual(result["event_msd"], 1.5)
+        self.assertAlmostEqual(result["event_fourth_moment"], 3.0)
+        self.assertAlmostEqual(result["event_ngp"], -0.2)
+        self.assertAlmostEqual(result["event_characteristic_k1"], 0.625)
+
+        truncated = dict(marginal)
+        truncated["count_pmf"] = np.array([0.2, 0.6, 0.2])
+        result = mix(truncated, kernel, wave_numbers=np.array([1.0]), dimension=3)
+        self.assertAlmostEqual(result["omitted_count_probability"], 0.2)
+        self.assertAlmostEqual(result["event_msd"], 1.5)
+
+    def test_pool_interval_path_kernels_uses_sample_weighted_conditionals(self):
+        pool = getattr(ka_replicates, "pool_interval_path_kernels", None)
+        self.assertIsNotNone(pool)
+        statistics = {
+            2: {
+                "sample_count": np.array([8.0, 2.0]),
+                "conditional_msd": np.array([0.0, 2.0]),
+                "conditional_fourth_moment": np.array([0.0, 4.0]),
+                "conditional_characteristic_k1": np.array([1.0, 0.5]),
+            },
+            4: {
+                "sample_count": np.array([3.0, 6.0, 1.0]),
+                "conditional_msd": np.array([0.0, 5.0, 8.0]),
+                "conditional_fourth_moment": np.array([0.0, 25.0, 64.0]),
+                "conditional_characteristic_k1": np.array([1.0, -0.5, 0.25]),
+            },
+        }
+
+        pooled = pool(statistics, wave_numbers=np.array([1.0]))
+
+        np.testing.assert_array_equal(pooled["sample_count"], [11.0, 8.0, 1.0])
+        np.testing.assert_allclose(pooled["conditional_msd"], [0.0, 4.25, 8.0])
+        np.testing.assert_allclose(
+            pooled["conditional_fourth_moment"], [0.0, 19.75, 64.0]
+        )
+        np.testing.assert_allclose(
+            pooled["conditional_characteristic_k1"], [1.0, -0.25, 0.25]
+        )
+
     def test_posterior_weighted_displacement_kernel_links_fast_counts_to_large_motion(self):
         estimate = getattr(
             ka_replicates,
