@@ -820,8 +820,17 @@ def _prepare_linear_memory_statistics(
     if np.any(column_scale <= 0.0) or np.any(~np.isfinite(column_scale)):
         raise ValueError("linear memory feature design has unresolved columns")
     normalized = design / column_scale
-    gram = np.einsum("ni,nj->ij", normalized, normalized, optimize=False)
-    target_projection = np.einsum("ni,n->i", normalized, target, optimize=False)
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        gram = normalized.T @ normalized
+        target_projection = normalized.T @ target
+    if np.any(~np.isfinite(gram)) or np.any(~np.isfinite(target_projection)):
+        gram = np.einsum("ni,nj->ij", normalized, normalized, optimize=False)
+        target_projection = np.einsum(
+            "ni,n->i",
+            normalized,
+            target,
+            optimize=False,
+        )
     eigenvalues = np.linalg.eigvalsh(gram)
     eigenvalues = np.maximum(eigenvalues, 0.0)
     singular_values = np.sqrt(eigenvalues[::-1])
