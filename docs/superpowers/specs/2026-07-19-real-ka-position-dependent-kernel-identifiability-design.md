@@ -132,9 +132,12 @@ For each outer held clone:
    regularization parameter on the other three clones.
 2. Select memory support from `[4, 16, 40, 100]` frames by inner whole-clone
    validation among those three training clones.
-3. Select auxiliary rank from `[1, 2, 4, 8]` and positive decay rates from the
+3. Select ridge from `[0, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2]` after column
+   normalization of the training design. Zero ridge is admissible only for a
+   full-column-rank design with finite condition number.
+4. Select auxiliary rank from `[1, 2, 4, 8]` and positive decay rates from the
    fixed grid `logspace(log10(0.05), log10(50), 32)` by the same inner folds.
-4. Refit the selected model on all three training clones and score the held
+5. Refit the selected model on all three training clones and score the held
    clone once.
 
 Time rows from one clone may never be split across training and validation.
