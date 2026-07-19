@@ -105,3 +105,92 @@ def generator_ladder_conditional_diffusion(
         "estimator": "exact_generator_ladder_carre_du_champ",
         **_CLOSED_CLAIMS,
     }
+
+
+def generator_ladder_local_characteristics(
+    coordinates: np.ndarray,
+    *,
+    terminal_generator: np.ndarray,
+    velocity_jacobians: np.ndarray,
+    friction: float,
+    temperature: float,
+) -> dict[str, np.ndarray | float | str]:
+    """Return the exact microscopic-frame drift and diffusion of a ladder.
+
+    For ``Y=(g_0,...,g_{m-1})`` with ``g_{r+1}=L g_r``, the drift is
+    ``(g_1,...,g_m)``.  This identity is conditioned on the full microscopic
+    phase-space frame and therefore does not assert that ``Y`` is autonomous.
+    """
+
+    state = np.asarray(coordinates, dtype=float)
+    terminal = np.asarray(terminal_generator, dtype=float)
+    jacobians = np.asarray(velocity_jacobians, dtype=float)
+    if (
+        state.ndim != 3
+        or state.shape[2] != 3
+        or state.shape[0] < 1
+        or state.shape[1] < 1
+        or terminal.shape != state.shape[1:]
+        or jacobians.ndim != 5
+        or jacobians.shape[:3] != state.shape
+        or jacobians.shape[4] != 3
+        or jacobians.shape[3] < 1
+        or np.any(~np.isfinite(state))
+        or np.any(~np.isfinite(terminal))
+        or np.any(~np.isfinite(jacobians))
+    ):
+        raise ValueError(
+            "generator coordinates, terminal drift, and velocity Jacobians "
+            "must be finite aligned microscopic-frame arrays"
+        )
+    diffusion = generator_ladder_conditional_diffusion(
+        jacobians,
+        friction=friction,
+        temperature=temperature,
+    )
+    drift = np.concatenate((state[1:], terminal[None]), axis=0)
+    return {
+        "coordinates": state,
+        "drift": drift,
+        **diffusion,
+        "microscopic_state_conditioned": 1.0,
+        "projected_state_autonomous": 0.0,
+        **_CLOSED_CLAIMS,
+    }
+
+
+def quadratic_test_generator(
+    state: np.ndarray,
+    *,
+    drift: np.ndarray,
+    diffusion: np.ndarray,
+    linear: np.ndarray,
+    hessian: np.ndarray,
+) -> float:
+    """Evaluate ``L f`` for ``f(y)=a.y + y.H.y/2`` from local characteristics."""
+
+    value = np.asarray(state, dtype=float)
+    local_drift = np.asarray(drift, dtype=float)
+    local_diffusion = np.asarray(diffusion, dtype=float)
+    linear_term = np.asarray(linear, dtype=float)
+    curvature = np.asarray(hessian, dtype=float)
+    dimension = value.size
+    if (
+        value.ndim != 1
+        or local_drift.shape != value.shape
+        or linear_term.shape != value.shape
+        or local_diffusion.shape != (dimension, dimension)
+        or curvature.shape != (dimension, dimension)
+        or np.any(~np.isfinite(value))
+        or np.any(~np.isfinite(local_drift))
+        or np.any(~np.isfinite(local_diffusion))
+        or np.any(~np.isfinite(linear_term))
+        or np.any(~np.isfinite(curvature))
+        or not np.allclose(curvature, curvature.T, rtol=1e-12, atol=1e-12)
+    ):
+        raise ValueError("quadratic generator inputs must be finite and aligned")
+    gradient = linear_term + curvature @ value
+    return float(
+        gradient @ local_drift
+        + 0.5 * np.einsum("ij,ij->", curvature, local_diffusion)
+    )

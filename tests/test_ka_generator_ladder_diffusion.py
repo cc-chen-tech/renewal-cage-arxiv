@@ -9,6 +9,53 @@ sys.path.insert(0, str(ROOT / "src"))
 
 
 class GeneratorLadderDiffusionTests(unittest.TestCase):
+    def test_local_characteristics_shift_generator_chain_and_match_ito_formula(self):
+        from ka_generator_ladder_diffusion import (
+            generator_ladder_local_characteristics,
+            quadratic_test_generator,
+        )
+
+        rng = np.random.default_rng(40)
+        coordinates = rng.normal(size=(4, 2, 3))
+        terminal = rng.normal(size=(2, 3))
+        jacobians = rng.normal(size=(4, 2, 3, 5, 3))
+        result = generator_ladder_local_characteristics(
+            coordinates,
+            terminal_generator=terminal,
+            velocity_jacobians=jacobians,
+            friction=1.1,
+            temperature=0.45,
+        )
+        expected_drift = np.concatenate((coordinates[1:], terminal[None]), axis=0)
+        np.testing.assert_allclose(result["drift"], expected_drift)
+
+        target = 1
+        state_dimension = 12
+        linear = rng.normal(size=state_dimension)
+        raw = rng.normal(size=(state_dimension, state_dimension))
+        hessian = 0.5 * (raw + raw.T)
+        state = np.transpose(coordinates[:, target], (0, 1)).reshape(-1)
+        drift = np.asarray(result["drift"])[:, target].reshape(-1)
+        diffusion = np.asarray(result["joint_diffusion"])[target]
+        expected_generator = (
+            (linear + hessian @ state) @ drift
+            + 0.5 * np.einsum("ij,ij->", hessian, diffusion)
+        )
+        self.assertAlmostEqual(
+            quadratic_test_generator(
+                state,
+                drift=drift,
+                diffusion=diffusion,
+                linear=linear,
+                hessian=hessian,
+            ),
+            expected_generator,
+            places=12,
+        )
+        self.assertEqual(result["microscopic_state_conditioned"], 1.0)
+        self.assertEqual(result["projected_state_autonomous"], 0.0)
+        self.assertEqual(result["finite_generator_ladder_closure_supported"], 0.0)
+
     def test_lp_velocity_jacobian_matches_quadratic_coordinate_difference(self):
         from ka_generator_ladder_diffusion import lp_velocity_jacobian
 
