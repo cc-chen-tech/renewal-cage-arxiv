@@ -290,3 +290,180 @@ def predict_mz_drift(
             jacobian_velocity[:, first - lag : stop],
         )
     return prediction
+
+
+def _validated_decay(
+    decay_rates: np.ndarray,
+    frame_time: float,
+) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
+    rates = np.asarray(decay_rates, dtype=float)
+    dt = float(frame_time)
+    if (
+        rates.ndim != 1
+        or len(rates) < 1
+        or np.any(~np.isfinite(rates))
+        or np.any(rates <= 0.0)
+        or not math.isfinite(dt)
+        or dt <= 0.0
+    ):
+        raise ValueError("decay rates and frame time must be finite and positive")
+    rho = np.exp(-rates * dt)
+    integrated_forcing = -np.expm1(-rates * dt) / rates
+    return rates, dt, rho, integrated_forcing
+
+
+def _isotropic_radial_coupling(
+    position: np.ndarray,
+    *,
+    scale: dict[str, float],
+    coupling_coefficients: np.ndarray,
+) -> np.ndarray:
+    vectors = _finite_vectors(position)
+    mu, sigma, epsilon = _validated_scale(scale)
+    coefficients = np.asarray(coupling_coefficients, dtype=float)
+    if (
+        coefficients.ndim != 2
+        or coefficients.shape[1] != 3
+        or coefficients.shape[0] < 1
+        or np.any(~np.isfinite(coefficients))
+    ):
+        raise ValueError("coupling coefficients must be finite rank-by-three values")
+    radial_square = np.sum(vectors**2, axis=-1)
+    normalized = (radial_square - mu) / sigma
+    identity = np.broadcast_to(np.eye(3), (*vectors.shape[:-1], 3, 3))
+    outer = vectors[..., :, None] * vectors[..., None, :]
+    radial_projector = outer / np.maximum(radial_square, epsilon)[..., None, None]
+    return (
+        identity[..., None, :, :] * coefficients[:, 0, None, None]
+        + normalized[..., None, None, None]
+        * identity[..., None, :, :]
+        * coefficients[:, 1, None, None]
+        + radial_projector[..., None, :, :] * coefficients[:, 2, None, None]
+    )
+
+
+def real_pole_history_features(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    frame_time: float,
+) -> dict[str, object]:
+    """Build historical MZ features with positive real temporal poles."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    rates, _, rho, forcing = _validated_decay(decay_rates, frame_time)
+    jacobian = radial_vector_basis_jacobian(positions, scale)
+    jacobian_velocity = np.einsum(
+        "ctpbik,ctpk->ctpbi",
+        jacobian,
+        velocities,
+    )
+    history = np.zeros(
+        (*positions.shape[:-1], len(rates), 3, 3),
+        dtype=float,
+    )
+    for time_index in range(positions.shape[1] - 1):
+        history[:, time_index + 1] = (
+            rho[None, None, :, None, None] * history[:, time_index]
+            + forcing[None, None, :, None, None]
+            * jacobian_velocity[:, time_index, :, None, :, :]
+        )
+    return {
+        "history_features": history,
+        "decay_rates": rates.copy(),
+        "positive_real_poles": 1.0,
+        "positive_prony_factorization": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def two_position_auxiliary_features(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    coupling_coefficients: np.ndarray,
+    frame_time: float,
+) -> dict[str, object]:
+    """Propagate a positive two-position auxiliary-bath kernel realization."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    rates, _, rho, forcing = _validated_decay(decay_rates, frame_time)
+    coefficients = np.asarray(coupling_coefficients, dtype=float)
+    if coefficients.shape != (len(rates), 3):
+        raise ValueError("one radial coupling row is required per decay rate")
+    coupling = _isotropic_radial_coupling(
+        positions,
+        scale=scale,
+        coupling_coefficients=coefficients,
+    )
+    auxiliary = np.zeros(
+        (*positions.shape[:-1], len(rates), 3),
+        dtype=float,
+    )
+    force = np.zeros_like(positions)
+    for time_index in range(positions.shape[1]):
+        force[:, time_index] = np.einsum(
+            "cpaij,cpaj->cpi",
+            coupling[:, time_index],
+            auxiliary[:, time_index],
+        )
+        if time_index + 1 < positions.shape[1]:
+            projected_velocity = np.einsum(
+                "cpaij,cpj->cpai",
+                np.swapaxes(coupling[:, time_index], -1, -2),
+                velocities[:, time_index],
+            )
+            auxiliary[:, time_index + 1] = (
+                rho[None, None, :, None] * auxiliary[:, time_index]
+                - forcing[None, None, :, None] * projected_velocity
+            )
+    return {
+        "force": force,
+        "auxiliary": auxiliary,
+        "coupling": coupling,
+        "decay_rates": rates.copy(),
+        "positive_real_poles": 1.0,
+        "positive_prony_factorization": 1.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def reconstruct_auxiliary_innovations(
+    auxiliary: np.ndarray,
+    position: np.ndarray,
+    velocity: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    coupling_coefficients: np.ndarray,
+    frame_time: float,
+) -> np.ndarray:
+    """Reconstruct discrete innovations after removing exact auxiliary drift."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    rates, _, rho, forcing = _validated_decay(decay_rates, frame_time)
+    states = np.asarray(auxiliary, dtype=float)
+    if (
+        states.shape != (*positions.shape[:-1], len(rates), 3)
+        or np.any(~np.isfinite(states))
+    ):
+        raise ValueError("auxiliary states must be finite and path aligned")
+    coupling = _isotropic_radial_coupling(
+        positions,
+        scale=scale,
+        coupling_coefficients=coupling_coefficients,
+    )
+    projected_velocity = np.einsum(
+        "ctpaij,ctpj->ctpai",
+        np.swapaxes(coupling[:, :-1], -1, -2),
+        velocities[:, :-1],
+    )
+    return (
+        states[:, 1:]
+        - rho[None, None, None, :, None] * states[:, :-1]
+        + forcing[None, None, None, :, None] * projected_velocity
+    )

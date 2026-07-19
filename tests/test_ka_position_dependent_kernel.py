@@ -198,6 +198,75 @@ class PositionDependentKernelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unresolved columns"):
             solve_regularized_mz_kernel(unresolved, ridge=1e-4)
 
+    def test_two_position_auxiliary_recursion_matches_direct_convolution(self):
+        from ka_position_dependent_kernel import (
+            fit_radial_basis_scale,
+            real_pole_history_features,
+            reconstruct_auxiliary_innovations,
+            two_position_auxiliary_features,
+        )
+
+        rng = np.random.default_rng(73)
+        position = rng.normal(size=(2, 9, 4, 3))
+        velocity = rng.normal(size=position.shape)
+        scale = fit_radial_basis_scale(position)
+        rates = np.array([0.3, 1.2])
+        coefficients = np.array([[1.0, 0.2, 0.1], [0.5, -0.1, 0.2]])
+        frame_time = 0.01
+        result = two_position_auxiliary_features(
+            position,
+            velocity,
+            scale=scale,
+            decay_rates=rates,
+            coupling_coefficients=coefficients,
+            frame_time=frame_time,
+        )
+        coupling = result["coupling"]
+        rho = np.exp(-rates * frame_time)
+        forcing = -np.expm1(-rates * frame_time) / rates
+        direct = np.zeros_like(position)
+        for time_index in range(1, position.shape[1]):
+            for history_index in range(time_index):
+                weight = forcing * rho ** (time_index - 1 - history_index)
+                historical_projection = np.einsum(
+                    "cpaij,cpj->cpai",
+                    np.swapaxes(coupling[:, history_index], -1, -2),
+                    velocity[:, history_index],
+                )
+                direct[:, time_index] -= np.einsum(
+                    "a,cpaij,cpaj->cpi",
+                    weight,
+                    coupling[:, time_index],
+                    historical_projection,
+                )
+        np.testing.assert_allclose(
+            result["force"],
+            direct,
+            rtol=3e-14,
+            atol=3e-14,
+        )
+        innovation = reconstruct_auxiliary_innovations(
+            result["auxiliary"],
+            position,
+            velocity,
+            scale=scale,
+            decay_rates=rates,
+            coupling_coefficients=coefficients,
+            frame_time=frame_time,
+        )
+        np.testing.assert_allclose(innovation, 0.0, rtol=0.0, atol=3e-16)
+        self.assertEqual(result["positive_prony_factorization"], 1.0)
+
+        real_pole = real_pole_history_features(
+            position,
+            velocity,
+            scale=scale,
+            decay_rates=rates,
+            frame_time=frame_time,
+        )
+        self.assertEqual(real_pole["positive_prony_factorization"], 0.0)
+        self.assertEqual(real_pole["history_features"].shape, (2, 9, 4, 2, 3, 3))
+
 
 if __name__ == "__main__":
     unittest.main()
