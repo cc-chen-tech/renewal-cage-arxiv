@@ -202,6 +202,26 @@ positions are sampled directly from this law; no discretized CDF or duplicated
 periodic endpoint is used. Momentum and auxiliary coordinates are sampled from
 their exact independent centered Gaussians of variance `T`.
 
+The continuous SDE preserves the quotient-space Gibbs law exactly, but the
+frozen explicit/exact-OU discretization does not. Starting from exact Gibbs,
+its one-step moment defects are available analytically:
+
+```text
+E[p_(n+1)^2]-T = dt^2 {
+  E[W'(u)^2] + gamma_0^2 T + T E[sum_a C_a(u)^2]
+},
+
+E[z_(a,n+1)^2]-T = T phi_a^2 E[C_a(u)^2],
+
+E[p_(n+1) z_(a,n+1)] = T E[C_a(u)]
+  [-phi_a + dt rho_a + gamma_0 dt phi_a].
+```
+
+These are `O(dt^2)` local defects. Halving `dt` should reduce them by about a
+factor of four; it does not make the discrete scheme exactly Gibbs preserving.
+The canary half-step gate therefore tests numerical convergence of the chosen
+integrator, not validity of the continuous invariant-measure proof.
+
 ## Numerical and physical gates
 
 ### 1. Algebraic reconstruction

@@ -25,6 +25,7 @@ from nonlinear_bath_diagnostics import (  # noqa: E402
 )
 from nonlinear_bath_gle import (  # noqa: E402
     NonlinearBathControls,
+    gibbs_one_step_moment_bias,
     gibbs_stationarity_audit,
     periodic_coupling,
     reconstruct_auxiliary_path,
@@ -813,6 +814,28 @@ def canary_preflight(
         == 1.0
         for result in stationarity_results
     )
+    full_bias = gibbs_one_step_moment_bias(controls=canary["controls"])
+    half_bias = gibbs_one_step_moment_bias(controls=half_step["controls"])
+
+    def contraction_ratio(half_value: float, full_value: float) -> float:
+        if full_value == 0.0:
+            return 0.0 if half_value == 0.0 else float("inf")
+        return abs(half_value / full_value)
+
+    momentum_bias_ratio = contraction_ratio(
+        float(half_bias["momentum_variance_bias"]),
+        float(full_bias["momentum_variance_bias"]),
+    )
+    auxiliary_bias_ratio = float(
+        np.max(
+            np.divide(
+                np.abs(half_bias["auxiliary_variance_bias"]),
+                np.abs(full_bias["auxiliary_variance_bias"]),
+                out=np.zeros_like(half_bias["auxiliary_variance_bias"]),
+                where=np.abs(full_bias["auxiliary_variance_bias"]) > 0.0,
+            )
+        )
+    )
     passed = maximum_error <= 5e-11 and gibbs_derived
     return {
         "record": "canary_preflight",
@@ -827,6 +850,26 @@ def canary_preflight(
             gibbs_derived
         ),
         "unwrapped_position_gibbs_probability_allowed": 0.0,
+        "discrete_scheme_exact_gibbs_preserving": float(
+            full_bias["discrete_scheme_exact_gibbs_preserving"]
+        ),
+        "full_step_momentum_variance_bias": float(
+            full_bias["momentum_variance_bias"]
+        ),
+        "half_step_momentum_variance_bias": float(
+            half_bias["momentum_variance_bias"]
+        ),
+        "half_step_momentum_bias_ratio": momentum_bias_ratio,
+        "full_step_maximum_auxiliary_variance_bias": float(
+            np.max(np.abs(full_bias["auxiliary_variance_bias"]))
+        ),
+        "half_step_maximum_auxiliary_variance_bias": float(
+            np.max(np.abs(half_bias["auxiliary_variance_bias"]))
+        ),
+        "half_step_auxiliary_bias_maximum_ratio": auxiliary_bias_ratio,
+        "analytic_half_step_local_bias_contraction_pass": float(
+            momentum_bias_ratio <= 0.251 and auxiliary_bias_ratio <= 0.251
+        ),
         "finite_state_and_provenance_validated": 1.0,
         "canary_preflight_pass": float(passed),
         "exact_nonlinear_bath_elimination_supported": 0.0,
@@ -1058,6 +1101,30 @@ def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict
             "periodic_quotient_gibbs_invariant_density_derived"
         ],
         "unwrapped_position_gibbs_probability_allowed": 0.0,
+        "discrete_scheme_exact_gibbs_preserving": preflight[
+            "discrete_scheme_exact_gibbs_preserving"
+        ],
+        "full_step_momentum_variance_bias": preflight[
+            "full_step_momentum_variance_bias"
+        ],
+        "half_step_momentum_variance_bias": preflight[
+            "half_step_momentum_variance_bias"
+        ],
+        "half_step_momentum_bias_ratio": preflight[
+            "half_step_momentum_bias_ratio"
+        ],
+        "full_step_maximum_auxiliary_variance_bias": preflight[
+            "full_step_maximum_auxiliary_variance_bias"
+        ],
+        "half_step_maximum_auxiliary_variance_bias": preflight[
+            "half_step_maximum_auxiliary_variance_bias"
+        ],
+        "half_step_auxiliary_bias_maximum_ratio": preflight[
+            "half_step_auxiliary_bias_maximum_ratio"
+        ],
+        "analytic_half_step_local_bias_contraction_pass": preflight[
+            "analytic_half_step_local_bias_contraction_pass"
+        ],
         "half_step_equilibrium_not_worse": float(half_step_not_worse),
         "bath_replay_pooled_normalized_rmse": replay[
             "pooled_normalized_rmse"

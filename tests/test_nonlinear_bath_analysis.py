@@ -203,7 +203,19 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
             "equilibrium_auxiliary": np.zeros((3, 2, 2)),
             "canary_normal_z": np.zeros((2, 2, 2)),
         }
-        passed = canary_preflight(cache, dict(cache))
+        half_cache = dict(cache)
+        half_cache["controls"] = NonlinearBathControls(
+            temperature=controls.temperature,
+            friction=controls.friction,
+            period=controls.period,
+            barrier=controls.barrier,
+            rates=controls.rates,
+            amplitudes=controls.amplitudes,
+            modulation=controls.modulation,
+            phases=controls.phases,
+            time_step=0.5 * controls.time_step,
+        )
+        passed = canary_preflight(cache, half_cache)
         self.assertEqual(passed["canary_preflight_pass"], 1.0)
         self.assertEqual(passed["maximum_reconstruction_relative_error"], 0.0)
         self.assertEqual(
@@ -216,6 +228,9 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
             passed["maximum_normalized_stationarity_residual"],
             2e-14,
         )
+        self.assertEqual(passed["discrete_scheme_exact_gibbs_preserving"], 0.0)
+        self.assertLess(passed["half_step_momentum_bias_ratio"], 0.251)
+        self.assertLess(passed["half_step_auxiliary_bias_maximum_ratio"], 0.251)
         for claim in (
             "autonomous_single_particle_gle_allowed",
             "complete_event_clock_closure_allowed",

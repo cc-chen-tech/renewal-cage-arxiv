@@ -226,6 +226,84 @@ def _ou_coefficients(controls: NonlinearBathControls) -> tuple[np.ndarray, np.nd
     return decay, integral
 
 
+def gibbs_one_step_moment_bias(
+    *,
+    controls: NonlinearBathControls,
+    position_quadrature_count: int = 65536,
+) -> dict[str, np.ndarray | float]:
+    """Predict the explicit scheme's exact one-step Gibbs moment defects."""
+
+    if (
+        controls.temperature <= 0.0
+        or isinstance(position_quadrature_count, bool)
+        or not isinstance(position_quadrature_count, (int, np.integer))
+        or position_quadrature_count < 64
+    ):
+        raise ValueError("one-step Gibbs audit needs positive T and quadrature")
+    position = controls.period * (
+        (np.arange(position_quadrature_count) + 0.5)
+        / position_quadrature_count
+        - 0.5
+    )
+    log_weight = -periodic_potential(
+        position,
+        barrier=controls.barrier,
+        period=controls.period,
+    ) / controls.temperature
+    weight = np.exp(log_weight - float(np.max(log_weight)))
+    weight /= np.sum(weight)
+    gradient = periodic_potential_gradient(
+        position,
+        barrier=controls.barrier,
+        period=controls.period,
+    )
+    coupling = periodic_coupling(position, controls=controls)
+    mean_gradient_squared = float(np.sum(weight * gradient**2))
+    mean_coupling = np.sum(weight[:, None] * coupling, axis=0)
+    mean_coupling_squared = np.sum(weight[:, None] * coupling**2, axis=0)
+    temperature = controls.temperature
+    time_step = controls.time_step
+    momentum_variance_bias = time_step**2 * (
+        mean_gradient_squared
+        + controls.friction**2 * temperature
+        + temperature * float(np.sum(mean_coupling_squared))
+    )
+    decay, integral = _ou_coefficients(controls)
+    auxiliary_variance_bias = (
+        temperature * integral**2 * mean_coupling_squared
+    )
+    momentum_auxiliary_covariance = temperature * mean_coupling * (
+        -integral
+        + time_step * decay
+        + time_step * controls.friction * integral
+    )
+    maximum_defect = float(
+        max(
+            abs(momentum_variance_bias),
+            np.max(np.abs(auxiliary_variance_bias)),
+            np.max(np.abs(momentum_auxiliary_covariance)),
+        )
+    )
+    return {
+        "position_quadrature_count": float(position_quadrature_count),
+        "mean_potential_gradient_squared": mean_gradient_squared,
+        "mean_coupling": mean_coupling,
+        "mean_coupling_squared": mean_coupling_squared,
+        "momentum_variance_bias": float(momentum_variance_bias),
+        "auxiliary_variance_bias": auxiliary_variance_bias,
+        "momentum_auxiliary_covariance_after_step": (
+            momentum_auxiliary_covariance
+        ),
+        "maximum_one_step_moment_defect": maximum_defect,
+        "one_step_defect_order": 2.0,
+        "discrete_scheme_exact_gibbs_preserving": float(
+            maximum_defect <= 1e-15
+        ),
+        "periodic_quotient_continuous_sde_gibbs_preserving": 1.0,
+        **_CLOSED_CLAIMS,
+    }
+
+
 def nonlinear_bath_step(
     position: np.ndarray,
     momentum: np.ndarray,

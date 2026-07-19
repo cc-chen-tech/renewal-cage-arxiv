@@ -216,6 +216,62 @@ class NonlinearBathGleTests(unittest.TestCase):
         self.assertNotIn("gibbs_invariant_density_derived", result)
         self.assertEqual(result["thermodynamic_claim_allowed"], 0.0)
 
+    def test_one_step_gibbs_bias_matches_exact_constant_coupling_moments(self):
+        from nonlinear_bath_gle import gibbs_one_step_moment_bias
+
+        controls = self.controls(
+            barrier=0.0,
+            modulation=np.zeros(2),
+        )
+        result = gibbs_one_step_moment_bias(controls=controls)
+        dt = controls.time_step
+        temperature = controls.temperature
+        expected_p_bias = dt**2 * temperature * (
+            controls.friction**2 + np.sum(controls.amplitudes**2)
+        )
+        np.testing.assert_allclose(
+            result["momentum_variance_bias"],
+            expected_p_bias,
+            rtol=2e-13,
+            atol=1e-18,
+        )
+        decay = np.exp(-controls.rates * dt)
+        phi = -np.expm1(-controls.rates * dt) / controls.rates
+        np.testing.assert_allclose(
+            result["auxiliary_variance_bias"],
+            temperature * phi**2 * controls.amplitudes**2,
+            rtol=2e-13,
+            atol=1e-18,
+        )
+        np.testing.assert_allclose(
+            result["momentum_auxiliary_covariance_after_step"],
+            temperature
+            * controls.amplitudes
+            * (-phi + dt * decay + dt * controls.friction * phi),
+            rtol=2e-13,
+            atol=1e-18,
+        )
+        self.assertEqual(result["discrete_scheme_exact_gibbs_preserving"], 0.0)
+
+        half = gibbs_one_step_moment_bias(
+            controls=self.controls(
+                barrier=0.0,
+                modulation=np.zeros(2),
+                time_step=0.5 * dt,
+            )
+        )
+        self.assertAlmostEqual(
+            half["momentum_variance_bias"] / result["momentum_variance_bias"],
+            0.25,
+        )
+        self.assertLess(
+            np.max(
+                half["auxiliary_variance_bias"]
+                / result["auxiliary_variance_bias"]
+            ),
+            0.251,
+        )
+
     def test_remote_simulator_cli_exposes_only_frozen_modes(self):
         completed = subprocess.run(
             [
