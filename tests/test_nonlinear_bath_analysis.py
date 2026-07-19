@@ -35,6 +35,20 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         ):
             self.assertIn(phrase, completed.stdout)
 
+        preflight = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "check_nonlinear_bath_canary.py"),
+                "--help",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(preflight.returncode, 0, preflight.stderr)
+        for phrase in ("--canary-cache", "--half-step-cache", "--output-json"):
+            self.assertIn(phrase, preflight.stdout)
+
     def test_bundle_header_gate_requires_all_modes_and_exact_source_hashes(self):
         from analyze_nonlinear_bath_elimination import validate_bundle_headers
 
@@ -164,6 +178,47 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
             table["trajectory_index"],
             np.array([0, 0, 0, 1, 1, 2]),
         )
+
+    def test_canary_preflight_blocks_any_failed_auxiliary_reconstruction(self):
+        from analyze_nonlinear_bath_elimination import canary_preflight
+        from nonlinear_bath_gle import NonlinearBathControls
+
+        controls = NonlinearBathControls(
+            temperature=0.58,
+            friction=1.0,
+            period=1.0,
+            barrier=1.74,
+            rates=np.array([0.2, 1.0]),
+            amplitudes=np.array([1.0, 0.55]),
+            modulation=np.array([0.45, 0.25]),
+            phases=np.array([0.0, 0.5 * np.pi]),
+            time_step=0.001,
+        )
+        cache = {
+            "controls": controls,
+            "equilibrium_positions": np.zeros((3, 2)),
+            "equilibrium_momenta": np.zeros((3, 2)),
+            "equilibrium_auxiliary": np.zeros((3, 2, 2)),
+            "canary_normal_z": np.zeros((2, 2, 2)),
+        }
+        passed = canary_preflight(cache, dict(cache))
+        self.assertEqual(passed["canary_preflight_pass"], 1.0)
+        self.assertEqual(passed["maximum_reconstruction_relative_error"], 0.0)
+        for claim in (
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(passed[claim], 0.0)
+
+        corrupted = dict(cache)
+        corrupted_auxiliary = cache["equilibrium_auxiliary"].copy()
+        corrupted_auxiliary[-1, 0, 0] = 0.1
+        corrupted["equilibrium_auxiliary"] = corrupted_auxiliary
+        failed = canary_preflight(cache, corrupted)
+        self.assertEqual(failed["canary_preflight_pass"], 0.0)
 
     def test_hazard_scoring_uses_only_training_fit_and_fixed_survival_grid(self):
         from analyze_nonlinear_bath_elimination import score_hazard_models

@@ -774,6 +774,32 @@ def _reconstruction_error(cache: dict[str, object]) -> float:
     )
 
 
+def canary_preflight(
+    canary: dict[str, object],
+    half_step: dict[str, object],
+) -> dict[str, float | str]:
+    """Authorize production only after both exact-OU paths reconstruct."""
+
+    canary_error = _reconstruction_error(canary)
+    half_step_error = _reconstruction_error(half_step)
+    maximum_error = max(canary_error, half_step_error)
+    passed = maximum_error <= 5e-11
+    return {
+        "record": "canary_preflight",
+        "canary_reconstruction_relative_error": canary_error,
+        "half_step_reconstruction_relative_error": half_step_error,
+        "maximum_reconstruction_relative_error": maximum_error,
+        "reconstruction_tolerance": 5e-11,
+        "finite_state_and_provenance_validated": 1.0,
+        "canary_preflight_pass": float(passed),
+        "exact_nonlinear_bath_elimination_supported": 0.0,
+        "synthetic_bath_level_fdt_replay_supported": 0.0,
+        "synthetic_delayed_hazard_emerges": 0.0,
+        "real_ka_position_dependent_kernel_authorized": 0.0,
+        **{claim: 0.0 for claim in _BROAD_CLAIMS},
+    }
+
+
 def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict[str, object]:
     """Recompute every gate and write details, summary, survival, and SVG."""
 
