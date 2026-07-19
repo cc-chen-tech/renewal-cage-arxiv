@@ -205,6 +205,7 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
             "equilibrium_positions": np.zeros((3, 2)),
             "equilibrium_momenta": np.zeros((3, 2)),
             "equilibrium_auxiliary": np.zeros((3, 2, 2)),
+            "canary_normal_p": np.zeros((2, 2)),
             "canary_normal_z": np.zeros((2, 2, 2)),
         }
         half_cache = dict(cache)
@@ -221,9 +222,18 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         )
         half_cache["brownian_subincrements_per_step"] = 1
         half_cache["underlying_brownian_time_step"] = 5e-4
+        half_cache["equilibrium_positions"] = np.zeros((5, 2))
+        half_cache["equilibrium_momenta"] = np.zeros((5, 2))
+        half_cache["equilibrium_auxiliary"] = np.zeros((5, 2, 2))
+        half_cache["canary_normal_p"] = np.zeros((4, 2))
+        half_cache["canary_normal_z"] = np.zeros((4, 2, 2))
         passed = canary_preflight(cache, half_cache)
         self.assertEqual(passed["canary_preflight_pass"], 1.0)
         self.assertEqual(passed["canary_brownian_path_coupled"], 1.0)
+        self.assertEqual(
+            passed["canary_brownian_path_coupling_relative_error"],
+            0.0,
+        )
         self.assertEqual(passed["canary_underlying_brownian_time_step"], 5e-4)
         self.assertEqual(passed["canary_full_subincrements_per_step"], 2.0)
         self.assertEqual(passed["canary_half_subincrements_per_step"], 1.0)
@@ -250,8 +260,8 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         ):
             self.assertEqual(passed[claim], 0.0)
 
-        corrupted = dict(cache)
-        corrupted_auxiliary = cache["equilibrium_auxiliary"].copy()
+        corrupted = dict(half_cache)
+        corrupted_auxiliary = half_cache["equilibrium_auxiliary"].copy()
         corrupted_auxiliary[-1, 0, 0] = 0.1
         corrupted["equilibrium_auxiliary"] = corrupted_auxiliary
         failed = canary_preflight(cache, corrupted)
@@ -262,6 +272,18 @@ class NonlinearBathAnalysisTests(unittest.TestCase):
         failed_coupling = canary_preflight(cache, uncoupled)
         self.assertEqual(failed_coupling["canary_brownian_path_coupled"], 0.0)
         self.assertEqual(failed_coupling["canary_preflight_pass"], 0.0)
+
+        tampered = dict(half_cache)
+        tampered_normal_p = half_cache["canary_normal_p"].copy()
+        tampered_normal_p[0, 0] = 0.1
+        tampered["canary_normal_p"] = tampered_normal_p
+        failed_stream = canary_preflight(cache, tampered)
+        self.assertGreater(
+            failed_stream["canary_brownian_path_coupling_relative_error"],
+            0.0,
+        )
+        self.assertEqual(failed_stream["canary_brownian_path_coupled"], 0.0)
+        self.assertEqual(failed_stream["canary_preflight_pass"], 0.0)
 
     def test_hazard_scoring_uses_only_training_fit_and_fixed_survival_grid(self):
         from analyze_nonlinear_bath_elimination import score_hazard_models

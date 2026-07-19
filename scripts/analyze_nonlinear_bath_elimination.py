@@ -784,6 +784,46 @@ def _reconstruction_error(cache: dict[str, object]) -> float:
     )
 
 
+def _brownian_coupling_error(
+    canary: dict[str, object],
+    half_step: dict[str, object],
+) -> float:
+    """Compare saved coarse normals with exact pairs of saved fine normals."""
+
+    half_controls = half_step["controls"]
+    if not isinstance(half_controls, NonlinearBathControls):
+        raise ValueError("canary controls are invalid")
+    full_p = np.asarray(canary.get("canary_normal_p", np.empty(0)))
+    half_p = np.asarray(half_step.get("canary_normal_p", np.empty(0)))
+    full_z = np.asarray(canary.get("canary_normal_z", np.empty(0)))
+    half_z = np.asarray(half_step.get("canary_normal_z", np.empty(0)))
+    if (
+        full_p.ndim != 2
+        or half_p.shape != (2 * full_p.shape[0], full_p.shape[1])
+        or full_z.ndim != 3
+        or half_z.shape
+        != (2 * full_z.shape[0], full_z.shape[1], full_z.shape[2])
+        or full_z.shape[:2] != full_p.shape
+        or full_z.shape[2] != len(half_controls.rates)
+    ):
+        return float("inf")
+    aggregated_p = (half_p[0::2] + half_p[1::2]) / math.sqrt(2.0)
+    half_decay = np.exp(-half_controls.rates * half_controls.time_step)
+    aggregated_z = (
+        half_decay[None, None, :] * half_z[0::2] + half_z[1::2]
+    ) / np.sqrt(1.0 + half_decay**2)[None, None, :]
+    maximum_difference = max(
+        float(np.max(np.abs(full_p - aggregated_p))),
+        float(np.max(np.abs(full_z - aggregated_z))),
+    )
+    scale = max(
+        float(np.max(np.abs(full_p))),
+        float(np.max(np.abs(full_z))),
+        1.0,
+    )
+    return maximum_difference / scale
+
+
 def canary_preflight(
     canary: dict[str, object],
     half_step: dict[str, object],
@@ -836,7 +876,7 @@ def canary_preflight(
     half_underlying_step = float(
         half_step.get("underlying_brownian_time_step", float("nan"))
     )
-    brownian_path_coupled = (
+    brownian_metadata_coupled = (
         full_subincrements == 2
         and half_subincrements == 1
         and math.isclose(
@@ -863,6 +903,12 @@ def canary_preflight(
             rel_tol=0.0,
             abs_tol=1e-15,
         )
+    )
+    brownian_coupling_error = _brownian_coupling_error(canary, half_step)
+    brownian_coupling_tolerance = 5e-15
+    brownian_path_coupled = (
+        brownian_metadata_coupled
+        and brownian_coupling_error <= brownian_coupling_tolerance
     )
     full_bias = gibbs_one_step_moment_bias(controls=full_controls)
     half_bias = gibbs_one_step_moment_bias(controls=half_controls)
@@ -921,6 +967,12 @@ def canary_preflight(
             momentum_bias_ratio <= 0.251 and auxiliary_bias_ratio <= 0.251
         ),
         "canary_brownian_path_coupled": float(brownian_path_coupled),
+        "canary_brownian_path_coupling_relative_error": (
+            brownian_coupling_error
+        ),
+        "canary_brownian_path_coupling_tolerance": (
+            brownian_coupling_tolerance
+        ),
         "canary_underlying_brownian_time_step": full_underlying_step,
         "canary_full_subincrements_per_step": float(full_subincrements),
         "canary_half_subincrements_per_step": float(half_subincrements),
@@ -1181,6 +1233,12 @@ def analyze_bundle(cache_paths: dict[str, Path], *, output_prefix: Path) -> dict
         ],
         "canary_brownian_path_coupled": preflight[
             "canary_brownian_path_coupled"
+        ],
+        "canary_brownian_path_coupling_relative_error": preflight[
+            "canary_brownian_path_coupling_relative_error"
+        ],
+        "canary_brownian_path_coupling_tolerance": preflight[
+            "canary_brownian_path_coupling_tolerance"
         ],
         "canary_underlying_brownian_time_step": preflight[
             "canary_underlying_brownian_time_step"

@@ -241,6 +241,11 @@ both canaries have identical initial states, underlying fine increments, and
 final RNG state. Their difference is therefore a coupled discretization error,
 not a comparison of independent stochastic paths.
 
+The remote preflight does not trust this provenance declaration alone. It
+reaggregates every saved half-step momentum and exact-OU auxiliary normal and
+compares them with the corresponding saved full-step normal. Production remains
+blocked unless the maximum relative coupling residual is at most `5e-15`.
+
 ## Numerical and physical gates
 
 ### 1. Algebraic reconstruction
