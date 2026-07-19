@@ -102,6 +102,24 @@ Langevin bath. All environment, GLE, event-clock, Kramers, and thermodynamic
 claim flags remain zero. See
 `docs/microscopic-l2p-deterministic-diffusion.md`.
 
+A physical-lag-conditioned event-transfer diagnostic now replaces the global
+`n`-jump kernel by the calibration-measured `K_t(displacement | N=n)` and
+separately swaps the event-count marginal, conditional path kernel, and cage
+residual across the calibration/held-out split. At `T=0.45`, the fully
+calibration-only ensemble canary passes held-out MSD, pooled NGP, multi-`k`
+`F_s`, `D`, `tau_alpha`, and `D tau_alpha`; individual restarts do not pass, and
+the three restarts share one parent trajectory. A matched ablation keeps the
+same empirical `P_t(N)` and calibration residual but pools the path kernel over
+lag: its MSD/NGP and derived-scalar gates pass, while its maximum multi-`k`
+`F_s` error is `0.0331` and fails the frozen `0.03` tolerance. Restoring
+`K_t` lowers that maximum to `0.0239`, although only two of three restart labels
+improve in mean `F_s` error. At `T=0.58`, even the all-held oracle factorization
+fails. The result therefore supports a retrospective low-temperature ensemble
+shape canary, not a preregistered forecast, uniform restart improvement,
+finite-memory mechanism, universal cage-event representation, spatial theory,
+or thermodynamic glass theory. See
+`docs/ka-interval-conditioned-event-transfer.md`.
+
 The model combines:
 
 - local Ornstein-Uhlenbeck-like cage variance,
