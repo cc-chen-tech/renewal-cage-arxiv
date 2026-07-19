@@ -24,13 +24,57 @@ from simulate_nonlinear_bath_elimination import (  # noqa: E402
 )
 
 
-_BROAD_CLAIMS = (
+_SUPPORT_CLAIMS = (
+    "exact_nonlinear_bath_elimination_supported",
+    "synthetic_bath_level_fdt_replay_supported",
+    "synthetic_delayed_hazard_emerges",
+    "real_ka_position_dependent_kernel_authorized",
+)
+_REQUIRED_ONE_CLAIMS = (
+    "real_ka_kernel_identifiability_test_required",
+)
+_CLOSED_CLAIMS = (
+    "positive_prony_kernel_identified_in_ka",
+    "finite_auxiliary_rank_identified_in_ka",
+    "oscillatory_matrix_bath_authorized",
     "autonomous_single_particle_gle_allowed",
     "complete_event_clock_closure_allowed",
     "kramers_escape_claim_allowed",
     "spatial_facilitation_claim_allowed",
     "thermodynamic_claim_allowed",
 )
+_CLAIM_FIELDS = _SUPPORT_CLAIMS + _REQUIRED_ONE_CLAIMS + _CLOSED_CLAIMS
+
+
+def validate_claim_flags(verdict: dict[str, object]) -> dict[str, float]:
+    """Validate the complete binary claim schema before writing manifests."""
+
+    missing = [field for field in _CLAIM_FIELDS if field not in verdict]
+    if missing:
+        raise ValueError(f"claim schema is missing fields: {';'.join(missing)}")
+    flags: dict[str, float] = {}
+    for field in _CLAIM_FIELDS:
+        try:
+            value = float(verdict[field])
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"claim schema has nonnumeric field: {field}") from error
+        if value not in (0.0, 1.0):
+            raise ValueError(f"claim schema has nonbinary field: {field}")
+        flags[field] = value
+    for field in _REQUIRED_ONE_CLAIMS:
+        if flags[field] != 1.0:
+            raise ValueError(f"claim schema disabled required audit: {field}")
+    for field in _CLOSED_CLAIMS:
+        if flags[field] != 0.0:
+            raise ValueError(f"claim schema opened unauthorized field: {field}")
+    if (
+        flags["synthetic_bath_level_fdt_replay_supported"]
+        > flags["exact_nonlinear_bath_elimination_supported"]
+        or flags["real_ka_position_dependent_kernel_authorized"]
+        > flags["synthetic_bath_level_fdt_replay_supported"]
+    ):
+        raise ValueError("claim schema violates the authorization hierarchy")
+    return flags
 
 
 def find_conflicting_processes(
@@ -220,9 +264,7 @@ def _write_manifests(output_dir: Path, artifact_prefix: Path) -> None:
     if len(rows) != 1:
         raise ValueError("remote sequence requires exactly one verdict row")
     verdict = rows[0]
-    for claim in _BROAD_CLAIMS:
-        if claim not in verdict or float(verdict[claim]) != 0.0:
-            raise ValueError(f"remote sequence found an open broad claim: {claim}")
+    claim_flags = validate_claim_flags(verdict)
     try:
         git_commit = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -251,7 +293,7 @@ def _write_manifests(output_dir: Path, artifact_prefix: Path) -> None:
         "diagnostics_sha256": file_sha256(
             ROOT / "src" / "nonlinear_bath_diagnostics.py"
         ),
-        "broad_claims": {claim: float(verdict[claim]) for claim in _BROAD_CLAIMS},
+        "claim_flags": claim_flags,
     }
     temporary = manifest_path.with_name(manifest_path.name + ".tmp")
     temporary.write_text(

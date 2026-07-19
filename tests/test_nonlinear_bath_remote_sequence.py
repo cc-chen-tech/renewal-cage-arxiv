@@ -107,6 +107,44 @@ class NonlinearBathRemoteSequenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "artifact prefix"):
                 validate_remote_paths(output, Path(directory) / "outside" / "gate")
 
+    def test_manifest_claim_schema_rejects_missing_nonbinary_or_open_flags(self):
+        from run_nonlinear_bath_remote_sequence import validate_claim_flags
+
+        flags = {
+            "exact_nonlinear_bath_elimination_supported": "1.0",
+            "synthetic_bath_level_fdt_replay_supported": "1.0",
+            "synthetic_delayed_hazard_emerges": "0.0",
+            "real_ka_position_dependent_kernel_authorized": "1.0",
+            "real_ka_kernel_identifiability_test_required": "1.0",
+            "positive_prony_kernel_identified_in_ka": "0.0",
+            "finite_auxiliary_rank_identified_in_ka": "0.0",
+            "oscillatory_matrix_bath_authorized": "0.0",
+            "autonomous_single_particle_gle_allowed": "0.0",
+            "complete_event_clock_closure_allowed": "0.0",
+            "kramers_escape_claim_allowed": "0.0",
+            "spatial_facilitation_claim_allowed": "0.0",
+            "thermodynamic_claim_allowed": "0.0",
+        }
+        validated = validate_claim_flags(flags)
+        self.assertEqual(validated["exact_nonlinear_bath_elimination_supported"], 1.0)
+        self.assertEqual(validated["thermodynamic_claim_allowed"], 0.0)
+
+        for label, key, value in (
+            ("missing", "synthetic_delayed_hazard_emerges", None),
+            ("nonbinary", "synthetic_delayed_hazard_emerges", "0.5"),
+            ("broad open", "thermodynamic_claim_allowed", "1.0"),
+            ("family open", "positive_prony_kernel_identified_in_ka", "1.0"),
+            ("test disabled", "real_ka_kernel_identifiability_test_required", "0.0"),
+        ):
+            changed = dict(flags)
+            if value is None:
+                del changed[key]
+            else:
+                changed[key] = value
+            with self.subTest(label=label):
+                with self.assertRaisesRegex(ValueError, "claim schema"):
+                    validate_claim_flags(changed)
+
 
 if __name__ == "__main__":
     unittest.main()
