@@ -2,6 +2,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import csv
 from pathlib import Path
 
 import numpy as np
@@ -151,6 +152,95 @@ class PositionDependentKernelAnalysisTests(unittest.TestCase):
             [row for row in selections if row["held_clone_index"] == 4.0],
             [row for row in changed if row["held_clone_index"] == 4.0],
         )
+
+    def test_outer_refit_scores_one_common_held_horizon_and_fail_closed_claims(self):
+        from analyze_ka_position_dependent_kernel import (
+            fit_and_score_outer_hierarchy,
+            select_auxiliary_hierarchy,
+            select_nonparametric_hierarchy,
+        )
+        from ka_position_dependent_kernel import (
+            classify_position_dependent_kernel_gate,
+        )
+
+        clones = self._synthetic_kernel_clones()
+        _, nonparametric = select_nonparametric_hierarchy(
+            clones,
+            supports=(2, 3),
+            ridge_grid=(1e-6,),
+            permutation_seed=20260719,
+        )
+        decay_grid = np.array([0.1, 0.3, 1.0, 3.0])
+        _, auxiliary = select_auxiliary_hierarchy(
+            clones,
+            nonparametric,
+            ranks=(1, 2),
+            ridge_grid=(1e-6,),
+            decay_grid=decay_grid,
+            frame_time=0.01,
+        )
+        rows, kernels = fit_and_score_outer_hierarchy(
+            clones,
+            nonparametric + auxiliary,
+            decay_grid=decay_grid,
+            frame_time=0.01,
+            temperature=0.58,
+            maximum_diagnostic_lag=2,
+            permutation_seed=20260719,
+        )
+        self.assertEqual(len(rows), 4 * 5)
+        self.assertGreater(len(kernels), 0)
+        for held_clone in range(1, 5):
+            fold = [row for row in rows if row["held_clone_index"] == float(held_clone)]
+            self.assertEqual(len({row["held_scalar_component_count"] for row in fold}), 1)
+            self.assertTrue(all(row["fit_uses_outer_held_clone"] == 0.0 for row in fold))
+            m3 = next(row for row in fold if row["model"] == "past_position_real_pole")
+            m4 = next(row for row in fold if row["model"] == "two_position_positive_prony")
+            self.assertEqual(m3["second_fdt_diagnostics_applicable"], 0.0)
+            self.assertEqual(m4["second_fdt_diagnostics_applicable"], 1.0)
+            self.assertEqual(m4["positive_prony_factorization"], 1.0)
+        verdict = classify_position_dependent_kernel_gate(rows)
+        for claim in (
+            "latent_auxiliary_innovation_identified_in_ka",
+            "stochastic_auxiliary_bath_identified_in_ka",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "spatial_facilitation_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(verdict[claim], 0.0)
+
+        from analyze_ka_position_dependent_kernel import (
+            file_sha256,
+            write_kernel_artifacts,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory) / "kernel_gate"
+            paths = write_kernel_artifacts(
+                prefix,
+                details=rows,
+                selections=nonparametric + auxiliary,
+                kernels=kernels,
+                verdict=verdict,
+                source_paths=[
+                    ROOT / "scripts" / "analyze_ka_position_dependent_kernel.py",
+                    ROOT / "src" / "ka_position_dependent_kernel.py",
+                ],
+            )
+            self.assertEqual(set(paths), {"details", "selection", "kernel", "summary", "svg", "sha256"})
+            self.assertTrue(all(path.is_file() for path in paths.values()))
+            svg = paths["svg"].read_text()
+            self.assertIn("unclipped held diagnostics", svg)
+            self.assertIn("residual-correlation tolerance 0.20", svg)
+            self.assertIn("second-FDT tolerance 0.30", svg)
+            with paths["sha256"].open(newline="") as handle:
+                manifest = list(csv.DictReader(handle))
+            artifact_rows = [row for row in manifest if row["record"] == "artifact"]
+            self.assertEqual(len(artifact_rows), 5)
+            for row in artifact_rows:
+                self.assertEqual(file_sha256(Path(row["path"])), row["sha256"])
 
     def test_cli_and_loader_require_frozen_four_clone_provenance(self):
         from analyze_ka_position_dependent_kernel import (
