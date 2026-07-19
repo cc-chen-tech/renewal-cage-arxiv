@@ -304,6 +304,91 @@ class PositionDependentKernelTests(unittest.TestCase):
         self.assertEqual(real_pole["positive_prony_factorization"], 0.0)
         self.assertEqual(real_pole["history_features"].shape, (2, 9, 4, 2, 3, 3))
 
+    def test_real_pole_and_two_position_fits_recover_synthetic_drifts(self):
+        from ka_position_dependent_kernel import (
+            fit_radial_basis_scale,
+            fit_real_pole_model,
+            fit_two_position_prony_model,
+            radial_vector_basis,
+            real_pole_history_features,
+            two_position_auxiliary_features,
+        )
+
+        rng = np.random.default_rng(91)
+        position = rng.normal(size=(3, 18, 5, 3))
+        velocity = rng.normal(size=position.shape)
+        scale = fit_radial_basis_scale(position)
+        rates = np.array([0.2, 1.1])
+        frame_time = 0.02
+        mean = np.array([0.2, -0.05, 0.03])
+        basis = radial_vector_basis(position, scale)
+        mean_drift = np.einsum("b,ctpbi->ctpi", mean, basis)
+
+        real_coefficients = np.array(
+            [
+                [0.4, -0.1, 0.05],
+                [-0.15, 0.07, 0.02],
+            ]
+        )
+        real_history = real_pole_history_features(
+            position,
+            velocity,
+            scale=scale,
+            decay_rates=rates,
+            frame_time=frame_time,
+        )["history_features"]
+        real_drift = mean_drift - np.einsum(
+            "ab,ctpabi->ctpi",
+            real_coefficients,
+            real_history,
+        )
+        real_fit = fit_real_pole_model(
+            position,
+            velocity,
+            real_drift,
+            scale=scale,
+            decay_rates=rates,
+            frame_time=frame_time,
+            ridge=0.0,
+        )
+        np.testing.assert_allclose(real_fit["prediction"], real_drift, atol=3e-12)
+        np.testing.assert_allclose(
+            real_fit["pole_coefficients"],
+            real_coefficients,
+            atol=3e-12,
+        )
+        self.assertEqual(real_fit["positive_prony_factorization"], 0.0)
+
+        coupling_coefficients = np.array(
+            [[0.8, 0.1, -0.05], [0.45, -0.08, 0.12]]
+        )
+        auxiliary = two_position_auxiliary_features(
+            position,
+            velocity,
+            scale=scale,
+            decay_rates=rates,
+            coupling_coefficients=coupling_coefficients,
+            frame_time=frame_time,
+        )
+        thermodynamic_drift = mean_drift + auxiliary["force"]
+        thermodynamic_fit = fit_two_position_prony_model(
+            position,
+            velocity,
+            thermodynamic_drift,
+            scale=scale,
+            decay_rates=rates,
+            frame_time=frame_time,
+            ridge=0.0,
+        )
+        np.testing.assert_allclose(
+            thermodynamic_fit["prediction"],
+            thermodynamic_drift,
+            rtol=2e-10,
+            atol=2e-10,
+        )
+        self.assertEqual(thermodynamic_fit["positive_prony_factorization"], 1.0)
+        self.assertEqual(thermodynamic_fit["all_projected_gram_matrices_psd"], 1.0)
+
     def test_classifier_separates_mz_real_pole_and_positive_prony_claims(self):
         from ka_position_dependent_kernel import (
             classify_position_dependent_kernel_gate,

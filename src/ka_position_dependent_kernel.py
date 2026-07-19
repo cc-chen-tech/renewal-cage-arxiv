@@ -498,6 +498,261 @@ def reconstruct_auxiliary_innovations(
     )
 
 
+def _fit_linear_memory_features(
+    mean_features: np.ndarray,
+    memory_features: np.ndarray,
+    acceleration: np.ndarray,
+    *,
+    ridge: float,
+) -> dict[str, object]:
+    mean = np.asarray(mean_features, dtype=float)
+    memory = np.asarray(memory_features, dtype=float)
+    target_array = np.asarray(acceleration, dtype=float)
+    ridge_value = float(ridge)
+    if (
+        mean.ndim != 5
+        or memory.ndim != 5
+        or mean.shape[:3] != memory.shape[:3]
+        or mean.shape[-1] != 3
+        or memory.shape[-1] != 3
+        or target_array.shape != (*mean.shape[:3], 3)
+        or mean.shape[-2] < 1
+        or memory.shape[-2] < 1
+        or np.any(~np.isfinite(mean))
+        or np.any(~np.isfinite(memory))
+        or np.any(~np.isfinite(target_array))
+        or not math.isfinite(ridge_value)
+        or ridge_value < 0.0
+    ):
+        raise ValueError("linear memory features and ridge must be finite and aligned")
+    features = np.concatenate((mean, memory), axis=-2)
+    design = np.moveaxis(features, -1, -2).reshape(-1, features.shape[-2])
+    target = target_array.reshape(-1)
+    column_scale = np.linalg.norm(design, axis=0) / math.sqrt(len(target))
+    if np.any(column_scale <= 0.0) or np.any(~np.isfinite(column_scale)):
+        raise ValueError("linear memory feature design has unresolved columns")
+    normalized = design / column_scale
+    singular_values = np.linalg.svd(normalized, compute_uv=False)
+    rank = int(np.linalg.matrix_rank(normalized))
+    if ridge_value == 0.0 and rank != normalized.shape[1]:
+        raise ValueError("zero-ridge memory fit requires full column rank")
+    mean_count = mean.shape[-2]
+    penalty = np.ones(normalized.shape[1])
+    penalty[:mean_count] = 0.0
+    augmented_design = np.concatenate(
+        (normalized, np.diag(np.sqrt(ridge_value * penalty))),
+        axis=0,
+    )
+    augmented_target = np.concatenate((target, np.zeros(normalized.shape[1])))
+    normalized_coefficients = np.linalg.lstsq(
+        augmented_design,
+        augmented_target,
+        rcond=None,
+    )[0]
+    coefficients = normalized_coefficients / column_scale
+    prediction = np.einsum("...fi,f->...i", features, coefficients)
+    condition = (
+        float(singular_values[0] / singular_values[-1])
+        if singular_values[-1] > 0.0
+        else float("inf")
+    )
+    return {
+        "mean_coefficients": coefficients[:mean_count],
+        "memory_coefficients": coefficients[mean_count:],
+        "linear_prediction": prediction,
+        "condition_number": condition,
+        "numerical_rank": float(rank),
+        "singular_values": singular_values,
+        "ridge": ridge_value,
+    }
+
+
+def fit_real_pole_model(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    acceleration: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    frame_time: float,
+    ridge: float,
+) -> dict[str, object]:
+    """Fit a signed past-position real-pole MZ realization."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    target = np.asarray(acceleration, dtype=float)
+    if target.shape != positions.shape or np.any(~np.isfinite(target)):
+        raise ValueError("real-pole acceleration must be finite and aligned")
+    history_result = real_pole_history_features(
+        positions,
+        velocities,
+        scale=scale,
+        decay_rates=decay_rates,
+        frame_time=frame_time,
+    )
+    history = np.asarray(history_result["history_features"])
+    memory_features = -history.reshape(*history.shape[:3], -1, 3)
+    mean_features = radial_vector_basis(positions, scale)
+    fitted = _fit_linear_memory_features(
+        mean_features,
+        memory_features,
+        target,
+        ridge=ridge,
+    )
+    pole_count = len(np.asarray(decay_rates))
+    prediction = np.asarray(fitted["linear_prediction"])
+    residual_variance = float(np.mean((target - prediction) ** 2))
+    return {
+        "prediction": prediction,
+        "mean_force_coefficients": fitted["mean_coefficients"],
+        "pole_coefficients": np.asarray(fitted["memory_coefficients"]).reshape(
+            pole_count,
+            3,
+        ),
+        "training_residual_variance": residual_variance,
+        "condition_number": fitted["condition_number"],
+        "numerical_rank": fitted["numerical_rank"],
+        "ridge": fitted["ridge"],
+        "decay_rates": np.asarray(decay_rates, dtype=float).copy(),
+        "positive_prony_factorization": 0.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def _radial_coupling_basis(
+    position: np.ndarray,
+    scale: dict[str, float],
+) -> np.ndarray:
+    vectors = _finite_vectors(position)
+    mu, sigma, epsilon = _validated_scale(scale)
+    radial_square = np.sum(vectors**2, axis=-1)
+    normalized = (radial_square - mu) / sigma
+    identity = np.broadcast_to(np.eye(3), (*vectors.shape[:-1], 3, 3))
+    outer = vectors[..., :, None] * vectors[..., None, :]
+    radial_projector = outer / np.maximum(radial_square, epsilon)[..., None, None]
+    return np.stack(
+        (
+            identity,
+            normalized[..., None, None] * identity,
+            radial_projector,
+        ),
+        axis=-3,
+    )
+
+
+def fit_two_position_prony_model(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    acceleration: np.ndarray,
+    *,
+    scale: dict[str, float],
+    decay_rates: np.ndarray,
+    frame_time: float,
+    ridge: float,
+) -> dict[str, object]:
+    """Fit symmetric pole Grams and project each to a positive rank-one bath."""
+
+    positions, velocities = _finite_clone_paths(position, velocity)
+    target = np.asarray(acceleration, dtype=float)
+    rates, _, rho, forcing = _validated_decay(decay_rates, frame_time)
+    if target.shape != positions.shape or np.any(~np.isfinite(target)):
+        raise ValueError("two-position acceleration must be finite and aligned")
+    coupling_basis = _radial_coupling_basis(positions, scale)
+    history = np.zeros(
+        (*positions.shape[:-1], len(rates), 3, 3),
+        dtype=float,
+    )
+    for time_index in range(positions.shape[1] - 1):
+        projected = np.einsum(
+            "cpmij,cpj->cpmi",
+            np.swapaxes(coupling_basis[:, time_index], -1, -2),
+            velocities[:, time_index],
+        )
+        history[:, time_index + 1] = (
+            rho[None, None, :, None, None] * history[:, time_index]
+            + forcing[None, None, :, None, None] * projected[:, :, None]
+        )
+    gram_pairs = ((0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2))
+    feature_rows = []
+    for pole in range(len(rates)):
+        for left, right in gram_pairs:
+            feature = np.einsum(
+                "ctpij,ctpj->ctpi",
+                coupling_basis[..., left, :, :],
+                history[..., pole, right, :],
+            )
+            if left != right:
+                feature += np.einsum(
+                    "ctpij,ctpj->ctpi",
+                    coupling_basis[..., right, :, :],
+                    history[..., pole, left, :],
+                )
+            feature_rows.append(-feature)
+    memory_features = np.stack(feature_rows, axis=-2)
+    mean_features = radial_vector_basis(positions, scale)
+    fitted = _fit_linear_memory_features(
+        mean_features,
+        memory_features,
+        target,
+        ridge=ridge,
+    )
+    raw_grams = np.zeros((len(rates), 3, 3), dtype=float)
+    offset = 0
+    for pole in range(len(rates)):
+        for left, right in gram_pairs:
+            value = float(fitted["memory_coefficients"][offset])
+            raw_grams[pole, left, right] = value
+            raw_grams[pole, right, left] = value
+            offset += 1
+    projected_grams = np.zeros_like(raw_grams)
+    coupling_coefficients = np.zeros((len(rates), 3), dtype=float)
+    for pole, gram in enumerate(raw_grams):
+        eigenvalues, eigenvectors = np.linalg.eigh(gram)
+        largest = float(eigenvalues[-1])
+        if largest > 0.0:
+            coupling_coefficients[pole] = math.sqrt(largest) * eigenvectors[:, -1]
+            projected_grams[pole] = np.outer(
+                coupling_coefficients[pole],
+                coupling_coefficients[pole],
+            )
+    auxiliary = two_position_auxiliary_features(
+        positions,
+        velocities,
+        scale=scale,
+        decay_rates=rates,
+        coupling_coefficients=coupling_coefficients,
+        frame_time=frame_time,
+    )
+    mean_prediction = np.einsum(
+        "b,ctpbi->ctpi",
+        fitted["mean_coefficients"],
+        mean_features,
+    )
+    prediction = mean_prediction + np.asarray(auxiliary["force"])
+    residual_variance = float(np.mean((target - prediction) ** 2))
+    minimum_projected_eigenvalue = float(
+        min(np.min(np.linalg.eigvalsh(gram)) for gram in projected_grams)
+    )
+    return {
+        "prediction": prediction,
+        "mean_force_coefficients": fitted["mean_coefficients"],
+        "raw_gram_matrices": raw_grams,
+        "projected_gram_matrices": projected_grams,
+        "coupling_coefficients": coupling_coefficients,
+        "training_residual_variance": residual_variance,
+        "condition_number": fitted["condition_number"],
+        "numerical_rank": fitted["numerical_rank"],
+        "ridge": fitted["ridge"],
+        "decay_rates": rates.copy(),
+        "minimum_projected_gram_eigenvalue": minimum_projected_eigenvalue,
+        "all_projected_gram_matrices_psd": float(
+            minimum_projected_eigenvalue >= -1e-12
+        ),
+        "positive_prony_factorization": 1.0,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
 _KERNEL_MODELS = (
     "stationary_scalar_nonparametric_volterra",
     "finite_basis_mz_position_kernel",
