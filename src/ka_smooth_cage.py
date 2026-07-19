@@ -7,7 +7,10 @@ from pathlib import Path
 
 import numpy as np
 
-from ka_local_cage import ka_lj_force_and_isotropic_curvature
+from ka_local_cage import (
+    ka_lj_force_and_isotropic_curvature,
+    ka_lj_pair_hessian_geometry,
+)
 from ka_replicates import load_lammps_custom_trajectory
 
 
@@ -116,6 +119,7 @@ def smooth_force_support_cage_batch(
     target_batch_size: int = 16,
     additional_vectors: np.ndarray | None = None,
     compute_gram: bool = True,
+    return_jacobian: bool = False,
 ) -> dict[str, np.ndarray | float]:
     """Evaluate exact smooth-cage vector coordinates for fixed targets."""
 
@@ -161,6 +165,8 @@ def smooth_force_support_cage_batch(
         raise ValueError("target_batch_size must be a positive integer")
     if not isinstance(compute_gram, (bool, np.bool_)):
         raise ValueError("compute_gram must be Boolean")
+    if not isinstance(return_jacobian, (bool, np.bool_)):
+        raise ValueError("return_jacobian must be Boolean")
     if additional_vectors is None:
         extra_vectors = np.empty((0, *positions.shape), dtype=float)
     else:
@@ -183,6 +189,11 @@ def smooth_force_support_cage_batch(
     target_jacobian_block = np.empty_like(jacobian_gram)
     total_weight = np.empty(len(targets), dtype=float)
     support_count = np.empty(len(targets), dtype=int)
+    full_jacobian = (
+        np.empty((len(targets), len(positions), 3, 3), dtype=float)
+        if return_jacobian
+        else None
+    )
     identity = np.eye(3)
     for start in range(0, len(targets), int(target_batch_size)):
         stop = min(start + int(target_batch_size), len(targets))
@@ -214,6 +225,13 @@ def smooth_force_support_cage_batch(
             "tna,tnb->tab", centered, radial_gradient
         )
         target_block = identity[None, :, :] + centered_gradient / chunk_weight[:, None, None]
+        if return_jacobian:
+            neighbor_block = -(
+                weight[:, :, None, None] * identity[None, None, :, :]
+                + centered[:, :, :, None] * radial_gradient[:, :, None, :]
+            ) / chunk_weight[:, None, None, None]
+            neighbor_block[local_axis, selected] = target_block
+            full_jacobian[start:stop] = neighbor_block
         vector_fields = np.concatenate([velocities[None, :, :], extra_vectors], axis=0)
         vector_difference = (
             vector_fields[:, selected, None, :] - vector_fields[:, None, :, :]
@@ -268,6 +286,203 @@ def smooth_force_support_cage_batch(
     if compute_gram:
         result["jacobian_gram"] = jacobian_gram
         result["target_jacobian_block"] = target_jacobian_block
+    if return_jacobian:
+        result["jacobian"] = full_jacobian
+    return result
+
+
+def contract_cage_jacobian_force_jacobian(
+    cage_jacobian: np.ndarray,
+    *,
+    particle_i: np.ndarray,
+    particle_j: np.ndarray,
+    pair_hessian: np.ndarray,
+) -> np.ndarray:
+    """Return the full matrix product ``J DF`` from unordered KA pairs."""
+
+    jacobian = np.asarray(cage_jacobian, dtype=float)
+    first_raw = np.asarray(particle_i)
+    second_raw = np.asarray(particle_j)
+    hessian = np.asarray(pair_hessian, dtype=float)
+    if (
+        jacobian.ndim != 4
+        or jacobian.shape[2:] != (3, 3)
+        or len(jacobian) < 1
+        or np.any(~np.isfinite(jacobian))
+    ):
+        raise ValueError("cage_jacobian must have finite shape (targets, particles, 3, 3)")
+    pair_count = len(first_raw) if first_raw.ndim == 1 else -1
+    if (
+        first_raw.ndim != 1
+        or second_raw.shape != first_raw.shape
+        or np.any(first_raw != first_raw.astype(int))
+        or np.any(second_raw != second_raw.astype(int))
+        or hessian.shape != (pair_count, 3, 3)
+        or np.any(~np.isfinite(hessian))
+    ):
+        raise ValueError("pair indices and Hessians must be finite aligned arrays")
+    first = first_raw.astype(int)
+    second = second_raw.astype(int)
+    if (
+        np.any(first < 0)
+        or np.any(second >= jacobian.shape[1])
+        or np.any(first >= second)
+    ):
+        raise ValueError("particle_i and particle_j must be valid ordered pair indices")
+
+    by_particle = np.zeros(
+        (jacobian.shape[1], jacobian.shape[0], 3, 3), dtype=float
+    )
+    pair_batch_size = 2048
+    for start in range(0, pair_count, pair_batch_size):
+        stop = min(start + pair_batch_size, pair_count)
+        selected_i = first[start:stop]
+        selected_j = second[start:stop]
+        block = np.einsum(
+            "tpac,pcb->tpab",
+            jacobian[:, selected_j] - jacobian[:, selected_i],
+            hessian[start:stop],
+        )
+        block_by_pair = np.transpose(block, (1, 0, 2, 3))
+        np.add.at(by_particle, selected_i, block_by_pair)
+        np.add.at(by_particle, selected_j, -block_by_pair)
+    return np.transpose(by_particle, (1, 2, 0, 3))
+
+
+def smooth_cage_l2p_velocity_jacobian_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    forces: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    jacobian_step: float,
+    potential_protocol: str = "ka_lj_cut",
+    target_batch_size: int = 16,
+    return_components: bool = False,
+) -> dict[str, np.ndarray | float | str]:
+    """Construct the full deterministic matrix ``grad_V(L^2 p)``."""
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    particle_types = np.asarray(particle_types, dtype=int)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or forces.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+        or np.any(~np.isfinite(forces))
+    ):
+        raise ValueError("phase-space arrays must be aligned finite (particles, 3) arrays")
+    if not math.isfinite(friction) or friction < 0.0:
+        raise ValueError("friction must be finite and nonnegative")
+    if not math.isfinite(jacobian_step) or jacobian_step <= 0.0:
+        raise ValueError("jacobian_step must be finite and positive")
+    if not isinstance(return_components, (bool, np.bool_)):
+        raise ValueError("return_components must be boolean")
+
+    coordinate_arguments = {
+        "velocities": np.zeros_like(positions),
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "target_batch_size": target_batch_size,
+        "compute_gram": False,
+        "return_jacobian": True,
+    }
+
+    def cage_jacobian(configuration: np.ndarray) -> np.ndarray:
+        return np.asarray(
+            smooth_force_support_cage_batch(
+                configuration,
+                **coordinate_arguments,
+            )["jacobian"],
+            dtype=float,
+        )
+
+    step = float(jacobian_step)
+    base = cage_jacobian(positions)
+    pair_geometry = ka_lj_pair_hessian_geometry(
+        positions,
+        particle_types=particle_types,
+        box_lengths=box_lengths,
+        potential_protocol=potential_protocol,
+    )
+    total = contract_cage_jacobian_force_jacobian(
+        base,
+        particle_i=np.asarray(pair_geometry["particle_i"]),
+        particle_j=np.asarray(pair_geometry["particle_j"]),
+        pair_hessian=np.asarray(pair_geometry["pair_hessian"]),
+    )
+
+    def matrix_layout(value: np.ndarray) -> np.ndarray:
+        return np.transpose(value, (0, 2, 1, 3))
+
+    components: dict[str, np.ndarray] = {}
+    if return_components:
+        components["force_jacobian_term"] = total
+        total = total.copy()
+
+    plus_force = cage_jacobian(positions + step * forces)
+    minus_force = cage_jacobian(positions - step * forces)
+    plus_force -= minus_force
+    del minus_force
+    plus_force *= 3.0 / (2.0 * step)
+    force_direction_term = matrix_layout(plus_force)
+    total += force_direction_term
+    if return_components:
+        components["force_direction_cage_jacobian_term"] = force_direction_term
+    else:
+        del force_direction_term, plus_force
+
+    plus_velocity = cage_jacobian(positions + step * velocities)
+    minus_velocity = cage_jacobian(positions - step * velocities)
+    minus_velocity *= -1.0
+    minus_velocity += plus_velocity
+    minus_velocity /= 2.0 * step
+    plus_velocity -= base
+    plus_velocity -= step * minus_velocity
+    plus_velocity *= 2.0 / step**2
+
+    minus_velocity *= -6.0 * friction
+    velocity_direction_term = matrix_layout(minus_velocity)
+    total += velocity_direction_term
+    if return_components:
+        components["velocity_direction_cage_jacobian_term"] = (
+            velocity_direction_term
+        )
+    else:
+        del velocity_direction_term, minus_velocity
+
+    plus_velocity *= 3.0
+    third_derivative_term = matrix_layout(plus_velocity)
+    if return_components:
+        components["third_derivative_cage_jacobian_term"] = third_derivative_term
+
+    base *= friction**2
+    friction_term = matrix_layout(base)
+    total += friction_term
+    if return_components:
+        components["friction_cage_jacobian_term"] = friction_term
+    total += third_derivative_term
+    if not return_components:
+        del third_derivative_term, plus_velocity
+
+    result: dict[str, np.ndarray | float | str] = {
+        "l2p_velocity_jacobian": total,
+        "jacobian_step": step,
+        "pair_count": float(pair_geometry["pair_count"]),
+        "potential_protocol": potential_protocol,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+    result.update(components)
     return result
 
 
@@ -553,6 +768,103 @@ def smooth_cage_second_generator_batch(
         "phase_space_step": step,
         "trace_probe_count": float(len(probes)),
         "trace_probe_second_moment_error": probe_second_moment_error,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def smooth_cage_l2p_velocity_directional_derivative_batch(
+    positions: np.ndarray,
+    *,
+    velocities: np.ndarray,
+    velocity_direction: np.ndarray,
+    forces: np.ndarray,
+    force_generator: np.ndarray,
+    force_generator_direction: np.ndarray,
+    particle_types: np.ndarray,
+    box_lengths: np.ndarray,
+    target_indices: np.ndarray,
+    friction: float,
+    directional_step: float,
+    phase_space_step: float,
+    velocity_step: float,
+    target_batch_size: int = 16,
+) -> dict[str, np.ndarray | float]:
+    """Return the velocity-directional derivative of ``L^2 p``.
+
+    The Ito trace contribution to ``L^2 p`` depends on configuration but not
+    velocity.  Evaluating the matched velocity perturbations at zero
+    temperature therefore removes an otherwise unnecessary inner trace-probe
+    calculation without changing this derivative.
+    """
+
+    positions = np.asarray(positions, dtype=float)
+    velocities = np.asarray(velocities, dtype=float)
+    direction = np.asarray(velocity_direction, dtype=float)
+    forces = np.asarray(forces, dtype=float)
+    force_generator = np.asarray(force_generator, dtype=float)
+    force_generator_direction = np.asarray(force_generator_direction, dtype=float)
+    targets = np.asarray(target_indices, dtype=int)
+    if (
+        positions.ndim != 2
+        or positions.shape[1] != 3
+        or velocities.shape != positions.shape
+        or forces.shape != positions.shape
+        or force_generator.shape != positions.shape
+        or force_generator_direction.shape != positions.shape
+        or np.any(~np.isfinite(positions))
+        or np.any(~np.isfinite(velocities))
+        or np.any(~np.isfinite(forces))
+        or np.any(~np.isfinite(force_generator))
+        or np.any(~np.isfinite(force_generator_direction))
+    ):
+        raise ValueError("phase-space arrays must be aligned finite (particles, 3) arrays")
+    if direction.shape != velocities.shape or np.any(~np.isfinite(direction)):
+        raise ValueError("velocity_direction must be finite and align with velocities")
+    if not math.isfinite(velocity_step) or velocity_step <= 0.0:
+        raise ValueError("velocity_step must be finite and positive")
+    if (
+        targets.ndim != 1
+        or len(targets) < 1
+        or np.any(targets < 0)
+        or np.any(targets >= len(positions))
+    ):
+        raise ValueError("target_indices must select one or more particles")
+    if not np.any(direction):
+        return {
+            "l2p_velocity_directional_derivative": np.zeros((len(targets), 3)),
+            "velocity_step": float(velocity_step),
+            "thermodynamic_claim_allowed": 0.0,
+        }
+
+    common = {
+        "positions": positions,
+        "forces": forces,
+        "particle_types": particle_types,
+        "box_lengths": box_lengths,
+        "target_indices": targets,
+        "friction": friction,
+        "temperature": 0.0,
+        "directional_step": directional_step,
+        "phase_space_step": phase_space_step,
+        "trace_probes": None,
+        "target_batch_size": target_batch_size,
+    }
+    plus = smooth_cage_second_generator_batch(
+        **common,
+        velocities=velocities + velocity_step * direction,
+        force_generator=force_generator
+        + velocity_step * force_generator_direction,
+    )["second_relative_generator"]
+    minus = smooth_cage_second_generator_batch(
+        **common,
+        velocities=velocities - velocity_step * direction,
+        force_generator=force_generator
+        - velocity_step * force_generator_direction,
+    )["second_relative_generator"]
+    derivative = (np.asarray(plus) - np.asarray(minus)) / (2.0 * velocity_step)
+    return {
+        "l2p_velocity_directional_derivative": derivative,
+        "velocity_step": float(velocity_step),
         "thermodynamic_claim_allowed": 0.0,
     }
 

@@ -14,8 +14,10 @@ from cache_ka_relative_second_generator import (  # noqa: E402
     load_second_generator_drift_cache,
 )
 from analyze_ka_relative_second_generator_closure import (  # noqa: E402
+    extract_l2p_white_innovation_fold,
     load_matched_second_generator_clones,
     second_generator_resolved_state,
+    white_residual_shape_diagnostic,
 )
 
 from ka_relative_mori import (  # noqa: E402
@@ -30,6 +32,67 @@ from ka_collective_memory import discrete_mori_zwanzig_operators  # noqa: E402
 
 
 class RelativeMoriTests(unittest.TestCase):
+    def test_l2p_white_innovation_fold_returns_exact_source_frame_alignment(self):
+        rng = np.random.default_rng(20260719)
+
+        def clone(offset):
+            shape = (90, 3, 3)
+            position = rng.normal(size=shape) + offset
+            velocity = 0.4 * position + rng.normal(scale=0.5, size=shape)
+            drift = -0.3 * position + rng.normal(scale=0.3, size=shape)
+            second = -0.2 * velocity + rng.normal(scale=0.2, size=shape)
+            return {
+                "relative_position": position,
+                "relative_velocity": velocity,
+                "relative_drift": drift,
+                "second_relative_generator": second,
+            }
+
+        training = [clone(0.0), clone(0.2), clone(-0.1)]
+        held = clone(0.05)
+        result = extract_l2p_white_innovation_fold(
+            training,
+            held,
+            memory_order=4,
+            bath_order=3,
+            ridge_regularization=1e-8,
+            var_ridge_regularization=1e-6,
+        )
+
+        np.testing.assert_array_equal(
+            result["held_source_frame_indices"], np.arange(8, 90)
+        )
+        self.assertEqual(result["held_white_innovation"].shape, (82, 9, 4))
+        self.assertEqual(result["held_target_count"], 3.0)
+        self.assertEqual(
+            result["held_l2p_vector_innovation"].shape, (82, 3, 3)
+        )
+        np.testing.assert_allclose(
+            result["held_l2p_vector_innovation"],
+            result["held_white_innovation"][:, :, 3].reshape(82, 3, 3),
+        )
+        manual = finite_memory_innovation_series(
+            result["held_state"], result["operators"]
+        )
+        from ka_markov_bath import vector_autoregressive_residual
+
+        manual = vector_autoregressive_residual(
+            manual,
+            result["var_coefficients"],
+            mean=result["var_mean"],
+        )
+        np.testing.assert_allclose(result["held_white_innovation"], manual)
+        expected_shape = white_residual_shape_diagnostic(manual, maximum_lag=10)
+        observed_shape = white_residual_shape_diagnostic(
+            result["held_white_innovation"], maximum_lag=10
+        )
+        for key in (
+            "maximum_absolute_correlation",
+            "maximum_absolute_squared_correlation",
+            "excess_kurtosis",
+        ):
+            np.testing.assert_allclose(observed_shape[key], expected_shape[key])
+
     def test_second_generator_state_appends_l2p_without_changing_baseline_coordinates(self):
         shape = (4, 1, 3)
         clone = {

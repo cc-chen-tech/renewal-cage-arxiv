@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="75" y="38" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#20242a">Deterministic microscopic L2p conditional-diffusion gate</text>
+<text x="75" y="65" font-family="Arial, sans-serif" font-size="13" fill="#50555c">Four held clones; unchanged covariance models and tolerances; unclipped axes</text>
+<line x1="80" y1="91" x2="108" y2="91" stroke="#50555c" stroke-width="3"/>
+<circle cx="94" cy="91" r="4" fill="#50555c"/>
+<text x="116" y="96" font-family="Arial, sans-serif" font-size="13" fill="#30353b">constant_full</text>
+<line x1="350" y1="91" x2="378" y2="91" stroke="#16817a" stroke-width="3"/>
+<circle cx="364" cy="91" r="4" fill="#16817a"/>
+<text x="386" y="96" font-family="Arial, sans-serif" font-size="13" fill="#30353b">trace_only</text>
+<line x1="620" y1="91" x2="648" y2="91" stroke="#1d5ca8" stroke-width="3"/>
+<circle cx="634" cy="91" r="4" fill="#1d5ca8"/>
+<text x="656" y="96" font-family="Arial, sans-serif" font-size="13" fill="#30353b">exact_tensor</text>
+<line x1="890" y1="91" x2="918" y2="91" stroke="#c54b3c" stroke-width="3"/>
+<circle cx="904" cy="91" r="4" fill="#c54b3c"/>
+<text x="926" y="96" font-family="Arial, sans-serif" font-size="13" fill="#30353b">permuted_tensor</text>
+<rect x="75.0" y="125.0" width="470.0" height="410.0" fill="#fbfcfd" stroke="#c9cdd2"/>
+<line x1="75.0" y1="535.000" x2="545.0" y2="535.000" stroke="#e3e6e9"/>
+<text x="66.0" y="539.000" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">-0.0268</text>
+<line x1="75.0" y1="432.500" x2="545.0" y2="432.500" stroke="#e3e6e9"/>
+<text x="66.0" y="436.500" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.0703</text>
+<line x1="75.0" y1="330.000" x2="545.0" y2="330.000" stroke="#e3e6e9"/>
+<text x="66.0" y="334.000" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.167</text>
+<line x1="75.0" y1="227.500" x2="545.0" y2="227.500" stroke="#e3e6e9"/>
+<text x="66.0" y="231.500" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.265</text>
+<line x1="75.0" y1="125.000" x2="545.0" y2="125.000" stroke="#e3e6e9"/>
+<text x="66.0" y="129.000" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.362</text>
+<line x1="75.0" y1="506.724" x2="545.0" y2="506.724" stroke="#15191e" stroke-width="1.4" stroke-dasharray="7 5"/>
+<text x="539.0" y="499.724" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#15191e">zero improvement</text>
+<text x="75.0" y="585" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#24282e">negative log-likelihood improvement</text>
+<text x="75.0" y="607" font-family="Arial, sans-serif" font-size="12" fill="#555b62">constant_full NLL - model NLL</text>
+<line x1="130.000" y1="535.0" x2="130.000" y2="541.0" stroke="#555b62"/>
+<text x="130.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 1</text>
+<line x1="250.000" y1="535.0" x2="250.000" y2="541.0" stroke="#555b62"/>
+<text x="250.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 2</text>
+<line x1="370.000" y1="535.0" x2="370.000" y2="541.0" stroke="#555b62"/>
+<text x="370.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 3</text>
+<line x1="490.000" y1="535.0" x2="490.000" y2="541.0" stroke="#555b62"/>
+<text x="490.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 4</text>
+<polyline points="130.000,506.724 250.000,506.724 370.000,506.724 490.000,506.724" fill="none" stroke="#50555c" stroke-width="2.4"/>
+<circle cx="130.000" cy="506.724" r="4.2" fill="#50555c"/>
+<circle cx="250.000" cy="506.724" r="4.2" fill="#50555c"/>
+<circle cx="370.000" cy="506.724" r="4.2" fill="#50555c"/>
+<circle cx="490.000" cy="506.724" r="4.2" fill="#50555c"/>
+<polyline points="130.000,394.666 250.000,321.385 370.000,365.759 490.000,407.132" fill="none" stroke="#16817a" stroke-width="2.4"/>
+<circle cx="130.000" cy="394.666" r="4.2" fill="#16817a"/>
+<circle cx="250.000" cy="321.385" r="4.2" fill="#16817a"/>
+<circle cx="370.000" cy="365.759" r="4.2" fill="#16817a"/>
+<circle cx="490.000" cy="407.132" r="4.2" fill="#16817a"/>
+<polyline points="130.000,230.730 250.000,153.276 370.000,209.505 490.000,264.243" fill="none" stroke="#1d5ca8" stroke-width="2.4"/>
+<circle cx="130.000" cy="230.730" r="4.2" fill="#1d5ca8"/>
+<circle cx="250.000" cy="153.276" r="4.2" fill="#1d5ca8"/>
+<circle cx="370.000" cy="209.505" r="4.2" fill="#1d5ca8"/>
+<circle cx="490.000" cy="264.243" r="4.2" fill="#1d5ca8"/>
+<polyline points="130.000,485.889 250.000,477.072 370.000,478.442 490.000,486.868" fill="none" stroke="#c54b3c" stroke-width="2.4"/>
+<circle cx="130.000" cy="485.889" r="4.2" fill="#c54b3c"/>
+<circle cx="250.000" cy="477.072" r="4.2" fill="#c54b3c"/>
+<circle cx="370.000" cy="478.442" r="4.2" fill="#c54b3c"/>
+<circle cx="490.000" cy="486.868" r="4.2" fill="#c54b3c"/>
+<rect x="650.0" y="125.0" width="470.0" height="410.0" fill="#fbfcfd" stroke="#c9cdd2"/>
+<line x1="650.0" y1="535.000" x2="1120.0" y2="535.000" stroke="#e3e6e9"/>
+<text x="641.0" y="539.000" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.0131</text>
+<line x1="650.0" y1="432.500" x2="1120.0" y2="432.500" stroke="#e3e6e9"/>
+<text x="641.0" y="436.500" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.147</text>
+<line x1="650.0" y1="330.000" x2="1120.0" y2="330.000" stroke="#e3e6e9"/>
+<text x="641.0" y="334.000" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.28</text>
+<line x1="650.0" y1="227.500" x2="1120.0" y2="227.500" stroke="#e3e6e9"/>
+<text x="641.0" y="231.500" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.414</text>
+<line x1="650.0" y1="125.000" x2="1120.0" y2="125.000" stroke="#e3e6e9"/>
+<text x="641.0" y="129.000" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555b62">0.548</text>
+<line x1="650.0" y1="506.724" x2="1120.0" y2="506.724" stroke="#15191e" stroke-width="1.4" stroke-dasharray="7 5"/>
+<text x="1114.0" y="499.724" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#15191e">tolerance = 0.05</text>
+<text x="650.0" y="585" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#24282e">maximum absolute squared whitened correlation</text>
+<text x="650.0" y="607" font-family="Arial, sans-serif" font-size="12" fill="#555b62">held residual; lower is better</text>
+<line x1="705.000" y1="535.0" x2="705.000" y2="541.0" stroke="#555b62"/>
+<text x="705.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 1</text>
+<line x1="825.000" y1="535.0" x2="825.000" y2="541.0" stroke="#555b62"/>
+<text x="825.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 2</text>
+<line x1="945.000" y1="535.0" x2="945.000" y2="541.0" stroke="#555b62"/>
+<text x="945.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 3</text>
+<line x1="1065.000" y1="535.0" x2="1065.000" y2="541.0" stroke="#555b62"/>
+<text x="1065.000" y="558" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#444a50">fold 4</text>
+<polyline points="705.000,314.213 825.000,153.276 945.000,366.610 1065.000,379.480" fill="none" stroke="#50555c" stroke-width="2.4"/>
+<circle cx="705.000" cy="314.213" r="4.2" fill="#50555c"/>
+<circle cx="825.000" cy="153.276" r="4.2" fill="#50555c"/>
+<circle cx="945.000" cy="366.610" r="4.2" fill="#50555c"/>
+<circle cx="1065.000" cy="379.480" r="4.2" fill="#50555c"/>
+<polyline points="705.000,431.771 825.000,386.815 945.000,462.512 1065.000,458.430" fill="none" stroke="#16817a" stroke-width="2.4"/>
+<circle cx="705.000" cy="431.771" r="4.2" fill="#16817a"/>
+<circle cx="825.000" cy="386.815" r="4.2" fill="#16817a"/>
+<circle cx="945.000" cy="462.512" r="4.2" fill="#16817a"/>
+<circle cx="1065.000" cy="458.430" r="4.2" fill="#16817a"/>
+<polyline points="705.000,463.261 825.000,421.654 945.000,447.775 1065.000,491.382" fill="none" stroke="#1d5ca8" stroke-width="2.4"/>
+<circle cx="705.000" cy="463.261" r="4.2" fill="#1d5ca8"/>
+<circle cx="825.000" cy="421.654" r="4.2" fill="#1d5ca8"/>
+<circle cx="945.000" cy="447.775" r="4.2" fill="#1d5ca8"/>
+<circle cx="1065.000" cy="491.382" r="4.2" fill="#1d5ca8"/>
+<polyline points="705.000,310.411 825.000,201.812 945.000,384.729 1065.000,403.003" fill="none" stroke="#c54b3c" stroke-width="2.4"/>
+<circle cx="705.000" cy="310.411" r="4.2" fill="#c54b3c"/>
+<circle cx="825.000" cy="201.812" r="4.2" fill="#c54b3c"/>
+<circle cx="945.000" cy="384.729" r="4.2" fill="#c54b3c"/>
+<circle cx="1065.000" cy="403.003" r="4.2" fill="#c54b3c"/>
+</svg>

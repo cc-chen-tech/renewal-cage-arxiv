@@ -9730,6 +9730,155 @@ def write_ka_shape_mechanism_selection_pdf(path: Path) -> None:
     c.save()
 
 
+def write_l2p_deterministic_diffusion_pdf(path: Path) -> None:
+    source = (
+        DATA_DIR
+        / "renewal_cage_ka_l2p_deterministic_diffusion_T058_details.csv"
+    )
+    with source.open() as handle:
+        rows = list(csv.DictReader(handle))
+    models = (
+        "constant_full",
+        "trace_only",
+        "exact_tensor",
+        "permuted_tensor",
+    )
+    expected = {(fold, model) for fold in range(1, 5) for model in models}
+    by_cell = {
+        (int(float(row["fold_index"])), row["model"]): row
+        for row in rows
+        if row["model"] in models
+    }
+    if set(by_cell) != expected:
+        raise ValueError("deterministic L2p PDF grid is not complete")
+
+    nll = {
+        (fold, model): float(
+            by_cell[(fold, "constant_full")]["negative_log_likelihood"]
+        )
+        - float(by_cell[(fold, model)]["negative_log_likelihood"])
+        for fold in range(1, 5)
+        for model in models
+    }
+    memory = {
+        cell: float(row["maximum_absolute_squared_whitened_correlation"])
+        for cell, row in by_cell.items()
+    }
+
+    def bounds(values: list[float], reference: float) -> tuple[float, float]:
+        low = min(*values, reference)
+        high = max(*values, reference)
+        span = high - low
+        if math.isclose(span, 0.0):
+            span = max(abs(high), 1.0)
+        return low - 0.08 * span, high + 0.08 * span
+
+    model_colors = {
+        "constant_full": colors.HexColor("#50555c"),
+        "trace_only": colors.HexColor("#16817a"),
+        "exact_tensor": colors.HexColor("#1d5ca8"),
+        "permuted_tensor": colors.HexColor("#c54b3c"),
+    }
+    c = canvas.Canvas(str(path), pagesize=landscape(letter), invariant=1)
+    page_width, _ = landscape(letter)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(42, 575, "Deterministic microscopic L2p conditional diffusion")
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        42,
+        558,
+        "Four held KA clones; deterministic velocity Jacobian; unchanged covariance gates; unclipped axes",
+    )
+    for index, model in enumerate(models):
+        x = 48 + 180 * index
+        c.setStrokeColor(model_colors[model])
+        c.setFillColor(model_colors[model])
+        c.setLineWidth(2)
+        c.line(x, 536, x + 22, 536)
+        c.circle(x + 11, 536, 2.5, fill=1, stroke=0)
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 8)
+        c.drawString(x + 28, 533, model)
+
+    panels = (
+        (
+            52.0,
+            nll,
+            bounds(list(nll.values()), 0.0),
+            0.0,
+            "constant-full NLL minus model NLL",
+            "zero improvement",
+        ),
+        (
+            421.0,
+            memory,
+            bounds(list(memory.values()), 0.05),
+            0.05,
+            "maximum absolute squared whitened correlation",
+            "tolerance = 0.05",
+        ),
+    )
+    panel_width = 320.0
+    panel_bottom = 118.0
+    panel_height = 370.0
+    folds = np.arange(1.0, 5.0)
+    for left, values, y_range, reference, title, reference_label in panels:
+        draw_axes(
+            c,
+            left,
+            panel_bottom,
+            panel_width,
+            panel_height,
+            title,
+            "held fold",
+            (1.0, 4.0),
+            y_range,
+        )
+        x_values = scale(folds, left, left + panel_width, (1.0, 4.0))
+        for model in models:
+            raw = np.asarray([values[(fold, model)] for fold in range(1, 5)])
+            y_values = scale(
+                raw,
+                panel_bottom,
+                panel_bottom + panel_height,
+                y_range,
+            )
+            draw_polyline(c, x_values, y_values, model_colors[model], 1.8)
+            c.setFillColor(model_colors[model])
+            for x_value, y_value in zip(x_values, y_values):
+                c.circle(float(x_value), float(y_value), 2.6, fill=1, stroke=0)
+        reference_y = float(
+            scale(
+                np.asarray([reference]),
+                panel_bottom,
+                panel_bottom + panel_height,
+                y_range,
+            )[0]
+        )
+        c.setStrokeColor(colors.black)
+        c.setDash(4, 3)
+        c.line(left, reference_y, left + panel_width, reference_y)
+        c.setDash()
+        c.setFont("Helvetica", 7)
+        c.setFillColor(colors.black)
+        c.drawRightString(left + panel_width - 3, reference_y + 4, reference_label)
+    c.setFont("Helvetica", 8)
+    c.drawString(
+        52,
+        69,
+        "Exact Qc improves NLL and squared memory in every fold but fails absolute correlation and kurtosis gates.",
+    )
+    c.drawString(
+        52,
+        55,
+        "Verdict: informative but insufficient; L3p derivation authorized; autonomous GLE and thermodynamic claims remain closed.",
+    )
+    c.setFont("Helvetica", 6)
+    c.drawRightString(page_width - 42, 35, "Source: committed deterministic T=0.58 held-fold CSV")
+    c.showPage()
+    c.save()
+
+
 def build_arxiv_package(output_dir: Path | None = None) -> Path:
     if output_dir is None:
         output_dir = DIST_DIR
@@ -9737,6 +9886,10 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     PAPER_FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 
     results_pdf = PAPER_FIGURE_DIR / "renewal_cage_results.pdf"
+    l2p_deterministic_diffusion_pdf = (
+        PAPER_FIGURE_DIR
+        / "renewal_cage_ka_l2p_deterministic_diffusion_T058.pdf"
+    )
     stationary_finite_flight_pdf = PAPER_FIGURE_DIR / "renewal_cage_stationary_finite_flight.pdf"
     obadiya_sota_alignment_pdf = PAPER_FIGURE_DIR / "renewal_cage_obadiya_sota_alignment.pdf"
     obadiya_waiting_shuffle_pdf = PAPER_FIGURE_DIR / "renewal_cage_obadiya_T045_waiting_shuffle.pdf"
@@ -10081,6 +10234,7 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
     )
     inversion_pdf = PAPER_FIGURE_DIR / "renewal_cage_inversion.pdf"
     write_results_pdf(results_pdf)
+    write_l2p_deterministic_diffusion_pdf(l2p_deterministic_diffusion_pdf)
     write_stationary_finite_flight_pdf(stationary_finite_flight_pdf)
     write_obadiya_sota_alignment_pdf(obadiya_sota_alignment_pdf)
     write_obadiya_waiting_shuffle_pdf(obadiya_waiting_shuffle_pdf)
@@ -10374,6 +10528,16 @@ def build_arxiv_package(output_dir: Path | None = None) -> Path:
         archive.write(PAPER_DIR / "main.tex", "main.tex")
         archive.write(PAPER_DIR / "references.bib", "references.bib")
         archive.write(results_pdf, "figures/renewal_cage_results.pdf")
+        archive.write(
+            l2p_deterministic_diffusion_pdf,
+            "figures/renewal_cage_ka_l2p_deterministic_diffusion_T058.pdf",
+        )
+        for suffix in ("details", "convergence", "summary"):
+            filename = (
+                "renewal_cage_ka_l2p_deterministic_diffusion_T058_"
+                f"{suffix}.csv"
+            )
+            archive.write(DATA_DIR / filename, f"data/{filename}")
         archive.write(
             stationary_finite_flight_pdf,
             "figures/renewal_cage_stationary_finite_flight.pdf",
