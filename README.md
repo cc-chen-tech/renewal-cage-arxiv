@@ -88,6 +88,21 @@ NGP remain diagnostic inputs, the three restart labels share one parent sample,
 and all static/finite-exchange, cage-jump-coupling, spatial, microdynamic, and
 thermodynamic claims remain closed. See `docs/ka-shape-mechanism-selection.md`.
 
+The independent-parent PRL memory-closure test is documented in
+[`docs/prl-memory-closure-independent-parent-result.md`](docs/prl-memory-closure-independent-parent-result.md).
+Only one pre-existing `T=0.45` source parent is currently auditable; two newly
+prepared parent outputs remain completion-ineligible because their historical
+launcher did not persist an exit code. `T=0.58` still contributes one of five
+required source parents. Restart-first reanalysis
+finds that neither source parent passes stationarity (no `T=0.45` child passes
+all three comparisons; only `T=0.58` child 4 does). Heldout, environment, and
+spectral rows now pass exact parent/source/complete-trajectory hash joins, but
+that engineering repair does not turn correlated restarts into independent
+parents. The paired-schedule particle-conditioned finite-exchange ordered-path
+candidate also fails every `T=0.45` child. The PRL claim therefore remains
+blocked; complete microscopic closure, spatial facilitation, and
+thermodynamic-transition claims remain outside scope.
+
 A deterministic microscopic `L^2p` diffusion gate now removes the unresolved
 32-probe numerical bottleneck. The full velocity Jacobian of `L^2p` is
 contracted with exact KA pair Hessians to form

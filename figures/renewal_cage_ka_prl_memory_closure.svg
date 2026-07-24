@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="318" viewBox="0 0 1120 318">
+<rect width="100%" height="100%" fill="#fbfaf7"/>
+<style>text{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;fill:#18212b}.title{font:700 22px ui-sans-serif,system-ui}.sub{font:14px ui-sans-serif,system-ui;fill:#4d5966}.pass{fill:#16794b}.fail{fill:#b42318}</style>
+<text x="28" y="38" class="title">PRL memory closure — parent-first gate</text>
+<text x="28" y="66" class="sub">gate: blocked_independent_parent_validation</text>
+<text x="28" y="90" class="sub">Rows below are correlated-parent diagnostics; restart averages cannot open the claim.</text>
+<text x="28" y="122">model</text><text x="520" y="122">parent</text><text x="800" y="122">worst child score</text><text x="1010" y="122">curve</text>
+<text x="28" y="148">contiguous_empirical_upper_control</text>
+<text x="520" y="148">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
+<text x="800" y="148">3.32359</text>
+<text x="1010" y="148" class="fail">FAIL</text>
+<text x="28" y="172">finite_exchange_environment</text>
+<text x="520" y="172">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
+<text x="800" y="172">25.6055</text>
+<text x="1010" y="172" class="fail">FAIL</text>
+<text x="28" y="196">full_candidate</text>
+<text x="520" y="196">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
+<text x="800" y="196">14.8946</text>
+<text x="1010" y="196" class="fail">FAIL</text>
+<text x="28" y="220">mean_rate_null</text>
+<text x="520" y="220">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
+<text x="800" y="220">25.6788</text>
+<text x="1010" y="220" class="fail">FAIL</text>
+<text x="28" y="244">one_step_jump_law</text>
+<text x="520" y="244">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
+<text x="800" y="244">25.6399</text>
+<text x="1010" y="244" class="fail">FAIL</text>
+<text x="28" y="268">static_particle_environment</text>
+<text x="520" y="268">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
+<text x="800" y="268">25.3087</text>
+<text x="1010" y="268" class="fail">FAIL</text>
+<text x="28" y="292">two_point_path_spectrum</text>
+<text x="520" y="292">10.5281/zenodo.7469766:a5fc820faf564c3d69cc1adfc861de11c6cd8a113e7bcd89aa7463f9358e18a2</text>
+<text x="800" y="292">5.28899</text>
+<text x="1010" y="292" class="fail">FAIL</text>
+</svg>
