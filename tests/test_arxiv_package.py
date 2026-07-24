@@ -67,6 +67,9 @@ from summarize_ka_shape_mechanism_selection import (  # noqa: E402
     CLAIM_FLAGS as SHAPE_SELECTION_CLOSED_CLAIMS,
     analyze_committed_tables as analyze_shape_mechanism_selection,
 )
+from analyze_ka_l2p_conditional_diffusion import (  # noqa: E402
+    classify_l2p_conditional_diffusion,
+)
 
 
 class ArxivPackageTests(unittest.TestCase):
@@ -3868,6 +3871,112 @@ class ArxivPackageTests(unittest.TestCase):
             float(extension["maximum_maximum_absolute_held_white_residual_excess_kurtosis"]),
             5.0,
         )
+
+    def test_deterministic_l2p_diffusion_is_recomputed_and_claim_limited(self):
+        stem = "renewal_cage_ka_l2p_deterministic_diffusion_T058"
+        document_path = ROOT / "docs" / "microscopic-l2p-deterministic-diffusion.md"
+        required_paths = (
+            ROOT / "scripts" / "cache_ka_l2p_deterministic_diffusion.py",
+            ROOT / "scripts" / "analyze_ka_l2p_conditional_diffusion.py",
+            document_path,
+            ROOT / "figures" / f"{stem}.svg",
+            ROOT / "data" / f"{stem}_details.csv",
+            ROOT / "data" / f"{stem}_convergence.csv",
+            ROOT / "data" / f"{stem}_summary.csv",
+        )
+        for path in required_paths:
+            self.assertTrue(path.is_file(), path)
+
+        with required_paths[4].open() as handle:
+            details = list(csv.DictReader(handle))
+        with required_paths[5].open() as handle:
+            convergence = list(csv.DictReader(handle))
+        with required_paths[6].open() as handle:
+            summaries = list(csv.DictReader(handle))
+        self.assertEqual(len(details), 20)
+        self.assertEqual(len(convergence), 4)
+        self.assertEqual(
+            {(int(float(row["fold_index"])), row["model"]) for row in details},
+            {
+                (fold, model)
+                for fold in range(1, 5)
+                for model in (
+                    "constant_full",
+                    "constant_isotropic",
+                    "trace_only",
+                    "exact_tensor",
+                    "permuted_tensor",
+                )
+            },
+        )
+        self.assertEqual(
+            {row["numerical_estimator"] for row in convergence},
+            {"deterministic_velocity_jacobian"},
+        )
+        self.assertTrue(
+            all(float(row["numerical_gate_pass"]) == 1.0 for row in convergence)
+        )
+
+        stored = next(row for row in summaries if row["record"] == "verdict")
+        recomputed = classify_l2p_conditional_diffusion(details, convergence)
+        for key, value in recomputed.items():
+            self.assertSerializedValueMatches(stored, key, value)
+        self.assertEqual(float(stored["every_fold_nll_improves"]), 1.0)
+        self.assertGreater(
+            float(stored["constant_to_tensor_nll_improvement_ci95_low"]), 0.0
+        )
+        self.assertEqual(float(stored["every_fold_exact_tensor_absolute_gate_pass"]), 0.0)
+        self.assertEqual(float(stored["l2p_conditional_diffusion_supported"]), 0.0)
+        self.assertEqual(
+            float(stored["l2p_conditional_diffusion_informative_but_insufficient"]),
+            1.0,
+        )
+        self.assertEqual(float(stored["l3p_derivation_authorized"]), 1.0)
+        for key in (
+            "microscopic_environment_coordinate_z_allowed",
+            "continuous_gaussian_langevin_bath_allowed",
+            "autonomous_single_particle_gle_allowed",
+            "complete_event_clock_closure_allowed",
+            "kramers_escape_claim_allowed",
+            "thermodynamic_claim_allowed",
+        ):
+            self.assertEqual(float(stored[key]), 0.0)
+
+        exact_rows = [row for row in details if row["model"] == "exact_tensor"]
+        self.assertTrue(
+            all(
+                float(row["maximum_absolute_squared_whitened_correlation"]) > 0.05
+                for row in exact_rows
+            )
+        )
+        self.assertTrue(
+            all(
+                float(row["maximum_absolute_component_excess_kurtosis"]) > 0.35
+                for row in exact_rows
+            )
+        )
+        document = document_path.read_text()
+        for phrase in (
+            "deterministic_velocity_jacobian",
+            "0.276920594908",
+            "0.206686682091",
+            "l2p_conditional_diffusion_supported = 0",
+            "l2p_conditional_diffusion_informative_but_insufficient = 1",
+            "l3p_derivation_authorized = 1",
+            "thermodynamic_claim_allowed = 0",
+        ):
+            self.assertIn(phrase, document)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            archive_path = build_arxiv_package(Path(temporary))
+            with zipfile.ZipFile(archive_path) as archive:
+                names = set(archive.namelist())
+        self.assertIn(
+            "figures/renewal_cage_ka_l2p_deterministic_diffusion_T058.pdf",
+            names,
+        )
+        for suffix in ("details", "convergence", "summary"):
+            self.assertIn(f"data/{stem}_{suffix}.csv", names)
 
     def test_t045_overlap_s4_blocks_unidentifiable_xi4(self):
         curve_path = ROOT / "data" / "renewal_cage_ka_replicates_T045_overlap_s4_pilot_curve.csv"

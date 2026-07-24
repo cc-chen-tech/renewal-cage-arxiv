@@ -71,7 +71,9 @@ from ka_local_cage import (  # noqa: E402
     ka_lj_radial_derivatives,
     ka_lj_force_and_isotropic_curvature,
     ka_lj_force_generator_observables,
+    ka_lj_pair_hessian_geometry,
     ka_lj_sparse_force_generator_observables,
+    ka_lj_sparse_force_generator_multi,
     ka_lj_second_force_generator,
     ka_lj_shell_forces,
     precursor_event_hazard_diagnostic,
@@ -4869,6 +4871,94 @@ class KAReplicatePreparationTests(unittest.TestCase):
                     atol=2e-12,
                 )
 
+    def test_unordered_pair_hessian_geometry_matches_dense_reference_and_covariance(self):
+        positions = np.array(
+            [
+                [0.10, -0.20, 0.30],
+                [1.05, -0.10, 0.25],
+                [-0.65, 0.55, 0.35],
+                [0.05, -1.15, 0.60],
+                [7.0, 7.0, 7.0],
+            ]
+        )
+        particle_types = np.array([0, 0, 1, 0, 1])
+        box = np.array([20.0, 20.0, 20.0])
+        rotation = np.array(
+            [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
+        )
+        translation = np.array([2.0, -3.0, 1.5])
+
+        for protocol in ("ka_lj_cut", "ka_lj_c3_switch"):
+            with self.subTest(protocol=protocol):
+                geometry = ka_lj_pair_hessian_geometry(
+                    positions,
+                    particle_types=particle_types,
+                    box_lengths=box,
+                    potential_protocol=protocol,
+                )
+                dense = ka_lj_force_generator_observables(
+                    positions,
+                    velocities=np.zeros_like(positions),
+                    particle_types=particle_types,
+                    box_lengths=box,
+                    target_indices=np.arange(len(positions)),
+                    friction=1.0,
+                    temperature=0.58,
+                    potential_protocol=protocol,
+                )
+                particle_i = np.asarray(geometry["particle_i"])
+                particle_j = np.asarray(geometry["particle_j"])
+                pair_hessian = np.asarray(geometry["pair_hessian"])
+
+                self.assertTrue(np.all(particle_i < particle_j))
+                self.assertGreater(len(particle_i), 0)
+                self.assertLess(len(particle_i), len(positions) * (len(positions) - 1) // 2)
+                self.assertEqual(float(geometry["pair_count"]), float(len(particle_i)))
+                self.assertEqual(geometry["thermodynamic_claim_allowed"], 0.0)
+                np.testing.assert_array_equal(
+                    dense["target_pair_active"][particle_i, particle_j],
+                    np.ones(len(particle_i), dtype=bool),
+                )
+                np.testing.assert_allclose(
+                    pair_hessian,
+                    dense["target_pair_hessian"][particle_i, particle_j],
+                    rtol=2e-13,
+                    atol=2e-13,
+                )
+                np.testing.assert_allclose(
+                    pair_hessian,
+                    np.swapaxes(pair_hessian, -1, -2),
+                    rtol=0.0,
+                    atol=2e-13,
+                )
+
+                translated = ka_lj_pair_hessian_geometry(
+                    positions + translation,
+                    particle_types=particle_types,
+                    box_lengths=box,
+                    potential_protocol=protocol,
+                )
+                np.testing.assert_array_equal(translated["particle_i"], particle_i)
+                np.testing.assert_array_equal(translated["particle_j"], particle_j)
+                np.testing.assert_allclose(
+                    translated["pair_hessian"], pair_hessian, rtol=2e-13, atol=2e-13
+                )
+
+                rotated = ka_lj_pair_hessian_geometry(
+                    positions @ rotation.T,
+                    particle_types=particle_types,
+                    box_lengths=box,
+                    potential_protocol=protocol,
+                )
+                np.testing.assert_array_equal(rotated["particle_i"], particle_i)
+                np.testing.assert_array_equal(rotated["particle_j"], particle_j)
+                expected_rotated = np.einsum(
+                    "ab,pbc,dc->pad", rotation, pair_hessian, rotation
+                )
+                np.testing.assert_allclose(
+                    rotated["pair_hessian"], expected_rotated, rtol=2e-13, atol=2e-13
+                )
+
     def test_ka_c3_switched_force_generators_match_full_phase_space_drift(self):
         positions = np.array([[0.0, 0.0, 0.0], [1.77, 0.17, -0.08]])
         velocities = np.array([[0.4, -0.2, 0.1], [-0.3, 0.5, -0.4]])
@@ -4993,6 +5083,43 @@ class KAReplicatePreparationTests(unittest.TestCase):
                 float(np.max(sparse["candidate_count"])), len(positions)
             )
             self.assertEqual(float(sparse["thermodynamic_claim_allowed"]), 0.0)
+
+    def test_sparse_multi_velocity_force_generator_matches_repeated_geometry(self):
+        rng = np.random.default_rng(20260719)
+        positions = rng.uniform(0.0, 9.0, size=(96, 3))
+        velocity_fields = rng.normal(size=(5, 96, 3))
+        particle_types = np.arange(96, dtype=int) % 2
+        box_lengths = np.full(3, 9.0)
+        targets = np.array([0, 7, 22, 51, 95])
+
+        for protocol in ("ka_lj_cut", "ka_lj_c3_switch"):
+            multi = ka_lj_sparse_force_generator_multi(
+                positions,
+                velocity_fields=velocity_fields,
+                particle_types=particle_types,
+                box_lengths=box_lengths,
+                target_indices=targets,
+                potential_protocol=protocol,
+            )
+            repeated = np.asarray(
+                [
+                    ka_lj_sparse_force_generator_observables(
+                        positions,
+                        velocities=velocity,
+                        particle_types=particle_types,
+                        box_lengths=box_lengths,
+                        target_indices=targets,
+                        potential_protocol=protocol,
+                    )["force_generator"]
+                    for velocity in velocity_fields
+                ]
+            )
+
+            np.testing.assert_allclose(
+                multi["force_generator"], repeated, rtol=2e-13, atol=2e-13
+            )
+            self.assertEqual(multi["force_generator"].shape, (5, 5, 3))
+            self.assertEqual(float(multi["thermodynamic_claim_allowed"]), 0.0)
 
     def test_ka_force_generator_matches_directional_force_derivative_and_hessian_noise(self):
         positions = np.array([[0.0, 0.0, 0.0], [1.13, 0.17, -0.08]])

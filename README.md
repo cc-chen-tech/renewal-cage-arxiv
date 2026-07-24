@@ -103,6 +103,20 @@ candidate also fails every `T=0.45` child. The PRL claim therefore remains
 blocked; complete microscopic closure, spatial facilitation, and
 thermodynamic-transition claims remain outside scope.
 
+A deterministic microscopic `L^2p` diffusion gate now removes the unresolved
+32-probe numerical bottleneck. The full velocity Jacobian of `L^2p` is
+contracted with exact KA pair Hessians to form
+`Q_c=2 gamma T D_V(L^2p)D_V(L^2p)^T`. Four 200-frame held-clone tests show
+positive constant-to-tensor NLL improvement in every fold (replicate-first
+mean `0.27692`, 95% t interval `[0.20669,0.34715]`) and reject a time-permuted
+tensor null. However, every exact-tensor fold still fails the frozen absolute
+whitening gate through residual squared memory and excess kurtosis. The result
+is mechanically `informative_but_insufficient`, authorizes an `L^3p`
+derivation, and does not establish an autonomous single-particle Gaussian
+Langevin bath. All environment, GLE, event-clock, Kramers, and thermodynamic
+claim flags remain zero. See
+`docs/microscopic-l2p-deterministic-diffusion.md`.
+
 A physical-lag-conditioned event-transfer diagnostic now replaces the global
 `n`-jump kernel by the calibration-measured `K_t(displacement | N=n)` and
 separately swaps the event-count marginal, conditional path kernel, and cage

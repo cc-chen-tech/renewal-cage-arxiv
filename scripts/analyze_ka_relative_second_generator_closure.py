@@ -259,26 +259,24 @@ def stationary_correlation(state: np.ndarray, maximum_lag: int) -> np.ndarray:
     return output
 
 
-def score_fold_model(
+def extract_l2p_white_innovation_fold(
     training: list[dict[str, np.ndarray | float | str]],
     held: dict[str, np.ndarray | float | str],
     *,
-    include_l2p: bool,
-    fold_index: int,
-    protocol: str,
     memory_order: int,
     bath_order: int,
-    maximum_lag: int,
-    simulation_count: int,
     ridge_regularization: float,
     var_ridge_regularization: float,
-    seed: int,
-) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]]]:
-    model = "relative_phase_generator_l2p" if include_l2p else "relative_phase_generator"
+    include_l2p: bool = True,
+) -> dict[str, np.ndarray | float | dict[str, np.ndarray | float]]:
+    """Fit one microscopic Mori/VAR fold and retain exact frame alignment."""
+
+    if len(training) < 2 or memory_order < 1 or bath_order < 1:
+        raise ValueError("innovation extraction requires training clones and positive orders")
     frame_count = min(
         len(np.asarray(clone["relative_position"])) for clone in [*training, held]
     )
-    if frame_count <= memory_order + bath_order + maximum_lag + 2:
+    if frame_count <= memory_order + bath_order + 2:
         raise ValueError("matched paths are too short for frozen Mori and VAR controls")
     bias = np.mean(
         np.concatenate(
@@ -287,22 +285,27 @@ def score_fold_model(
         ),
         axis=0,
     )
+
+    def truncate(clone: dict[str, np.ndarray | float | str]) -> dict[str, object]:
+        return {
+            key: (
+                np.asarray(value)[:frame_count]
+                if key
+                in {
+                    "relative_position",
+                    "relative_velocity",
+                    "relative_drift",
+                    "second_relative_generator",
+                }
+                else value
+            )
+            for key, value in clone.items()
+        }
+
     training_state = np.concatenate(
         [
             second_generator_resolved_state(
-                {
-                    key: (
-                        np.asarray(value)[:frame_count]
-                        if key in {
-                            "relative_position",
-                            "relative_velocity",
-                            "relative_drift",
-                            "second_relative_generator",
-                        }
-                        else value
-                    )
-                    for key, value in clone.items()
-                },
+                truncate(clone),
                 bias=bias,
                 include_l2p=include_l2p,
             )
@@ -311,19 +314,7 @@ def score_fold_model(
         axis=1,
     )
     held_state = second_generator_resolved_state(
-        {
-            key: (
-                np.asarray(value)[:frame_count]
-                if key in {
-                    "relative_position",
-                    "relative_velocity",
-                    "relative_drift",
-                    "second_relative_generator",
-                }
-                else value
-            )
-            for key, value in held.items()
-        },
+        truncate(held),
         bias=bias,
         include_l2p=include_l2p,
     )
@@ -333,7 +324,6 @@ def score_fold_model(
         raise ValueError("resolved generator coordinates need nonzero variance")
     training_state = (training_state - mean) / scale
     held_state = (held_state - mean) / scale
-
     mori = discrete_mori_zwanzig_operators(
         training_state,
         memory_order=memory_order,
@@ -355,6 +345,77 @@ def score_fold_model(
     held_white = vector_autoregressive_residual(
         held_innovation, coefficients, mean=bath_mean
     )
+    first_source_frame = (len(operators) - 1) + 1 + len(coefficients)
+    held_source_frames = np.arange(first_source_frame, frame_count, dtype=int)
+    if len(held_source_frames) != len(held_white):
+        raise ValueError("white-innovation frame alignment is inconsistent")
+    target_count = np.asarray(held["relative_position"]).shape[1]
+    if held_white.shape[1] != 3 * target_count:
+        raise ValueError("white innovations do not preserve target-component alignment")
+    held_l2p_vector = (
+        held_white[:, :, 3].reshape(len(held_white), target_count, 3)
+        if include_l2p
+        else np.empty((len(held_white), target_count, 0))
+    )
+    return {
+        "frame_count": float(frame_count),
+        "bias": bias,
+        "normalization_mean": mean,
+        "normalization_scale": scale,
+        "training_state": training_state,
+        "held_state": held_state,
+        "operators": operators,
+        "training_innovation": training_innovation,
+        "held_innovation": held_innovation,
+        "var": var,
+        "var_coefficients": coefficients,
+        "var_mean": bath_mean,
+        "training_white_innovation": training_white,
+        "held_white_innovation": held_white,
+        "held_l2p_vector_innovation": held_l2p_vector,
+        "held_target_count": float(target_count),
+        "held_source_frame_indices": held_source_frames,
+        "thermodynamic_claim_allowed": 0.0,
+    }
+
+
+def score_fold_model(
+    training: list[dict[str, np.ndarray | float | str]],
+    held: dict[str, np.ndarray | float | str],
+    *,
+    include_l2p: bool,
+    fold_index: int,
+    protocol: str,
+    memory_order: int,
+    bath_order: int,
+    maximum_lag: int,
+    simulation_count: int,
+    ridge_regularization: float,
+    var_ridge_regularization: float,
+    seed: int,
+) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]]]:
+    model = "relative_phase_generator_l2p" if include_l2p else "relative_phase_generator"
+    extracted = extract_l2p_white_innovation_fold(
+        training,
+        held,
+        memory_order=memory_order,
+        bath_order=bath_order,
+        ridge_regularization=ridge_regularization,
+        var_ridge_regularization=var_ridge_regularization,
+        include_l2p=include_l2p,
+    )
+    frame_count = int(extracted["frame_count"])
+    if frame_count <= memory_order + bath_order + maximum_lag + 2:
+        raise ValueError("matched paths are too short for frozen Mori and VAR controls")
+    training_state = np.asarray(extracted["training_state"])
+    held_state = np.asarray(extracted["held_state"])
+    operators = np.asarray(extracted["operators"])
+    training_innovation = np.asarray(extracted["training_innovation"])
+    var = extracted["var"]
+    coefficients = np.asarray(extracted["var_coefficients"])
+    bath_mean = np.asarray(extracted["var_mean"])
+    training_white = np.asarray(extracted["training_white_innovation"])
+    held_white = np.asarray(extracted["held_white_innovation"])
     training_shape = white_residual_shape_diagnostic(
         training_white, maximum_lag=maximum_lag
     )
